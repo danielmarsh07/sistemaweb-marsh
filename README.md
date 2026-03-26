@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 Marsh Consultoria - Sistema Backend
 
 Backend Node.js + Express para gerenciamento de Clientes, Fornecedores e Transações Financeiras.
@@ -81,4 +82,8 @@ curl -X POST http://localhost:3000/api/transacoes \
 ---
 
 Desenvolvido por Daniel Marsh 🎯
+=======
+# sistemaweb-marsh
+Sistema Web Marsh Consultoria
+>>>>>>> 900a6e943afcb79f9c373d1bdf65b3c3b3b6fa6f
 

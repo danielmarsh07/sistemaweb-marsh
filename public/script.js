@@ -1,5 +1,6 @@
 // ===== CONFIG =====
-const API_URL = 'http://localhost:3000/api';
+// Use relative URL para funcionar tanto em desenvolvimento quanto em produção
+const API_URL = '/api';
 
 // ===== STATE =====
 let currentPage = 'dashboard';
