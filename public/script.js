@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== EVENT LISTENERS =====
 function setupEventListeners() {
-  document.querySelectorAll('.nav-link').forEach(link => {
+  document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const page = link.dataset.page;
@@ -120,8 +120,8 @@ function setupEventListeners() {
 
 // ===== NAVIGATION =====
 function showPage(page) {
-  document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(link => link.classList.remove('active'));
+  document.querySelectorAll(`[data-page="${page}"]`).forEach(el => el.classList.add('active'));
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`${page}-page`).classList.add('active');
