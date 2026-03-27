@@ -14,14 +14,19 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Importar rotas
+const authRoutes = require('./routes/auth');
 const clientesRoutes = require('./routes/clientes');
 const fornecedoresRoutes = require('./routes/fornecedores');
 const transacoesRoutes = require('./routes/transacoes');
+const autenticar = require('./middleware/autenticar');
 
-// Usar rotas
-app.use('/api/clientes', clientesRoutes);
-app.use('/api/fornecedores', fornecedoresRoutes);
-app.use('/api/transacoes', transacoesRoutes);
+// Rotas públicas
+app.use('/api/auth', authRoutes);
+
+// Rotas protegidas
+app.use('/api/clientes', autenticar, clientesRoutes);
+app.use('/api/fornecedores', autenticar, fornecedoresRoutes);
+app.use('/api/transacoes', autenticar, transacoesRoutes);
 
 // Rota de teste
 app.get('/api/ping', (req, res) => {
@@ -70,6 +75,14 @@ async function iniciar() {
         descricao TEXT,
         data TIMESTAMP DEFAULT NOW(),
         usuario_id INTEGER DEFAULT 1
+      );
+
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        senha VARCHAR(255) NOT NULL,
+        data_criacao TIMESTAMP DEFAULT NOW()
       );
     `);
 

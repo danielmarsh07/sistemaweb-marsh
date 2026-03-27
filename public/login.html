@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Marsh Consultoria</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      min-height: 100vh;
+      background: var(--navy);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-card {
+      background: var(--navy-mid);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .login-logo h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .login-logo span {
+      color: var(--cyan);
+    }
+
+    .login-logo p {
+      color: var(--grey-400);
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 1.75rem;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 0.75rem;
+      text-align: center;
+      color: var(--grey-400);
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-bottom: 2px solid transparent;
+      transition: var(--transition);
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+
+    .tab.active {
+      color: var(--cyan);
+      border-bottom-color: var(--cyan);
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      color: var(--grey-400);
+      font-size: 0.8rem;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: var(--white);
+      font-size: 0.95rem;
+      transition: var(--transition);
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--cyan);
+      background: rgba(0,200,255,0.05);
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--blue);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      margin-top: 0.5rem;
+    }
+
+    .btn-login:hover {
+      background: var(--blue-light);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .mensagem {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      text-align: center;
+      display: none;
+    }
+
+    .mensagem.erro {
+      background: rgba(239,68,68,0.15);
+      color: #fca5a5;
+      border: 1px solid rgba(239,68,68,0.3);
+      display: block;
+    }
+
+    .mensagem.sucesso {
+      background: rgba(16,185,129,0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16,185,129,0.3);
+      display: block;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>Marsh <span>Consultoria</span></h1>
+      <p>Sistema de Gestão</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="trocarTab('login')">Entrar</button>
+      <button class="tab" onclick="trocarTab('registro')">Criar conta</button>
+    </div>
+
+    <!-- Formulário de Login -->
+    <div id="tab-login" class="tab-content active">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="seu@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="login-senha" placeholder="••••••••" />
+      </div>
+      <button class="btn-login" onclick="fazerLogin()">Entrar</button>
+      <div class="mensagem" id="login-msg"></div>
+    </div>
+
+    <!-- Formulário de Registro -->
+    <div id="tab-registro" class="tab-content">
+      <div class="form-group">
+        <label>Nome</label>
+        <input type="text" id="reg-nome" placeholder="Seu nome" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="seu@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres" />
+      </div>
+      <button class="btn-login" onclick="fazerRegistro()">Criar conta</button>
+      <div class="mensagem" id="reg-msg"></div>
+    </div>
+  </div>
+
+  <script>
+    // Se já tem token, vai direto pro dashboard
+    if (localStorage.getItem('token')) {
+      window.location.href = '/';
+    }
+
+    function trocarTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelector(`#tab-${tab}`).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    function mostrarMensagem(id, texto, tipo) {
+      const el = document.getElementById(id);
+      el.textContent = texto;
+      el.className = `mensagem ${tipo}`;
+    }
+
+    async function fazerLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const senha = document.getElementById('login-senha').value;
+
+      if (!email || !senha) {
+        return mostrarMensagem('login-msg', 'Preencha email e senha.', 'erro');
+      }
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, senha })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          return mostrarMensagem('login-msg', data.erro, 'erro');
+        }
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('usuario', JSON.stringify(data.usuario));
+        window.location.href = '/';
+      } catch {
+        mostrarMensagem('login-msg', 'Erro de conexão. Tente novamente.', 'erro');
+      }
+    }
+
+    async function fazerRegistro() {
+      const nome = document.getElementById('reg-nome').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const senha = document.getElementById('reg-senha').value;
+
+      if (!nome || !email || !senha) {
+        return mostrarMensagem('reg-msg', 'Preencha todos os campos.', 'erro');
+      }
+
+      if (senha.length < 6) {
+        return mostrarMensagem('reg-msg', 'Senha deve ter no mínimo 6 caracteres.', 'erro');
+      }
+
+      try {
+        const res = await fetch('/api/auth/registro', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, email, senha })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          return mostrarMensagem('reg-msg', data.erro, 'erro');
+        }
+
+        mostrarMensagem('reg-msg', 'Conta criada! Faça login.', 'sucesso');
+        setTimeout(() => trocarTab('login'), 1500);
+      } catch {
+        mostrarMensagem('reg-msg', 'Erro de conexão. Tente novamente.', 'erro');
+      }
+    }
+
+    // Enter para submeter
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const tabAtiva = document.querySelector('.tab-content.active').id;
+        if (tabAtiva === 'tab-login') fazerLogin();
+        else fazerRegistro();
+      }
+    });
+  </script>
+</body>
+</html>

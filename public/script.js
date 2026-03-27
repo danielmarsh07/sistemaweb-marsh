@@ -1,6 +1,48 @@
 // ===== CONFIG =====
-// Use relative URL para funcionar tanto em desenvolvimento quanto em produção
 const API_URL = '/api';
+
+// ===== AUTH =====
+const token = localStorage.getItem('token');
+const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
+
+// Se não tem token, vai pro login
+if (!token) {
+  window.location.href = '/login.html';
+}
+
+// Exibir nome do usuário logado
+if (usuario) {
+  const el = document.getElementById('usuario-nome');
+  if (el) el.textContent = usuario.nome;
+}
+
+// Helper: fetch com token automático
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...(options.headers || {})
+    }
+  });
+
+  // Token expirado ou inválido
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    window.location.href = '/login.html';
+    return;
+  }
+
+  return res;
+}
+
+function logout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('usuario');
+  window.location.href = '/login.html';
+}
 
 // ===== STATE =====
 let currentPage = 'dashboard';
@@ -15,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== EVENT LISTENERS =====
 function setupEventListeners() {
-  // Navegação
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -24,7 +65,6 @@ function setupEventListeners() {
     });
   });
 
-  // Botões de ação
   document.getElementById('btn-novo-cliente').addEventListener('click', () => {
     clienteEmEdicao = null;
     resetForm('#form-cliente');
@@ -44,31 +84,24 @@ function setupEventListeners() {
     showModal('#modal-transacao');
   });
 
-  // Fechar modals
   document.querySelectorAll('.btn-close').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const modal = e.target.closest('.modal');
-      closeModal(modal);
+      closeModal(e.target.closest('.modal'));
     });
   });
 
   document.querySelectorAll('.btn-cancel').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const modal = e.target.closest('.modal');
-      closeModal(modal);
+      closeModal(e.target.closest('.modal'));
     });
   });
 
-  // Fechar modal ao clicar fora
   document.querySelectorAll('.modal').forEach(modal => {
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        closeModal(modal);
-      }
+      if (e.target === modal) closeModal(modal);
     });
   });
 
-  // Forms
   document.getElementById('form-cliente').addEventListener('submit', (e) => {
     e.preventDefault();
     salvarCliente();
@@ -87,19 +120,12 @@ function setupEventListeners() {
 
 // ===== NAVIGATION =====
 function showPage(page) {
-  // Atualizar nav
-  document.querySelectorAll('.nav-link').forEach(link => {
-    link.classList.remove('active');
-  });
+  document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
   document.querySelector(`[data-page="${page}"]`).classList.add('active');
 
-  // Atualizar página
-  document.querySelectorAll('.page').forEach(p => {
-    p.classList.remove('active');
-  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`${page}-page`).classList.add('active');
 
-  // Atualizar título
   const titles = {
     dashboard: 'Dashboard',
     clientes: 'Clientes',
@@ -110,7 +136,6 @@ function showPage(page) {
 
   currentPage = page;
 
-  // Carregar dados
   if (page === 'clientes') loadClientes();
   if (page === 'fornecedores') loadFornecedores();
   if (page === 'transacoes') loadTransacoes();
@@ -120,9 +145,9 @@ function showPage(page) {
 async function loadDashboard() {
   try {
     const [clientes, fornecedores, transacoes] = await Promise.all([
-      fetch(`${API_URL}/clientes`).then(r => r.json()),
-      fetch(`${API_URL}/fornecedores`).then(r => r.json()),
-      fetch(`${API_URL}/transacoes`).then(r => r.json())
+      apiFetch(`${API_URL}/clientes`).then(r => r.json()),
+      apiFetch(`${API_URL}/fornecedores`).then(r => r.json()),
+      apiFetch(`${API_URL}/transacoes`).then(r => r.json())
     ]);
 
     document.getElementById('total-clientes').textContent = clientes.length;
@@ -140,14 +165,13 @@ async function loadDashboard() {
     }
   } catch (erro) {
     console.error('Erro ao carregar dashboard:', erro);
-    alert('Erro ao carregar dashboard!');
   }
 }
 
 // ===== CLIENTES =====
 async function loadClientes() {
   try {
-    const response = await fetch(`${API_URL}/clientes`);
+    const response = await apiFetch(`${API_URL}/clientes`);
     const clientes = await response.json();
 
     const tbody = document.getElementById('clientes-tbody');
@@ -185,16 +209,14 @@ async function salvarCliente() {
 
   try {
     if (clienteEmEdicao) {
-      await fetch(`${API_URL}/clientes/${clienteEmEdicao}`, {
+      await apiFetch(`${API_URL}/clientes/${clienteEmEdicao}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dados)
       });
       alert('Cliente atualizado com sucesso!');
     } else {
-      await fetch(`${API_URL}/clientes`, {
+      await apiFetch(`${API_URL}/clientes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dados)
       });
       alert('Cliente criado com sucesso!');
@@ -210,7 +232,7 @@ async function salvarCliente() {
 
 async function editarCliente(id) {
   try {
-    const response = await fetch(`${API_URL}/clientes/${id}`);
+    const response = await apiFetch(`${API_URL}/clientes/${id}`);
     const cliente = await response.json();
 
     clienteEmEdicao = id;
@@ -232,7 +254,7 @@ async function deletarCliente(id) {
   if (!confirm('Tem certeza que deseja deletar este cliente?')) return;
 
   try {
-    await fetch(`${API_URL}/clientes/${id}`, { method: 'DELETE' });
+    await apiFetch(`${API_URL}/clientes/${id}`, { method: 'DELETE' });
     alert('Cliente deletado com sucesso!');
     loadClientes();
     loadDashboard();
@@ -244,7 +266,7 @@ async function deletarCliente(id) {
 // ===== FORNECEDORES =====
 async function loadFornecedores() {
   try {
-    const response = await fetch(`${API_URL}/fornecedores`);
+    const response = await apiFetch(`${API_URL}/fornecedores`);
     const fornecedores = await response.json();
 
     const tbody = document.getElementById('fornecedores-tbody');
@@ -282,16 +304,14 @@ async function salvarFornecedor() {
 
   try {
     if (fornecedorEmEdicao) {
-      await fetch(`${API_URL}/fornecedores/${fornecedorEmEdicao}`, {
+      await apiFetch(`${API_URL}/fornecedores/${fornecedorEmEdicao}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dados)
       });
       alert('Fornecedor atualizado com sucesso!');
     } else {
-      await fetch(`${API_URL}/fornecedores`, {
+      await apiFetch(`${API_URL}/fornecedores`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dados)
       });
       alert('Fornecedor criado com sucesso!');
@@ -307,7 +327,7 @@ async function salvarFornecedor() {
 
 async function editarFornecedor(id) {
   try {
-    const response = await fetch(`${API_URL}/fornecedores/${id}`);
+    const response = await apiFetch(`${API_URL}/fornecedores/${id}`);
     const forn = await response.json();
 
     fornecedorEmEdicao = id;
@@ -329,7 +349,7 @@ async function deletarFornecedor(id) {
   if (!confirm('Tem certeza que deseja deletar este fornecedor?')) return;
 
   try {
-    await fetch(`${API_URL}/fornecedores/${id}`, { method: 'DELETE' });
+    await apiFetch(`${API_URL}/fornecedores/${id}`, { method: 'DELETE' });
     alert('Fornecedor deletado com sucesso!');
     loadFornecedores();
     loadDashboard();
@@ -341,7 +361,7 @@ async function deletarFornecedor(id) {
 // ===== TRANSAÇÕES =====
 async function loadTransacoes() {
   try {
-    const response = await fetch(`${API_URL}/transacoes`);
+    const response = await apiFetch(`${API_URL}/transacoes`);
     const dados = await response.json();
     const transacoes = dados.transacoes || [];
 
@@ -378,9 +398,8 @@ async function salvarTransacao() {
   };
 
   try {
-    await fetch(`${API_URL}/transacoes`, {
+    await apiFetch(`${API_URL}/transacoes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados)
     });
 
@@ -397,7 +416,7 @@ async function deletarTransacao(id) {
   if (!confirm('Tem certeza que deseja deletar esta transação?')) return;
 
   try {
-    await fetch(`${API_URL}/transacoes/${id}`, { method: 'DELETE' });
+    await apiFetch(`${API_URL}/transacoes/${id}`, { method: 'DELETE' });
     alert('Transação deletada com sucesso!');
     loadTransacoes();
     loadDashboard();
