@@ -3,215 +3,403 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Marsh Consultoria</title>
-  <link rel="stylesheet" href="styles.css" />
-  <style>
-    body {
-      min-height: 100vh;
-      background: var(--navy);
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* NAV */
-    .landing-nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.25rem 3rem;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .landing-nav .brand {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .landing-nav .brand span {
-      color: var(--cyan);
-    }
-
-    .btn-nav-login {
-      padding: 0.55rem 1.4rem;
-      background: transparent;
-      border: 1.5px solid var(--cyan);
-      color: var(--cyan);
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-      transition: var(--transition);
-    }
-
-    .btn-nav-login:hover {
-      background: var(--cyan);
-      color: var(--navy);
-    }
-
-    /* HERO */
-    .hero {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 4rem 2rem;
-    }
-
-    .hero-badge {
-      display: inline-block;
-      background: rgba(0,200,255,0.1);
-      color: var(--cyan);
-      border: 1px solid rgba(0,200,255,0.25);
-      border-radius: 100px;
-      padding: 0.35rem 1rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      margin-bottom: 1.75rem;
-      text-transform: uppercase;
-    }
-
-    .hero h1 {
-      font-size: clamp(2rem, 5vw, 3.5rem);
-      font-weight: 800;
-      color: var(--white);
-      line-height: 1.15;
-      max-width: 700px;
-      margin-bottom: 1.25rem;
-    }
-
-    .hero h1 span {
-      color: var(--cyan);
-    }
-
-    .hero p {
-      color: var(--grey-400);
-      font-size: 1.1rem;
-      max-width: 520px;
-      line-height: 1.7;
-      margin-bottom: 2.5rem;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .btn-hero-primary {
-      padding: 0.85rem 2rem;
-      background: var(--blue);
-      color: var(--white);
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      text-decoration: none;
-      transition: var(--transition);
-    }
-
-    .btn-hero-primary:hover {
-      background: var(--blue-light);
-      transform: translateY(-2px);
-    }
-
-    /* FEATURES */
-    .features {
-      display: flex;
-      justify-content: center;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-      padding: 3rem 2rem 4rem;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    .feature-card {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      flex: 1;
-      min-width: 200px;
-      max-width: 260px;
-      text-align: center;
-    }
-
-    .feature-card .icon {
-      font-size: 2rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .feature-card h3 {
-      color: var(--white);
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 0.4rem;
-    }
-
-    .feature-card p {
-      color: var(--grey-400);
-      font-size: 0.85rem;
-      line-height: 1.6;
-    }
-
-    /* FOOTER */
-    .landing-footer {
-      text-align: center;
-      padding: 1.5rem;
-      color: var(--grey-400);
-      font-size: 0.8rem;
-      border-top: 1px solid rgba(255,255,255,0.06);
-    }
-  </style>
+  <title>Marsh Consultoria – SAP | Desenvolvimento | Automação</title>
+  <meta name="description" content="Marsh Consultoria: especialistas em SAP, desenvolvimento de software C#, automações de processos e criação de sites. Bragança Paulista – SP." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- NAVBAR -->
-  <nav class="landing-nav">
-    <div class="brand">Marsh <span>Consultoria</span></div>
-    <a href="/login.html" class="btn-nav-login">Entrar no Sistema</a>
-  </nav>
+  <!-- ===== HEADER ===== -->
+  <header id="header">
+    <div class="container header-inner">
+      <a href="#home" class="logo">
+        <div class="logo-icon">M</div>
+        <span>Marsh <strong>Consultoria</strong></span>
+      </a>
+      <nav id="nav">
+        <a href="#home">Home</a>
+        <a href="#servicos">Serviços</a>
+        <a href="#sobre">Sobre</a>
+        <a href="#contato">Contato</a>
+        <a href="/login.html" class="btn-sistema">Entrar no Sistema</a>
+      </nav>
+      <button class="menu-toggle" id="menuToggle" aria-label="Menu">&#9776;</button>
+    </div>
+  </header>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-badge">Sistema de Gestão</div>
-    <h1>Gerencie sua consultoria com <span>simplicidade</span></h1>
-    <p>Controle clientes, fornecedores e finanças em um só lugar. Acesso seguro e em tempo real.</p>
-    <div class="hero-actions">
-      <a href="/login.html" class="btn-hero-primary">Acessar o Sistema</a>
+  <!-- ===== HERO ===== -->
+  <section id="home" class="hero">
+    <div class="hero-bg"></div>
+    <div class="container hero-content">
+      <span class="badge">Tecnologia &amp; Inovação</span>
+      <h1>Consultoria que <span class="gradient-text">transforma</span><br/>o seu negócio</h1>
+      <p class="hero-sub">
+        Especialistas em SAP, desenvolvimento de software, automação de processos
+        e criação de sites. Soluções tecnológicas sob medida para a sua empresa.
+      </p>
+      <div class="hero-actions">
+        <a href="#servicos" class="btn btn-primary">Nossos Serviços</a>
+        <a href="#contato" class="btn btn-outline">Falar com Especialista</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><strong>10+</strong><span>Anos de Experiência</span></div>
+        <div class="stat-div"></div>
+        <div class="stat"><strong>50+</strong><span>Projetos Entregues</span></div>
+        <div class="stat-div"></div>
+        <div class="stat"><strong>100%</strong><span>Compromisso</span></div>
+      </div>
+    </div>
+    <div class="hero-grid-overlay"></div>
+  </section>
+
+  <!-- ===== SERVIÇOS ===== -->
+  <section id="servicos" class="services">
+    <div class="container">
+      <div class="section-header">
+        <span class="badge badge-dark">O que fazemos</span>
+        <h2>Nossas <span class="gradient-text">Especialidades</span></h2>
+        <p>Combinamos expertise técnica e visão de negócio para entregar soluções que realmente geram resultado.</p>
+      </div>
+
+      <div class="services-grid">
+
+        <!-- SAP -->
+        <div class="card" id="sap">
+          <div class="card-icon sap-icon">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="12" fill="url(#g1)"/><path d="M12 30l8-14 6 10 4-6 6 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g1" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#0066cc"/><stop offset="1" stop-color="#003d7a"/></linearGradient></defs></svg>
+          </div>
+          <h3>Consultoria SAP</h3>
+          <p>
+            Com vasta experiência no ecossistema SAP, oferecemos consultoria especializada em implementação,
+            customização e otimização de módulos. Nossa equipe domina os principais módulos — SD, MM, FI/CO,
+            PP e HCM — garantindo que sua empresa extraia o máximo valor da plataforma.
+          </p>
+          <p>
+            Atuamos desde o levantamento de requisitos até o go-live, com suporte contínuo
+            pós-implementação, reduzindo riscos e acelerando o retorno sobre o investimento.
+          </p>
+          <ul class="card-list">
+            <li>Implementação e migração de módulos SAP</li>
+            <li>Desenvolvimento ABAP e customizações</li>
+            <li>Integração com sistemas externos via RFC, BAPI e IDoc</li>
+            <li>Suporte e manutenção evolutiva</li>
+            <li>Treinamento de equipes</li>
+          </ul>
+        </div>
+
+        <!-- C# / Software -->
+        <div class="card" id="software">
+          <div class="card-icon csharp-icon">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="12" fill="url(#g2)"/><text x="9" y="33" font-size="24" font-family="monospace" fill="white" font-weight="bold">C#</text><defs><linearGradient id="g2" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#6c3bdb"/><stop offset="1" stop-color="#3b1fa8"/></linearGradient></defs></svg>
+          </div>
+          <h3>Desenvolvimento de Software</h3>
+          <p>
+            Desenvolvemos soluções corporativas robustas com C# e o ecossistema .NET. Aplicações desktop,
+            web ou APIs — nossa expertise em boas práticas de engenharia garante sistemas escaláveis,
+            seguros e de alto desempenho, adaptados ao fluxo real do seu negócio.
+          </p>
+          <p>
+            Integramos com SAP, bancos de dados relacionais e APIs externas para criar soluções completas
+            que automatizam processos e aumentam a produtividade da sua equipe.
+          </p>
+          <ul class="card-list">
+            <li>Aplicações desktop (WinForms, WPF)</li>
+            <li>APIs RESTful com ASP.NET Core</li>
+            <li>Integração com SAP e sistemas legados</li>
+            <li>Dashboards e relatórios gerenciais</li>
+            <li>Banco de dados SQL Server, Oracle e PostgreSQL</li>
+          </ul>
+        </div>
+
+        <!-- Automações -->
+        <div class="card" id="automacoes">
+          <div class="card-icon auto-icon">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="12" fill="url(#g3)"/><path d="M24 10v4M24 34v4M10 24h4M34 24h4M14.93 14.93l2.83 2.83M30.24 30.24l2.83 2.83M14.93 33.07l2.83-2.83M30.24 17.76l2.83-2.83" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="24" r="5" stroke="#fff" stroke-width="2.5"/><defs><linearGradient id="g3" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#00b4d8"/><stop offset="1" stop-color="#0077b6"/></linearGradient></defs></svg>
+          </div>
+          <h3>Automação de Processos</h3>
+          <p>
+            Transforme tarefas manuais e repetitivas em fluxos automatizados inteligentes. Desenvolvemos
+            automações com scripts avançados, RPA (Robotic Process Automation) e integrações entre sistemas
+            que eliminam erros humanos e liberam sua equipe para atividades estratégicas.
+          </p>
+          <p>
+            Automatizamos processos em SAP, Excel, e-mail, web e sistemas legados, gerando economia
+            real de tempo e reduzindo custos operacionais de forma mensurável.
+          </p>
+          <ul class="card-list">
+            <li>RPA com scripts C# e Python</li>
+            <li>Automação de tarefas em SAP (GUI Scripting)</li>
+            <li>Geração e tratamento automático de relatórios Excel</li>
+            <li>Integração e sincronização entre plataformas</li>
+            <li>Alertas e monitoramento automatizados</li>
+          </ul>
+        </div>
+
+        <!-- Sites -->
+        <div class="card" id="sites">
+          <div class="card-icon web-icon">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="12" fill="url(#g4)"/><rect x="8" y="12" width="32" height="24" rx="3" stroke="#fff" stroke-width="2.5"/><path d="M8 18h32" stroke="#fff" stroke-width="2.5"/><circle cx="13" cy="15" r="1.5" fill="#fff"/><circle cx="18" cy="15" r="1.5" fill="#fff"/><path d="M16 28h16M16 24h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/><defs><linearGradient id="g4" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#00c897"/><stop offset="1" stop-color="#007a5e"/></linearGradient></defs></svg>
+          </div>
+          <h3>Desenvolvimento de Sites</h3>
+          <p>
+            Criamos sites e aplicações web modernas, responsivas e otimizadas para conversão. Do site
+            institucional ao portal corporativo, desenvolvemos com as tecnologias mais atuais do mercado,
+            focando em experiência do usuário, performance e SEO.
+          </p>
+          <p>
+            Sua presença digital é o cartão de visitas da sua empresa. Desenvolvemos soluções que
+            transmitem credibilidade, atraem clientes e impulsionam seus resultados online.
+          </p>
+          <ul class="card-list">
+            <li>Sites institucionais e landing pages</li>
+            <li>Portais corporativos e intranets</li>
+            <li>Sistemas web com autenticação e painel admin</li>
+            <li>Integração com APIs e serviços externos</li>
+            <li>Otimização de performance e SEO</li>
+          </ul>
+        </div>
+
+      </div>
     </div>
   </section>
 
-  <!-- FEATURES -->
-  <div class="features">
-    <div class="feature-card">
-      <div class="icon">👥</div>
-      <h3>Clientes</h3>
-      <p>Cadastro e gestão completa de clientes com todos os dados em um só lugar.</p>
+  <!-- ===== POR QUE NÓS ===== -->
+  <section class="why">
+    <div class="container">
+      <div class="why-inner">
+        <div class="why-text">
+          <span class="badge">Por que escolher a Marsh?</span>
+          <h2>Tecnologia com <span class="gradient-text">propósito</span></h2>
+          <p>
+            Não entregamos apenas código — entregamos soluções que resolvem problemas reais.
+            Cada projeto é tratado com atenção individualizada, desde o entendimento do seu
+            negócio até o acompanhamento pós-entrega.
+          </p>
+          <div class="why-items">
+            <div class="why-item">
+              <div class="why-dot"></div>
+              <div>
+                <strong>Atendimento personalizado</strong>
+                <p>Cada cliente é único. Adaptamos nossas soluções à realidade e ao orçamento do seu negócio.</p>
+              </div>
+            </div>
+            <div class="why-item">
+              <div class="why-dot"></div>
+              <div>
+                <strong>Experiência comprovada</strong>
+                <p>Atuação em empresas de médio e grande porte com projetos SAP e sistemas críticos de negócio.</p>
+              </div>
+            </div>
+            <div class="why-item">
+              <div class="why-dot"></div>
+              <div>
+                <strong>Comprometimento total</strong>
+                <p>Cumprimos prazos e mantemos comunicação transparente em todas as etapas do projeto.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="why-visual">
+          <div class="tech-card">
+            <div class="tech-tag">SAP</div>
+            <div class="tech-tag">C# / .NET</div>
+            <div class="tech-tag">SQL Server</div>
+            <div class="tech-tag">RPA</div>
+            <div class="tech-tag">ASP.NET Core</div>
+            <div class="tech-tag">Oracle</div>
+            <div class="tech-tag">ABAP</div>
+            <div class="tech-tag">HTML / CSS / JS</div>
+            <div class="tech-tag">Python</div>
+            <div class="tech-tag">WPF</div>
+            <div class="tech-tag">REST API</div>
+            <div class="tech-tag">Azure</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="feature-card">
-      <div class="icon">🏢</div>
-      <h3>Fornecedores</h3>
-      <p>Controle seus fornecedores e mantenha os contatos sempre atualizados.</p>
-    </div>
-    <div class="feature-card">
-      <div class="icon">💰</div>
-      <h3>Financeiro</h3>
-      <p>Acompanhe entradas, saídas e saldo com resumo financeiro em tempo real.</p>
-    </div>
-  </div>
+  </section>
 
-  <!-- FOOTER -->
-  <footer class="landing-footer">
-    © 2026 Marsh Consultoria — Todos os direitos reservados
+  <!-- ===== SOBRE ===== -->
+  <section id="sobre" class="about">
+    <div class="container">
+      <div class="about-inner">
+        <div class="about-visual">
+          <div class="avatar-card">
+            <div class="avatar">DM</div>
+            <div class="avatar-info">
+              <strong>Daniel Marsh</strong>
+              <span>Fundador &amp; Consultor Sênior</span>
+              <div class="avatar-tags">
+                <span>SAP Expert</span>
+                <span>Dev C#</span>
+                <span>Automação</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="about-text">
+          <span class="badge">Quem somos</span>
+          <h2>Sobre a <span class="gradient-text">Marsh Consultoria</span></h2>
+          <p>
+            A Marsh Consultoria foi fundada por <strong>Daniel Mathias Lopes</strong>, profissional
+            com sólida experiência em consultoria SAP e desenvolvimento de sistemas corporativos.
+            Conhecido no mercado como <strong>Daniel Marsh</strong>, ele lidera projetos de alta
+            complexidade com a missão de simplificar a tecnologia para empresas de todos os tamanhos.
+          </p>
+          <p>
+            Sediada em <strong>Bragança Paulista – SP</strong>, a empresa atende clientes em todo o
+            Brasil, combinando o rigor técnico do desenvolvimento de software com a visão estratégica
+            da consultoria empresarial. Nossa abordagem é sempre próxima, ágil e orientada a resultados.
+          </p>
+          <p>
+            Acreditamos que tecnologia bem aplicada é o maior diferencial competitivo que uma empresa
+            pode ter — e nossa missão é colocar esse diferencial nas mãos dos nossos clientes.
+          </p>
+          <div class="about-contact-info">
+            <a href="mailto:daniel.marsh@marshconsultoria.com.br" class="contact-chip">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M2 4h16v12H2V4zm0 0l8 7 8-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              daniel.marsh@marshconsultoria.com.br
+            </a>
+            <a href="tel:+5521967806718" class="contact-chip">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M3 3h4l1.5 4L6 9s1 3 5 5l2.5-2.5L17 13v4s-9 1-14-10S3 3 3 3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              (21) 96780-6718
+            </a>
+            <span class="contact-chip">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 2C7 2 4 4.5 4 8c0 5 6 10 6 10s6-5 6-10c0-3.5-3-6-6-6zm0 8a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.5"/></svg>
+              Bragança Paulista – SP
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CONTATO ===== -->
+  <section id="contato" class="contact">
+    <div class="container">
+      <div class="section-header">
+        <span class="badge">Vamos conversar</span>
+        <h2>Entre em <span class="gradient-text">Contato</span></h2>
+        <p>Pronto para transformar seu negócio? Envie uma mensagem e responderemos em breve.</p>
+      </div>
+
+      <div class="contact-inner">
+        <div class="contact-info-box">
+          <h3>Fale conosco</h3>
+          <p>Seja para tirar dúvidas, solicitar um orçamento ou iniciar um projeto — estamos aqui para ajudar.</p>
+          <div class="info-items">
+            <div class="info-item">
+              <div class="info-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4V4zm0 0l8 7 8-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <strong>E-mail</strong>
+                <a href="mailto:daniel.marsh@marshconsultoria.com.br">daniel.marsh@marshconsultoria.com.br</a>
+              </div>
+            </div>
+            <div class="info-item">
+              <div class="info-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M3 3h6l2 5-2.5 3S10 14 14 16l3-2.5 5 2V21s-12 1-18-15S3 3 3 3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <strong>WhatsApp / Telefone</strong>
+                <a href="https://wa.me/5521967806718" target="_blank" rel="noopener">(21) 96780-6718</a>
+              </div>
+            </div>
+            <div class="info-item">
+              <div class="info-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C8 2 4 5.5 4 10c0 7 8 12 8 12s8-5 8-12c0-4.5-4-8-8-8zm0 10a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5"/></svg>
+              </div>
+              <div>
+                <strong>Localização</strong>
+                <span>Bragança Paulista – SP, Brasil</span>
+              </div>
+            </div>
+          </div>
+          <a href="https://wa.me/5521967806718?text=Olá%20Daniel,%20vim%20pelo%20site%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20serviços%20da%20Marsh%20Consultoria."
+             target="_blank" rel="noopener" class="btn btn-primary whatsapp-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            Chamar no WhatsApp
+          </a>
+        </div>
+
+        <form class="contact-form" id="contactForm" action="https://formspree.io/f/xbdpljgk" method="POST">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="name">Nome completo *</label>
+              <input type="text" id="name" name="name" placeholder="Seu nome" required />
+            </div>
+            <div class="form-group">
+              <label for="email">E-mail *</label>
+              <input type="email" id="email" name="email" placeholder="seu@email.com" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="phone">Telefone / WhatsApp</label>
+            <input type="tel" id="phone" name="phone" placeholder="(00) 00000-0000" />
+          </div>
+          <div class="form-group">
+            <label for="subject">Área de interesse *</label>
+            <select id="subject" name="subject" required>
+              <option value="">Selecione um serviço...</option>
+              <option value="SAP">Consultoria SAP</option>
+              <option value="Software">Desenvolvimento de Software C#</option>
+              <option value="Automação">Automação de Processos</option>
+              <option value="Sites">Desenvolvimento de Sites</option>
+              <option value="Outro">Outro assunto</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="message">Mensagem *</label>
+            <textarea id="message" name="message" rows="5" placeholder="Descreva brevemente o que você precisa..." required></textarea>
+          </div>
+          <input type="hidden" name="_replyto" id="replyto" />
+          <button type="submit" class="btn btn-primary btn-full" id="submitBtn">
+            Enviar Mensagem
+          </button>
+          <div class="form-success" id="formSuccess" style="display:none">
+            Mensagem enviada! Em breve entraremos em contato.
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <div class="logo">
+          <div class="logo-icon">M</div>
+          <span>Marsh <strong>Consultoria</strong></span>
+        </div>
+        <p>Consultoria e desenvolvimento de sistemas SAP e Web.</p>
+        <p>Bragança Paulista – SP, Brasil</p>
+      </div>
+      <div class="footer-links">
+        <strong>Serviços</strong>
+        <a href="#sap">Consultoria SAP</a>
+        <a href="#software">Desenvolvimento C#</a>
+        <a href="#automacoes">Automação de Processos</a>
+        <a href="#sites">Desenvolvimento de Sites</a>
+      </div>
+      <div class="footer-links">
+        <strong>Contato</strong>
+        <a href="mailto:daniel.marsh@marshconsultoria.com.br">daniel.marsh@marshconsultoria.com.br</a>
+        <a href="tel:+5521967806718">+55(21) 96780-6718</a>
+        <a href="https://wa.me/5521967806718" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Marsh Consultoria. Todos os direitos reservados.</span>
+        <span>Desenvolvido por Marsh Consultoria</span>
+      </div>
+    </div>
   </footer>
 
+  <script src="landing-script.js"></script>
 </body>
 </html>
