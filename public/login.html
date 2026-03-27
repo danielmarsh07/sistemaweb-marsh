@@ -199,7 +199,7 @@
   <script>
     // Se já tem token, vai direto pro dashboard
     if (localStorage.getItem('token')) {
-      window.location.href = '/';
+      window.location.href = '/dashboard.html';
     }
 
     function trocarTab(tab) {
@@ -238,7 +238,7 @@
 
         localStorage.setItem('token', data.token);
         localStorage.setItem('usuario', JSON.stringify(data.usuario));
-        window.location.href = '/';
+        window.location.href = '/dashboard.html';
       } catch {
         mostrarMensagem('login-msg', 'Erro de conexão. Tente novamente.', 'erro');
       }

@@ -1,300 +1,217 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - Marsh Consultoria</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marsh Consultoria</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      min-height: 100vh;
+      background: var(--navy);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* NAV */
+    .landing-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 3rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .landing-nav .brand {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .landing-nav .brand span {
+      color: var(--cyan);
+    }
+
+    .btn-nav-login {
+      padding: 0.55rem 1.4rem;
+      background: transparent;
+      border: 1.5px solid var(--cyan);
+      color: var(--cyan);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    .btn-nav-login:hover {
+      background: var(--cyan);
+      color: var(--navy);
+    }
+
+    /* HERO */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 4rem 2rem;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(0,200,255,0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(0,200,255,0.25);
+      border-radius: 100px;
+      padding: 0.35rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 1.75rem;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      color: var(--white);
+      line-height: 1.15;
+      max-width: 700px;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 span {
+      color: var(--cyan);
+    }
+
+    .hero p {
+      color: var(--grey-400);
+      font-size: 1.1rem;
+      max-width: 520px;
+      line-height: 1.7;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-hero-primary {
+      padding: 0.85rem 2rem;
+      background: var(--blue);
+      color: var(--white);
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    .btn-hero-primary:hover {
+      background: var(--blue-light);
+      transform: translateY(-2px);
+    }
+
+    /* FEATURES */
+    .features {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      padding: 3rem 2rem 4rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      flex: 1;
+      min-width: 200px;
+      max-width: 260px;
+      text-align: center;
+    }
+
+    .feature-card .icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-card h3 {
+      color: var(--white);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    .feature-card p {
+      color: var(--grey-400);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    /* FOOTER */
+    .landing-footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--grey-400);
+      font-size: 0.8rem;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+  </style>
 </head>
 <body>
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="logo-box">M</div>
-      <h2>Marsh Sistema</h2>
+
+  <!-- NAVBAR -->
+  <nav class="landing-nav">
+    <div class="brand">Marsh <span>Consultoria</span></div>
+    <a href="/login.html" class="btn-nav-login">Entrar no Sistema</a>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-badge">Sistema de Gestão</div>
+    <h1>Gerencie sua consultoria com <span>simplicidade</span></h1>
+    <p>Controle clientes, fornecedores e finanças em um só lugar. Acesso seguro e em tempo real.</p>
+    <div class="hero-actions">
+      <a href="/login.html" class="btn-hero-primary">Acessar o Sistema</a>
     </div>
+  </section>
 
-    <nav class="sidebar-nav">
-      <a href="#" data-page="dashboard" class="nav-link active">
-        <span class="icon">📊</span> Dashboard
-      </a>
-      <a href="#" data-page="clientes" class="nav-link">
-        <span class="icon">👥</span> Clientes
-      </a>
-      <a href="#" data-page="fornecedores" class="nav-link">
-        <span class="icon">🏢</span> Fornecedores
-      </a>
-      <a href="#" data-page="transacoes" class="nav-link">
-        <span class="icon">💰</span> Transações
-      </a>
-    </nav>
-
-    <div class="sidebar-footer">
-      <p>v1.0.0</p>
+  <!-- FEATURES -->
+  <div class="features">
+    <div class="feature-card">
+      <div class="icon">👥</div>
+      <h3>Clientes</h3>
+      <p>Cadastro e gestão completa de clientes com todos os dados em um só lugar.</p>
     </div>
-  </aside>
-
-  <!-- MAIN CONTENT -->
-  <main class="main-content">
-    <!-- Header -->
-    <header class="header">
-      <h1 id="page-title">Dashboard</h1>
-      <div class="header-right">
-        <span class="user-info" id="usuario-nome">Carregando...</span>
-        <button onclick="logout()" style="margin-left:1rem; padding:0.4rem 0.9rem; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#94a3b8; border-radius:8px; cursor:pointer; font-size:0.85rem;">Sair</button>
-      </div>
-    </header>
-
-    <!-- Page Content -->
-    <div class="container">
-      <!-- DASHBOARD PAGE -->
-      <section id="dashboard-page" class="page active">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon">👥</div>
-            <div class="stat-content">
-              <h3>Clientes</h3>
-              <p id="total-clientes" class="stat-number">0</p>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon">🏢</div>
-            <div class="stat-content">
-              <h3>Fornecedores</h3>
-              <p id="total-fornecedores" class="stat-number">0</p>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon">💵</div>
-            <div class="stat-content">
-              <h3>Entradas</h3>
-              <p id="total-entradas" class="stat-number">R$ 0</p>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon">📉</div>
-            <div class="stat-content">
-              <h3>Saídas</h3>
-              <p id="total-saidas" class="stat-number">R$ 0</p>
-            </div>
-          </div>
-
-          <div class="stat-card stat-card-full">
-            <div class="stat-icon">📊</div>
-            <div class="stat-content">
-              <h3>Saldo</h3>
-              <p id="total-saldo" class="stat-number stat-saldo">R$ 0</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- CLIENTES PAGE -->
-      <section id="clientes-page" class="page">
-        <div class="page-header">
-          <h2>Gerenciar Clientes</h2>
-          <button id="btn-novo-cliente" class="btn btn-primary">+ Novo Cliente</button>
-        </div>
-
-        <div id="clientes-table" class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>CPF/CNPJ</th>
-                <th>Email</th>
-                <th>Telefone</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="clientes-tbody">
-              <tr>
-                <td colspan="5" class="text-center">Carregando...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- FORNECEDORES PAGE -->
-      <section id="fornecedores-page" class="page">
-        <div class="page-header">
-          <h2>Gerenciar Fornecedores</h2>
-          <button id="btn-novo-fornecedor" class="btn btn-primary">+ Novo Fornecedor</button>
-        </div>
-
-        <div id="fornecedores-table" class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>CNPJ</th>
-                <th>Email</th>
-                <th>Ramo</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="fornecedores-tbody">
-              <tr>
-                <td colspan="5" class="text-center">Carregando...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TRANSAÇÕES PAGE -->
-      <section id="transacoes-page" class="page">
-        <div class="page-header">
-          <h2>Transações Financeiras</h2>
-          <button id="btn-nova-transacao" class="btn btn-primary">+ Nova Transação</button>
-        </div>
-
-        <div id="transacoes-table" class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Tipo</th>
-                <th>Categoria</th>
-                <th>Descrição</th>
-                <th>Valor</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="transacoes-tbody">
-              <tr>
-                <td colspan="6" class="text-center">Carregando...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+    <div class="feature-card">
+      <div class="icon">🏢</div>
+      <h3>Fornecedores</h3>
+      <p>Controle seus fornecedores e mantenha os contatos sempre atualizados.</p>
     </div>
-  </main>
-
-  <!-- MODALS -->
-  <!-- Modal Novo Cliente -->
-  <div id="modal-cliente" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Novo Cliente</h3>
-        <button class="btn-close">&times;</button>
-      </div>
-      <form id="form-cliente" class="form">
-        <div class="form-group">
-          <label>Nome *</label>
-          <input type="text" name="nome" required>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>CPF/CNPJ</label>
-            <input type="text" name="cpf_cnpj">
-          </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input type="email" name="email">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Telefone</label>
-            <input type="text" name="telefone">
-          </div>
-          <div class="form-group">
-            <label>Endereço</label>
-            <input type="text" name="endereco">
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
-        </div>
-      </form>
+    <div class="feature-card">
+      <div class="icon">💰</div>
+      <h3>Financeiro</h3>
+      <p>Acompanhe entradas, saídas e saldo com resumo financeiro em tempo real.</p>
     </div>
   </div>
 
-  <!-- Modal Novo Fornecedor -->
-  <div id="modal-fornecedor" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Novo Fornecedor</h3>
-        <button class="btn-close">&times;</button>
-      </div>
-      <form id="form-fornecedor" class="form">
-        <div class="form-group">
-          <label>Nome *</label>
-          <input type="text" name="nome" required>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>CNPJ</label>
-            <input type="text" name="cnpj">
-          </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input type="email" name="email">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Telefone</label>
-            <input type="text" name="telefone">
-          </div>
-          <div class="form-group">
-            <label>Ramo</label>
-            <input type="text" name="ramo">
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <!-- FOOTER -->
+  <footer class="landing-footer">
+    © 2026 Marsh Consultoria — Todos os direitos reservados
+  </footer>
 
-  <!-- Modal Nova Transação -->
-  <div id="modal-transacao" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Nova Transação</h3>
-        <button class="btn-close">&times;</button>
-      </div>
-      <form id="form-transacao" class="form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Tipo *</label>
-            <select name="tipo" required>
-              <option value="">Selecione...</option>
-              <option value="entrada">Entrada</option>
-              <option value="saída">Saída</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Valor *</label>
-            <input type="number" name="valor" step="0.01" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Categoria *</label>
-          <input type="text" name="categoria" required>
-        </div>
-        <div class="form-group">
-          <label>Descrição</label>
-          <textarea name="descricao" rows="3"></textarea>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script src="script.js"></script>
 </body>
 </html>
