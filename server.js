@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const path = require('path');
+const pool = require('./db');
 
 const app = express();
 
@@ -37,9 +38,51 @@ app.use((req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada' });
 });
 
-// Iniciar servidor
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
-  console.log(`📊 Dashboard: http://localhost:${PORT}`);
-});
+// Criar tabelas se não existirem e iniciar servidor
+async function iniciar() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS clientes (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        cpf_cnpj VARCHAR(50),
+        email VARCHAR(255),
+        telefone VARCHAR(50),
+        endereco TEXT,
+        data_criacao TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS fornecedores (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        cnpj VARCHAR(50),
+        email VARCHAR(255),
+        telefone VARCHAR(50),
+        ramo VARCHAR(255),
+        data_criacao TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS transacoes (
+        id SERIAL PRIMARY KEY,
+        tipo VARCHAR(20) NOT NULL,
+        valor NUMERIC(12,2) NOT NULL,
+        categoria VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        data TIMESTAMP DEFAULT NOW(),
+        usuario_id INTEGER DEFAULT 1
+      );
+    `);
+
+    console.log('✅ Tabelas verificadas/criadas com sucesso!');
+  } catch (err) {
+    console.error('❌ Erro ao criar tabelas:', err.message);
+  }
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+    console.log(`📊 Dashboard: http://localhost:${PORT}`);
+  });
+}
+
+iniciar();
