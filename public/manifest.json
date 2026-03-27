@@ -1,0 +1,18 @@
+{
+  "name": "Marsh Consultoria",
+  "short_name": "Marsh",
+  "description": "Sistema de Gestão Marsh Consultoria",
+  "start_url": "/login.html",
+  "display": "standalone",
+  "background_color": "#0d1b2a",
+  "theme_color": "#0066cc",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
