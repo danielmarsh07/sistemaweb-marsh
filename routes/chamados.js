@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { notificarNovoChamado, notificarAtualizacaoStatus } = require('../services/email');
 
 // GET - Listar chamados (cliente vê só os seus; admin vê todos)
 router.get('/', async (req, res) => {
@@ -129,7 +130,16 @@ router.post('/', async (req, res) => {
         prioridade || 'media', categoria || null
       ]
     );
-    res.status(201).json({ mensagem: 'Chamado aberto com sucesso!', chamado: result.rows[0] });
+    const chamado = result.rows[0];
+
+    // Notifica admins/técnicos sobre o novo chamado (não bloqueia a resposta)
+    notificarNovoChamado({
+      chamado,
+      empresa_id,
+      aberto_por: req.usuario.nome
+    }).catch(() => {});
+
+    res.status(201).json({ mensagem: 'Chamado aberto com sucesso!', chamado });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao abrir chamado', detalhe: err.message });
   }
@@ -176,7 +186,18 @@ router.put('/:id', async (req, res) => {
         req.params.id, empresa_id
       ]
     );
-    res.json({ mensagem: 'Chamado atualizado com sucesso!', chamado: result.rows[0] });
+    const chamado = result.rows[0];
+
+    // Notifica cliente se o status mudou
+    if (status && status !== ch.status) {
+      notificarAtualizacaoStatus({
+        chamado,
+        statusAnterior: ch.status,
+        empresa_id
+      }).catch(() => {});
+    }
+
+    res.json({ mensagem: 'Chamado atualizado com sucesso!', chamado });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao atualizar chamado', detalhe: err.message });
   }

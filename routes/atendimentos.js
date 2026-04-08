@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { notificarNovoAtendimento } = require('../services/email');
 
 // GET - Listar atendimentos de um chamado
 router.get('/chamado/:chamado_id', async (req, res) => {
@@ -81,10 +82,20 @@ router.post('/', async (req, res) => {
     const atendimento = result.rows[0];
 
     // Buscar nome do usuário para retornar
-    const usuario = await pool.query('SELECT nome FROM usuarios WHERE id = $1', [usuario_id]);
-    if (usuario.rows.length > 0) {
-      atendimento.usuario_nome = usuario.rows[0].nome;
+    const usuarioRes = await pool.query('SELECT nome FROM usuarios WHERE id = $1', [usuario_id]);
+    if (usuarioRes.rows.length > 0) {
+      atendimento.usuario_nome = usuarioRes.rows[0].nome;
     }
+
+    // Notificar a outra parte sobre o novo comentário/atendimento
+    const chamadoCompleto = chamadoOk.rows[0];
+    notificarNovoAtendimento({
+      atendimento,
+      chamado: chamadoCompleto,
+      remetente_tipo: req.usuario.tipo,
+      remetente_nome: req.usuario.nome,
+      empresa_id
+    }).catch(() => {});
 
     res.status(201).json({ mensagem: 'Atendimento registrado com sucesso!', atendimento });
   } catch (err) {
