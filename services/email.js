@@ -1,8 +1,13 @@
 const { Resend } = require('resend');
 const pool = require('../db');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = 'Marsh Consultoria <noreply@marshconsultoria.com.br>';
+
+// Inicialização lazy — não quebra o servidor se a chave não estiver configurada
+function getResend() {
+  if (!process.env.RESEND_API_KEY) return null;
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 // --- Helpers para buscar destinatários ---
 
@@ -27,7 +32,8 @@ async function emailsCliente(cliente_id) {
 // --- Envio genérico com tratamento de erro silencioso ---
 
 async function enviar({ to, subject, html }) {
-  if (!process.env.RESEND_API_KEY) return; // não configurado ainda
+  const resend = getResend();
+  if (!resend) return; // chave não configurada
   try {
     const destinatarios = Array.isArray(to) ? to.map(u => u.email) : [to];
     if (!destinatarios.length) return;
