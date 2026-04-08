@@ -489,6 +489,113 @@ tbody tr:last-child td {
   border-top: 1px solid var(--grey-200);
 }
 
+/* ===== MODAL LARGE ===== */
+.modal-lg {
+  max-width: 780px !important;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* ===== FORM SECTION TITLE ===== */
+.form-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--blue);
+  padding: 12px 0 6px;
+  margin-top: 8px;
+  border-bottom: 1px solid var(--grey-200);
+  margin-bottom: 12px;
+}
+
+/* ===== FILTROS ===== */
+.filtro-select {
+  padding: 8px 12px;
+  border: 1px solid var(--grey-200);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.filtro-select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+/* ===== TIMELINE DE ATENDIMENTOS ===== */
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 20px;
+  bottom: -16px;
+  width: 2px;
+  background: var(--grey-200);
+}
+
+.timeline-badge {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px var(--grey-200);
+}
+
+.badge-tipo-comentario { background: #64748b; }
+.badge-tipo-contato_cliente { background: #0d6efd; }
+.badge-tipo-escalamento { background: #f59e0b; }
+.badge-tipo-solucao { background: #10b981; }
+
+.timeline-content {
+  flex: 1;
+  background: var(--grey-50);
+  border: 1px solid var(--grey-200);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.timeline-meta {
+  font-size: 0.78rem;
+  color: var(--grey-400);
+}
+
+.timeline-desc {
+  font-size: 0.9rem;
+  color: var(--grey-800);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ===== STATS GRID: 3 colunas no desktop ===== */
+.stats-grid {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+
+.stat-card-full {
+  grid-column: 1 / -1 !important;
+}
+
 /* ===== BOTTOM NAV (mobile) ===== */
 .bottom-nav {
   display: none;

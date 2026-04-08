@@ -12,6 +12,7 @@
   <link rel="apple-touch-icon" href="/icon.svg" />
 </head>
 <body>
+
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-header">
@@ -29,13 +30,23 @@
       <a href="#" data-page="fornecedores" class="nav-link">
         <span class="icon">🏢</span> Fornecedores
       </a>
+      <a href="#" data-page="tecnologias" class="nav-link">
+        <span class="icon">💻</span> Tecnologias
+      </a>
+      <a href="#" data-page="chamados" class="nav-link">
+        <span class="icon">🎫</span> Chamados
+      </a>
       <a href="#" data-page="transacoes" class="nav-link">
         <span class="icon">💰</span> Transações
+      </a>
+      <a href="#" data-page="usuarios" class="nav-link">
+        <span class="icon">🔑</span> Usuários
       </a>
     </nav>
 
     <div class="sidebar-footer">
-      <p>v1.0.0</p>
+      <p id="sidebar-empresa">Marsh Consultoria</p>
+      <p>v2.0.0</p>
     </div>
   </aside>
 
@@ -50,27 +61,39 @@
       </div>
     </header>
 
-    <!-- Page Content -->
     <div class="container">
-      <!-- DASHBOARD PAGE -->
+
+      <!-- ========== DASHBOARD PAGE ========== -->
       <section id="dashboard-page" class="page active">
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card" style="cursor:pointer" onclick="showPage('clientes')">
             <div class="stat-icon">👥</div>
             <div class="stat-content">
               <h3>Clientes</h3>
               <p id="total-clientes" class="stat-number">0</p>
             </div>
           </div>
-
-          <div class="stat-card">
+          <div class="stat-card" style="cursor:pointer" onclick="showPage('fornecedores')">
             <div class="stat-icon">🏢</div>
             <div class="stat-content">
               <h3>Fornecedores</h3>
               <p id="total-fornecedores" class="stat-number">0</p>
             </div>
           </div>
-
+          <div class="stat-card" style="cursor:pointer" onclick="showPage('tecnologias')">
+            <div class="stat-icon">💻</div>
+            <div class="stat-content">
+              <h3>Tecnologias</h3>
+              <p id="total-tecnologias" class="stat-number">0</p>
+            </div>
+          </div>
+          <div class="stat-card" style="cursor:pointer" onclick="showPage('chamados')">
+            <div class="stat-icon">🎫</div>
+            <div class="stat-content">
+              <h3>Chamados Abertos</h3>
+              <p id="total-chamados-abertos" class="stat-number">0</p>
+            </div>
+          </div>
           <div class="stat-card">
             <div class="stat-icon">💵</div>
             <div class="stat-content">
@@ -78,7 +101,6 @@
               <p id="total-entradas" class="stat-number">R$ 0</p>
             </div>
           </div>
-
           <div class="stat-card">
             <div class="stat-icon">📉</div>
             <div class="stat-content">
@@ -86,7 +108,6 @@
               <p id="total-saidas" class="stat-number">R$ 0</p>
             </div>
           </div>
-
           <div class="stat-card stat-card-full">
             <div class="stat-icon">📊</div>
             <div class="stat-content">
@@ -95,70 +116,191 @@
             </div>
           </div>
         </div>
+
+        <!-- Chamados recentes no dashboard -->
+        <div style="margin-top:2rem;">
+          <h3 style="margin-bottom:1rem; color:#1e293b;">Chamados Recentes</h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Título</th>
+                  <th>Cliente</th>
+                  <th>Status</th>
+                  <th>Prioridade</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-chamados-tbody">
+                <tr><td colspan="6" class="text-center">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
-      <!-- CLIENTES PAGE -->
+      <!-- ========== CLIENTES PAGE ========== -->
       <section id="clientes-page" class="page">
         <div class="page-header">
           <h2>Gerenciar Clientes</h2>
           <button id="btn-novo-cliente" class="btn btn-primary">+ Novo Cliente</button>
         </div>
 
-        <div id="clientes-table" class="table-container">
+        <div class="table-container">
           <table>
             <thead>
               <tr>
-                <th>Nome</th>
-                <th>CPF/CNPJ</th>
-                <th>Email</th>
+                <th>Empresa</th>
+                <th>CNPJ/CPF</th>
+                <th>Responsável</th>
                 <th>Telefone</th>
+                <th>Status</th>
+                <th>Chamados</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody id="clientes-tbody">
-              <tr>
-                <td colspan="5" class="text-center">Carregando...</td>
-              </tr>
+              <tr><td colspan="7" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- FORNECEDORES PAGE -->
+      <!-- ========== FORNECEDORES PAGE ========== -->
       <section id="fornecedores-page" class="page">
         <div class="page-header">
           <h2>Gerenciar Fornecedores</h2>
           <button id="btn-novo-fornecedor" class="btn btn-primary">+ Novo Fornecedor</button>
         </div>
 
-        <div id="fornecedores-table" class="table-container">
+        <div class="table-container">
           <table>
             <thead>
               <tr>
-                <th>Nome</th>
+                <th>Empresa</th>
                 <th>CNPJ</th>
-                <th>Email</th>
-                <th>Ramo</th>
+                <th>Tipo</th>
+                <th>Contato</th>
+                <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody id="fornecedores-tbody">
-              <tr>
-                <td colspan="5" class="text-center">Carregando...</td>
-              </tr>
+              <tr><td colspan="6" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- TRANSAÇÕES PAGE -->
+      <!-- ========== TECNOLOGIAS PAGE ========== -->
+      <section id="tecnologias-page" class="page">
+        <div class="page-header">
+          <h2>Tecnologias</h2>
+          <button id="btn-nova-tecnologia" class="btn btn-primary">+ Nova Tecnologia</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>Fabricante</th>
+                <th>Versão</th>
+                <th>Clientes</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tecnologias-tbody">
+              <tr><td colspan="7" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== CHAMADOS PAGE ========== -->
+      <section id="chamados-page" class="page">
+        <div class="page-header">
+          <h2>Chamados e Atendimentos</h2>
+          <button id="btn-novo-chamado" class="btn btn-primary">+ Novo Chamado</button>
+        </div>
+
+        <!-- Filtros -->
+        <div style="display:flex; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+          <select id="filtro-status" class="filtro-select" onchange="loadChamados()">
+            <option value="">Todos os status</option>
+            <option value="aberto">Aberto</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="aguardando_cliente">Aguardando cliente</option>
+            <option value="resolvido">Resolvido</option>
+            <option value="fechado">Fechado</option>
+          </select>
+          <select id="filtro-prioridade" class="filtro-select" onchange="loadChamados()">
+            <option value="">Todas as prioridades</option>
+            <option value="critica">Crítica</option>
+            <option value="alta">Alta</option>
+            <option value="media">Média</option>
+            <option value="baixa">Baixa</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Título</th>
+                <th>Cliente</th>
+                <th>Tecnologia</th>
+                <th>Status</th>
+                <th>Prioridade</th>
+                <th>Abertura</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="chamados-tbody">
+              <tr><td colspan="8" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== USUÁRIOS PAGE ========== -->
+      <section id="usuarios-page" class="page">
+        <div class="page-header">
+          <h2>Usuários do Sistema</h2>
+          <button id="btn-novo-usuario" class="btn btn-primary">+ Novo Usuário</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Perfil</th>
+                <th>Vinculado a</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="usuarios-tbody">
+              <tr><td colspan="6" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== TRANSAÇÕES PAGE ========== -->
       <section id="transacoes-page" class="page">
         <div class="page-header">
           <h2>Transações Financeiras</h2>
           <button id="btn-nova-transacao" class="btn btn-primary">+ Nova Transação</button>
         </div>
 
-        <div id="transacoes-table" class="table-container">
+        <div class="table-container">
           <table>
             <thead>
               <tr>
@@ -171,95 +313,508 @@
               </tr>
             </thead>
             <tbody id="transacoes-tbody">
-              <tr>
-                <td colspan="6" class="text-center">Carregando...</td>
-              </tr>
+              <tr><td colspan="6" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
       </section>
-    </div>
+
+    </div><!-- /.container -->
   </main>
 
-  <!-- MODALS -->
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- MODAL: CLIENTE -->
   <div id="modal-cliente" class="modal">
-    <div class="modal-content">
+    <div class="modal-content modal-lg">
       <div class="modal-header">
-        <h3>Novo Cliente</h3>
+        <h3 id="modal-cliente-titulo">Novo Cliente</h3>
         <button class="btn-close">&times;</button>
       </div>
       <form id="form-cliente" class="form">
-        <div class="form-group">
-          <label>Nome *</label>
-          <input type="text" name="nome" required>
+        <div class="form-section-title">Dados da Empresa</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Razão Social *</label>
+            <input type="text" name="razao_social" required>
+          </div>
+          <div class="form-group">
+            <label>Nome Fantasia</label>
+            <input type="text" name="nome_fantasia">
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>CPF/CNPJ</label>
-            <input type="text" name="cpf_cnpj">
+            <label>CNPJ / CPF</label>
+            <input type="text" name="cpf_cnpj" placeholder="00.000.000/0001-00">
           </div>
           <div class="form-group">
-            <label>Email</label>
+            <label>Status</label>
+            <select name="status">
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="suspenso">Suspenso</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Inscrição Estadual</label>
+            <input type="text" name="inscricao_estadual">
+          </div>
+          <div class="form-group">
+            <label>Inscrição Municipal</label>
+            <input type="text" name="inscricao_municipal">
+          </div>
+        </div>
+
+        <div class="form-section-title">Contato</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>E-mail</label>
             <input type="email" name="email">
           </div>
-        </div>
-        <div class="form-row">
           <div class="form-group">
             <label>Telefone</label>
             <input type="text" name="telefone">
           </div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
-            <label>Endereço</label>
-            <input type="text" name="endereco">
+            <label>Celular</label>
+            <input type="text" name="celular">
+          </div>
+          <div class="form-group">
+            <label>Site</label>
+            <input type="text" name="site" placeholder="https://">
           </div>
         </div>
+
+        <div class="form-section-title">Responsável</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome do Responsável</label>
+            <input type="text" name="responsavel_nome">
+          </div>
+          <div class="form-group">
+            <label>E-mail do Responsável</label>
+            <input type="email" name="responsavel_email">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Telefone do Responsável</label>
+            <input type="text" name="responsavel_telefone">
+          </div>
+        </div>
+
+        <div class="form-section-title">Endereço</div>
+        <div class="form-row">
+          <div class="form-group" style="max-width:160px">
+            <label>CEP</label>
+            <input type="text" name="cep" placeholder="00000-000">
+          </div>
+          <div class="form-group">
+            <label>Logradouro</label>
+            <input type="text" name="logradouro">
+          </div>
+          <div class="form-group" style="max-width:100px">
+            <label>Número</label>
+            <input type="text" name="numero">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Complemento</label>
+            <input type="text" name="complemento">
+          </div>
+          <div class="form-group">
+            <label>Bairro</label>
+            <input type="text" name="bairro">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cidade</label>
+            <input type="text" name="cidade">
+          </div>
+          <div class="form-group" style="max-width:100px">
+            <label>UF</label>
+            <select name="uf">
+              <option value="">--</option>
+              <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+              <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+              <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+              <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+              <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+              <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+              <option>SP</option><option>SE</option><option>TO</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section-title">Contrato</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Início do Contrato</label>
+            <input type="date" name="data_inicio_contrato">
+          </div>
+          <div class="form-group">
+            <label>Fim do Contrato</label>
+            <input type="date" name="data_fim_contrato">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea name="observacoes" rows="3"></textarea>
+        </div>
+
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
+          <button type="submit" class="btn btn-primary">Salvar Cliente</button>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- MODAL: FORNECEDOR -->
   <div id="modal-fornecedor" class="modal">
-    <div class="modal-content">
+    <div class="modal-content modal-lg">
       <div class="modal-header">
-        <h3>Novo Fornecedor</h3>
+        <h3 id="modal-fornecedor-titulo">Novo Fornecedor</h3>
         <button class="btn-close">&times;</button>
       </div>
       <form id="form-fornecedor" class="form">
-        <div class="form-group">
-          <label>Nome *</label>
-          <input type="text" name="nome" required>
+        <div class="form-section-title">Dados da Empresa</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Razão Social *</label>
+            <input type="text" name="razao_social" required>
+          </div>
+          <div class="form-group">
+            <label>Nome Fantasia</label>
+            <input type="text" name="nome_fantasia">
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>CNPJ</label>
-            <input type="text" name="cnpj">
+            <input type="text" name="cnpj" placeholder="00.000.000/0001-00">
           </div>
           <div class="form-group">
-            <label>Email</label>
-            <input type="email" name="email">
+            <label>Tipo</label>
+            <select name="tipo">
+              <option value="">Selecione...</option>
+              <option value="software">Software</option>
+              <option value="hardware">Hardware</option>
+              <option value="servico">Serviço</option>
+              <option value="consultoria">Consultoria</option>
+              <option value="outro">Outro</option>
+            </select>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
+            <label>Ramo de Atividade</label>
+            <input type="text" name="ramo">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status">
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section-title">Contato</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>E-mail</label>
+            <input type="email" name="email">
+          </div>
+          <div class="form-group">
             <label>Telefone</label>
             <input type="text" name="telefone">
           </div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
-            <label>Ramo</label>
-            <input type="text" name="ramo">
+            <label>Celular</label>
+            <input type="text" name="celular">
+          </div>
+          <div class="form-group">
+            <label>Site</label>
+            <input type="text" name="site" placeholder="https://">
           </div>
         </div>
+
+        <div class="form-section-title">Contato Principal</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome do Contato</label>
+            <input type="text" name="contato_nome">
+          </div>
+          <div class="form-group">
+            <label>E-mail do Contato</label>
+            <input type="email" name="contato_email">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea name="observacoes" rows="3"></textarea>
+        </div>
+
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
+          <button type="submit" class="btn btn-primary">Salvar Fornecedor</button>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- MODAL: TECNOLOGIA -->
+  <div id="modal-tecnologia" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-tecnologia-titulo">Nova Tecnologia</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-tecnologia" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome *</label>
+            <input type="text" name="nome" required>
+          </div>
+          <div class="form-group">
+            <label>Categoria</label>
+            <select name="categoria">
+              <option value="">Selecione...</option>
+              <option value="ERP">ERP</option>
+              <option value="CRM">CRM</option>
+              <option value="BI">BI / Analytics</option>
+              <option value="Infra">Infraestrutura</option>
+              <option value="Segurança">Segurança</option>
+              <option value="Comunicação">Comunicação</option>
+              <option value="Financeiro">Financeiro</option>
+              <option value="RH">RH</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Fabricante</label>
+            <input type="text" name="fabricante">
+          </div>
+          <div class="form-group">
+            <label>Versão</label>
+            <input type="text" name="versao">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status">
+              <option value="ativa">Ativa</option>
+              <option value="inativa">Inativa</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea name="descricao" rows="3"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Tecnologia</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHAMADO -->
+  <div id="modal-chamado" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-chamado-titulo">Novo Chamado</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-chamado" class="form">
+        <div class="form-group">
+          <label>Título *</label>
+          <input type="text" name="titulo" required placeholder="Descreva brevemente o problema...">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cliente *</label>
+            <select name="cliente_id" required id="select-cliente-chamado">
+              <option value="">Selecione o cliente...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tecnologia</label>
+            <select name="tecnologia_id" id="select-tecnologia-chamado">
+              <option value="">Selecione a tecnologia...</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Prioridade</label>
+            <select name="prioridade">
+              <option value="baixa">Baixa</option>
+              <option value="media" selected>Média</option>
+              <option value="alta">Alta</option>
+              <option value="critica">Crítica</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Categoria</label>
+            <input type="text" name="categoria" placeholder="Ex: Suporte, Bug, Dúvida...">
+          </div>
+        </div>
+        <div class="form-group" id="campo-status-chamado" style="display:none">
+          <label>Status</label>
+          <select name="status">
+            <option value="aberto">Aberto</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="aguardando_cliente">Aguardando cliente</option>
+            <option value="resolvido">Resolvido</option>
+            <option value="fechado">Fechado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea name="descricao" rows="4" placeholder="Descreva o problema com detalhes..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Chamado</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: DETALHE DO CHAMADO (com atendimentos) -->
+  <div id="modal-detalhe-chamado" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="detalhe-chamado-titulo">Chamado #0</h3>
+        <button class="btn-close" id="btn-close-detalhe">&times;</button>
+      </div>
+      <div id="detalhe-chamado-info" style="padding:1rem 1.5rem; background:#f8fafc; border-radius:8px; margin-bottom:1rem; font-size:0.9rem;">
+        <!-- Preenchido via JS -->
+      </div>
+
+      <div style="padding:0 0.5rem;">
+        <h4 style="margin-bottom:1rem; color:#0d6efd;">Timeline de Atendimentos</h4>
+        <div id="timeline-atendimentos" style="margin-bottom:1.5rem;">
+          <!-- Preenchido via JS -->
+        </div>
+
+        <div style="border-top:1px solid #e2e8f0; padding-top:1rem;">
+          <h4 style="margin-bottom:0.75rem; color:#1e293b;">Registrar Atendimento</h4>
+          <form id="form-atendimento" class="form">
+            <input type="hidden" name="chamado_id" id="atendimento-chamado-id">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tipo</label>
+                <select name="tipo">
+                  <option value="comentario">Comentário</option>
+                  <option value="contato_cliente">Contato com cliente</option>
+                  <option value="escalamento">Escalamento</option>
+                  <option value="solucao">Solução (fecha chamado)</option>
+                </select>
+              </div>
+              <div class="form-group" style="max-width:160px">
+                <label>Tempo (min)</label>
+                <input type="number" name="tempo_gasto_minutos" min="0" value="0">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Descrição *</label>
+              <textarea name="descricao" rows="3" required placeholder="Descreva o atendimento realizado..."></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Registrar Atendimento</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: USUÁRIO -->
+  <div id="modal-usuario" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-usuario-titulo">Novo Usuário</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-usuario" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome *</label>
+            <input type="text" name="nome" required>
+          </div>
+          <div class="form-group">
+            <label>E-mail *</label>
+            <input type="email" name="email" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Perfil *</label>
+            <select name="tipo" id="select-tipo-usuario" onchange="toggleClienteSelect()">
+              <option value="tecnico">Técnico (acesso interno)</option>
+              <option value="cliente">Cliente (acesso ao portal)</option>
+              <option value="admin_empresa">Administrador</option>
+            </select>
+          </div>
+          <div class="form-group" id="campo-cliente-usuario">
+            <label>Cliente vinculado *</label>
+            <select name="cliente_id" id="select-cliente-usuario">
+              <option value="">Selecione o cliente...</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" id="campo-senha-usuario">
+          <label>Senha *</label>
+          <input type="password" name="senha" placeholder="Mínimo 6 caracteres">
+          <small style="color:#94a3b8; font-size:0.78rem">O usuário pode alterar a senha após o primeiro acesso.</small>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Criar Usuário</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RESET SENHA -->
+  <div id="modal-reset-senha" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Redefinir Senha</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-reset-senha" class="form">
+        <input type="hidden" id="reset-usuario-id">
+        <div class="form-group">
+          <label>Nova senha para <strong id="reset-usuario-nome"></strong></label>
+          <input type="password" name="nova_senha" required placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Redefinir Senha</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TRANSAÇÃO -->
   <div id="modal-transacao" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -301,19 +856,27 @@
   <nav class="bottom-nav">
     <button class="bottom-nav-item active" data-page="dashboard">
       <span class="bn-icon">📊</span>
-      <span>Dashboard</span>
+      <span>Home</span>
     </button>
     <button class="bottom-nav-item" data-page="clientes">
       <span class="bn-icon">👥</span>
       <span>Clientes</span>
     </button>
-    <button class="bottom-nav-item" data-page="fornecedores">
-      <span class="bn-icon">🏢</span>
-      <span>Fornecedores</span>
+    <button class="bottom-nav-item" data-page="tecnologias">
+      <span class="bn-icon">💻</span>
+      <span>Tecno</span>
+    </button>
+    <button class="bottom-nav-item" data-page="chamados">
+      <span class="bn-icon">🎫</span>
+      <span>Chamados</span>
     </button>
     <button class="bottom-nav-item" data-page="transacoes">
       <span class="bn-icon">💰</span>
-      <span>Transações</span>
+      <span>Finanças</span>
+    </button>
+    <button class="bottom-nav-item" data-page="usuarios">
+      <span class="bn-icon">🔑</span>
+      <span>Usuários</span>
     </button>
   </nav>
 

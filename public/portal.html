@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal do Cliente — Marsh Consultoria</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0066cc" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0d1b2a;
+      --navy-mid: #1a2f4a;
+      --blue: #0d6efd;
+      --blue-light: #4da3ff;
+      --cyan: #00c8ff;
+      --accent: #00e5b4;
+      --white: #ffffff;
+      --grey-50: #f8fafc;
+      --grey-100: #f1f5f9;
+      --grey-200: #e2e8f0;
+      --grey-400: #94a3b8;
+      --grey-600: #475569;
+      --grey-800: #1e293b;
+      --red: #ef4444;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--grey-50);
+      color: var(--grey-800);
+      line-height: 1.6;
+    }
+
+    /* ===== HEADER ===== */
+    .portal-header {
+      background: var(--navy);
+      color: white;
+      padding: 0 1.5rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(0,200,255,0.15);
+    }
+
+    .portal-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .portal-brand .logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .portal-brand h1 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .portal-brand small {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--cyan);
+      font-weight: 400;
+    }
+
+    .portal-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .btn-sair {
+      padding: 0.3rem 0.8rem;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.6);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: 0.2s;
+    }
+    .btn-sair:hover { border-color: rgba(255,255,255,0.4); color: white; }
+
+    /* ===== MAIN ===== */
+    .portal-main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ===== WELCOME ===== */
+    .welcome-bar {
+      background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+      color: white;
+      border-radius: var(--radius);
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .welcome-bar h2 { font-size: 1.2rem; }
+    .welcome-bar p { font-size: 0.85rem; color: rgba(255,255,255,0.6); margin-top: 0.25rem; }
+
+    .btn-novo-chamado {
+      padding: 0.65rem 1.4rem;
+      background: var(--cyan);
+      color: var(--navy);
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: 0.2s;
+      white-space: nowrap;
+    }
+    .btn-novo-chamado:hover { background: var(--blue-light); color: white; }
+
+    /* ===== STATS ===== */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-box {
+      background: white;
+      border-radius: var(--radius);
+      padding: 1.2rem;
+      text-align: center;
+      border: 1px solid var(--grey-200);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .stat-box .num {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-box .lbl {
+      font-size: 0.78rem;
+      color: var(--grey-400);
+      margin-top: 0.25rem;
+    }
+
+    /* ===== CHAMADOS LIST ===== */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .section-header h3 { font-size: 1rem; font-weight: 600; }
+
+    .filtros {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .filtro-btn {
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      border: 1px solid var(--grey-200);
+      background: white;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: 0.2s;
+      color: var(--grey-600);
+    }
+    .filtro-btn.active {
+      background: var(--blue);
+      color: white;
+      border-color: var(--blue);
+    }
+
+    .chamado-card {
+      background: white;
+      border: 1px solid var(--grey-200);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: 0.2s;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .chamado-card:hover {
+      border-color: var(--blue);
+      box-shadow: 0 4px 16px rgba(13,110,253,0.08);
+    }
+
+    .chamado-id {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--grey-400);
+      white-space: nowrap;
+      min-width: 40px;
+      padding-top: 2px;
+    }
+
+    .chamado-body { flex: 1; }
+
+    .chamado-titulo {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: var(--grey-800);
+    }
+
+    .chamado-meta {
+      font-size: 0.78rem;
+      color: var(--grey-400);
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .chamado-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .badge {
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.show { display: flex; }
+
+    .modal-box {
+      background: white;
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--grey-200);
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 1;
+    }
+
+    .modal-top h3 { font-size: 1rem; }
+
+    .btn-fechar {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--grey-400);
+      line-height: 1;
+    }
+
+    .modal-body { padding: 1.25rem 1.5rem; }
+
+    /* Detalhe do chamado */
+    .chamado-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      background: var(--grey-50);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .chamado-info-grid div strong { color: var(--grey-600); display: block; font-size: 0.75rem; }
+
+    /* Timeline */
+    .timeline { margin-bottom: 1.5rem; }
+    .timeline h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--blue); }
+
+    .tl-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .tl-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .tl-content {
+      flex: 1;
+      background: var(--grey-50);
+      border: 1px solid var(--grey-200);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+    }
+
+    .tl-meta {
+      font-size: 0.75rem;
+      color: var(--grey-400);
+      margin-bottom: 4px;
+    }
+
+    /* Form de comentário */
+    .form-comentario { border-top: 1px solid var(--grey-200); padding-top: 1.25rem; }
+    .form-comentario h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; }
+
+    .form-comentario textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--grey-200);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 90px;
+    }
+    .form-comentario textarea:focus {
+      outline: none;
+      border-color: var(--blue);
+    }
+
+    .btn-comentar {
+      margin-top: 0.75rem;
+      padding: 0.6rem 1.25rem;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    /* Form novo chamado */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--grey-600);
+      margin-bottom: 0.3rem;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.65rem 0.9rem;
+      border: 1px solid var(--grey-200);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--blue);
+    }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    .btn-salvar {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--grey-400);
+    }
+
+    .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-state p { font-size: 0.9rem; }
+
+    @media (max-width: 600px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .chamado-info-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .welcome-bar { flex-direction: column; align-items: flex-start; }
+      .filtros { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="portal-header">
+    <div class="portal-brand">
+      <div class="logo">M</div>
+      <div>
+        <h1>Marsh Consultoria</h1>
+        <small id="header-empresa">Portal do Cliente</small>
+      </div>
+    </div>
+    <div class="portal-user">
+      <span id="header-usuario">...</span>
+      <button class="btn-sair" onclick="sair()">Sair</button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="portal-main">
+
+    <!-- Welcome -->
+    <div class="welcome-bar">
+      <div>
+        <h2 id="welcome-nome">Olá!</h2>
+        <p id="welcome-empresa">Acompanhe seus chamados de suporte</p>
+      </div>
+      <button class="btn-novo-chamado" onclick="abrirModalNovoChamado()">+ Novo Chamado</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="num" id="stat-abertos" style="color:#0d6efd">0</div>
+        <div class="lbl">Abertos</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="stat-andamento" style="color:#f59e0b">0</div>
+        <div class="lbl">Em andamento</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="stat-resolvidos" style="color:#10b981">0</div>
+        <div class="lbl">Resolvidos</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="stat-total" style="color:#64748b">0</div>
+        <div class="lbl">Total</div>
+      </div>
+    </div>
+
+    <!-- Lista de chamados -->
+    <div>
+      <div class="section-header">
+        <h3>Meus Chamados</h3>
+        <div class="filtros">
+          <button class="filtro-btn active" data-filtro="" onclick="filtrarChamados(this, '')">Todos</button>
+          <button class="filtro-btn" data-filtro="aberto" onclick="filtrarChamados(this, 'aberto')">Abertos</button>
+          <button class="filtro-btn" data-filtro="em_andamento" onclick="filtrarChamados(this, 'em_andamento')">Em andamento</button>
+          <button class="filtro-btn" data-filtro="resolvido" onclick="filtrarChamados(this, 'resolvido')">Resolvidos</button>
+        </div>
+      </div>
+      <div id="lista-chamados">
+        <div class="empty-state"><div class="icon">⏳</div><p>Carregando...</p></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: DETALHE DO CHAMADO -->
+  <div class="modal-overlay" id="modal-detalhe">
+    <div class="modal-box">
+      <div class="modal-top">
+        <h3 id="detalhe-titulo">Chamado #0</h3>
+        <button class="btn-fechar" onclick="fecharModal('modal-detalhe')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="chamado-info-grid" id="detalhe-info"></div>
+
+        <div class="timeline">
+          <h4>Histórico de Atendimentos</h4>
+          <div id="detalhe-timeline"></div>
+        </div>
+
+        <div class="form-comentario" id="form-comentario-wrapper">
+          <h4>Adicionar comentário</h4>
+          <form id="form-comentario" onsubmit="enviarComentario(event)">
+            <input type="hidden" id="comentario-chamado-id">
+            <textarea name="descricao" placeholder="Descreva sua dúvida ou informação adicional..." required></textarea>
+            <button type="submit" class="btn-comentar">Enviar comentário</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVO CHAMADO -->
+  <div class="modal-overlay" id="modal-novo-chamado">
+    <div class="modal-box">
+      <div class="modal-top">
+        <h3>Abrir Novo Chamado</h3>
+        <button class="btn-fechar" onclick="fecharModal('modal-novo-chamado')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-novo-chamado" onsubmit="salvarNovoChamado(event)">
+          <div class="form-group">
+            <label>Título *</label>
+            <input type="text" name="titulo" required placeholder="Descreva brevemente o problema...">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prioridade</label>
+              <select name="prioridade">
+                <option value="baixa">Baixa</option>
+                <option value="media" selected>Média</option>
+                <option value="alta">Alta</option>
+                <option value="critica">Crítica</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tecnologia</label>
+              <select name="tecnologia_id" id="select-tecnologia-portal">
+                <option value="">Nenhuma / Geral</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Descrição detalhada</label>
+            <textarea name="descricao" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível..."></textarea>
+          </div>
+          <button type="submit" class="btn-salvar">Abrir Chamado</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="portal-script.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
+</body>
+</html>
