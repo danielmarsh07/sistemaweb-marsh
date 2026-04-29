@@ -129,9 +129,18 @@ function setupEventListeners() {
     });
   });
 
+  // Fecha o modal só quando o usuário clicou no backdrop (mousedown E mouseup no backdrop).
+  // Evita fechar quando o usuário começa a selecionar texto dentro do form e solta o mouse fora.
   document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal(modal);
+    let mousedownNoBackdrop = false;
+    modal.addEventListener('mousedown', (e) => {
+      mousedownNoBackdrop = (e.target === modal);
+    });
+    modal.addEventListener('mouseup', (e) => {
+      if (mousedownNoBackdrop && e.target === modal) {
+        closeModal(modal);
+      }
+      mousedownNoBackdrop = false;
     });
   });
 
