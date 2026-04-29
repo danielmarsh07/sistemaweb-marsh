@@ -307,6 +307,14 @@ async function loadClientes() {
 
 async function salvarCliente() {
   const form = document.getElementById('form-cliente');
+
+  // Validação client-side de CPF/CNPJ (não bloqueia se vazio)
+  if (form.cpf_cnpj.value && !validarDocumentoFront(form.cpf_cnpj.value)) {
+    alert('CPF/CNPJ inválido. Verifique os dígitos.');
+    form.cpf_cnpj.focus();
+    return;
+  }
+
   const dados = {
     razao_social: form.razao_social.value,
     nome_fantasia: form.nome_fantasia.value,
@@ -330,7 +338,10 @@ async function salvarCliente() {
     uf: form.uf.value,
     data_inicio_contrato: form.data_inicio_contrato.value || null,
     data_fim_contrato: form.data_fim_contrato.value || null,
-    observacoes: form.observacoes.value
+    observacoes: form.observacoes.value,
+    segmento: form.segmento ? form.segmento.value : null,
+    porte: form.porte ? form.porte.value : null,
+    tier_sla: form.tier_sla ? form.tier_sla.value : null
   };
 
   try {
@@ -365,7 +376,8 @@ async function editarCliente(id) {
   const fields = ['razao_social','nome_fantasia','cpf_cnpj','inscricao_estadual',
     'inscricao_municipal','email','telefone','celular','site','responsavel_nome',
     'responsavel_email','responsavel_telefone','cep','logradouro','numero',
-    'complemento','bairro','cidade','uf','observacoes'];
+    'complemento','bairro','cidade','uf','observacoes',
+    'segmento','porte','tier_sla'];
 
   fields.forEach(f => {
     if (form[f]) form[f].value = c[f] || '';
@@ -423,6 +435,14 @@ async function loadFornecedores() {
 
 async function salvarFornecedor() {
   const form = document.getElementById('form-fornecedor');
+
+  // Validação client-side de CNPJ (não bloqueia se vazio)
+  if (form.cnpj.value && !validarCNPJFront(form.cnpj.value)) {
+    alert('CNPJ inválido. Verifique os dígitos.');
+    form.cnpj.focus();
+    return;
+  }
+
   const dados = {
     razao_social: form.razao_social.value,
     nome_fantasia: form.nome_fantasia.value,
@@ -436,7 +456,14 @@ async function salvarFornecedor() {
     site: form.site.value,
     contato_nome: form.contato_nome.value,
     contato_email: form.contato_email.value,
-    observacoes: form.observacoes.value
+    observacoes: form.observacoes.value,
+    cep: form.cep ? form.cep.value : null,
+    logradouro: form.logradouro ? form.logradouro.value : null,
+    numero: form.numero ? form.numero.value : null,
+    complemento: form.complemento ? form.complemento.value : null,
+    bairro: form.bairro ? form.bairro.value : null,
+    cidade: form.cidade ? form.cidade.value : null,
+    uf: form.uf ? form.uf.value : null
   };
 
   try {
@@ -469,7 +496,8 @@ async function editarFornecedor(id) {
   const form = document.getElementById('form-fornecedor');
 
   const fields = ['razao_social','nome_fantasia','cnpj','ramo','email','telefone',
-    'celular','site','contato_nome','contato_email','observacoes'];
+    'celular','site','contato_nome','contato_email','observacoes',
+    'cep','logradouro','numero','complemento','bairro','cidade','uf'];
   fields.forEach(field => {
     if (form[field]) form[field].value = f[field] || '';
   });
@@ -1043,6 +1071,44 @@ function formatDataHora(val) {
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Validação de CPF/CNPJ no client-side (mesma lógica do services/validacao.js)
+function _digits(s) { return String(s || '').replace(/\D/g, ''); }
+
+function validarCPFFront(cpf) {
+  const d = _digits(cpf);
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let s = 0;
+  for (let i = 0; i < 9; i++) s += parseInt(d[i]) * (10 - i);
+  let v = (s * 10) % 11; if (v === 10) v = 0;
+  if (v !== parseInt(d[9])) return false;
+  s = 0;
+  for (let i = 0; i < 10; i++) s += parseInt(d[i]) * (11 - i);
+  v = (s * 10) % 11; if (v === 10) v = 0;
+  return v === parseInt(d[10]);
+}
+
+function validarCNPJFront(cnpj) {
+  const d = _digits(cnpj);
+  if (d.length !== 14 || /^(\d)\1+$/.test(d)) return false;
+  const p1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+  let s = 0;
+  for (let i = 0; i < 12; i++) s += parseInt(d[i]) * p1[i];
+  let v = s % 11; v = v < 2 ? 0 : 11 - v;
+  if (v !== parseInt(d[12])) return false;
+  const p2 = [6, ...p1];
+  s = 0;
+  for (let i = 0; i < 13; i++) s += parseInt(d[i]) * p2[i];
+  v = s % 11; v = v < 2 ? 0 : 11 - v;
+  return v === parseInt(d[13]);
+}
+
+function validarDocumentoFront(doc) {
+  const d = _digits(doc);
+  if (d.length === 11) return validarCPFFront(d);
+  if (d.length === 14) return validarCNPJFront(d);
+  return false;
 }
 
 // Linha de auditoria: "Criado por X em DD/MM • Editado por Y em DD/MM"

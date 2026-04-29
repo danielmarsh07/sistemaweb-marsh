@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { validarCNPJ } = require('../services/validacao');
 
 // Helper: converte string vazia em null
 const v = (val) => (val === '' || val === undefined) ? null : val;
@@ -56,11 +57,16 @@ router.post('/', async (req, res) => {
     razao_social, nome_fantasia, cnpj,
     email, telefone, celular, site, ramo, tipo,
     contato_nome, contato_email,
-    status, observacoes
+    status, observacoes,
+    cep, logradouro, numero, complemento, bairro, cidade, uf
   } = req.body;
 
   if (!razao_social) {
     return res.status(400).json({ erro: 'Razão social é obrigatória' });
+  }
+
+  if (cnpj && !validarCNPJ(cnpj)) {
+    return res.status(400).json({ erro: 'CNPJ inválido. Verifique os dígitos.' });
   }
 
   try {
@@ -80,8 +86,11 @@ router.post('/', async (req, res) => {
         empresa_id, nome, razao_social, nome_fantasia, cnpj,
         email, telefone, celular, site, ramo, tipo,
         contato_nome, contato_email, status, observacoes,
+        cep, logradouro, numero, complemento, bairro, cidade, uf,
         criado_por_usuario_id, ativo
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, TRUE)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                $16, $17, $18, $19, $20, $21, $22,
+                $23, TRUE)
       RETURNING *`,
       [
         empresa_id,
@@ -91,6 +100,8 @@ router.post('/', async (req, res) => {
         ramo || null, tipo || null,
         contato_nome || null, contato_email || null,
         status || 'ativo', observacoes || null,
+        cep || null, logradouro || null, numero || null, complemento || null,
+        bairro || null, cidade || null, uf || null,
         req.usuario.id
       ]
     );
@@ -106,8 +117,13 @@ router.put('/:id', async (req, res) => {
   const {
     razao_social, nome_fantasia, cnpj,
     email, telefone, celular, site, ramo, tipo,
-    contato_nome, contato_email, status, observacoes
+    contato_nome, contato_email, status, observacoes,
+    cep, logradouro, numero, complemento, bairro, cidade, uf
   } = req.body;
+
+  if (cnpj && cnpj.trim() !== '' && !validarCNPJ(cnpj)) {
+    return res.status(400).json({ erro: 'CNPJ inválido. Verifique os dígitos.' });
+  }
 
   try {
     const atual = await pool.query(
@@ -137,8 +153,9 @@ router.put('/:id', async (req, res) => {
         nome=$1, razao_social=$2, nome_fantasia=$3, cnpj=$4,
         email=$5, telefone=$6, celular=$7, site=$8, ramo=$9, tipo=$10,
         contato_nome=$11, contato_email=$12, status=$13, observacoes=$14,
-        atualizado_por_usuario_id=$15, data_atualizacao=NOW()
-       WHERE id=$16 AND empresa_id=$17
+        cep=$15, logradouro=$16, numero=$17, complemento=$18, bairro=$19, cidade=$20, uf=$21,
+        atualizado_por_usuario_id=$22, data_atualizacao=NOW()
+       WHERE id=$23 AND empresa_id=$24
        RETURNING *`,
       [
         novaRazao, novaRazao,
@@ -154,6 +171,13 @@ router.put('/:id', async (req, res) => {
         v(contato_email) ?? f.contato_email,
         v(status) || f.status || 'ativo',
         v(observacoes) ?? f.observacoes,
+        v(cep) ?? f.cep,
+        v(logradouro) ?? f.logradouro,
+        v(numero) ?? f.numero,
+        v(complemento) ?? f.complemento,
+        v(bairro) ?? f.bairro,
+        v(cidade) ?? f.cidade,
+        v(uf) ?? f.uf,
         req.usuario.id,
         req.params.id, empresa_id
       ]

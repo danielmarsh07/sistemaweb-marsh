@@ -285,6 +285,20 @@ async function iniciar() {
       await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS data_atualizacao TIMESTAMP;`);
     }
 
+    // 16. Fase 2 — campos adicionais de classificação em clientes
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS segmento VARCHAR(50);`);
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS porte VARCHAR(20);`);
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tier_sla VARCHAR(20);`);
+
+    // 17. Fase 2 — endereço completo em fornecedores (espelho de clientes)
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS cep VARCHAR(20);`);
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS logradouro VARCHAR(255);`);
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS numero VARCHAR(20);`);
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS complemento VARCHAR(100);`);
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS bairro VARCHAR(100);`);
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS cidade VARCHAR(100);`);
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS uf VARCHAR(2);`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

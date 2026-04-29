@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { validarDocumento } = require('../services/validacao');
 
 // GET - Listar clientes da empresa logada
 router.get('/', async (req, res) => {
@@ -70,11 +71,17 @@ router.post('/', async (req, res) => {
     email, telefone, celular, site,
     responsavel_nome, responsavel_email, responsavel_telefone,
     cep, logradouro, numero, complemento, bairro, cidade, uf,
-    status, data_inicio_contrato, data_fim_contrato, observacoes
+    status, data_inicio_contrato, data_fim_contrato, observacoes,
+    segmento, porte, tier_sla
   } = req.body;
 
   if (!razao_social) {
     return res.status(400).json({ erro: 'Razão social é obrigatória' });
+  }
+
+  // Validar formato/dígito do CPF/CNPJ se preenchido
+  if (cpf_cnpj && !validarDocumento(cpf_cnpj)) {
+    return res.status(400).json({ erro: 'CPF/CNPJ inválido. Verifique os dígitos.' });
   }
 
   try {
@@ -97,6 +104,7 @@ router.post('/', async (req, res) => {
         responsavel_nome, responsavel_email, responsavel_telefone,
         cep, logradouro, numero, complemento, bairro, cidade, uf,
         status, data_inicio_contrato, data_fim_contrato, observacoes,
+        segmento, porte, tier_sla,
         criado_por_usuario_id, ativo
       ) VALUES (
         $1, $2, $3, $4, $5,
@@ -105,7 +113,8 @@ router.post('/', async (req, res) => {
         $12, $13, $14,
         $15, $16, $17, $18, $19, $20, $21,
         $22, $23, $24, $25,
-        $26, TRUE
+        $26, $27, $28,
+        $29, TRUE
       ) RETURNING *`,
       [
         empresa_id,
@@ -119,6 +128,7 @@ router.post('/', async (req, res) => {
         status || 'ativo',
         data_inicio_contrato || null, data_fim_contrato || null,
         observacoes || null,
+        segmento || null, porte || null, tier_sla || null,
         req.usuario.id
       ]
     );
@@ -141,8 +151,14 @@ router.put('/:id', async (req, res) => {
     email, telefone, celular, site,
     responsavel_nome, responsavel_email, responsavel_telefone,
     cep, logradouro, numero, complemento, bairro, cidade, uf,
-    status, data_inicio_contrato, data_fim_contrato, observacoes
+    status, data_inicio_contrato, data_fim_contrato, observacoes,
+    segmento, porte, tier_sla
   } = req.body;
+
+  // Validar formato/dígito do CPF/CNPJ se preenchido
+  if (cpf_cnpj && cpf_cnpj.trim() !== '' && !validarDocumento(cpf_cnpj)) {
+    return res.status(400).json({ erro: 'CPF/CNPJ inválido. Verifique os dígitos.' });
+  }
 
   try {
     // Usa IS NOT FALSE para pegar registros com ativo=TRUE e ativo=NULL (migração)
@@ -178,8 +194,9 @@ router.put('/:id', async (req, res) => {
         responsavel_nome=$11, responsavel_email=$12, responsavel_telefone=$13,
         cep=$14, logradouro=$15, numero=$16, complemento=$17, bairro=$18, cidade=$19, uf=$20,
         status=$21, data_inicio_contrato=$22::date, data_fim_contrato=$23::date, observacoes=$24,
-        atualizado_por_usuario_id=$25, data_atualizacao=NOW()
-       WHERE id=$26 AND empresa_id=$27
+        segmento=$25, porte=$26, tier_sla=$27,
+        atualizado_por_usuario_id=$28, data_atualizacao=NOW()
+       WHERE id=$29 AND empresa_id=$30
        RETURNING *`,
       [
         novaRazao,
@@ -206,6 +223,9 @@ router.put('/:id', async (req, res) => {
         v(data_inicio_contrato) || null,
         v(data_fim_contrato) || null,
         v(observacoes) ?? c.observacoes,
+        v(segmento) ?? c.segmento,
+        v(porte) ?? c.porte,
+        v(tier_sla) ?? c.tier_sla,
         req.usuario.id,
         req.params.id,
         empresa_id
