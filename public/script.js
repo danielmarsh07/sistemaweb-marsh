@@ -266,8 +266,8 @@ function renderDashboardChamados(chamados) {
   tbody.innerHTML = chamados.map(ch => `
     <tr style="cursor:pointer" onclick="abrirDetalheChamado(${ch.id})">
       <td>#${ch.id}</td>
-      <td>${ch.titulo}</td>
-      <td>${ch.cliente_nome || '-'}</td>
+      <td>${escapeHtml(ch.titulo)}</td>
+      <td>${escapeHtml(ch.cliente_nome || '-')}</td>
       <td>${badgeStatus(ch.status)}</td>
       <td>${badgePrioridade(ch.prioridade)}</td>
       <td>${formatData(ch.data_criacao)}</td>
@@ -290,13 +290,13 @@ async function loadClientes() {
   tbody.innerHTML = clientes.map(c => `
     <tr>
       <td>
-        <strong>${c.razao_social || c.nome}</strong>
-        ${c.nome_fantasia ? `<br><small style="color:#94a3b8">${c.nome_fantasia}</small>` : ''}
+        <strong>${escapeHtml(c.razao_social || c.nome)}</strong>
+        ${c.nome_fantasia ? `<br><small style="color:#94a3b8">${escapeHtml(c.nome_fantasia)}</small>` : ''}
         ${auditMeta(c)}
       </td>
-      <td>${c.cpf_cnpj || '-'}</td>
-      <td>${c.responsavel_nome || c.email || '-'}</td>
-      <td>${c.telefone || c.celular || '-'}</td>
+      <td>${escapeHtml(c.cpf_cnpj || '-')}</td>
+      <td>${escapeHtml(c.responsavel_nome || c.email || '-')}</td>
+      <td>${escapeHtml(c.telefone || c.celular || '-')}</td>
       <td>${badgeStatusGeral(c.status)}</td>
       <td>
         ${parseInt(c.chamados_abertos) > 0
@@ -424,13 +424,13 @@ async function loadFornecedores() {
   tbody.innerHTML = lista.map(f => `
     <tr>
       <td>
-        <strong>${f.razao_social || f.nome}</strong>
-        ${f.nome_fantasia ? `<br><small style="color:#94a3b8">${f.nome_fantasia}</small>` : ''}
+        <strong>${escapeHtml(f.razao_social || f.nome)}</strong>
+        ${f.nome_fantasia ? `<br><small style="color:#94a3b8">${escapeHtml(f.nome_fantasia)}</small>` : ''}
         ${auditMeta(f)}
       </td>
-      <td>${f.cnpj || '-'}</td>
-      <td>${f.tipo ? capitalize(f.tipo) : (f.ramo || '-')}</td>
-      <td>${f.contato_nome || f.email || '-'}</td>
+      <td>${escapeHtml(f.cnpj || '-')}</td>
+      <td>${f.tipo ? escapeHtml(capitalize(f.tipo)) : escapeHtml(f.ramo || '-')}</td>
+      <td>${escapeHtml(f.contato_nome || f.email || '-')}</td>
       <td>${badgeStatusGeral(f.status)}</td>
       <td>
         <button class="btn btn-edit" onclick="editarFornecedor(${f.id})">Editar</button>
@@ -540,12 +540,12 @@ async function loadTecnologias() {
   tbody.innerHTML = lista.map(t => `
     <tr>
       <td>
-        <strong>${t.nome}</strong>
+        <strong>${escapeHtml(t.nome)}</strong>
         ${auditMeta(t)}
       </td>
-      <td>${t.categoria || '-'}</td>
-      <td>${t.fabricante || '-'}</td>
-      <td>${t.versao || '-'}</td>
+      <td>${escapeHtml(t.categoria || '-')}</td>
+      <td>${escapeHtml(t.fabricante || '-')}</td>
+      <td>${escapeHtml(t.versao || '-')}</td>
       <td>${t.total_clientes || 0} cliente(s)</td>
       <td>${badgeStatusTec(t.status)}</td>
       <td>
@@ -661,15 +661,15 @@ async function loadChamados() {
     return `
     <tr${naoLidos > 0 ? ' class="row-novidade"' : ''}>
       <td><strong>#${ch.id}</strong></td>
-      <td style="max-width:240px;" title="${ch.titulo}">
+      <td style="max-width:240px;" title="${escapeHtml(ch.titulo)}">
         <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
-          ${ch.titulo}
+          ${escapeHtml(ch.titulo)}
           ${naoLidos > 0 ? `<span class="badge-novo-dash" title="${naoLidos} não lido(s)">${naoLidos}</span>` : ''}
         </div>
         ${auditMeta(ch)}
       </td>
-      <td>${ch.cliente_nome || '-'}</td>
-      <td>${ch.tecnologia_nome || '-'}</td>
+      <td>${escapeHtml(ch.cliente_nome || '-')}</td>
+      <td>${escapeHtml(ch.tecnologia_nome || '-')}</td>
       <td>${badgeStatus(ch.status)}${badgeSlaInline(ch.sla)}</td>
       <td>${badgePrioridade(ch.prioridade)}${ch.avaliacao_nota ? `<br><small style="color:#f59e0b">${'★'.repeat(ch.avaliacao_nota)}</small>` : ''}</td>
       <td>${formatData(ch.data_criacao)}</td>
@@ -762,7 +762,7 @@ function renderListaPendentesChamado() {
   if (!ul) return;
   ul.innerHTML = arquivosPendentesChamado.map((a, i) => `
     <li>
-      <span class="nome" title="${a.name}">📎 ${a.name}</span>
+      <span class="nome" title="${escapeHtml(a.name)}">📎 ${escapeHtml(a.name)}</span>
       <span class="tamanho">${formatarTamanhoDash(a.size)}</span>
       <button type="button" class="remover" onclick="removerPendenteChamado(${i})" title="Remover">×</button>
     </li>
@@ -881,19 +881,19 @@ async function abrirDetalheChamado(id) {
 
   document.getElementById('detalhe-chamado-info').innerHTML = `
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:0.75rem;">
-      <div><strong>Cliente:</strong> ${ch.cliente_nome || '-'}</div>
-      <div><strong>Tecnologia:</strong> ${ch.tecnologia_nome || '-'}</div>
+      <div><strong>Cliente:</strong> ${escapeHtml(ch.cliente_nome || '-')}</div>
+      <div><strong>Tecnologia:</strong> ${escapeHtml(ch.tecnologia_nome || '-')}</div>
       <div><strong>Status:</strong> ${badgeStatus(ch.status)}</div>
       <div><strong>Prioridade:</strong> ${badgePrioridade(ch.prioridade)}</div>
       ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA:</strong> ${badgeSlaInlineDetalhe(ch.sla)}</div>` : ''}
-      <div><strong>Categoria:</strong> ${ch.categoria || '-'}</div>
+      <div><strong>Categoria:</strong> ${escapeHtml(ch.categoria || '-')}</div>
       <div><strong>Abertura:</strong> ${formatData(ch.data_abertura)}</div>
-      <div><strong>Aberto por:</strong> ${ch.aberto_por_nome || '-'}</div>
-      <div><strong>Atribuído para:</strong> ${ch.atribuido_para_nome || '-'}</div>
+      <div><strong>Aberto por:</strong> ${escapeHtml(ch.aberto_por_nome || '-')}</div>
+      <div><strong>Atribuído para:</strong> ${escapeHtml(ch.atribuido_para_nome || '-')}</div>
       ${ch.avaliacao ? `<div><strong>Avaliação:</strong> <span style="color:#f59e0b">${'★'.repeat(ch.avaliacao.nota)}${'☆'.repeat(5 - ch.avaliacao.nota)}</span></div>` : ''}
     </div>
-    ${ch.descricao ? `<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #e2e8f0"><strong>Descrição:</strong><br>${ch.descricao}</div>` : ''}
-    ${ch.avaliacao && ch.avaliacao.comentario ? `<div style="margin-top:0.75rem; padding:0.75rem; background:#fef3c720; border-left:3px solid #f59e0b; border-radius:6px"><strong>Comentário do cliente:</strong><br><em>"${ch.avaliacao.comentario}"</em></div>` : ''}
+    ${ch.descricao ? `<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #e2e8f0"><strong>Descrição:</strong><br>${escapeHtml(ch.descricao)}</div>` : ''}
+    ${ch.avaliacao && ch.avaliacao.comentario ? `<div style="margin-top:0.75rem; padding:0.75rem; background:#fef3c720; border-left:3px solid #f59e0b; border-radius:6px"><strong>Comentário do cliente:</strong><br><em>"${escapeHtml(ch.avaliacao.comentario)}"</em></div>` : ''}
   `;
 
   renderTimeline(ch.atendimentos || []);
@@ -927,12 +927,13 @@ function renderAnexosDashboard(ch) {
       <div class="thumbs-grid-dash">
         ${imagens.map(a => `
           <div class="thumb-card-dash">
-            <div class="thumb-img-dash" style="background-image:url('${a.preview_url}')"
-                 onclick="abrirLightboxDash('${a.preview_url}', '${a.nome_original.replace(/'/g, "\\'")}')"></div>
+            <div class="thumb-img-dash" style="background-image:url('${escapeHtml(a.preview_url)}')"
+                 data-url="${escapeHtml(a.preview_url)}" data-legenda="${escapeHtml(a.nome_original)}"
+                 onclick="abrirLightboxDashFromCard(this)"></div>
             <div class="thumb-info-dash">
-              <span title="${a.nome_original}">${a.nome_original}</span>
+              <span title="${escapeHtml(a.nome_original)}">${escapeHtml(a.nome_original)}</span>
               <div class="thumb-actions-dash">
-                <small>${formatarTamanhoDash(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</small>
+                <small>${formatarTamanhoDash(a.tamanho_bytes)} · ${escapeHtml(a.enviado_por_nome || '')}</small>
                 <button class="btn btn-danger" onclick="removerAnexoDashboard(${ch.id}, ${a.id})">×</button>
               </div>
             </div>
@@ -945,8 +946,8 @@ function renderAnexosDashboard(ch) {
       <ul style="list-style:none; padding:0; margin-bottom:8px;">
         ${arquivos.map(a => `
           <li style="display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
-            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${a.nome_original}">📎 ${a.nome_original}</span>
-            <span style="font-size:11px; color:#94a3b8;">${formatarTamanhoDash(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
+            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(a.nome_original)}">📎 ${escapeHtml(a.nome_original)}</span>
+            <span style="font-size:11px; color:#94a3b8;">${formatarTamanhoDash(a.tamanho_bytes)} · ${escapeHtml(a.enviado_por_nome || '')}</span>
             <button class="btn btn-edit" onclick="baixarAnexoDashboard(${ch.id}, ${a.id})">Baixar</button>
             <button class="btn btn-danger" onclick="removerAnexoDashboard(${ch.id}, ${a.id})">×</button>
           </li>
@@ -964,6 +965,11 @@ function renderAnexosDashboard(ch) {
   `;
 }
 
+// Wrapper que pega url+legenda dos data-attributes; evita XSS via onclick com strings.
+function abrirLightboxDashFromCard(el) {
+  abrirLightboxDash(el.dataset.url, el.dataset.legenda);
+}
+
 function abrirLightboxDash(url, legenda) {
   let lb = document.getElementById('lightbox-dash');
   if (!lb) {
@@ -973,11 +979,23 @@ function abrirLightboxDash(url, legenda) {
     lb.onclick = () => lb.classList.remove('show');
     document.body.appendChild(lb);
   }
-  lb.innerHTML = `
-    <button class="lightbox-dash-fechar" onclick="event.stopPropagation(); document.getElementById('lightbox-dash').classList.remove('show')">&times;</button>
-    <img class="lightbox-dash-img" src="${url}" alt="${legenda}" onclick="event.stopPropagation()">
-    <div class="lightbox-dash-legenda">${legenda}</div>
-  `;
+  // Constrói o conteúdo via DOM API (textContent/setAttribute escapam por padrão).
+  lb.innerHTML = '';
+  const btnFechar = document.createElement('button');
+  btnFechar.className = 'lightbox-dash-fechar';
+  btnFechar.innerHTML = '&times;';
+  btnFechar.onclick = (e) => { e.stopPropagation(); lb.classList.remove('show'); };
+  const img = document.createElement('img');
+  img.className = 'lightbox-dash-img';
+  img.src = url;
+  img.alt = legenda || '';
+  img.onclick = (e) => e.stopPropagation();
+  const cap = document.createElement('div');
+  cap.className = 'lightbox-dash-legenda';
+  cap.textContent = legenda || '';
+  lb.appendChild(btnFechar);
+  lb.appendChild(img);
+  lb.appendChild(cap);
   lb.classList.add('show');
 }
 
@@ -1041,14 +1059,14 @@ function renderTimeline(atendimentos) {
 
   container.innerHTML = atendimentos.map(a => `
     <div class="timeline-item">
-      <div class="timeline-badge badge-tipo-${a.tipo}"></div>
+      <div class="timeline-badge badge-tipo-${escapeHtml(a.tipo)}"></div>
       <div class="timeline-content">
         <div class="timeline-header">
           <span class="timeline-tipo">${badgeTipoAtendimento(a.tipo)}</span>
-          <span class="timeline-meta">${a.usuario_nome || 'Sistema'} — ${formatDataHora(a.data_atendimento)}</span>
+          <span class="timeline-meta">${escapeHtml(a.usuario_nome || 'Sistema')} — ${formatDataHora(a.data_atendimento)}</span>
           ${a.tempo_gasto_minutos > 0 ? `<span style="color:#94a3b8; font-size:0.78rem">⏱ ${a.tempo_gasto_minutos}min</span>` : ''}
         </div>
-        <div class="timeline-desc">${a.descricao}</div>
+        <div class="timeline-desc">${escapeHtml(a.descricao)}</div>
       </div>
     </div>
   `).join('');
@@ -1095,10 +1113,10 @@ async function loadTransacoes() {
       <td>${formatData(t.data)}</td>
       <td><span class="badge badge-${t.tipo === 'entrada' ? 'resolvido' : 'alta'}">${t.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
       <td>
-        ${t.categoria}
+        ${escapeHtml(t.categoria)}
         ${auditMeta(t)}
       </td>
-      <td>${t.descricao || '-'}</td>
+      <td>${escapeHtml(t.descricao || '-')}</td>
       <td><strong>${formatMoeda(t.valor)}</strong></td>
       <td>
         <button class="btn btn-danger" onclick="deletarTransacao(${t.id})">Deletar</button>
@@ -1180,14 +1198,14 @@ async function loadUsuarios() {
   };
 
   tbody.innerHTML = lista.map(u => {
-    const t = tipoLabel[u.tipo] || { label: u.tipo, color: '#64748b' };
+    const t = tipoLabel[u.tipo] || { label: escapeHtml(u.tipo), color: '#64748b' };
     const ehVoce = u.id === usuario?.id;
     return `
       <tr>
-        <td><strong>${u.nome}</strong>${ehVoce ? ' <small style="color:#94a3b8">(você)</small>' : ''}</td>
-        <td>${u.email}</td>
+        <td><strong>${escapeHtml(u.nome)}</strong>${ehVoce ? ' <small style="color:#94a3b8">(você)</small>' : ''}</td>
+        <td>${escapeHtml(u.email)}</td>
         <td><span style="background:${t.color}20;color:${t.color};padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">${t.label}</span></td>
-        <td>${u.cliente_nome || (u.tipo === 'cliente' ? '<span style="color:#ef4444">⚠ sem vínculo</span>' : '—')}</td>
+        <td>${escapeHtml(u.cliente_nome || '') || (u.tipo === 'cliente' ? '<span style="color:#ef4444">⚠ sem vínculo</span>' : '—')}</td>
         <td>${u.ativo !== false
           ? '<span style="background:#10b98120;color:#10b981;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Ativo</span>'
           : '<span style="background:#ef444420;color:#ef4444;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Inativo</span>'
@@ -1330,6 +1348,18 @@ function resetForm(selector) {
   if (f) f.reset();
 }
 
+// ===== ESCAPE HTML =====
+// Aplica em qualquer dado user-controlled (titulo, descricao, nomes, anexos, etc)
+// antes de injetar via innerHTML em template strings. Defesa contra XSS persistente.
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function formatMoeda(valor) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
 }
@@ -1418,7 +1448,8 @@ function auditMeta(item) {
     atualizadoPor || dataAtualizacao ? `Última edição${atualizadoPor ? ' por ' + atualizadoPor : ''}${dataAtualizacao ? ' em ' + formatDataHora(dataAtualizacao) : ''}` : ''
   ].filter(Boolean).join('\n');
 
-  return `<div class="audit-meta" title="${tooltip}">${texto}</div>`;
+  // Escapa antes de injetar no innerHTML — nome do usuário pode conter HTML.
+  return `<div class="audit-meta" title="${escapeHtml(tooltip)}">${escapeHtml(texto)}</div>`;
 }
 
 // ===== BADGES =====

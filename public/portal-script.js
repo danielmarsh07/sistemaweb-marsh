@@ -133,11 +133,11 @@ function renderChamados(lista) {
       <div class="chamado-id">#${ch.id}</div>
       <div class="chamado-body">
         <div class="chamado-titulo">
-          ${ch.titulo}
+          ${escapeHtml(ch.titulo)}
           ${naoLidos > 0 ? `<span class="badge-novo" title="${naoLidos} novo(s) comentário(s)">${naoLidos} novo${naoLidos > 1 ? 's' : ''}</span>` : ''}
         </div>
         <div class="chamado-meta">
-          ${ch.tecnologia_nome ? `<span>💻 ${ch.tecnologia_nome}</span>` : ''}
+          ${ch.tecnologia_nome ? `<span>💻 ${escapeHtml(ch.tecnologia_nome)}</span>` : ''}
           <span>📅 ${formatData(ch.data_criacao)}</span>
           ${ch.total_atendimentos > 0 ? `<span>💬 ${ch.total_atendimentos} resposta(s)</span>` : ''}
           ${badgeSla(ch.sla)}
@@ -181,12 +181,12 @@ async function abrirDetalhe(id) {
   document.getElementById('detalhe-info').innerHTML = `
     <div><strong>Status</strong>${badgeStatus(ch.status)}</div>
     <div><strong>Prioridade</strong>${badgePrioridade(ch.prioridade)}</div>
-    <div><strong>Tecnologia</strong>${ch.tecnologia_nome || 'Geral'}</div>
+    <div><strong>Tecnologia</strong>${escapeHtml(ch.tecnologia_nome || 'Geral')}</div>
     <div><strong>Aberto em</strong>${formatDataHora(ch.data_abertura)}</div>
     ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA</strong>${badgeSlaDetalhe(ch.sla)}</div>` : ''}
-    ${ch.categoria ? `<div><strong>Categoria</strong>${ch.categoria}</div>` : ''}
+    ${ch.categoria ? `<div><strong>Categoria</strong>${escapeHtml(ch.categoria)}</div>` : ''}
     ${ch.data_fechamento ? `<div><strong>Fechado em</strong>${formatDataHora(ch.data_fechamento)}</div>` : ''}
-    <div style="grid-column:1/-1"><strong>Descrição</strong>${ch.descricao || '—'}</div>
+    <div style="grid-column:1/-1"><strong>Descrição</strong>${escapeHtml(ch.descricao || '—')}</div>
   `;
 
   // Timeline
@@ -243,11 +243,11 @@ function renderAnexos(ch) {
       ${imagens.length ? `
         <div class="thumbs-grid">
           ${imagens.map(a => `
-            <div class="thumb-card" onclick="abrirLightbox('${a.preview_url}', '${a.nome_original.replace(/'/g, "\\'")}')">
-              <div class="thumb-img" style="background-image:url('${a.preview_url}')"></div>
+            <div class="thumb-card" data-url="${escapeHtml(a.preview_url)}" data-legenda="${escapeHtml(a.nome_original)}" onclick="abrirLightboxFromCard(this)">
+              <div class="thumb-img" style="background-image:url('${escapeHtml(a.preview_url)}')"></div>
               <div class="thumb-info">
-                <span class="thumb-nome" title="${a.nome_original}">${a.nome_original}</span>
-                <span class="thumb-meta">${formatarTamanho(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
+                <span class="thumb-nome" title="${escapeHtml(a.nome_original)}">${escapeHtml(a.nome_original)}</span>
+                <span class="thumb-meta">${formatarTamanho(a.tamanho_bytes)} · ${escapeHtml(a.enviado_por_nome || '')}</span>
               </div>
             </div>
           `).join('')}
@@ -258,8 +258,8 @@ function renderAnexos(ch) {
         <ul class="anexos-list">
           ${arquivos.map(a => `
             <li class="anexo-item">
-              <span class="anexo-nome" title="${a.nome_original}">${iconeAnexo(a.mime_type)} ${a.nome_original}</span>
-              <span class="anexo-meta">${formatarTamanho(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
+              <span class="anexo-nome" title="${escapeHtml(a.nome_original)}">${iconeAnexo(a.mime_type)} ${escapeHtml(a.nome_original)}</span>
+              <span class="anexo-meta">${formatarTamanho(a.tamanho_bytes)} · ${escapeHtml(a.enviado_por_nome || '')}</span>
               <button class="btn-anexo" onclick="baixarAnexoPortal(${ch.id}, ${a.id})">Baixar</button>
             </li>
           `).join('')}
@@ -279,6 +279,11 @@ function renderAnexos(ch) {
   `;
 }
 
+// Wrapper que pega url+legenda dos data-attributes do card; evita XSS via onclick com strings.
+function abrirLightboxFromCard(el) {
+  abrirLightbox(el.dataset.url, el.dataset.legenda);
+}
+
 function abrirLightbox(url, legenda) {
   let lb = document.getElementById('lightbox');
   if (!lb) {
@@ -288,11 +293,23 @@ function abrirLightbox(url, legenda) {
     lb.onclick = () => lb.classList.remove('show');
     document.body.appendChild(lb);
   }
-  lb.innerHTML = `
-    <button class="lightbox-fechar" onclick="event.stopPropagation(); document.getElementById('lightbox').classList.remove('show')">&times;</button>
-    <img class="lightbox-img" src="${url}" alt="${legenda}" onclick="event.stopPropagation()">
-    <div class="lightbox-legenda">${legenda}</div>
-  `;
+  // Constrói o conteúdo via DOM API; setAttribute escapa automaticamente.
+  lb.innerHTML = '';
+  const btnFechar = document.createElement('button');
+  btnFechar.className = 'lightbox-fechar';
+  btnFechar.innerHTML = '&times;';
+  btnFechar.onclick = (e) => { e.stopPropagation(); lb.classList.remove('show'); };
+  const img = document.createElement('img');
+  img.className = 'lightbox-img';
+  img.src = url;
+  img.alt = legenda || '';
+  img.onclick = (e) => e.stopPropagation();
+  const cap = document.createElement('div');
+  cap.className = 'lightbox-legenda';
+  cap.textContent = legenda || '';
+  lb.appendChild(btnFechar);
+  lb.appendChild(img);
+  lb.appendChild(cap);
   lb.classList.add('show');
 }
 
@@ -374,7 +391,7 @@ function renderBlocoConcluido(ch, concluido) {
         <div class="stars-row" id="stars-row" data-nota="${nota}">
           ${[1,2,3,4,5].map(n => `<span class="star ${n <= nota ? 'on' : ''}" data-n="${n}" onclick="${jaAvaliou ? '' : `escolherNota(${n})`}">★</span>`).join('')}
         </div>
-        ${jaAvaliou && ch.avaliacao.comentario ? `<p class="csat-comentario">"${ch.avaliacao.comentario}"</p>` : ''}
+        ${jaAvaliou && ch.avaliacao.comentario ? `<p class="csat-comentario">"${escapeHtml(ch.avaliacao.comentario)}"</p>` : ''}
         ${!jaAvaliou ? `
           <textarea id="csat-comentario" placeholder="Conta pra gente o que achou (opcional)..." rows="2"></textarea>
           <button class="btn-enviar-csat" onclick="enviarAvaliacao(${ch.id})">Enviar avaliação</button>
@@ -450,10 +467,10 @@ function renderTimeline(atendimentos) {
       <div class="tl-dot" style="background:${cores[a.tipo] || '#64748b'}"></div>
       <div class="tl-content">
         <div class="tl-meta">
-          <strong style="color:${cores[a.tipo] || '#64748b'}">${labels[a.tipo] || a.tipo}</strong>
-          · ${a.usuario_nome || 'Suporte'} · ${formatDataHora(a.data_atendimento)}
+          <strong style="color:${cores[a.tipo] || '#64748b'}">${labels[a.tipo] || escapeHtml(a.tipo)}</strong>
+          · ${escapeHtml(a.usuario_nome || 'Suporte')} · ${formatDataHora(a.data_atendimento)}
         </div>
-        <div>${a.descricao}</div>
+        <div>${escapeHtml(a.descricao)}</div>
       </div>
     </div>
   `).join('');
@@ -538,7 +555,7 @@ function renderListaPendentes() {
   ul.innerHTML = arquivosPendentes.map((a, i) => `
     <li>
       <span>${iconeAnexo(a.type)}</span>
-      <span class="nome" title="${a.name}">${a.name}</span>
+      <span class="nome" title="${escapeHtml(a.name)}">${escapeHtml(a.name)}</span>
       <span class="tamanho">${formatarTamanho(a.size)}</span>
       <button type="button" class="remover" onclick="removerPendente(${i})" title="Remover">×</button>
     </li>
@@ -632,6 +649,18 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
     if (e.target === m) m.classList.remove('show');
   });
 });
+
+// ===== ESCAPE HTML =====
+// Usado em todo lugar onde dado vindo do usuário (titulo, descricao, nomes, anexos, comentários etc)
+// é interpolado em template string que vai para innerHTML. Protege contra XSS persistente.
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 // ===== FORMATTERS =====
 function formatData(val) {
