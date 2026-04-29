@@ -376,6 +376,16 @@ tbody tr:last-child td {
   font-weight: 600;
 }
 
+/* Linha de auditoria nas listagens (criado/editado por X em DD/MM) */
+.audit-meta {
+  font-size: 10.5px;
+  color: var(--grey-400);
+  margin-top: 2px;
+  line-height: 1.35;
+  font-weight: 400;
+  cursor: help;
+}
+
 .badge-entrada {
   background: rgba(16, 185, 129, 0.1);
   color: var(--green);

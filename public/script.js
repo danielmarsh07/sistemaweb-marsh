@@ -285,6 +285,7 @@ async function loadClientes() {
       <td>
         <strong>${c.razao_social || c.nome}</strong>
         ${c.nome_fantasia ? `<br><small style="color:#94a3b8">${c.nome_fantasia}</small>` : ''}
+        ${auditMeta(c)}
       </td>
       <td>${c.cpf_cnpj || '-'}</td>
       <td>${c.responsavel_nome || c.email || '-'}</td>
@@ -406,6 +407,7 @@ async function loadFornecedores() {
       <td>
         <strong>${f.razao_social || f.nome}</strong>
         ${f.nome_fantasia ? `<br><small style="color:#94a3b8">${f.nome_fantasia}</small>` : ''}
+        ${auditMeta(f)}
       </td>
       <td>${f.cnpj || '-'}</td>
       <td>${f.tipo ? capitalize(f.tipo) : (f.ramo || '-')}</td>
@@ -502,7 +504,10 @@ async function loadTecnologias() {
 
   tbody.innerHTML = lista.map(t => `
     <tr>
-      <td><strong>${t.nome}</strong></td>
+      <td>
+        <strong>${t.nome}</strong>
+        ${auditMeta(t)}
+      </td>
       <td>${t.categoria || '-'}</td>
       <td>${t.fabricante || '-'}</td>
       <td>${t.versao || '-'}</td>
@@ -609,7 +614,10 @@ async function loadChamados() {
   tbody.innerHTML = lista.map(ch => `
     <tr>
       <td><strong>#${ch.id}</strong></td>
-      <td style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${ch.titulo}">${ch.titulo}</td>
+      <td style="max-width:240px;" title="${ch.titulo}">
+        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${ch.titulo}</div>
+        ${auditMeta(ch)}
+      </td>
       <td>${ch.cliente_nome || '-'}</td>
       <td>${ch.tecnologia_nome || '-'}</td>
       <td>${badgeStatus(ch.status)}</td>
@@ -782,7 +790,10 @@ async function loadTransacoes() {
     <tr>
       <td>${formatData(t.data)}</td>
       <td><span class="badge badge-${t.tipo === 'entrada' ? 'resolvido' : 'alta'}">${t.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
-      <td>${t.categoria}</td>
+      <td>
+        ${t.categoria}
+        ${auditMeta(t)}
+      </td>
       <td>${t.descricao || '-'}</td>
       <td><strong>${formatMoeda(t.valor)}</strong></td>
       <td>
@@ -1032,6 +1043,40 @@ function formatDataHora(val) {
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Linha de auditoria: "Criado por X em DD/MM • Editado por Y em DD/MM"
+// Aceita tanto criado_por_nome (clientes/fornecedores/etc) quanto aberto_por_nome (chamados).
+function auditMeta(item) {
+  if (!item) return '';
+  const criadoPor = item.criado_por_nome || item.aberto_por_nome;
+  const dataCriacao = item.data_criacao || item.data_abertura;
+  const atualizadoPor = item.atualizado_por_nome;
+  const dataAtualizacao = item.data_atualizacao;
+
+  if (!criadoPor && !dataCriacao && !atualizadoPor && !dataAtualizacao) return '';
+
+  const partes = [];
+  if (criadoPor || dataCriacao) {
+    let p = 'Criado';
+    if (criadoPor) p += ` por ${criadoPor}`;
+    if (dataCriacao) p += ` em ${formatData(dataCriacao)}`;
+    partes.push(p);
+  }
+  if (atualizadoPor || dataAtualizacao) {
+    let p = 'Editado';
+    if (atualizadoPor) p += ` por ${atualizadoPor}`;
+    if (dataAtualizacao) p += ` em ${formatData(dataAtualizacao)}`;
+    partes.push(p);
+  }
+
+  const texto = partes.join(' • ');
+  const tooltip = [
+    criadoPor || dataCriacao ? `Criado${criadoPor ? ' por ' + criadoPor : ''}${dataCriacao ? ' em ' + formatDataHora(dataCriacao) : ''}` : '',
+    atualizadoPor || dataAtualizacao ? `Última edição${atualizadoPor ? ' por ' + atualizadoPor : ''}${dataAtualizacao ? ' em ' + formatDataHora(dataAtualizacao) : ''}` : ''
+  ].filter(Boolean).join('\n');
+
+  return `<div class="audit-meta" title="${tooltip}">${texto}</div>`;
 }
 
 // ===== BADGES =====
