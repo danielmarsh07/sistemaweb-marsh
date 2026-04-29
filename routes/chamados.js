@@ -18,32 +18,38 @@ router.get('/', async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const params = [empresa_id, usuario_id];
+    // whereParams contém apenas o que aparece no WHERE compartilhado entre COUNT e SELECT
+    const whereParams = [empresa_id];
     let where = 'WHERE ch.empresa_id = $1 AND ch.ativo = TRUE';
-    let idx = 3;
+    let idx = 2;
 
     if (isCliente && req.usuario.cliente_id) {
       where += ` AND ch.cliente_id = $${idx++}`;
-      params.push(req.usuario.cliente_id);
+      whereParams.push(req.usuario.cliente_id);
     }
-    if (status) { where += ` AND ch.status = $${idx++}`; params.push(status); }
-    if (prioridade) { where += ` AND ch.prioridade = $${idx++}`; params.push(prioridade); }
-    if (!isCliente && cliente_id) { where += ` AND ch.cliente_id = $${idx++}`; params.push(cliente_id); }
+    if (status) { where += ` AND ch.status = $${idx++}`; whereParams.push(status); }
+    if (prioridade) { where += ` AND ch.prioridade = $${idx++}`; whereParams.push(prioridade); }
+    if (!isCliente && cliente_id) { where += ` AND ch.cliente_id = $${idx++}`; whereParams.push(cliente_id); }
     if (busca && busca.trim()) {
       where += ` AND (ch.titulo ILIKE $${idx} OR ch.descricao ILIKE $${idx} OR CAST(ch.id AS TEXT) = $${idx + 1})`;
-      params.push(`%${busca.trim()}%`);
-      params.push(busca.trim());
+      whereParams.push(`%${busca.trim()}%`);
+      whereParams.push(busca.trim());
       idx += 2;
     }
 
-    // Conta total para paginação
+    // Conta total para paginação — só whereParams
     const totalResult = await pool.query(
       `SELECT COUNT(*) as total FROM chamados ch ${where}`,
-      params
+      whereParams
     );
     const total = parseInt(totalResult.rows[0].total);
 
-    const dadosParams = [...params, limit, offset];
+    // SELECT principal: depois dos filtros vêm usuario_id, limit, offset (nessa ordem)
+    const usuarioIdx = idx;
+    const limitIdx = idx + 1;
+    const offsetIdx = idx + 2;
+    const dadosParams = [...whereParams, usuario_id, limit, offset];
+
     const result = await pool.query(`
       SELECT ch.*,
         COALESCE(c.razao_social, c.nome) as cliente_nome,
@@ -54,10 +60,10 @@ router.get('/', async (req, res) => {
         (SELECT COUNT(*) FROM atendimentos a WHERE a.chamado_id = ch.id) as total_atendimentos,
         (SELECT COUNT(*) FROM atendimentos a
           WHERE a.chamado_id = ch.id
-            AND a.usuario_id IS DISTINCT FROM $2
+            AND a.usuario_id IS DISTINCT FROM $${usuarioIdx}
             AND NOT EXISTS (
               SELECT 1 FROM atendimentos_lidos al
-              WHERE al.atendimento_id = a.id AND al.usuario_id = $2
+              WHERE al.atendimento_id = a.id AND al.usuario_id = $${usuarioIdx}
             )
         ) as atendimentos_nao_lidos,
         av.nota as avaliacao_nota
@@ -70,7 +76,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN chamados_avaliacao av ON av.chamado_id = ch.id
       ${where}
       ORDER BY ch.data_criacao DESC
-      LIMIT $${idx} OFFSET $${idx + 1}
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `, dadosParams);
 
     // Anexa SLA computado em cada chamado
