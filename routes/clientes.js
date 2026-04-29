@@ -9,8 +9,12 @@ router.get('/', async (req, res) => {
     const result = await pool.query(
       `SELECT c.*,
         COALESCE(c.razao_social, c.nome) as nome_exibicao,
+        uc.nome as criado_por_nome,
+        ua.nome as atualizado_por_nome,
         (SELECT COUNT(*) FROM chamados ch WHERE ch.cliente_id = c.id AND ch.ativo = true AND ch.status NOT IN ('resolvido','fechado')) as chamados_abertos
        FROM clientes c
+       LEFT JOIN usuarios uc ON uc.id = c.criado_por_usuario_id
+       LEFT JOIN usuarios ua ON ua.id = c.atualizado_por_usuario_id
        WHERE c.empresa_id = $1 AND c.ativo = TRUE
        ORDER BY COALESCE(c.razao_social, c.nome) ASC`,
       [empresa_id]
@@ -26,7 +30,13 @@ router.get('/:id', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   try {
     const result = await pool.query(
-      'SELECT * FROM clientes WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
+      `SELECT c.*,
+        uc.nome as criado_por_nome,
+        ua.nome as atualizado_por_nome
+       FROM clientes c
+       LEFT JOIN usuarios uc ON uc.id = c.criado_por_usuario_id
+       LEFT JOIN usuarios ua ON ua.id = c.atualizado_por_usuario_id
+       WHERE c.id = $1 AND c.empresa_id = $2 AND c.ativo = TRUE`,
       [req.params.id, empresa_id]
     );
     if (result.rows.length === 0) {
@@ -86,18 +96,20 @@ router.post('/', async (req, res) => {
         email, telefone, celular, site,
         responsavel_nome, responsavel_email, responsavel_telefone,
         cep, logradouro, numero, complemento, bairro, cidade, uf,
-        status, data_inicio_contrato, data_fim_contrato, observacoes, ativo
+        status, data_inicio_contrato, data_fim_contrato, observacoes,
+        criado_por_usuario_id, ativo
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7,
         $8, $9, $10, $11,
         $12, $13, $14,
         $15, $16, $17, $18, $19, $20, $21,
-        $22, $23, $24, $25, TRUE
+        $22, $23, $24, $25,
+        $26, TRUE
       ) RETURNING *`,
       [
         empresa_id,
-        razao_social, // nome = razao_social para compatibilidade
+        razao_social,
         razao_social, nome_fantasia || null, cpf_cnpj || null,
         inscricao_estadual || null, inscricao_municipal || null,
         email || null, telefone || null, celular || null, site || null,
@@ -106,7 +118,8 @@ router.post('/', async (req, res) => {
         bairro || null, cidade || null, uf || null,
         status || 'ativo',
         data_inicio_contrato || null, data_fim_contrato || null,
-        observacoes || null
+        observacoes || null,
+        req.usuario.id
       ]
     );
     res.status(201).json({ mensagem: 'Cliente criado com sucesso!', cliente: result.rows[0] });
@@ -164,8 +177,9 @@ router.put('/:id', async (req, res) => {
         email=$7, telefone=$8, celular=$9, site=$10,
         responsavel_nome=$11, responsavel_email=$12, responsavel_telefone=$13,
         cep=$14, logradouro=$15, numero=$16, complemento=$17, bairro=$18, cidade=$19, uf=$20,
-        status=$21, data_inicio_contrato=$22::date, data_fim_contrato=$23::date, observacoes=$24
-       WHERE id=$25 AND empresa_id=$26
+        status=$21, data_inicio_contrato=$22::date, data_fim_contrato=$23::date, observacoes=$24,
+        atualizado_por_usuario_id=$25, data_atualizacao=NOW()
+       WHERE id=$26 AND empresa_id=$27
        RETURNING *`,
       [
         novaRazao,
@@ -192,6 +206,7 @@ router.put('/:id', async (req, res) => {
         v(data_inicio_contrato) || null,
         v(data_fim_contrato) || null,
         v(observacoes) ?? c.observacoes,
+        req.usuario.id,
         req.params.id,
         empresa_id
       ]

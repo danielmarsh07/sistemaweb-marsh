@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'marsh_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ JWT_SECRET não está definido. Defina a variável de ambiente antes de iniciar o servidor.');
+  process.exit(1);
+}
 
 function autenticar(req, res, next) {
   const authHeader = req.headers['authorization'];

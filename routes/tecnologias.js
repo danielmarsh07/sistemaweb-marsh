@@ -8,8 +8,12 @@ router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT t.*,
+        uc.nome as criado_por_nome,
+        ua.nome as atualizado_por_nome,
         (SELECT COUNT(*) FROM cliente_tecnologias ct WHERE ct.tecnologia_id = t.id AND ct.status = 'ativo') as total_clientes
        FROM tecnologias t
+       LEFT JOIN usuarios uc ON uc.id = t.criado_por_usuario_id
+       LEFT JOIN usuarios ua ON ua.id = t.atualizado_por_usuario_id
        WHERE t.empresa_id = $1 AND t.ativo = TRUE
        ORDER BY t.categoria ASC, t.nome ASC`,
       [empresa_id]
@@ -25,7 +29,13 @@ router.get('/:id', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   try {
     const result = await pool.query(
-      'SELECT * FROM tecnologias WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
+      `SELECT t.*,
+        uc.nome as criado_por_nome,
+        ua.nome as atualizado_por_nome
+       FROM tecnologias t
+       LEFT JOIN usuarios uc ON uc.id = t.criado_por_usuario_id
+       LEFT JOIN usuarios ua ON ua.id = t.atualizado_por_usuario_id
+       WHERE t.id = $1 AND t.empresa_id = $2 AND t.ativo = TRUE`,
       [req.params.id, empresa_id]
     );
     if (result.rows.length === 0) {
@@ -61,13 +71,14 @@ router.post('/', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO tecnologias (empresa_id, nome, categoria, descricao, fabricante, versao, status, ativo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE) RETURNING *`,
+      `INSERT INTO tecnologias (empresa_id, nome, categoria, descricao, fabricante, versao, status, criado_por_usuario_id, ativo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE) RETURNING *`,
       [
         empresa_id, nome,
         categoria || null, descricao || null,
         fabricante || null, versao || null,
-        status || 'ativa'
+        status || 'ativa',
+        req.usuario.id
       ]
     );
     res.status(201).json({ mensagem: 'Tecnologia criada com sucesso!', tecnologia: result.rows[0] });
@@ -92,8 +103,9 @@ router.put('/:id', async (req, res) => {
 
     const t = atual.rows[0];
     const result = await pool.query(
-      `UPDATE tecnologias SET nome=$1, categoria=$2, descricao=$3, fabricante=$4, versao=$5, status=$6
-       WHERE id=$7 AND empresa_id=$8 RETURNING *`,
+      `UPDATE tecnologias SET nome=$1, categoria=$2, descricao=$3, fabricante=$4, versao=$5, status=$6,
+        atualizado_por_usuario_id=$7, data_atualizacao=NOW()
+       WHERE id=$8 AND empresa_id=$9 RETURNING *`,
       [
         nome || t.nome,
         categoria ?? t.categoria,
@@ -101,6 +113,7 @@ router.put('/:id', async (req, res) => {
         fabricante ?? t.fabricante,
         versao ?? t.versao,
         status || t.status,
+        req.usuario.id,
         req.params.id, empresa_id
       ]
     );

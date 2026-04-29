@@ -16,12 +16,14 @@ router.get('/', async (req, res) => {
         t.nome as tecnologia_nome,
         u1.nome as aberto_por_nome,
         u2.nome as atribuido_para_nome,
+        u3.nome as atualizado_por_nome,
         (SELECT COUNT(*) FROM atendimentos a WHERE a.chamado_id = ch.id) as total_atendimentos
       FROM chamados ch
       LEFT JOIN clientes c ON c.id = ch.cliente_id
       LEFT JOIN tecnologias t ON t.id = ch.tecnologia_id
       LEFT JOIN usuarios u1 ON u1.id = ch.aberto_por_usuario_id
       LEFT JOIN usuarios u2 ON u2.id = ch.atribuido_para_usuario_id
+      LEFT JOIN usuarios u3 ON u3.id = ch.atualizado_por_usuario_id
       WHERE ch.empresa_id = $1 AND ch.ativo = TRUE
     `;
     const params = [empresa_id];
@@ -49,21 +51,33 @@ router.get('/', async (req, res) => {
 // GET - Um chamado por ID (com atendimentos)
 router.get('/:id', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
+  const isCliente = req.usuario.tipo === 'cliente';
   try {
-    const result = await pool.query(
-      `SELECT ch.*,
+    let query = `SELECT ch.*,
         COALESCE(c.razao_social, c.nome) as cliente_nome,
         t.nome as tecnologia_nome,
         u1.nome as aberto_por_nome,
-        u2.nome as atribuido_para_nome
+        u2.nome as atribuido_para_nome,
+        u3.nome as atualizado_por_nome
        FROM chamados ch
        LEFT JOIN clientes c ON c.id = ch.cliente_id
        LEFT JOIN tecnologias t ON t.id = ch.tecnologia_id
        LEFT JOIN usuarios u1 ON u1.id = ch.aberto_por_usuario_id
        LEFT JOIN usuarios u2 ON u2.id = ch.atribuido_para_usuario_id
-       WHERE ch.id = $1 AND ch.empresa_id = $2 AND ch.ativo = TRUE`,
-      [req.params.id, empresa_id]
-    );
+       LEFT JOIN usuarios u3 ON u3.id = ch.atualizado_por_usuario_id
+       WHERE ch.id = $1 AND ch.empresa_id = $2 AND ch.ativo = TRUE`;
+    const params = [req.params.id, empresa_id];
+
+    // Cliente só pode ver chamados vinculados ao seu cliente_id
+    if (isCliente) {
+      if (!req.usuario.cliente_id) {
+        return res.status(403).json({ erro: 'Usuário não vinculado a um cliente.' });
+      }
+      query += ' AND ch.cliente_id = $3';
+      params.push(req.usuario.cliente_id);
+    }
+
+    const result = await pool.query(query, params);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ erro: 'Chamado não encontrado' });
@@ -81,6 +95,19 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     chamado.atendimentos = atend.rows;
+
+    // Histórico de status (apenas para perfis internos)
+    if (!isCliente) {
+      const log = await pool.query(
+        `SELECT l.*, u.nome as usuario_nome
+         FROM chamados_status_log l
+         LEFT JOIN usuarios u ON u.id = l.usuario_id
+         WHERE l.chamado_id = $1
+         ORDER BY l.data_mudanca ASC`,
+        [req.params.id]
+      );
+      chamado.status_log = log.rows;
+    }
 
     res.json(chamado);
   } catch (err) {
@@ -132,6 +159,13 @@ router.post('/', async (req, res) => {
     );
     const chamado = result.rows[0];
 
+    // Registra abertura no histórico de status
+    await pool.query(
+      `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+       VALUES ($1, $2, $3, NULL, 'aberto', 'Chamado aberto')`,
+      [chamado.id, empresa_id, usuario_id]
+    );
+
     // Notifica admins/técnicos sobre o novo chamado (não bloqueia a resposta)
     notificarNovoChamado({
       chamado,
@@ -147,6 +181,9 @@ router.post('/', async (req, res) => {
 
 // PUT - Atualizar chamado (status, atribuição, etc.)
 router.put('/:id', async (req, res) => {
+  if (req.usuario.tipo === 'cliente') {
+    return res.status(403).json({ erro: 'Cliente não pode editar chamados.' });
+  }
   const empresa_id = req.usuario.empresa_id || 1;
   const {
     titulo, descricao, status, prioridade, categoria,
@@ -171,8 +208,9 @@ router.put('/:id', async (req, res) => {
       `UPDATE chamados SET
         titulo=$1, descricao=$2, status=$3, prioridade=$4, categoria=$5,
         cliente_id=$6, tecnologia_id=$7, atribuido_para_usuario_id=$8,
-        data_fechamento=$9
-       WHERE id=$10 AND empresa_id=$11 RETURNING *`,
+        data_fechamento=$9,
+        atualizado_por_usuario_id=$10, data_atualizacao=NOW()
+       WHERE id=$11 AND empresa_id=$12 RETURNING *`,
       [
         titulo || ch.titulo,
         descricao ?? ch.descricao,
@@ -183,13 +221,20 @@ router.put('/:id', async (req, res) => {
         tecnologia_id ?? ch.tecnologia_id,
         atribuido_para_usuario_id ?? ch.atribuido_para_usuario_id,
         dataFechamento,
+        req.usuario.id,
         req.params.id, empresa_id
       ]
     );
     const chamado = result.rows[0];
 
-    // Notifica cliente se o status mudou
+    // Registra mudança de status no histórico
     if (status && status !== ch.status) {
+      await pool.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [chamado.id, empresa_id, req.usuario.id, ch.status, status]
+      );
+
       notificarAtualizacaoStatus({
         chamado,
         statusAnterior: ch.status,
@@ -205,6 +250,9 @@ router.put('/:id', async (req, res) => {
 
 // DELETE - Exclusão lógica
 router.delete('/:id', async (req, res) => {
+  if (req.usuario.tipo === 'cliente') {
+    return res.status(403).json({ erro: 'Cliente não pode remover chamados.' });
+  }
   const empresa_id = req.usuario.empresa_id || 1;
   try {
     const result = await pool.query(

@@ -6,12 +6,19 @@ const { notificarNovoAtendimento } = require('../services/email');
 // GET - Listar atendimentos de um chamado
 router.get('/chamado/:chamado_id', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
+  const isCliente = req.usuario.tipo === 'cliente';
   try {
-    // Garante que o chamado pertence à empresa
-    const chamadoOk = await pool.query(
-      'SELECT id FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
-      [req.params.chamado_id, empresa_id]
-    );
+    // Garante que o chamado pertence à empresa (e ao cliente, se for cliente)
+    let q = 'SELECT id, cliente_id FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE';
+    const params = [req.params.chamado_id, empresa_id];
+    if (isCliente) {
+      if (!req.usuario.cliente_id) {
+        return res.status(403).json({ erro: 'Usuário não vinculado a um cliente.' });
+      }
+      q += ' AND cliente_id = $3';
+      params.push(req.usuario.cliente_id);
+    }
+    const chamadoOk = await pool.query(q, params);
     if (chamadoOk.rows.length === 0) {
       return res.status(404).json({ erro: 'Chamado não encontrado' });
     }
@@ -34,18 +41,28 @@ router.get('/chamado/:chamado_id', async (req, res) => {
 router.post('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   const usuario_id = req.usuario.id;
-  const { chamado_id, tipo, descricao, tempo_gasto_minutos, data_atendimento } = req.body;
+  const isCliente = req.usuario.tipo === 'cliente';
+  let { chamado_id, tipo, descricao, tempo_gasto_minutos, data_atendimento } = req.body;
 
   if (!chamado_id || !descricao) {
     return res.status(400).json({ erro: 'chamado_id e descrição são obrigatórios' });
   }
 
+  // Cliente só pode adicionar comentário (não solução, não escalamento)
+  if (isCliente) tipo = 'comentario';
+
   try {
-    // Garante que o chamado pertence à empresa
-    const chamadoOk = await pool.query(
-      'SELECT id, status FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
-      [chamado_id, empresa_id]
-    );
+    // Garante que o chamado pertence à empresa (e ao cliente, se for cliente)
+    let q = 'SELECT id, status, cliente_id FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE';
+    const params = [chamado_id, empresa_id];
+    if (isCliente) {
+      if (!req.usuario.cliente_id) {
+        return res.status(403).json({ erro: 'Usuário não vinculado a um cliente.' });
+      }
+      q += ' AND cliente_id = $3';
+      params.push(req.usuario.cliente_id);
+    }
+    const chamadoOk = await pool.query(q, params);
     if (chamadoOk.rows.length === 0) {
       return res.status(404).json({ erro: 'Chamado não encontrado' });
     }
@@ -62,8 +79,12 @@ router.post('/', async (req, res) => {
       ]
     );
 
+    const statusAtual = chamadoOk.rows[0].status;
+    let statusNovo = null;
+
     // Se o tipo for 'solucao', atualiza status do chamado para 'resolvido'
-    if (tipo === 'solucao') {
+    if (tipo === 'solucao' && statusAtual !== 'resolvido') {
+      statusNovo = 'resolvido';
       await pool.query(
         `UPDATE chamados SET status = 'resolvido', data_fechamento = NOW()
          WHERE id = $1 AND empresa_id = $2`,
@@ -72,10 +93,20 @@ router.post('/', async (req, res) => {
     }
 
     // Se estava aberto e recebeu atendimento, muda para 'em_andamento'
-    if (tipo !== 'solucao' && chamadoOk.rows[0].status === 'aberto') {
+    if (tipo !== 'solucao' && statusAtual === 'aberto') {
+      statusNovo = 'em_andamento';
       await pool.query(
         `UPDATE chamados SET status = 'em_andamento' WHERE id = $1 AND empresa_id = $2`,
         [chamado_id, empresa_id]
+      );
+    }
+
+    // Loga a mudança automática de status
+    if (statusNovo) {
+      await pool.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [chamado_id, empresa_id, usuario_id, statusAtual, statusNovo, `Mudança automática via atendimento (${tipo})`]
       );
     }
 
@@ -105,6 +136,9 @@ router.post('/', async (req, res) => {
 
 // DELETE - Remover atendimento
 router.delete('/:id', async (req, res) => {
+  if (req.usuario.tipo === 'cliente') {
+    return res.status(403).json({ erro: 'Cliente não pode remover atendimentos.' });
+  }
   const empresa_id = req.usuario.empresa_id || 1;
   try {
     // Verifica que o atendimento pertence a um chamado da empresa

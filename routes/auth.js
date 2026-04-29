@@ -2,40 +2,22 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'marsh_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
 
-// POST /api/auth/registro
-router.post('/registro', async (req, res) => {
-  const { nome, email, senha, empresa_id } = req.body;
-
-  if (!nome || !email || !senha) {
-    return res.status(400).json({ erro: 'Nome, email e senha são obrigatórios' });
-  }
-
-  try {
-    const existe = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
-    if (existe.rows.length > 0) {
-      return res.status(400).json({ erro: 'Email já cadastrado' });
-    }
-
-    const hash = await bcrypt.hash(senha, 10);
-    const result = await pool.query(
-      `INSERT INTO usuarios (nome, email, senha, empresa_id, tipo)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, nome, email, empresa_id, tipo`,
-      [nome, email, hash, empresa_id || 1, 'admin_empresa']
-    );
-
-    res.status(201).json({ mensagem: 'Usuário criado com sucesso!', usuario: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ erro: 'Erro ao criar usuário', detalhe: err.message });
-  }
+// Rate limit: 10 tentativas de login por IP a cada 15 minutos
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Muitas tentativas de login. Tente novamente em 15 minutos.' }
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, senha } = req.body;
 
   if (!email || !senha) {

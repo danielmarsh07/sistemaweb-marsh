@@ -6,6 +6,10 @@ const pool = require('./db');
 
 const app = express();
 
+// Necessário no Render (e qualquer reverse proxy) para o req.ip refletir o IP real
+// e o express-rate-limit funcionar corretamente.
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -249,6 +253,37 @@ async function iniciar() {
         data_criacao TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    // 14. Criar tabela de histórico de status do chamado (auditoria)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chamados_status_log (
+        id SERIAL PRIMARY KEY,
+        chamado_id INTEGER NOT NULL,
+        empresa_id INTEGER,
+        usuario_id INTEGER,
+        status_anterior VARCHAR(50),
+        status_novo VARCHAR(50) NOT NULL,
+        observacao TEXT,
+        data_mudanca TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_status_log_chamado ON chamados_status_log(chamado_id);`);
+
+    // 15. Auditoria — colunas criado_por_usuario_id, atualizado_por_usuario_id, data_atualizacao
+    // chamados não recebe criado_por_usuario_id porque já tem aberto_por_usuario_id (semanticamente equivalente).
+    const tabelasComCriadoPor = ['clientes', 'fornecedores', 'tecnologias', 'transacoes'];
+    const tabelasComAtualizadoPor = ['clientes', 'fornecedores', 'tecnologias', 'transacoes', 'chamados'];
+
+    for (const t of tabelasComCriadoPor) {
+      await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS criado_por_usuario_id INTEGER;`);
+      // Backfill: registros antigos ficam vinculados ao admin (usuario id=1)
+      await pool.query(`UPDATE ${t} SET criado_por_usuario_id = 1 WHERE criado_por_usuario_id IS NULL;`);
+    }
+
+    for (const t of tabelasComAtualizadoPor) {
+      await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS atualizado_por_usuario_id INTEGER;`);
+      await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS data_atualizacao TIMESTAMP;`);
+    }
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
