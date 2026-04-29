@@ -462,6 +462,104 @@ tbody tr:last-child td {
 }
 .arquivos-pendentes-dash li .remover:hover { color: var(--red); }
 
+/* ===== THUMBNAILS DE IMAGEM (dashboard) ===== */
+.thumbs-grid-dash {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.thumb-card-dash {
+  background: white;
+  border: 1px solid var(--grey-200);
+  border-radius: 7px;
+  overflow: hidden;
+  transition: 0.18s;
+}
+.thumb-card-dash:hover {
+  border-color: var(--blue);
+  box-shadow: 0 4px 12px rgba(13,110,253,0.10);
+}
+.thumb-img-dash {
+  width: 100%;
+  height: 80px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--grey-100);
+  cursor: pointer;
+}
+.thumb-info-dash {
+  padding: 5px 7px;
+  font-size: 11.5px;
+}
+.thumb-info-dash > span {
+  display: block;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+.thumb-actions-dash {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.thumb-actions-dash small {
+  font-size: 10px;
+  color: var(--grey-400);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thumb-actions-dash .btn {
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+/* Lightbox do dashboard */
+.lightbox-dash {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  flex-direction: column;
+  gap: 12px;
+}
+.lightbox-dash.show { display: flex; }
+.lightbox-dash-img {
+  max-width: 90%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.lightbox-dash-legenda {
+  color: white;
+  font-size: 13px;
+  text-align: center;
+  max-width: 90%;
+}
+.lightbox-dash-fechar {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  background: transparent;
+  color: white;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.lightbox-dash-fechar:hover { color: var(--cyan); }
+
 .badge-entrada {
   background: rgba(16, 185, 129, 0.1);
   color: var(--green);

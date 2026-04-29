@@ -917,11 +917,33 @@ function renderAnexosDashboard(ch) {
     timeline.parentNode.insertBefore(wrapper, timeline);
   }
   const anexos = ch.anexos || [];
+  const imagens = anexos.filter(a => a.preview_url);
+  const arquivos = anexos.filter(a => !a.preview_url);
+
   wrapper.innerHTML = `
     <h4 style="margin-bottom:0.5rem; color:#0d6efd; font-size:13px;">Anexos ${anexos.length ? `(${anexos.length})` : ''}</h4>
-    ${anexos.length ? `
+
+    ${imagens.length ? `
+      <div class="thumbs-grid-dash">
+        ${imagens.map(a => `
+          <div class="thumb-card-dash">
+            <div class="thumb-img-dash" style="background-image:url('${a.preview_url}')"
+                 onclick="abrirLightboxDash('${a.preview_url}', '${a.nome_original.replace(/'/g, "\\'")}')"></div>
+            <div class="thumb-info-dash">
+              <span title="${a.nome_original}">${a.nome_original}</span>
+              <div class="thumb-actions-dash">
+                <small>${formatarTamanhoDash(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</small>
+                <button class="btn btn-danger" onclick="removerAnexoDashboard(${ch.id}, ${a.id})">×</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    ${arquivos.length ? `
       <ul style="list-style:none; padding:0; margin-bottom:8px;">
-        ${anexos.map(a => `
+        ${arquivos.map(a => `
           <li style="display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
             <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${a.nome_original}">📎 ${a.nome_original}</span>
             <span style="font-size:11px; color:#94a3b8;">${formatarTamanhoDash(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
@@ -930,13 +952,33 @@ function renderAnexosDashboard(ch) {
           </li>
         `).join('')}
       </ul>
-    ` : '<p style="font-size:12.5px; color:#94a3b8; margin-bottom:8px;">Nenhum anexo.</p>'}
+    ` : ''}
+
+    ${anexos.length === 0 ? '<p style="font-size:12.5px; color:#94a3b8; margin-bottom:8px;">Nenhum anexo.</p>' : ''}
+
     <label style="display:inline-block; background:white; color:#0d6efd; border:1px dashed #0d6efd; border-radius:6px; padding:5px 12px; font-size:12.5px; font-weight:600; cursor:pointer;">
       + Enviar anexo
       <input type="file" hidden onchange="enviarAnexoDashboard(${ch.id}, this)">
     </label>
     <small style="margin-left:8px; font-size:11px; color:#94a3b8;">Máx 10 MB</small>
   `;
+}
+
+function abrirLightboxDash(url, legenda) {
+  let lb = document.getElementById('lightbox-dash');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'lightbox-dash';
+    lb.className = 'lightbox-dash';
+    lb.onclick = () => lb.classList.remove('show');
+    document.body.appendChild(lb);
+  }
+  lb.innerHTML = `
+    <button class="lightbox-dash-fechar" onclick="event.stopPropagation(); document.getElementById('lightbox-dash').classList.remove('show')">&times;</button>
+    <img class="lightbox-dash-img" src="${url}" alt="${legenda}" onclick="event.stopPropagation()">
+    <div class="lightbox-dash-legenda">${legenda}</div>
+  `;
+  lb.classList.add('show');
 }
 
 function formatarTamanhoDash(bytes) {

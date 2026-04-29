@@ -598,6 +598,94 @@
       color: var(--grey-400);
     }
 
+    /* ===== THUMBNAILS DE IMAGEM ===== */
+    .thumbs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .thumb-card {
+      background: white;
+      border: 1px solid var(--grey-200);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: 0.18s;
+    }
+    .thumb-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--blue);
+      box-shadow: 0 6px 16px rgba(13,110,253,0.12);
+    }
+    .thumb-img {
+      width: 100%;
+      height: 100px;
+      background-size: cover;
+      background-position: center;
+      background-color: var(--grey-100);
+    }
+    .thumb-info {
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .thumb-nome {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--grey-800);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .thumb-meta {
+      font-size: 0.68rem;
+      color: var(--grey-400);
+    }
+
+    /* ===== LIGHTBOX ===== */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .lightbox.show { display: flex; }
+    .lightbox-img {
+      max-width: 90%;
+      max-height: 80vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      cursor: default;
+    }
+    .lightbox-legenda {
+      color: white;
+      font-size: 0.85rem;
+      text-align: center;
+      max-width: 90%;
+    }
+    .lightbox-fechar {
+      position: absolute;
+      top: 20px;
+      right: 26px;
+      background: transparent;
+      color: white;
+      border: none;
+      font-size: 2.2rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+    }
+    .lightbox-fechar:hover { color: var(--cyan); }
+
     /* ===== DROPZONE no modal de Novo Chamado ===== */
     .dropzone {
       border: 1.5px dashed var(--grey-200);

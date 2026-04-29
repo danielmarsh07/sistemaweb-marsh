@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const { notificarNovoChamado, notificarAtualizacaoStatus } = require('../services/email');
 const { calcularSla } = require('../services/sla');
+const storage = require('../services/storage');
 
 // GET - Listar chamados (cliente vê só os seus; admin vê todos)
 // Suporta: status, prioridade, cliente_id, busca (texto), page, limit
@@ -142,16 +143,32 @@ router.get('/:id', async (req, res) => {
     `, [req.params.id, req.usuario.id]);
     chamado.atendimentos = atend.rows;
 
-    // Anexos
+    // Anexos — gera preview_url (presigned) para arquivos do tipo imagem
     const anexos = await pool.query(`
-      SELECT a.id, a.nome_original, a.tamanho_bytes, a.mime_type, a.data_upload,
+      SELECT a.id, a.nome_original, a.tamanho_bytes, a.mime_type, a.data_upload, a.storage_key,
         u.nome as enviado_por_nome
       FROM chamados_anexos a
       LEFT JOIN usuarios u ON u.id = a.usuario_id
       WHERE a.chamado_id = $1
       ORDER BY a.data_upload ASC
     `, [req.params.id]);
-    chamado.anexos = anexos.rows;
+    chamado.anexos = await Promise.all(anexos.rows.map(async (a) => {
+      const out = {
+        id: a.id,
+        nome_original: a.nome_original,
+        tamanho_bytes: a.tamanho_bytes,
+        mime_type: a.mime_type,
+        data_upload: a.data_upload,
+        enviado_por_nome: a.enviado_por_nome
+      };
+      const ehImagem = a.mime_type && a.mime_type.startsWith('image/');
+      if (ehImagem && storage.disponivel) {
+        try {
+          out.preview_url = await storage.getDownloadUrl(a.storage_key);
+        } catch { /* ignora — front cai no fluxo de Baixar */ }
+      }
+      return out;
+    }));
 
     // Avaliação CSAT (se existir)
     const avaliacao = await pool.query(

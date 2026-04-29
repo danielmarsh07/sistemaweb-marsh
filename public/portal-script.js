@@ -232,14 +232,31 @@ function renderAnexos(ch) {
   }
 
   const anexos = ch.anexos || [];
+  const imagens = anexos.filter(a => a.preview_url);
+  const arquivos = anexos.filter(a => !a.preview_url);
   const concluido = ch.status === 'fechado' || ch.status === 'resolvido';
 
   wrapper.innerHTML = `
     <div class="bloco-anexos">
       <h4>Anexos ${anexos.length ? `(${anexos.length})` : ''}</h4>
-      ${anexos.length ? `
+
+      ${imagens.length ? `
+        <div class="thumbs-grid">
+          ${imagens.map(a => `
+            <div class="thumb-card" onclick="abrirLightbox('${a.preview_url}', '${a.nome_original.replace(/'/g, "\\'")}')">
+              <div class="thumb-img" style="background-image:url('${a.preview_url}')"></div>
+              <div class="thumb-info">
+                <span class="thumb-nome" title="${a.nome_original}">${a.nome_original}</span>
+                <span class="thumb-meta">${formatarTamanho(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      ${arquivos.length ? `
         <ul class="anexos-list">
-          ${anexos.map(a => `
+          ${arquivos.map(a => `
             <li class="anexo-item">
               <span class="anexo-nome" title="${a.nome_original}">${iconeAnexo(a.mime_type)} ${a.nome_original}</span>
               <span class="anexo-meta">${formatarTamanho(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
@@ -247,7 +264,10 @@ function renderAnexos(ch) {
             </li>
           `).join('')}
         </ul>
-      ` : '<p class="sem-anexos">Nenhum anexo neste chamado.</p>'}
+      ` : ''}
+
+      ${anexos.length === 0 ? '<p class="sem-anexos">Nenhum anexo neste chamado.</p>' : ''}
+
       ${concluido ? '' : `
         <label class="btn-upload">
           + Enviar anexo
@@ -257,6 +277,23 @@ function renderAnexos(ch) {
       `}
     </div>
   `;
+}
+
+function abrirLightbox(url, legenda) {
+  let lb = document.getElementById('lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'lightbox';
+    lb.className = 'lightbox';
+    lb.onclick = () => lb.classList.remove('show');
+    document.body.appendChild(lb);
+  }
+  lb.innerHTML = `
+    <button class="lightbox-fechar" onclick="event.stopPropagation(); document.getElementById('lightbox').classList.remove('show')">&times;</button>
+    <img class="lightbox-img" src="${url}" alt="${legenda}" onclick="event.stopPropagation()">
+    <div class="lightbox-legenda">${legenda}</div>
+  `;
+  lb.classList.add('show');
 }
 
 function iconeAnexo(mime) {
