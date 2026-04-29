@@ -107,9 +107,15 @@ function setupEventListeners() {
     resetForm('#form-chamado');
     document.getElementById('modal-chamado-titulo').textContent = 'Novo Chamado';
     document.getElementById('campo-status-chamado').style.display = 'none';
+    document.getElementById('campo-anexos-chamado').style.display = 'block';
+    arquivosPendentesChamado = [];
+    renderListaPendentesChamado();
+    document.getElementById('upload-progresso-chamado').style.display = 'none';
     await preencherSelectsChamado();
     showModal('#modal-chamado');
   });
+
+  inicializarDropzoneChamado();
 
   document.getElementById('btn-nova-transacao').addEventListener('click', () => {
     resetForm('#form-transacao');
@@ -715,6 +721,59 @@ function onBuscaChamadosChange() {
   }, 350);
 }
 
+// ===== ANEXOS PENDENTES (modal Novo Chamado) =====
+let arquivosPendentesChamado = [];
+
+function inicializarDropzoneChamado() {
+  const dropzone = document.getElementById('dropzone-chamado');
+  const fileInput = document.getElementById('file-input-chamado');
+  if (!dropzone || !fileInput) return;
+
+  fileInput.addEventListener('change', e => {
+    adicionarArquivosChamado(Array.from(e.target.files || []));
+    fileInput.value = '';
+  });
+
+  ['dragenter', 'dragover'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('dragover'); })
+  );
+  ['dragleave', 'drop'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+  );
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    adicionarArquivosChamado(Array.from(e.dataTransfer.files || []));
+  });
+}
+
+function adicionarArquivosChamado(arquivos) {
+  for (const arq of arquivos) {
+    if (arq.size > 10 * 1024 * 1024) {
+      alert(`"${arq.name}" tem mais de 10 MB e foi ignorado.`);
+      continue;
+    }
+    arquivosPendentesChamado.push(arq);
+  }
+  renderListaPendentesChamado();
+}
+
+function renderListaPendentesChamado() {
+  const ul = document.getElementById('lista-pendentes-chamado');
+  if (!ul) return;
+  ul.innerHTML = arquivosPendentesChamado.map((a, i) => `
+    <li>
+      <span class="nome" title="${a.name}">📎 ${a.name}</span>
+      <span class="tamanho">${formatarTamanhoDash(a.size)}</span>
+      <button type="button" class="remover" onclick="removerPendenteChamado(${i})" title="Remover">×</button>
+    </li>
+  `).join('');
+}
+
+function removerPendenteChamado(i) {
+  arquivosPendentesChamado.splice(i, 1);
+  renderListaPendentesChamado();
+}
+
 async function salvarChamado() {
   const form = document.getElementById('form-chamado');
   const dados = {
@@ -735,10 +794,39 @@ async function salvarChamado() {
     const method = chamadoEmEdicao ? 'PUT' : 'POST';
     const res = await apiFetch(url, { method, body: JSON.stringify(dados) });
     if (!res) return;
-
     if (!res.ok) { const e = await res.json(); alert(e.erro); return; }
 
-    alert(chamadoEmEdicao ? 'Chamado atualizado!' : 'Chamado aberto!');
+    const data = await res.json();
+
+    // Se for novo chamado e há anexos pendentes, faz upload sequencial
+    if (!chamadoEmEdicao && data.chamado && arquivosPendentesChamado.length > 0) {
+      const progresso = document.getElementById('upload-progresso-chamado');
+      const fill = document.getElementById('progress-fill-chamado');
+      const status = document.getElementById('upload-status-chamado');
+      progresso.style.display = 'block';
+
+      for (let i = 0; i < arquivosPendentesChamado.length; i++) {
+        status.textContent = `Enviando anexo ${i + 1} de ${arquivosPendentesChamado.length}: ${arquivosPendentesChamado[i].name}`;
+        const fd = new FormData();
+        fd.append('arquivo', arquivosPendentesChamado[i]);
+        try {
+          const r = await fetch(`${API_URL}/chamados/${data.chamado.id}/anexos`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+            body: fd
+          });
+          if (!r.ok) {
+            const e = await r.json().catch(() => ({}));
+            alert(`Falha ao enviar "${arquivosPendentesChamado[i].name}": ${e.erro || 'erro'}`);
+          }
+        } catch (err) {
+          alert(`Falha ao enviar "${arquivosPendentesChamado[i].name}": ${err.message}`);
+        }
+        fill.style.width = `${((i + 1) / arquivosPendentesChamado.length) * 100}%`;
+      }
+    }
+
+    arquivosPendentesChamado = [];
     closeModal(document.getElementById('modal-chamado'));
     loadChamados();
     loadDashboard();
@@ -763,8 +851,9 @@ async function editarChamado(id) {
   form.prioridade.value = ch.prioridade || 'media';
   form.categoria.value = ch.categoria || '';
 
-  // Mostrar campo de status ao editar
+  // Mostrar campo de status ao editar; esconder anexos (uso o painel do detalhe)
   document.getElementById('campo-status-chamado').style.display = 'block';
+  document.getElementById('campo-anexos-chamado').style.display = 'none';
   if (form.status) form.status.value = ch.status || 'aberto';
 
   document.getElementById('modal-chamado-titulo').textContent = `Editar Chamado #${id}`;

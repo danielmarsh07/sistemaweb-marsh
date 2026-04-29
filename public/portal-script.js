@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('welcome-nome').textContent = `Olá, ${usuario.nome.split(' ')[0]}!`;
   document.getElementById('welcome-empresa').textContent = 'Acompanhe seus chamados e abra novas solicitações';
 
+  inicializarDropzone();
   carregarPortal();
 });
 
@@ -451,9 +452,65 @@ async function enviarComentario(e) {
 }
 
 // ===== NOVO CHAMADO =====
+let arquivosPendentes = []; // arquivos selecionados antes da criação do chamado
+
 function abrirModalNovoChamado() {
   document.getElementById('form-novo-chamado').reset();
+  arquivosPendentes = [];
+  renderListaPendentes();
+  document.getElementById('upload-progresso').style.display = 'none';
   abrirModal('modal-novo-chamado');
+}
+
+function inicializarDropzone() {
+  const dropzone = document.getElementById('dropzone-novo');
+  const fileInput = document.getElementById('file-input-novo');
+  if (!dropzone || !fileInput) return;
+
+  fileInput.addEventListener('change', e => {
+    adicionarArquivos(Array.from(e.target.files || []));
+    fileInput.value = '';
+  });
+
+  ['dragenter', 'dragover'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('dragover'); })
+  );
+  ['dragleave', 'drop'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+  );
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    adicionarArquivos(Array.from(e.dataTransfer.files || []));
+  });
+}
+
+function adicionarArquivos(arquivos) {
+  for (const arq of arquivos) {
+    if (arq.size > 10 * 1024 * 1024) {
+      alert(`"${arq.name}" tem mais de 10 MB e foi ignorado.`);
+      continue;
+    }
+    arquivosPendentes.push(arq);
+  }
+  renderListaPendentes();
+}
+
+function renderListaPendentes() {
+  const ul = document.getElementById('lista-pendentes');
+  if (!ul) return;
+  ul.innerHTML = arquivosPendentes.map((a, i) => `
+    <li>
+      <span>${iconeAnexo(a.type)}</span>
+      <span class="nome" title="${a.name}">${a.name}</span>
+      <span class="tamanho">${formatarTamanho(a.size)}</span>
+      <button type="button" class="remover" onclick="removerPendente(${i})" title="Remover">×</button>
+    </li>
+  `).join('');
+}
+
+function removerPendente(i) {
+  arquivosPendentes.splice(i, 1);
+  renderListaPendentes();
 }
 
 async function salvarNovoChamado(e) {
@@ -465,10 +522,11 @@ async function salvarNovoChamado(e) {
     descricao: form.descricao.value,
     prioridade: form.prioridade.value,
     tecnologia_id: form.tecnologia_id.value || null,
+    categoria: form.categoria ? form.categoria.value : null
     // cliente_id é inserido automaticamente pelo backend via usuario.cliente_id
   };
 
-  const btn = form.querySelector('button');
+  const btn = document.getElementById('btn-abrir-chamado');
   btn.disabled = true;
   btn.textContent = 'Abrindo chamado...';
 
@@ -477,15 +535,47 @@ async function salvarNovoChamado(e) {
     body: JSON.stringify(dados)
   });
 
-  btn.disabled = false;
-  btn.textContent = 'Abrir Chamado';
-
   if (!res || !res.ok) {
+    btn.disabled = false;
+    btn.textContent = 'Abrir Chamado';
     const err = res ? await res.json() : {};
     alert(err.erro || 'Erro ao abrir chamado. Tente novamente.');
     return;
   }
 
+  const { chamado } = await res.json();
+
+  // Upload sequencial dos anexos pendentes
+  if (arquivosPendentes.length > 0) {
+    const progresso = document.getElementById('upload-progresso');
+    const fill = document.getElementById('progress-fill');
+    const status = document.getElementById('upload-status');
+    progresso.style.display = 'block';
+
+    for (let i = 0; i < arquivosPendentes.length; i++) {
+      status.textContent = `Enviando anexo ${i + 1} de ${arquivosPendentes.length}: ${arquivosPendentes[i].name}`;
+      const fd = new FormData();
+      fd.append('arquivo', arquivosPendentes[i]);
+      try {
+        const r = await fetch(`${API}/chamados/${chamado.id}/anexos`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: fd
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          alert(`Falha ao enviar "${arquivosPendentes[i].name}": ${e.erro || 'erro desconhecido'}`);
+        }
+      } catch (err) {
+        alert(`Falha ao enviar "${arquivosPendentes[i].name}": ${err.message}`);
+      }
+      fill.style.width = `${((i + 1) / arquivosPendentes.length) * 100}%`;
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Abrir Chamado';
+  arquivosPendentes = [];
   fecharModal('modal-novo-chamado');
   await carregarChamados();
 }

@@ -598,6 +598,79 @@
       color: var(--grey-400);
     }
 
+    /* ===== DROPZONE no modal de Novo Chamado ===== */
+    .dropzone {
+      border: 1.5px dashed var(--grey-200);
+      border-radius: 9px;
+      background: var(--grey-50);
+      transition: 0.15s;
+    }
+    .dropzone.dragover {
+      border-color: var(--blue);
+      background: rgba(13,110,253,0.06);
+    }
+    .dropzone-prompt {
+      padding: 18px 14px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--grey-600);
+      cursor: pointer;
+    }
+    .dropzone-prompt strong { color: var(--blue); }
+    .dropzone-prompt small {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--grey-400);
+    }
+    .arquivos-pendentes {
+      list-style: none;
+      padding: 0 12px 12px;
+    }
+    .arquivos-pendentes li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: white;
+      border: 1px solid var(--grey-200);
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 0.82rem;
+    }
+    .arquivos-pendentes li .nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .arquivos-pendentes li .tamanho { font-size: 0.7rem; color: var(--grey-400); }
+    .arquivos-pendentes li .remover {
+      background: transparent;
+      border: none;
+      color: var(--grey-400);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .arquivos-pendentes li .remover:hover { color: var(--red); }
+
+    .upload-progresso {
+      margin: 10px 0;
+      font-size: 0.8rem;
+      color: var(--grey-600);
+    }
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--grey-100);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 5px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--blue), var(--cyan));
+      width: 0%;
+      transition: width 0.25s;
+    }
+
     @media (max-width: 600px) {
       .stats-row { grid-template-columns: repeat(2, 1fr); }
       .chamado-info-grid { grid-template-columns: 1fr; }
@@ -712,7 +785,7 @@
         <form id="form-novo-chamado" onsubmit="salvarNovoChamado(event)">
           <div class="form-group">
             <label>Título *</label>
-            <input type="text" name="titulo" required placeholder="Descreva brevemente o problema...">
+            <input type="text" name="titulo" required placeholder="Resumo do problema em uma frase">
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -732,10 +805,32 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Descrição detalhada</label>
-            <textarea name="descricao" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível..."></textarea>
+            <label>Categoria</label>
+            <input type="text" name="categoria" placeholder="Ex: Bug, Dúvida, Solicitação, Acesso...">
           </div>
-          <button type="submit" class="btn-salvar">Abrir Chamado</button>
+          <div class="form-group">
+            <label>Descrição detalhada</label>
+            <textarea name="descricao" rows="4" placeholder="O que aconteceu? Qual o erro? Quais passos para reproduzir? Anexe prints se possível."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Anexos</label>
+            <div class="dropzone" id="dropzone-novo">
+              <input type="file" id="file-input-novo" multiple hidden>
+              <div class="dropzone-prompt" onclick="document.getElementById('file-input-novo').click()">
+                <strong>📎 Clique aqui</strong> ou arraste arquivos
+                <small>Imagens, PDFs, planilhas, ZIPs · até 10 MB cada</small>
+              </div>
+              <ul class="arquivos-pendentes" id="lista-pendentes"></ul>
+            </div>
+          </div>
+
+          <div class="upload-progresso" id="upload-progresso" style="display:none">
+            <span id="upload-status">Enviando anexos...</span>
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          </div>
+
+          <button type="submit" class="btn-salvar" id="btn-abrir-chamado">Abrir Chamado</button>
         </form>
       </div>
     </div>

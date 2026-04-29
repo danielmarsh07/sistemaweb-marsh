@@ -406,6 +406,62 @@ tbody tr:last-child td {
   vertical-align: middle;
 }
 
+/* ===== DROPZONE de anexos no modal do dashboard ===== */
+.dropzone-dash {
+  border: 1.5px dashed var(--grey-200);
+  border-radius: 8px;
+  background: var(--grey-50);
+  transition: 0.15s;
+}
+.dropzone-dash.dragover {
+  border-color: var(--blue);
+  background: rgba(13,110,253,0.06);
+}
+.dropzone-prompt-dash {
+  padding: 14px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--grey-600);
+  cursor: pointer;
+}
+.dropzone-prompt-dash strong { color: var(--blue); }
+
+.arquivos-pendentes-dash {
+  list-style: none;
+  padding: 0 10px 10px;
+}
+.arquivos-pendentes-dash li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: white;
+  border: 1px solid var(--grey-200);
+  border-radius: 5px;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+.arquivos-pendentes-dash li .nome {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arquivos-pendentes-dash li .tamanho {
+  font-size: 10px;
+  color: var(--grey-400);
+}
+.arquivos-pendentes-dash li .remover {
+  background: transparent;
+  border: none;
+  color: var(--grey-400);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.arquivos-pendentes-dash li .remover:hover { color: var(--red); }
+
 .badge-entrada {
   background: rgba(16, 185, 129, 0.1);
   color: var(--green);
