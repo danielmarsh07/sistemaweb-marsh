@@ -81,6 +81,7 @@ router.get('/', async (req, res) => {
       paginacao: { total, page, limit, total_paginas: Math.ceil(total / limit) }
     });
   } catch (err) {
+    console.error('[chamados GET /]', err);
     res.status(500).json({ erro: 'Erro ao buscar chamados', detalhe: err.message });
   }
 });
@@ -171,6 +172,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(chamado);
   } catch (err) {
+    console.error('[chamados GET /:id]', err);
     res.status(500).json({ erro: 'Erro ao buscar chamado', detalhe: err.message });
   }
 });
