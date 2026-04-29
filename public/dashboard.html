@@ -228,8 +228,10 @@
         </div>
 
         <!-- Filtros -->
-        <div style="display:flex; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
-          <select id="filtro-status" class="filtro-select" onchange="loadChamados()">
+        <div style="display:flex; gap:0.75rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center;">
+          <input type="text" id="filtro-busca" class="filtro-select" placeholder="Buscar por título, descrição ou #ID..."
+                 style="min-width:260px; flex:1" oninput="onBuscaChamadosChange(this)">
+          <select id="filtro-status" class="filtro-select" onchange="onFiltroChamadosChange()">
             <option value="">Todos os status</option>
             <option value="aberto">Aberto</option>
             <option value="em_andamento">Em andamento</option>
@@ -237,7 +239,7 @@
             <option value="resolvido">Resolvido</option>
             <option value="fechado">Fechado</option>
           </select>
-          <select id="filtro-prioridade" class="filtro-select" onchange="loadChamados()">
+          <select id="filtro-prioridade" class="filtro-select" onchange="onFiltroChamadosChange()">
             <option value="">Todas as prioridades</option>
             <option value="critica">Crítica</option>
             <option value="alta">Alta</option>
@@ -265,6 +267,7 @@
             </tbody>
           </table>
         </div>
+        <div id="chamados-paginacao" style="display:flex; gap:10px; justify-content:center; align-items:center; margin-top:14px;"></div>
       </section>
 
       <!-- ========== USUÁRIOS PAGE ========== -->

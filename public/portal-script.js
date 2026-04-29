@@ -61,11 +61,12 @@ async function carregarPortal() {
 }
 
 async function carregarChamados() {
-  const res = await apiFetch(`${API}/chamados`);
+  const res = await apiFetch(`${API}/chamados?limit=200`);
   if (!res) return;
 
-  const chamados = await res.json();
-  todosOsChamados = Array.isArray(chamados) ? chamados : [];
+  const data = await res.json();
+  // API agora retorna { chamados, paginacao }; mantém compat com array antigo
+  todosOsChamados = Array.isArray(data) ? data : (data.chamados || []);
 
   atualizarStats();
   renderChamados(todosOsChamados);
@@ -124,15 +125,22 @@ function renderChamados(lista) {
     return;
   }
 
-  container.innerHTML = lista.map(ch => `
-    <div class="chamado-card" onclick="abrirDetalhe(${ch.id})">
+  container.innerHTML = lista.map(ch => {
+    const naoLidos = parseInt(ch.atendimentos_nao_lidos) || 0;
+    return `
+    <div class="chamado-card${naoLidos > 0 ? ' has-novidade' : ''}" onclick="abrirDetalhe(${ch.id})">
       <div class="chamado-id">#${ch.id}</div>
       <div class="chamado-body">
-        <div class="chamado-titulo">${ch.titulo}</div>
+        <div class="chamado-titulo">
+          ${ch.titulo}
+          ${naoLidos > 0 ? `<span class="badge-novo" title="${naoLidos} novo(s) comentário(s)">${naoLidos} novo${naoLidos > 1 ? 's' : ''}</span>` : ''}
+        </div>
         <div class="chamado-meta">
           ${ch.tecnologia_nome ? `<span>💻 ${ch.tecnologia_nome}</span>` : ''}
           <span>📅 ${formatData(ch.data_criacao)}</span>
           ${ch.total_atendimentos > 0 ? `<span>💬 ${ch.total_atendimentos} resposta(s)</span>` : ''}
+          ${badgeSla(ch.sla)}
+          ${ch.avaliacao_nota ? `<span title="Sua avaliação">${'⭐'.repeat(ch.avaliacao_nota)}</span>` : ''}
         </div>
       </div>
       <div class="chamado-badges">
@@ -140,7 +148,21 @@ function renderChamados(lista) {
         ${badgePrioridade(ch.prioridade)}
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function badgeSla(sla) {
+  if (!sla || sla.sla_status === 'concluido') return '';
+  if (sla.sla_status === 'estourado') {
+    return `<span class="sla-pill sla-estourado" title="SLA estourado">⏱ SLA estourado</span>`;
+  }
+  if (sla.sla_status === 'alerta') {
+    const h = Math.max(0, Math.floor(sla.restante_minutos / 60));
+    const m = Math.max(0, sla.restante_minutos % 60);
+    return `<span class="sla-pill sla-alerta" title="Pouco tempo restante">⏱ ${h}h${m}m restantes</span>`;
+  }
+  return '';
 }
 
 // ===== DETALHE DO CHAMADO =====
@@ -152,12 +174,15 @@ async function abrirDetalhe(id) {
   document.getElementById('detalhe-titulo').textContent = `Chamado #${ch.id}`;
   document.getElementById('comentario-chamado-id').value = ch.id;
 
+  const concluido = ch.status === 'fechado' || ch.status === 'resolvido';
+
   // Info grid
   document.getElementById('detalhe-info').innerHTML = `
     <div><strong>Status</strong>${badgeStatus(ch.status)}</div>
     <div><strong>Prioridade</strong>${badgePrioridade(ch.prioridade)}</div>
     <div><strong>Tecnologia</strong>${ch.tecnologia_nome || 'Geral'}</div>
     <div><strong>Aberto em</strong>${formatDataHora(ch.data_abertura)}</div>
+    ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA</strong>${badgeSlaDetalhe(ch.sla)}</div>` : ''}
     ${ch.categoria ? `<div><strong>Categoria</strong>${ch.categoria}</div>` : ''}
     ${ch.data_fechamento ? `<div><strong>Fechado em</strong>${formatDataHora(ch.data_fechamento)}</div>` : ''}
     <div style="grid-column:1/-1"><strong>Descrição</strong>${ch.descricao || '—'}</div>
@@ -166,12 +191,105 @@ async function abrirDetalhe(id) {
   // Timeline
   renderTimeline(ch.atendimentos || []);
 
-  // Ocultar form de comentário se chamado fechado/resolvido
+  // Bloco de ações pós-fechamento (reabrir + CSAT)
+  renderBlocoConcluido(ch, concluido);
+
+  // Form de comentário só em chamados ativos
   const wrapper = document.getElementById('form-comentario-wrapper');
-  wrapper.style.display = (ch.status === 'fechado' || ch.status === 'resolvido') ? 'none' : 'block';
+  wrapper.style.display = concluido ? 'none' : 'block';
   document.querySelector('#form-comentario textarea').value = '';
 
   abrirModal('modal-detalhe');
+
+  // Marcar atendimentos como lidos (não bloqueia a UI)
+  apiFetch(`${API}/chamados/${id}/marcar-lido`, { method: 'POST' }).catch(() => {});
+}
+
+function badgeSlaDetalhe(sla) {
+  if (!sla) return '';
+  if (sla.sla_status === 'estourado') return `<span class="badge" style="background:#ef444420;color:#ef4444">SLA estourado</span>`;
+  if (sla.sla_status === 'alerta') {
+    const h = Math.max(0, Math.floor(sla.restante_minutos / 60));
+    return `<span class="badge" style="background:#f59e0b20;color:#f59e0b">${h}h restantes</span>`;
+  }
+  const h = Math.max(0, Math.floor(sla.restante_minutos / 60));
+  return `<span class="badge" style="background:#10b98120;color:#10b981">${h}h restantes</span>`;
+}
+
+function renderBlocoConcluido(ch, concluido) {
+  const wrapper = document.getElementById('bloco-concluido') || (() => {
+    const div = document.createElement('div');
+    div.id = 'bloco-concluido';
+    document.querySelector('#modal-detalhe .modal-body').insertBefore(
+      div,
+      document.getElementById('form-comentario-wrapper')
+    );
+    return div;
+  })();
+
+  if (!concluido) { wrapper.innerHTML = ''; return; }
+
+  const jaAvaliou = !!ch.avaliacao;
+  const nota = jaAvaliou ? ch.avaliacao.nota : 0;
+
+  wrapper.innerHTML = `
+    <div class="bloco-concluido">
+      <div class="bloco-concluido-acao">
+        <p>O problema voltou? Você pode reabrir esse chamado.</p>
+        <button class="btn-reabrir" onclick="reabrirChamado(${ch.id})">↻ Reabrir chamado</button>
+      </div>
+      <div class="bloco-csat">
+        <h4>${jaAvaliou ? 'Sua avaliação' : 'Como foi o atendimento?'}</h4>
+        <div class="stars-row" id="stars-row" data-nota="${nota}">
+          ${[1,2,3,4,5].map(n => `<span class="star ${n <= nota ? 'on' : ''}" data-n="${n}" onclick="${jaAvaliou ? '' : `escolherNota(${n})`}">★</span>`).join('')}
+        </div>
+        ${jaAvaliou && ch.avaliacao.comentario ? `<p class="csat-comentario">"${ch.avaliacao.comentario}"</p>` : ''}
+        ${!jaAvaliou ? `
+          <textarea id="csat-comentario" placeholder="Conta pra gente o que achou (opcional)..." rows="2"></textarea>
+          <button class="btn-enviar-csat" onclick="enviarAvaliacao(${ch.id})">Enviar avaliação</button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+let notaEscolhida = 0;
+function escolherNota(n) {
+  notaEscolhida = n;
+  document.querySelectorAll('#stars-row .star').forEach((el, i) => {
+    el.classList.toggle('on', i < n);
+  });
+}
+
+async function enviarAvaliacao(chamadoId) {
+  if (!notaEscolhida) {
+    alert('Selecione uma nota de 1 a 5 estrelas.');
+    return;
+  }
+  const comentario = (document.getElementById('csat-comentario')?.value || '').trim();
+  const res = await apiFetch(`${API}/chamados/${chamadoId}/avaliar`, {
+    method: 'POST',
+    body: JSON.stringify({ nota: notaEscolhida, comentario })
+  });
+  if (!res || !res.ok) { alert('Erro ao enviar avaliação.'); return; }
+  notaEscolhida = 0;
+  await abrirDetalhe(chamadoId);
+}
+
+async function reabrirChamado(chamadoId) {
+  const motivo = prompt('Conta o que ainda não foi resolvido (opcional, mas ajuda muito):');
+  if (motivo === null) return; // cancelou
+  const res = await apiFetch(`${API}/chamados/${chamadoId}/reabrir`, {
+    method: 'POST',
+    body: JSON.stringify({ motivo })
+  });
+  if (!res || !res.ok) {
+    const e = res ? await res.json() : {};
+    alert(e.erro || 'Erro ao reabrir chamado.');
+    return;
+  }
+  await carregarChamados();
+  await abrirDetalhe(chamadoId);
 }
 
 function renderTimeline(atendimentos) {

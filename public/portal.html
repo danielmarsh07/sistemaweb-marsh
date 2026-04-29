@@ -434,6 +434,98 @@
     .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
     .empty-state p { font-size: 0.9rem; }
 
+    /* ===== BADGE NOVO / SLA ===== */
+    .chamado-card.has-novidade {
+      border-color: var(--blue);
+      box-shadow: 0 4px 14px rgba(13,110,253,0.10);
+    }
+    .badge-novo {
+      display: inline-block;
+      background: var(--blue);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .sla-pill {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .sla-pill.sla-alerta { background: #f59e0b22; color: #b45309; }
+    .sla-pill.sla-estourado { background: #ef444422; color: #b91c1c; }
+
+    /* ===== BLOCO PÓS-FECHAMENTO (reabrir + CSAT) ===== */
+    .bloco-concluido {
+      background: var(--grey-50);
+      border: 1px solid var(--grey-200);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 10px 0 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .bloco-concluido-acao p {
+      font-size: 0.85rem;
+      color: var(--grey-600);
+      margin-bottom: 8px;
+    }
+    .btn-reabrir {
+      background: white;
+      color: var(--blue);
+      border: 1px solid var(--blue);
+      border-radius: 7px;
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-reabrir:hover { background: var(--blue); color: white; }
+
+    .bloco-csat h4 { font-size: 0.85rem; margin-bottom: 8px; color: var(--grey-800); }
+    .stars-row {
+      display: flex;
+      gap: 4px;
+      font-size: 1.6rem;
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 8px;
+    }
+    .star { color: var(--grey-200); transition: 0.15s; }
+    .star.on { color: #f59e0b; }
+    .star:hover { transform: scale(1.1); }
+    .csat-comentario {
+      font-style: italic;
+      font-size: 0.85rem;
+      color: var(--grey-600);
+      margin-top: 6px;
+    }
+    #csat-comentario {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--grey-200);
+      border-radius: 7px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      resize: vertical;
+      margin-bottom: 8px;
+    }
+    .btn-enviar-csat {
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
     @media (max-width: 600px) {
       .stats-row { grid-template-columns: repeat(2, 1fr); }
       .chamado-info-grid { grid-template-columns: 1fr; }

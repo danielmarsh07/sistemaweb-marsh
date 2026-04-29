@@ -386,6 +386,26 @@ tbody tr:last-child td {
   cursor: help;
 }
 
+/* Linha de chamado com novidades não lidas */
+.row-novidade {
+  background: linear-gradient(90deg, rgba(13,110,253,0.05), transparent);
+}
+.row-novidade strong {
+  color: var(--blue);
+}
+
+.badge-novo-dash {
+  display: inline-block;
+  background: var(--blue);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 9px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .badge-entrada {
   background: rgba(16, 185, 129, 0.1);
   color: var(--green);

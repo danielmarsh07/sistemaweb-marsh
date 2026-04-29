@@ -299,6 +299,47 @@ async function iniciar() {
     await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS cidade VARCHAR(100);`);
     await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS uf VARCHAR(2);`);
 
+    // 18. Fase 4 — avaliação CSAT do chamado
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chamados_avaliacao (
+        id SERIAL PRIMARY KEY,
+        chamado_id INTEGER NOT NULL UNIQUE,
+        empresa_id INTEGER,
+        usuario_id INTEGER,
+        nota INTEGER NOT NULL CHECK (nota BETWEEN 1 AND 5),
+        comentario TEXT,
+        data_avaliacao TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // 19. Fase 4 — atendimentos lidos por usuário (badge "novos comentários")
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS atendimentos_lidos (
+        id SERIAL PRIMARY KEY,
+        atendimento_id INTEGER NOT NULL,
+        usuario_id INTEGER NOT NULL,
+        lido_em TIMESTAMP DEFAULT NOW(),
+        UNIQUE(atendimento_id, usuario_id)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_atend_lidos_user ON atendimentos_lidos(usuario_id);`);
+
+    // 20. Fase 4 — anexos do chamado (storage S3/R2)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chamados_anexos (
+        id SERIAL PRIMARY KEY,
+        chamado_id INTEGER NOT NULL,
+        empresa_id INTEGER,
+        usuario_id INTEGER,
+        nome_original VARCHAR(255) NOT NULL,
+        storage_key VARCHAR(500) NOT NULL,
+        tamanho_bytes BIGINT,
+        mime_type VARCHAR(150),
+        data_upload TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_anexos_chamado ON chamados_anexos(chamado_id);`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

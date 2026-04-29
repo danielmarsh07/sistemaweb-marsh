@@ -219,11 +219,12 @@ function showPage(page) {
 // ===== DASHBOARD =====
 async function loadDashboard() {
   try {
-    const [resumo, transacoes, chamados] = await Promise.all([
+    const [resumo, transacoes, chamadosResp] = await Promise.all([
       apiFetch(`${API_URL}/empresas/resumo`).then(r => r ? r.json() : {}),
       apiFetch(`${API_URL}/transacoes`).then(r => r ? r.json() : {}),
-      apiFetch(`${API_URL}/chamados?status=aberto`).then(r => r ? r.json() : [])
+      apiFetch(`${API_URL}/chamados?status=aberto&limit=10`).then(r => r ? r.json() : {})
     ]);
+    const chamados = Array.isArray(chamadosResp) ? chamadosResp : (chamadosResp.chamados || []);
 
     if (resumo) {
       document.getElementById('total-clientes').textContent = resumo.clientes || 0;
@@ -621,35 +622,50 @@ async function preencherSelectsChamado() {
     tecnologias.map(t => `<option value="${t.id}">${t.nome} ${t.categoria ? '(' + t.categoria + ')' : ''}</option>`).join('');
 }
 
+let chamadosPaginacao = { page: 1, limit: 25 };
+
 async function loadChamados() {
   const status = document.getElementById('filtro-status')?.value || '';
   const prioridade = document.getElementById('filtro-prioridade')?.value || '';
+  const busca = document.getElementById('filtro-busca')?.value?.trim() || '';
 
-  let url = `${API_URL}/chamados?`;
-  if (status) url += `status=${status}&`;
-  if (prioridade) url += `prioridade=${prioridade}&`;
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (prioridade) params.set('prioridade', prioridade);
+  if (busca) params.set('busca', busca);
+  params.set('page', chamadosPaginacao.page);
+  params.set('limit', chamadosPaginacao.limit);
 
-  const res = await apiFetch(url);
+  const res = await apiFetch(`${API_URL}/chamados?${params.toString()}`);
   if (!res) return;
-  const lista = await res.json();
+  const data = await res.json();
+  const lista = Array.isArray(data) ? data : (data.chamados || []);
+  const paginacao = data.paginacao || { total: lista.length, page: 1, limit: lista.length, total_paginas: 1 };
   const tbody = document.getElementById('chamados-tbody');
+
+  renderPaginacaoChamados(paginacao);
 
   if (!lista.length) {
     tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhum chamado encontrado</td></tr>';
     return;
   }
 
-  tbody.innerHTML = lista.map(ch => `
-    <tr>
+  tbody.innerHTML = lista.map(ch => {
+    const naoLidos = parseInt(ch.atendimentos_nao_lidos) || 0;
+    return `
+    <tr${naoLidos > 0 ? ' class="row-novidade"' : ''}>
       <td><strong>#${ch.id}</strong></td>
       <td style="max-width:240px;" title="${ch.titulo}">
-        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${ch.titulo}</div>
+        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
+          ${ch.titulo}
+          ${naoLidos > 0 ? `<span class="badge-novo-dash" title="${naoLidos} não lido(s)">${naoLidos}</span>` : ''}
+        </div>
         ${auditMeta(ch)}
       </td>
       <td>${ch.cliente_nome || '-'}</td>
       <td>${ch.tecnologia_nome || '-'}</td>
-      <td>${badgeStatus(ch.status)}</td>
-      <td>${badgePrioridade(ch.prioridade)}</td>
+      <td>${badgeStatus(ch.status)}${badgeSlaInline(ch.sla)}</td>
+      <td>${badgePrioridade(ch.prioridade)}${ch.avaliacao_nota ? `<br><small style="color:#f59e0b">${'★'.repeat(ch.avaliacao_nota)}</small>` : ''}</td>
       <td>${formatData(ch.data_criacao)}</td>
       <td>
         <button class="btn btn-edit" onclick="abrirDetalheChamado(${ch.id})">Ver</button>
@@ -657,7 +673,46 @@ async function loadChamados() {
         <button class="btn btn-danger" onclick="deletarChamado(${ch.id})">Remover</button>
       </td>
     </tr>
-  `).join('');
+    `;
+  }).join('');
+}
+
+function badgeSlaInline(sla) {
+  if (!sla || sla.sla_status === 'concluido' || sla.sla_status === 'ok') return '';
+  if (sla.sla_status === 'estourado') return '<br><small style="color:#ef4444; font-weight:600">⏱ SLA estourado</small>';
+  const h = Math.max(0, Math.floor(sla.restante_minutos / 60));
+  return `<br><small style="color:#f59e0b; font-weight:600">⏱ ${h}h restantes</small>`;
+}
+
+function renderPaginacaoChamados(p) {
+  const container = document.getElementById('chamados-paginacao');
+  if (!container) return;
+  if (p.total_paginas <= 1) { container.innerHTML = ''; return; }
+
+  container.innerHTML = `
+    <button class="btn btn-secondary" ${p.page <= 1 ? 'disabled' : ''} onclick="mudarPaginaChamados(${p.page - 1})">← Anterior</button>
+    <span style="font-size:12.5px; color:#64748b">Página ${p.page} de ${p.total_paginas} · ${p.total} chamado(s)</span>
+    <button class="btn btn-secondary" ${p.page >= p.total_paginas ? 'disabled' : ''} onclick="mudarPaginaChamados(${p.page + 1})">Próxima →</button>
+  `;
+}
+
+function mudarPaginaChamados(p) {
+  chamadosPaginacao.page = p;
+  loadChamados();
+}
+
+function onFiltroChamadosChange() {
+  chamadosPaginacao.page = 1;
+  loadChamados();
+}
+
+let _buscaTimer = null;
+function onBuscaChamadosChange() {
+  clearTimeout(_buscaTimer);
+  _buscaTimer = setTimeout(() => {
+    chamadosPaginacao.page = 1;
+    loadChamados();
+  }, 350);
 }
 
 async function salvarChamado() {
@@ -741,12 +796,15 @@ async function abrirDetalheChamado(id) {
       <div><strong>Tecnologia:</strong> ${ch.tecnologia_nome || '-'}</div>
       <div><strong>Status:</strong> ${badgeStatus(ch.status)}</div>
       <div><strong>Prioridade:</strong> ${badgePrioridade(ch.prioridade)}</div>
+      ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA:</strong> ${badgeSlaInlineDetalhe(ch.sla)}</div>` : ''}
       <div><strong>Categoria:</strong> ${ch.categoria || '-'}</div>
       <div><strong>Abertura:</strong> ${formatData(ch.data_abertura)}</div>
       <div><strong>Aberto por:</strong> ${ch.aberto_por_nome || '-'}</div>
       <div><strong>Atribuído para:</strong> ${ch.atribuido_para_nome || '-'}</div>
+      ${ch.avaliacao ? `<div><strong>Avaliação:</strong> <span style="color:#f59e0b">${'★'.repeat(ch.avaliacao.nota)}${'☆'.repeat(5 - ch.avaliacao.nota)}</span></div>` : ''}
     </div>
     ${ch.descricao ? `<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #e2e8f0"><strong>Descrição:</strong><br>${ch.descricao}</div>` : ''}
+    ${ch.avaliacao && ch.avaliacao.comentario ? `<div style="margin-top:0.75rem; padding:0.75rem; background:#fef3c720; border-left:3px solid #f59e0b; border-radius:6px"><strong>Comentário do cliente:</strong><br><em>"${ch.avaliacao.comentario}"</em></div>` : ''}
   `;
 
   renderTimeline(ch.atendimentos || []);
@@ -754,6 +812,17 @@ async function abrirDetalheChamado(id) {
   document.getElementById('atendimento-chamado-id').value = ch.id;
 
   showModal('#modal-detalhe-chamado');
+
+  // Marca atendimentos como lidos para o usuário atual
+  apiFetch(`${API_URL}/chamados/${id}/marcar-lido`, { method: 'POST' }).catch(() => {});
+}
+
+function badgeSlaInlineDetalhe(sla) {
+  if (!sla) return '';
+  if (sla.sla_status === 'estourado') return '<span style="color:#ef4444; font-weight:600">⏱ Estourado</span>';
+  const h = Math.max(0, Math.floor(sla.restante_minutos / 60));
+  const cor = sla.sla_status === 'alerta' ? '#f59e0b' : '#10b981';
+  return `<span style="color:${cor}; font-weight:600">⏱ ${h}h restantes</span>`;
 }
 
 function renderTimeline(atendimentos) {
