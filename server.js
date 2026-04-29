@@ -27,6 +27,7 @@ const tecnologiasRoutes = require('./routes/tecnologias');
 const chamadosRoutes = require('./routes/chamados');
 const atendimentosRoutes = require('./routes/atendimentos');
 const usuariosRoutes = require('./routes/usuarios');
+const anexosRoutes = require('./routes/anexos');
 const autenticar = require('./middleware/autenticar');
 
 // Rotas públicas
@@ -39,6 +40,7 @@ app.use('/api/fornecedores', autenticar, fornecedoresRoutes);
 app.use('/api/transacoes', autenticar, transacoesRoutes);
 app.use('/api/tecnologias', autenticar, tecnologiasRoutes);
 app.use('/api/chamados', autenticar, chamadosRoutes);
+app.use('/api/chamados', autenticar, anexosRoutes); // anexos sob /api/chamados/:id/anexos
 app.use('/api/atendimentos', autenticar, atendimentosRoutes);
 app.use('/api/usuarios', autenticar, usuariosRoutes);
 

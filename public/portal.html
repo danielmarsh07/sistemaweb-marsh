@@ -526,6 +526,78 @@
       cursor: pointer;
     }
 
+    /* ===== ANEXOS ===== */
+    .bloco-anexos {
+      background: var(--grey-50);
+      border: 1px solid var(--grey-200);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 10px 0 16px;
+    }
+    .bloco-anexos h4 {
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+      color: var(--grey-800);
+    }
+    .anexos-list {
+      list-style: none;
+      margin-bottom: 10px;
+    }
+    .anexo-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--grey-200);
+      font-size: 0.85rem;
+    }
+    .anexo-item:last-child { border-bottom: none; }
+    .anexo-nome {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .anexo-meta {
+      font-size: 0.72rem;
+      color: var(--grey-400);
+      white-space: nowrap;
+    }
+    .btn-anexo {
+      background: white;
+      color: var(--blue);
+      border: 1px solid var(--blue);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-anexo:hover { background: var(--blue); color: white; }
+    .sem-anexos {
+      font-size: 0.8rem;
+      color: var(--grey-400);
+      margin-bottom: 8px;
+    }
+    .btn-upload {
+      display: inline-block;
+      background: white;
+      color: var(--blue);
+      border: 1px dashed var(--blue);
+      border-radius: 7px;
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-upload:hover { background: rgba(13,110,253,0.05); }
+    .upload-hint {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: var(--grey-400);
+    }
+
     @media (max-width: 600px) {
       .stats-row { grid-template-columns: repeat(2, 1fr); }
       .chamado-info-grid { grid-template-columns: 1fr; }

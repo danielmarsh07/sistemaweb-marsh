@@ -808,6 +808,7 @@ async function abrirDetalheChamado(id) {
   `;
 
   renderTimeline(ch.atendimentos || []);
+  renderAnexosDashboard(ch);
   resetForm('#form-atendimento');
   document.getElementById('atendimento-chamado-id').value = ch.id;
 
@@ -815,6 +816,81 @@ async function abrirDetalheChamado(id) {
 
   // Marca atendimentos como lidos para o usuário atual
   apiFetch(`${API_URL}/chamados/${id}/marcar-lido`, { method: 'POST' }).catch(() => {});
+}
+
+function renderAnexosDashboard(ch) {
+  let wrapper = document.getElementById('anexos-dashboard');
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.id = 'anexos-dashboard';
+    wrapper.style.cssText = 'padding: 0 0.5rem 0.75rem; margin-bottom:0.75rem;';
+    const timeline = document.getElementById('timeline-atendimentos');
+    timeline.parentNode.insertBefore(wrapper, timeline);
+  }
+  const anexos = ch.anexos || [];
+  wrapper.innerHTML = `
+    <h4 style="margin-bottom:0.5rem; color:#0d6efd; font-size:13px;">Anexos ${anexos.length ? `(${anexos.length})` : ''}</h4>
+    ${anexos.length ? `
+      <ul style="list-style:none; padding:0; margin-bottom:8px;">
+        ${anexos.map(a => `
+          <li style="display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
+            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${a.nome_original}">📎 ${a.nome_original}</span>
+            <span style="font-size:11px; color:#94a3b8;">${formatarTamanhoDash(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
+            <button class="btn btn-edit" onclick="baixarAnexoDashboard(${ch.id}, ${a.id})">Baixar</button>
+            <button class="btn btn-danger" onclick="removerAnexoDashboard(${ch.id}, ${a.id})">×</button>
+          </li>
+        `).join('')}
+      </ul>
+    ` : '<p style="font-size:12.5px; color:#94a3b8; margin-bottom:8px;">Nenhum anexo.</p>'}
+    <label style="display:inline-block; background:white; color:#0d6efd; border:1px dashed #0d6efd; border-radius:6px; padding:5px 12px; font-size:12.5px; font-weight:600; cursor:pointer;">
+      + Enviar anexo
+      <input type="file" hidden onchange="enviarAnexoDashboard(${ch.id}, this)">
+    </label>
+    <small style="margin-left:8px; font-size:11px; color:#94a3b8;">Máx 10 MB</small>
+  `;
+}
+
+function formatarTamanhoDash(bytes) {
+  if (!bytes) return '';
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(0)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+async function enviarAnexoDashboard(chamadoId, input) {
+  if (!input.files || !input.files[0]) return;
+  const arquivo = input.files[0];
+  if (arquivo.size > 10 * 1024 * 1024) { alert('Máximo 10 MB.'); input.value = ''; return; }
+
+  const formData = new FormData();
+  formData.append('arquivo', arquivo);
+
+  const res = await fetch(`${API_URL}/chamados/${chamadoId}/anexos`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+    body: formData
+  });
+  input.value = '';
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    alert(e.erro || 'Erro ao enviar anexo.');
+    return;
+  }
+  await abrirDetalheChamado(chamadoId);
+}
+
+async function baixarAnexoDashboard(chamadoId, anexoId) {
+  const res = await apiFetch(`${API_URL}/chamados/${chamadoId}/anexos/${anexoId}/download`);
+  if (!res || !res.ok) { alert('Erro ao baixar.'); return; }
+  const data = await res.json();
+  window.open(data.url, '_blank');
+}
+
+async function removerAnexoDashboard(chamadoId, anexoId) {
+  if (!confirm('Remover este anexo?')) return;
+  const res = await apiFetch(`${API_URL}/chamados/${chamadoId}/anexos/${anexoId}`, { method: 'DELETE' });
+  if (!res || !res.ok) { const e = res ? await res.json() : {}; alert(e.erro || 'Erro ao remover.'); return; }
+  await abrirDetalheChamado(chamadoId);
 }
 
 function badgeSlaInlineDetalhe(sla) {

@@ -191,6 +191,9 @@ async function abrirDetalhe(id) {
   // Timeline
   renderTimeline(ch.atendimentos || []);
 
+  // Anexos
+  renderAnexos(ch);
+
   // Bloco de ações pós-fechamento (reabrir + CSAT)
   renderBlocoConcluido(ch, concluido);
 
@@ -214,6 +217,96 @@ function badgeSlaDetalhe(sla) {
   }
   const h = Math.max(0, Math.floor(sla.restante_minutos / 60));
   return `<span class="badge" style="background:#10b98120;color:#10b981">${h}h restantes</span>`;
+}
+
+function renderAnexos(ch) {
+  let wrapper = document.getElementById('bloco-anexos');
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.id = 'bloco-anexos';
+    document.querySelector('#modal-detalhe .modal-body').insertBefore(
+      wrapper,
+      document.getElementById('form-comentario-wrapper')
+    );
+  }
+
+  const anexos = ch.anexos || [];
+  const concluido = ch.status === 'fechado' || ch.status === 'resolvido';
+
+  wrapper.innerHTML = `
+    <div class="bloco-anexos">
+      <h4>Anexos ${anexos.length ? `(${anexos.length})` : ''}</h4>
+      ${anexos.length ? `
+        <ul class="anexos-list">
+          ${anexos.map(a => `
+            <li class="anexo-item">
+              <span class="anexo-nome" title="${a.nome_original}">${iconeAnexo(a.mime_type)} ${a.nome_original}</span>
+              <span class="anexo-meta">${formatarTamanho(a.tamanho_bytes)} · ${a.enviado_por_nome || ''}</span>
+              <button class="btn-anexo" onclick="baixarAnexoPortal(${ch.id}, ${a.id})">Baixar</button>
+            </li>
+          `).join('')}
+        </ul>
+      ` : '<p class="sem-anexos">Nenhum anexo neste chamado.</p>'}
+      ${concluido ? '' : `
+        <label class="btn-upload">
+          + Enviar anexo
+          <input type="file" id="upload-anexo-portal" hidden onchange="enviarAnexoPortal(${ch.id}, this)">
+        </label>
+        <small class="upload-hint">Imagens, PDFs, docs, planilhas, ZIP. Máx 10 MB.</small>
+      `}
+    </div>
+  `;
+}
+
+function iconeAnexo(mime) {
+  if (!mime) return '📎';
+  if (mime.startsWith('image/')) return '🖼';
+  if (mime === 'application/pdf') return '📄';
+  if (mime.includes('zip')) return '🗜';
+  if (mime.includes('sheet') || mime.includes('excel')) return '📊';
+  if (mime.includes('word') || mime.includes('document')) return '📝';
+  return '📎';
+}
+
+function formatarTamanho(bytes) {
+  if (!bytes) return '';
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(0)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+async function enviarAnexoPortal(chamadoId, input) {
+  if (!input.files || !input.files[0]) return;
+  const arquivo = input.files[0];
+  if (arquivo.size > 10 * 1024 * 1024) {
+    alert('Arquivo maior que 10 MB.');
+    input.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('arquivo', arquivo);
+
+  const res = await fetch(`${API}/chamados/${chamadoId}/anexos`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData
+  });
+
+  input.value = '';
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    alert(e.erro || 'Erro ao enviar anexo.');
+    return;
+  }
+  await abrirDetalhe(chamadoId);
+}
+
+async function baixarAnexoPortal(chamadoId, anexoId) {
+  const res = await apiFetch(`${API}/chamados/${chamadoId}/anexos/${anexoId}/download`);
+  if (!res || !res.ok) { alert('Erro ao baixar anexo.'); return; }
+  const data = await res.json();
+  window.open(data.url, '_blank');
 }
 
 function renderBlocoConcluido(ch, concluido) {
