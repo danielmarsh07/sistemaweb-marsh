@@ -265,12 +265,12 @@ function renderDashboardChamados(chamados) {
   }
   tbody.innerHTML = chamados.map(ch => `
     <tr style="cursor:pointer" onclick="abrirDetalheChamado(${ch.id})">
-      <td>#${ch.id}</td>
-      <td>${escapeHtml(ch.titulo)}</td>
-      <td>${escapeHtml(ch.cliente_nome || '-')}</td>
-      <td>${badgeStatus(ch.status)}</td>
-      <td>${badgePrioridade(ch.prioridade)}</td>
-      <td>${formatData(ch.data_criacao)}</td>
+      <td data-label="#">#${ch.id}</td>
+      <td data-label="Título">${escapeHtml(ch.titulo)}</td>
+      <td data-label="Cliente">${escapeHtml(ch.cliente_nome || '-')}</td>
+      <td data-label="Status">${badgeStatus(ch.status)}</td>
+      <td data-label="Prioridade">${badgePrioridade(ch.prioridade)}</td>
+      <td data-label="Abertura">${formatData(ch.data_criacao)}</td>
     </tr>
   `).join('');
 }
@@ -289,22 +289,22 @@ async function loadClientes() {
 
   tbody.innerHTML = clientes.map(c => `
     <tr>
-      <td>
+      <td data-label="Razão Social">
         <strong>${escapeHtml(c.razao_social || c.nome)}</strong>
         ${c.nome_fantasia ? `<br><small style="color:#94a3b8">${escapeHtml(c.nome_fantasia)}</small>` : ''}
         ${auditMeta(c)}
       </td>
-      <td>${escapeHtml(c.cpf_cnpj || '-')}</td>
-      <td>${escapeHtml(c.responsavel_nome || c.email || '-')}</td>
-      <td>${escapeHtml(c.telefone || c.celular || '-')}</td>
-      <td>${badgeStatusGeral(c.status)}</td>
-      <td>
+      <td data-label="CNPJ/CPF">${escapeHtml(c.cpf_cnpj || '-')}</td>
+      <td data-label="Responsável">${escapeHtml(c.responsavel_nome || c.email || '-')}</td>
+      <td data-label="Telefone">${escapeHtml(c.telefone || c.celular || '-')}</td>
+      <td data-label="Status">${badgeStatusGeral(c.status)}</td>
+      <td data-label="Chamados">
         ${parseInt(c.chamados_abertos) > 0
           ? `<span class="badge badge-aberto">${c.chamados_abertos} aberto(s)</span>`
           : '<span style="color:#94a3b8">0</span>'
         }
       </td>
-      <td>
+      <td data-label="Ações">
         <button class="btn btn-edit" onclick="editarCliente(${c.id})">Editar</button>
         <button class="btn btn-danger" onclick="deletarCliente(${c.id})">Remover</button>
       </td>
@@ -423,16 +423,16 @@ async function loadFornecedores() {
 
   tbody.innerHTML = lista.map(f => `
     <tr>
-      <td>
+      <td data-label="Razão Social">
         <strong>${escapeHtml(f.razao_social || f.nome)}</strong>
         ${f.nome_fantasia ? `<br><small style="color:#94a3b8">${escapeHtml(f.nome_fantasia)}</small>` : ''}
         ${auditMeta(f)}
       </td>
-      <td>${escapeHtml(f.cnpj || '-')}</td>
-      <td>${f.tipo ? escapeHtml(capitalize(f.tipo)) : escapeHtml(f.ramo || '-')}</td>
-      <td>${escapeHtml(f.contato_nome || f.email || '-')}</td>
-      <td>${badgeStatusGeral(f.status)}</td>
-      <td>
+      <td data-label="CNPJ">${escapeHtml(f.cnpj || '-')}</td>
+      <td data-label="Tipo">${f.tipo ? escapeHtml(capitalize(f.tipo)) : escapeHtml(f.ramo || '-')}</td>
+      <td data-label="Contato">${escapeHtml(f.contato_nome || f.email || '-')}</td>
+      <td data-label="Status">${badgeStatusGeral(f.status)}</td>
+      <td data-label="Ações">
         <button class="btn btn-edit" onclick="editarFornecedor(${f.id})">Editar</button>
         <button class="btn btn-danger" onclick="deletarFornecedor(${f.id})">Remover</button>
       </td>
@@ -539,16 +539,16 @@ async function loadTecnologias() {
 
   tbody.innerHTML = lista.map(t => `
     <tr>
-      <td>
+      <td data-label="Nome">
         <strong>${escapeHtml(t.nome)}</strong>
         ${auditMeta(t)}
       </td>
-      <td>${escapeHtml(t.categoria || '-')}</td>
-      <td>${escapeHtml(t.fabricante || '-')}</td>
-      <td>${escapeHtml(t.versao || '-')}</td>
-      <td>${t.total_clientes || 0} cliente(s)</td>
-      <td>${badgeStatusTec(t.status)}</td>
-      <td>
+      <td data-label="Categoria">${escapeHtml(t.categoria || '-')}</td>
+      <td data-label="Fabricante">${escapeHtml(t.fabricante || '-')}</td>
+      <td data-label="Versão">${escapeHtml(t.versao || '-')}</td>
+      <td data-label="Clientes">${t.total_clientes || 0} cliente(s)</td>
+      <td data-label="Status">${badgeStatusTec(t.status)}</td>
+      <td data-label="Ações">
         <button class="btn btn-edit" onclick="editarTecnologia(${t.id})">Editar</button>
         <button class="btn btn-danger" onclick="deletarTecnologia(${t.id})">Remover</button>
       </td>
@@ -660,20 +660,20 @@ async function loadChamados() {
     const naoLidos = parseInt(ch.atendimentos_nao_lidos) || 0;
     return `
     <tr${naoLidos > 0 ? ' class="row-novidade"' : ''}>
-      <td><strong>#${ch.id}</strong></td>
-      <td style="max-width:240px;" title="${escapeHtml(ch.titulo)}">
-        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
+      <td data-label="#"><strong>#${ch.id}</strong></td>
+      <td data-label="Título" class="td-titulo" style="max-width:240px;" title="${escapeHtml(ch.titulo)}">
+        <div class="td-titulo-inner" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
           ${escapeHtml(ch.titulo)}
           ${naoLidos > 0 ? `<span class="badge-novo-dash" title="${naoLidos} não lido(s)">${naoLidos}</span>` : ''}
         </div>
         ${auditMeta(ch)}
       </td>
-      <td>${escapeHtml(ch.cliente_nome || '-')}</td>
-      <td>${escapeHtml(ch.tecnologia_nome || '-')}</td>
-      <td>${badgeStatus(ch.status)}${badgeSlaInline(ch.sla)}</td>
-      <td>${badgePrioridade(ch.prioridade)}${ch.avaliacao_nota ? `<br><small style="color:#f59e0b">${'★'.repeat(ch.avaliacao_nota)}</small>` : ''}</td>
-      <td>${formatData(ch.data_criacao)}</td>
-      <td>
+      <td data-label="Cliente">${escapeHtml(ch.cliente_nome || '-')}</td>
+      <td data-label="Tecnologia">${escapeHtml(ch.tecnologia_nome || '-')}</td>
+      <td data-label="Status">${badgeStatus(ch.status)}${badgeSlaInline(ch.sla)}</td>
+      <td data-label="Prioridade">${badgePrioridade(ch.prioridade)}${ch.avaliacao_nota ? `<br><small style="color:#f59e0b">${'★'.repeat(ch.avaliacao_nota)}</small>` : ''}</td>
+      <td data-label="Abertura">${formatData(ch.data_criacao)}</td>
+      <td data-label="Ações">
         <button class="btn btn-edit" onclick="abrirDetalheChamado(${ch.id})">Ver</button>
         <button class="btn btn-edit" onclick="editarChamado(${ch.id})">Editar</button>
         <button class="btn btn-danger" onclick="deletarChamado(${ch.id})">Remover</button>
@@ -1110,15 +1110,15 @@ async function loadTransacoes() {
 
   tbody.innerHTML = transacoes.map(t => `
     <tr>
-      <td>${formatData(t.data)}</td>
-      <td><span class="badge badge-${t.tipo === 'entrada' ? 'resolvido' : 'alta'}">${t.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
-      <td>
+      <td data-label="Data">${formatData(t.data)}</td>
+      <td data-label="Tipo"><span class="badge badge-${t.tipo === 'entrada' ? 'resolvido' : 'alta'}">${t.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+      <td data-label="Categoria">
         ${escapeHtml(t.categoria)}
         ${auditMeta(t)}
       </td>
-      <td>${escapeHtml(t.descricao || '-')}</td>
-      <td><strong>${formatMoeda(t.valor)}</strong></td>
-      <td>
+      <td data-label="Descrição">${escapeHtml(t.descricao || '-')}</td>
+      <td data-label="Valor"><strong>${formatMoeda(t.valor)}</strong></td>
+      <td data-label="Ações">
         <button class="btn btn-danger" onclick="deletarTransacao(${t.id})">Deletar</button>
       </td>
     </tr>
@@ -1202,15 +1202,15 @@ async function loadUsuarios() {
     const ehVoce = u.id === usuario?.id;
     return `
       <tr>
-        <td><strong>${escapeHtml(u.nome)}</strong>${ehVoce ? ' <small style="color:#94a3b8">(você)</small>' : ''}</td>
-        <td>${escapeHtml(u.email)}</td>
-        <td><span style="background:${t.color}20;color:${t.color};padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">${t.label}</span></td>
-        <td>${escapeHtml(u.cliente_nome || '') || (u.tipo === 'cliente' ? '<span style="color:#ef4444">⚠ sem vínculo</span>' : '—')}</td>
-        <td>${u.ativo !== false
+        <td data-label="Nome"><strong>${escapeHtml(u.nome)}</strong>${ehVoce ? ' <small style="color:#94a3b8">(você)</small>' : ''}</td>
+        <td data-label="Email">${escapeHtml(u.email)}</td>
+        <td data-label="Perfil"><span style="background:${t.color}20;color:${t.color};padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">${t.label}</span></td>
+        <td data-label="Vinculado a">${escapeHtml(u.cliente_nome || '') || (u.tipo === 'cliente' ? '<span style="color:#ef4444">⚠ sem vínculo</span>' : '—')}</td>
+        <td data-label="Status">${u.ativo !== false
           ? '<span style="background:#10b98120;color:#10b981;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Ativo</span>'
           : '<span style="background:#ef444420;color:#ef4444;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Inativo</span>'
         }</td>
-        <td>
+        <td data-label="Ações">
           <button class="btn btn-edit" onclick="abrirEditarUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.tipo}', ${u.cliente_id || 'null'})">Editar</button>
           <button class="btn btn-edit" onclick="abrirResetSenha(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Senha</button>
           ${u.ativo !== false
