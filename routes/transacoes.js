@@ -77,6 +77,15 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    const catCheck = await pool.query(
+      `SELECT 1 FROM categorias_transacao
+       WHERE empresa_id = $1 AND nome = $2 AND tipo = $3 AND ativo = TRUE`,
+      [empresa_id, categoria, tipo]
+    );
+    if (catCheck.rows.length === 0) {
+      return res.status(400).json({ erro: `Categoria "${categoria}" não está cadastrada para o tipo ${tipo}. Cadastre em "Categorias" antes.` });
+    }
+
     const result = await pool.query(
       `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id)
        VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6, $7, $7) RETURNING *`,
@@ -107,14 +116,28 @@ router.put('/:id', async (req, res) => {
     }
 
     const t = atual.rows[0];
+    const novoTipo = tipo || t.tipo;
+    const novaCategoria = categoria || t.categoria;
+
+    if (novaCategoria !== t.categoria || novoTipo !== t.tipo) {
+      const catCheck = await pool.query(
+        `SELECT 1 FROM categorias_transacao
+         WHERE empresa_id = $1 AND nome = $2 AND tipo = $3 AND ativo = TRUE`,
+        [empresa_id, novaCategoria, novoTipo]
+      );
+      if (catCheck.rows.length === 0) {
+        return res.status(400).json({ erro: `Categoria "${novaCategoria}" não está cadastrada para o tipo ${novoTipo}.` });
+      }
+    }
+
     const result = await pool.query(
       `UPDATE transacoes SET tipo=$1, valor=$2, categoria=$3, descricao=$4, data=$5,
         atualizado_por_usuario_id=$6, data_atualizacao=NOW()
        WHERE id=$7 AND empresa_id=$8 RETURNING *`,
       [
-        tipo || t.tipo,
+        novoTipo,
         valor != null && valor !== '' ? parseFloat(valor) : t.valor,
-        categoria || t.categoria,
+        novaCategoria,
         descricao != null ? descricao : t.descricao,
         data || t.data,
         req.usuario.id,

@@ -52,6 +52,7 @@ let tecnologiaEmEdicao = null;
 let chamadoEmEdicao = null;
 let usuarioEmEdicao = null;
 let transacaoEmEdicao = null;
+let categoriaTransEmEdicao = null;
 
 // Caches das listagens (para filtragem/ordenacao client-side)
 let _clientesCache = [];
@@ -59,6 +60,7 @@ let _fornecedoresCache = [];
 let _usuariosCache = [];
 let _transacoesCache = [];
 let _clientesChamadosCache = [];
+let _categoriasTransCache = [];
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -130,9 +132,34 @@ function setupEventListeners() {
     resetForm('#form-transacao');
     document.getElementById('modal-transacao-titulo').textContent = 'Nova Transação';
     document.getElementById('transacao-id').value = '';
+    popularSelectCategoriaTransacao('', '');
     const btn = document.getElementById('btn-salvar-transacao');
     if (btn) btn.textContent = 'Salvar';
     showModal('#modal-transacao');
+  });
+
+  // Quando o tipo muda no modal de transação, atualiza as categorias disponíveis
+  const formTrans = document.getElementById('form-transacao');
+  if (formTrans) {
+    formTrans.tipo.addEventListener('change', (e) => {
+      popularSelectCategoriaTransacao(e.target.value, '');
+    });
+  }
+
+  document.getElementById('btn-nova-categoria-trans').addEventListener('click', () => {
+    categoriaTransEmEdicao = null;
+    resetForm('#form-categoria-transacao');
+    document.getElementById('modal-categoria-transacao-titulo').textContent = 'Nova Categoria';
+    document.getElementById('categoria-transacao-id').value = '';
+    document.getElementById('categoria-trans-ativo-group').style.display = 'none';
+    const btn = document.getElementById('btn-salvar-categoria-trans');
+    if (btn) btn.textContent = 'Salvar';
+    showModal('#modal-categoria-transacao');
+  });
+
+  document.getElementById('form-categoria-transacao').addEventListener('submit', (e) => {
+    e.preventDefault();
+    salvarCategoriaTransacao();
   });
 
   // Fechar modais
@@ -221,6 +248,7 @@ function showPage(page) {
     tecnologias: 'Tecnologias',
     chamados: 'Chamados',
     transacoes: 'Transações Financeiras',
+    'categorias-transacao': 'Categorias de Transação',
     usuarios: 'Usuários do Sistema',
     configuracoes: 'Configurações'
   };
@@ -233,6 +261,7 @@ function showPage(page) {
   if (page === 'tecnologias') loadTecnologias();
   if (page === 'chamados') loadChamados();
   if (page === 'transacoes') loadTransacoes();
+  if (page === 'categorias-transacao') loadCategoriasTransacao();
   if (page === 'usuarios') loadUsuarios();
   if (page === 'configuracoes') renderThemePicker();
 }
@@ -1092,7 +1121,7 @@ async function abrirDetalheChamado(id) {
   document.getElementById('atendimento-chamado-id').value = ch.id;
 
   document.getElementById('detalhe-chamado-info').innerHTML = `
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:0.75rem;">
+    <div class="detalhe-chamado-grid">
       <div><strong>Cliente:</strong> ${escapeHtml(ch.cliente_nome || '-')}</div>
       <div><strong>Tecnologia:</strong> ${escapeHtml(ch.tecnologia_nome || '-')}</div>
       <div><strong>Status:</strong> ${badgeStatus(ch.status)}</div>
@@ -1102,10 +1131,10 @@ async function abrirDetalheChamado(id) {
       <div><strong>Abertura:</strong> ${formatData(ch.data_abertura)}</div>
       <div><strong>Aberto por:</strong> ${escapeHtml(ch.aberto_por_nome || '-')}</div>
       <div><strong>Atribuído para:</strong> ${escapeHtml(ch.atribuido_para_nome || '-')}</div>
-      ${ch.avaliacao ? `<div><strong>Avaliação:</strong> <span style="color:#f59e0b">${'★'.repeat(ch.avaliacao.nota)}${'☆'.repeat(5 - ch.avaliacao.nota)}</span></div>` : ''}
+      ${ch.avaliacao ? `<div><strong>Avaliação:</strong> <span class="detalhe-chamado-stars">${'★'.repeat(ch.avaliacao.nota)}${'☆'.repeat(5 - ch.avaliacao.nota)}</span></div>` : ''}
     </div>
-    ${ch.descricao ? `<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #e2e8f0"><strong>Descrição:</strong><br>${escapeHtml(ch.descricao)}</div>` : ''}
-    ${ch.avaliacao && ch.avaliacao.comentario ? `<div style="margin-top:0.75rem; padding:0.75rem; background:#fef3c720; border-left:3px solid #f59e0b; border-radius:6px"><strong>Comentário do cliente:</strong><br><em>"${escapeHtml(ch.avaliacao.comentario)}"</em></div>` : ''}
+    ${ch.descricao ? `<div class="detalhe-chamado-descricao"><strong>Descrição:</strong><br>${escapeHtml(ch.descricao)}</div>` : ''}
+    ${ch.avaliacao && ch.avaliacao.comentario ? `<div class="detalhe-chamado-comentario"><strong>Comentário do cliente:</strong><br><em>"${escapeHtml(ch.avaliacao.comentario)}"</em></div>` : ''}
   `;
 
   renderTimeline(ch.atendimentos || []);
@@ -1133,7 +1162,7 @@ function renderAnexosDashboard(ch) {
   const arquivos = anexos.filter(a => !a.preview_url);
 
   wrapper.innerHTML = `
-    <h4 style="margin-bottom:0.5rem; color:#0d6efd; font-size:13px;">Anexos ${anexos.length ? `(${anexos.length})` : ''}</h4>
+    <h4 class="anexos-dash-title">Anexos ${anexos.length ? `(${anexos.length})` : ''}</h4>
 
     ${imagens.length ? `
       <div class="thumbs-grid-dash">
@@ -1155,11 +1184,11 @@ function renderAnexosDashboard(ch) {
     ` : ''}
 
     ${arquivos.length ? `
-      <ul style="list-style:none; padding:0; margin-bottom:8px;">
+      <ul class="anexos-dash-list">
         ${arquivos.map(a => `
-          <li style="display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
-            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(a.nome_original)}">📎 ${escapeHtml(a.nome_original)}</span>
-            <span style="font-size:11px; color:#94a3b8;">${formatarTamanhoDash(a.tamanho_bytes)} · ${escapeHtml(a.enviado_por_nome || '')}</span>
+          <li>
+            <span class="anexo-nome" title="${escapeHtml(a.nome_original)}">📎 ${escapeHtml(a.nome_original)}</span>
+            <span class="anexo-meta">${formatarTamanhoDash(a.tamanho_bytes)} · ${escapeHtml(a.enviado_por_nome || '')}</span>
             <button class="btn btn-edit" onclick="baixarAnexoDashboard(${ch.id}, ${a.id})">Baixar</button>
             <button class="btn btn-danger" onclick="removerAnexoDashboard(${ch.id}, ${a.id})">×</button>
           </li>
@@ -1167,13 +1196,13 @@ function renderAnexosDashboard(ch) {
       </ul>
     ` : ''}
 
-    ${anexos.length === 0 ? '<p style="font-size:12.5px; color:#94a3b8; margin-bottom:8px;">Nenhum anexo.</p>' : ''}
+    ${anexos.length === 0 ? '<p class="anexos-dash-vazio">Nenhum anexo.</p>' : ''}
 
-    <label style="display:inline-block; background:white; color:#0d6efd; border:1px dashed #0d6efd; border-radius:6px; padding:5px 12px; font-size:12.5px; font-weight:600; cursor:pointer;">
+    <label class="anexos-dash-upload">
       + Enviar anexo
       <input type="file" hidden onchange="enviarAnexoDashboard(${ch.id}, this)">
     </label>
-    <small style="margin-left:8px; font-size:11px; color:#94a3b8;">Máx 10 MB</small>
+    <small class="anexos-dash-hint">Máx 10 MB</small>
   `;
 }
 
@@ -1308,24 +1337,131 @@ async function salvarAtendimento() {
 }
 
 // ===== TRANSAÇÕES =====
+let _transacoesFiltroPadraoAplicado = false;
+
 async function loadTransacoes() {
   const tbody = document.getElementById('transacoes-tbody');
   if (tbody && _transacoesCache.length === 0) tbody.innerHTML = skeletonRows(6);
-  const res = await apiFetch(`${API_URL}/transacoes`);
-  if (!res) return;
-  const dados = await res.json();
-  _transacoesCache = dados.transacoes || [];
+  await Promise.all([
+    (async () => {
+      const res = await apiFetch(`${API_URL}/transacoes`);
+      if (!res) return;
+      const dados = await res.json();
+      _transacoesCache = dados.transacoes || [];
+    })(),
+    fetchCategoriasTransCache()
+  ]);
   popularSelectsTransacoes(_transacoesCache);
+  popularSelectAnoTransacoes(_transacoesCache);
+
+  // Na primeira abertura da tela, pré-seleciona mês/ano atual.
+  if (!_transacoesFiltroPadraoAplicado) {
+    aplicarFiltroMesAtualTransacoes();
+    _transacoesFiltroPadraoAplicado = true;
+  }
+
   renderTransacoes();
 }
 
-function popularSelectsTransacoes(lista) {
-  const categorias = [...new Set(lista.map(t => t.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  preencherSelectOptions('filtro-transacoes-categoria', categorias);
+function aplicarFiltroMesAtualTransacoes() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1;
+  const ano = hoje.getFullYear();
+  const selMes = document.getElementById('filtro-transacoes-mes');
+  const selAno = document.getElementById('filtro-transacoes-ano');
+  if (selMes) selMes.value = String(mes);
+  if (selAno) {
+    // garante que o ano corrente existe como opção
+    if (!Array.from(selAno.options).some(o => o.value === String(ano))) {
+      const op = document.createElement('option');
+      op.value = String(ano); op.textContent = String(ano);
+      selAno.appendChild(op);
+    }
+    selAno.value = String(ano);
+  }
+  sincronizarDatasComMesAno();
+}
 
-  // datalist no modal
-  const dl = document.getElementById('categorias-transacao');
-  if (dl) dl.innerHTML = categorias.map(c => `<option value="${escapeHtml(c)}">`).join('');
+function popularSelectAnoTransacoes(lista) {
+  const sel = document.getElementById('filtro-transacoes-ano');
+  if (!sel) return;
+  const anos = [...new Set(lista.map(t => t.data ? new Date(t.data).getFullYear() : null).filter(Boolean))]
+    .sort((a, b) => b - a);
+  const anoAtual = new Date().getFullYear();
+  if (!anos.includes(anoAtual)) anos.unshift(anoAtual);
+
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">Ano — todos</option>' +
+    anos.map(a => `<option value="${a}">${a}</option>`).join('');
+  if (atual && anos.map(String).includes(atual)) sel.value = atual;
+}
+
+function sincronizarDatasComMesAno() {
+  const mes = document.getElementById('filtro-transacoes-mes')?.value || '';
+  const ano = document.getElementById('filtro-transacoes-ano')?.value || '';
+  const elDe = document.getElementById('filtro-transacoes-data-de');
+  const elAte = document.getElementById('filtro-transacoes-data-ate');
+  if (!elDe || !elAte) return;
+
+  if (!mes && !ano) {
+    elDe.value = '';
+    elAte.value = '';
+    return;
+  }
+  const anoNum = ano ? parseInt(ano, 10) : new Date().getFullYear();
+  if (mes) {
+    const mesNum = parseInt(mes, 10);
+    const inicio = new Date(anoNum, mesNum - 1, 1);
+    const fim = new Date(anoNum, mesNum, 0); // último dia do mês
+    elDe.value = inicio.toISOString().slice(0, 10);
+    elAte.value = fim.toISOString().slice(0, 10);
+  } else {
+    // Ano inteiro
+    elDe.value = `${anoNum}-01-01`;
+    elAte.value = `${anoNum}-12-31`;
+  }
+}
+
+function onFiltroMesAnoChange() {
+  sincronizarDatasComMesAno();
+  renderTransacoes();
+}
+
+async function fetchCategoriasTransCache() {
+  const res = await apiFetch(`${API_URL}/categorias-transacao`);
+  if (!res) return;
+  _categoriasTransCache = await res.json();
+}
+
+function popularSelectsTransacoes(lista) {
+  // Filtro de categoria: usa cadastro (mais confiável que extrair das transações).
+  const fonteFiltro = _categoriasTransCache.length
+    ? _categoriasTransCache.filter(c => c.ativo).map(c => c.nome)
+    : lista.map(t => t.categoria).filter(Boolean);
+  const categoriasFiltro = [...new Set(fonteFiltro)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  preencherSelectOptions('filtro-transacoes-categoria', categoriasFiltro);
+}
+
+// Popula o select de categoria do modal de transação conforme o tipo selecionado.
+function popularSelectCategoriaTransacao(tipo, valorAtual) {
+  const sel = document.getElementById('select-categoria-transacao');
+  if (!sel) return;
+  if (!tipo) {
+    sel.innerHTML = '<option value="">Selecione o tipo primeiro...</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const cats = _categoriasTransCache
+    .filter(c => c.tipo === tipo && c.ativo)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  if (!cats.length) {
+    sel.innerHTML = '<option value="">Nenhuma categoria cadastrada para este tipo</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    cats.map(c => `<option value="${escapeHtml(c.nome)}"${c.nome === valorAtual ? ' selected' : ''}>${escapeHtml(c.nome)}</option>`).join('');
 }
 
 function renderTransacoes() {
@@ -1375,6 +1511,22 @@ function renderTransacoes() {
     else if (t.tipo === 'saída') { totSaidas += v; qtdSaidas++; }
   });
   const saldo = totEntradas - totSaidas;
+
+  // Saldo em Caixa acumulado (toda a base, ignora filtros)
+  let caixaEntradas = 0, caixaSaidas = 0;
+  _transacoesCache.forEach(t => {
+    const v = parseFloat(t.valor) || 0;
+    if (t.tipo === 'entrada') caixaEntradas += v;
+    else if (t.tipo === 'saída') caixaSaidas += v;
+  });
+  const saldoCaixa = caixaEntradas - caixaSaidas;
+
+  const elCaixa = document.getElementById('totais-saldo-caixa');
+  if (elCaixa) {
+    elCaixa.textContent = formatMoeda(saldoCaixa);
+    elCaixa.style.color = saldoCaixa < 0 ? '#ef4444' : (saldoCaixa > 0 ? '#10b981' : '');
+  }
+
   const elEntradas = document.getElementById('totais-entradas');
   const elSaidas = document.getElementById('totais-saidas');
   const elSaldo = document.getElementById('totais-saldo');
@@ -1426,7 +1578,8 @@ function onFiltroTransacoesChange(debounce = false) {
 
 function limparFiltrosTransacoes() {
   ['filtro-transacoes-busca','filtro-transacoes-tipo','filtro-transacoes-categoria',
-   'filtro-transacoes-data-de','filtro-transacoes-data-ate'].forEach(id => {
+   'filtro-transacoes-data-de','filtro-transacoes-data-ate',
+   'filtro-transacoes-mes','filtro-transacoes-ano'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   const ord = document.getElementById('filtro-transacoes-ordenar');
@@ -1438,6 +1591,8 @@ async function editarTransacao(id) {
   const t = _transacoesCache.find(x => x.id === id);
   if (!t) { alert('Transação não encontrada.'); return; }
 
+  if (!_categoriasTransCache.length) await fetchCategoriasTransCache();
+
   transacaoEmEdicao = id;
   const form = document.getElementById('form-transacao');
   resetForm('#form-transacao');
@@ -1446,9 +1601,10 @@ async function editarTransacao(id) {
   document.getElementById('transacao-id').value = id;
   form.tipo.value = t.tipo || '';
   form.valor.value = t.valor != null ? parseFloat(t.valor) : '';
-  form.categoria.value = t.categoria || '';
   form.descricao.value = t.descricao || '';
   if (form.data) form.data.value = t.data ? String(t.data).split('T')[0] : '';
+
+  popularSelectCategoriaTransacao(t.tipo || '', t.categoria || '');
 
   const btn = document.getElementById('btn-salvar-transacao');
   if (btn) btn.textContent = 'Salvar Alterações';
@@ -1489,6 +1645,144 @@ async function deletarTransacao(id) {
   alert('Transação deletada!');
   loadTransacoes();
   loadDashboard();
+}
+
+// ===== CATEGORIAS DE TRANSAÇÃO =====
+async function loadCategoriasTransacao() {
+  const tbody = document.getElementById('categorias-transacao-tbody');
+  if (tbody && _categoriasTransCache.length === 0) tbody.innerHTML = skeletonRows(5);
+  await fetchCategoriasTransCache();
+  renderCategoriasTransacao();
+}
+
+function renderCategoriasTransacao() {
+  const tbody = document.getElementById('categorias-transacao-tbody');
+  if (!tbody) return;
+
+  const busca = (document.getElementById('filtro-cat-trans-busca')?.value || '').trim().toLowerCase();
+  const tipo = document.getElementById('filtro-cat-trans-tipo')?.value || '';
+  const status = document.getElementById('filtro-cat-trans-status')?.value || '';
+
+  let lista = _categoriasTransCache.filter(c => {
+    if (tipo && c.tipo !== tipo) return false;
+    if (status === 'ativo' && !c.ativo) return false;
+    if (status === 'inativo' && c.ativo) return false;
+    if (busca) {
+      const alvo = [c.nome, c.descricao].filter(Boolean).join(' ').toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    return true;
+  });
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">${_categoriasTransCache.length === 0 ? 'Nenhuma categoria cadastrada' : 'Nenhuma categoria para os filtros aplicados'}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(c => `
+    <tr>
+      <td data-label="Nome"><strong>${escapeHtml(c.nome)}</strong>${auditMeta(c)}</td>
+      <td data-label="Tipo"><span class="badge badge-${c.tipo === 'entrada' ? 'resolvido' : 'alta'}">${c.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+      <td data-label="Descrição">${escapeHtml(c.descricao || '-')}</td>
+      <td data-label="Uso">${c.total_uso || 0} transação(ões)</td>
+      <td data-label="Status">${c.ativo ? '<span class="badge badge-resolvido">Ativa</span>' : '<span class="badge badge-baixa">Inativa</span>'}</td>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarCategoriaTransacao(${c.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon btn-danger" title="Excluir" aria-label="Excluir" onclick="deletarCategoriaTransacao(${c.id})">${iconSVG('trash')}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+let _filtroCatTransTimer = null;
+function onFiltroCategoriasTransChange(debounce = false) {
+  if (debounce) {
+    clearTimeout(_filtroCatTransTimer);
+    _filtroCatTransTimer = setTimeout(renderCategoriasTransacao, 250);
+  } else {
+    renderCategoriasTransacao();
+  }
+}
+
+function limparFiltrosCategoriasTrans() {
+  ['filtro-cat-trans-busca', 'filtro-cat-trans-tipo', 'filtro-cat-trans-status'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderCategoriasTransacao();
+}
+
+async function editarCategoriaTransacao(id) {
+  const c = _categoriasTransCache.find(x => x.id === id);
+  if (!c) { alert('Categoria não encontrada.'); return; }
+
+  categoriaTransEmEdicao = id;
+  const form = document.getElementById('form-categoria-transacao');
+  resetForm('#form-categoria-transacao');
+
+  document.getElementById('modal-categoria-transacao-titulo').textContent = `Editar Categoria #${id}`;
+  document.getElementById('categoria-transacao-id').value = id;
+  form.nome.value = c.nome || '';
+  form.tipo.value = c.tipo || '';
+  form.descricao.value = c.descricao || '';
+  document.getElementById('cat-trans-ativo').checked = !!c.ativo;
+  document.getElementById('categoria-trans-ativo-group').style.display = '';
+
+  const btn = document.getElementById('btn-salvar-categoria-trans');
+  if (btn) btn.textContent = 'Salvar Alterações';
+
+  showModal('#modal-categoria-transacao');
+}
+
+async function salvarCategoriaTransacao() {
+  const form = document.getElementById('form-categoria-transacao');
+  const dados = {
+    nome: form.nome.value.trim(),
+    tipo: form.tipo.value,
+    descricao: form.descricao.value
+  };
+  if (categoriaTransEmEdicao) {
+    dados.ativo = document.getElementById('cat-trans-ativo').checked;
+  }
+
+  try {
+    const url = categoriaTransEmEdicao
+      ? `${API_URL}/categorias-transacao/${categoriaTransEmEdicao}`
+      : `${API_URL}/categorias-transacao`;
+    const method = categoriaTransEmEdicao ? 'PUT' : 'POST';
+    const res = await apiFetch(url, { method, body: JSON.stringify(dados) });
+    if (!res) return;
+    if (!res.ok) {
+      const e = await res.json();
+      alert(e.erro || 'Erro ao salvar categoria');
+      return;
+    }
+    alert(categoriaTransEmEdicao ? 'Categoria atualizada!' : 'Categoria criada!');
+    categoriaTransEmEdicao = null;
+    closeModal(document.getElementById('modal-categoria-transacao'));
+    await loadCategoriasTransacao();
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+async function deletarCategoriaTransacao(id) {
+  const c = _categoriasTransCache.find(x => x.id === id);
+  if (!c) return;
+  const aviso = c.total_uso > 0
+    ? `Esta categoria é usada em ${c.total_uso} transação(ões). Em vez de excluir, ela será desativada (transações antigas mantêm a categoria). Continuar?`
+    : 'Deseja excluir esta categoria?';
+  if (!confirm(aviso)) return;
+
+  const res = await apiFetch(`${API_URL}/categorias-transacao/${id}`, { method: 'DELETE' });
+  if (!res) return;
+  if (!res.ok) {
+    const e = await res.json();
+    alert(e.erro || 'Erro ao excluir categoria');
+    return;
+  }
+  const data = await res.json();
+  alert(data.mensagem || 'Categoria excluída!');
+  await loadCategoriasTransacao();
 }
 
 // ===== USUÁRIOS =====

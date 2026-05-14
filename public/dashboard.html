@@ -40,6 +40,9 @@
       <a href="#" data-page="transacoes" class="nav-link">
         <span class="icon">💰</span> Transações
       </a>
+      <a href="#" data-page="categorias-transacao" class="nav-link">
+        <span class="icon">🏷️</span> Categorias
+      </a>
       <a href="#" data-page="usuarios" class="nav-link">
         <span class="icon">🔑</span> Usuários
       </a>
@@ -412,6 +415,24 @@
           <input type="text" id="filtro-transacoes-busca" class="filtro-select"
                  placeholder="Buscar por categoria ou descrição..."
                  style="min-width:240px; flex:1" oninput="onFiltroTransacoesChange(true)">
+          <select id="filtro-transacoes-mes" class="filtro-select" onchange="onFiltroMesAnoChange()">
+            <option value="">Mês — todos</option>
+            <option value="1">Janeiro</option>
+            <option value="2">Fevereiro</option>
+            <option value="3">Março</option>
+            <option value="4">Abril</option>
+            <option value="5">Maio</option>
+            <option value="6">Junho</option>
+            <option value="7">Julho</option>
+            <option value="8">Agosto</option>
+            <option value="9">Setembro</option>
+            <option value="10">Outubro</option>
+            <option value="11">Novembro</option>
+            <option value="12">Dezembro</option>
+          </select>
+          <select id="filtro-transacoes-ano" class="filtro-select" onchange="onFiltroMesAnoChange()">
+            <option value="">Ano — todos</option>
+          </select>
           <select id="filtro-transacoes-tipo" class="filtro-select" onchange="onFiltroTransacoesChange()">
             <option value="">Todos os tipos</option>
             <option value="entrada">Entrada</option>
@@ -433,22 +454,27 @@
           <button type="button" class="btn btn-secondary" onclick="limparFiltrosTransacoes()" style="padding:6px 12px; font-size:12.5px;">Limpar</button>
         </div>
 
-        <!-- Totalizador -->
+        <!-- Totalizadores -->
         <div class="totais-finance" id="transacoes-totais">
+          <div class="totais-card totais-caixa">
+            <span class="totais-label">Saldo em Caixa</span>
+            <span class="totais-valor" id="totais-saldo-caixa">R$ 0,00</span>
+            <span class="totais-qtd">Acumulado (todo o histórico)</span>
+          </div>
           <div class="totais-card totais-entrada">
-            <span class="totais-label">Entradas</span>
+            <span class="totais-label">Entradas do Período</span>
             <span class="totais-valor" id="totais-entradas">R$ 0,00</span>
             <span class="totais-qtd" id="totais-qtd-entradas">0 lançamento(s)</span>
           </div>
           <div class="totais-card totais-saida">
-            <span class="totais-label">Saídas</span>
+            <span class="totais-label">Saídas do Período</span>
             <span class="totais-valor" id="totais-saidas">R$ 0,00</span>
             <span class="totais-qtd" id="totais-qtd-saidas">0 lançamento(s)</span>
           </div>
           <div class="totais-card totais-saldo">
-            <span class="totais-label">Saldo</span>
+            <span class="totais-label">Saldo do Período</span>
             <span class="totais-valor" id="totais-saldo">R$ 0,00</span>
-            <span class="totais-qtd" id="totais-qtd-total">0 lançamento(s) no filtro</span>
+            <span class="totais-qtd" id="totais-qtd-total">0 de 0 lançamento(s)</span>
           </div>
         </div>
 
@@ -465,6 +491,49 @@
               </tr>
             </thead>
             <tbody id="transacoes-tbody">
+              <tr><td colspan="6" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== CATEGORIAS DE TRANSAÇÃO PAGE ========== -->
+      <section id="categorias-transacao-page" class="page">
+        <div class="page-header">
+          <h2>Categorias de Transação</h2>
+          <button id="btn-nova-categoria-trans" class="btn btn-primary">+ Nova Categoria</button>
+        </div>
+
+        <div class="filtros-bar">
+          <input type="text" id="filtro-cat-trans-busca" class="filtro-select"
+                 placeholder="Buscar por nome ou descrição..."
+                 style="min-width:240px; flex:1" oninput="onFiltroCategoriasTransChange(true)">
+          <select id="filtro-cat-trans-tipo" class="filtro-select" onchange="onFiltroCategoriasTransChange()">
+            <option value="">Todos os tipos</option>
+            <option value="entrada">Entrada</option>
+            <option value="saída">Saída</option>
+          </select>
+          <select id="filtro-cat-trans-status" class="filtro-select" onchange="onFiltroCategoriasTransChange()">
+            <option value="">Todos os status</option>
+            <option value="ativo">Ativas</option>
+            <option value="inativo">Inativas</option>
+          </select>
+          <button type="button" class="btn btn-secondary" onclick="limparFiltrosCategoriasTrans()" style="padding:6px 12px; font-size:12.5px;">Limpar</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>Uso</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="categorias-transacao-tbody">
               <tr><td colspan="6" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
@@ -977,18 +1046,18 @@
         <h3 id="detalhe-chamado-titulo">Chamado #0</h3>
         <button class="btn-close" id="btn-close-detalhe">&times;</button>
       </div>
-      <div id="detalhe-chamado-info" style="padding:1rem 1.5rem; background:#f8fafc; border-radius:8px; margin-bottom:1rem; font-size:0.9rem;">
+      <div id="detalhe-chamado-info" class="detalhe-chamado-info">
         <!-- Preenchido via JS -->
       </div>
 
       <div style="padding:0 0.5rem;">
-        <h4 style="margin-bottom:1rem; color:#0d6efd;">Timeline de Atendimentos</h4>
+        <h4 class="detalhe-chamado-section-title">Timeline de Atendimentos</h4>
         <div id="timeline-atendimentos" style="margin-bottom:1.5rem;">
           <!-- Preenchido via JS -->
         </div>
 
-        <div style="border-top:1px solid #e2e8f0; padding-top:1rem;">
-          <h4 style="margin-bottom:0.75rem; color:#1e293b;">Registrar Atendimento</h4>
+        <div class="detalhe-chamado-form-wrap">
+          <h4 class="detalhe-chamado-section-title detalhe-chamado-section-title--soft">Registrar Atendimento</h4>
           <form id="form-atendimento" class="form">
             <input type="hidden" name="chamado_id" id="atendimento-chamado-id">
             <div class="form-row">
@@ -1116,8 +1185,10 @@
         </div>
         <div class="form-group">
           <label>Categoria *</label>
-          <input type="text" name="categoria" required list="categorias-transacao">
-          <datalist id="categorias-transacao"></datalist>
+          <select name="categoria" id="select-categoria-transacao" required>
+            <option value="">Selecione o tipo primeiro...</option>
+          </select>
+          <small class="form-hint" id="hint-categoria-transacao">Cadastre novas categorias em <a href="#" onclick="showPage('categorias-transacao'); closeModal(document.getElementById('modal-transacao')); return false;">Categorias</a>.</small>
         </div>
         <div class="form-group">
           <label>Descrição</label>
@@ -1126,6 +1197,47 @@
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="btn-salvar-transacao">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CATEGORIA DE TRANSAÇÃO -->
+  <div id="modal-categoria-transacao" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-categoria-transacao-titulo">Nova Categoria</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-categoria-transacao" class="form">
+        <input type="hidden" name="id" id="categoria-transacao-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome *</label>
+            <input type="text" name="nome" required maxlength="120" placeholder="Ex: Supermercado, Mensalidade Cliente...">
+          </div>
+          <div class="form-group">
+            <label>Tipo *</label>
+            <select name="tipo" required>
+              <option value="">Selecione...</option>
+              <option value="entrada">Entrada</option>
+              <option value="saída">Saída</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea name="descricao" rows="2" placeholder="Opcional. Anote o que essa categoria representa."></textarea>
+        </div>
+        <div class="form-group" id="categoria-trans-ativo-group" style="display:none;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" name="ativo" id="cat-trans-ativo" checked style="width:auto;">
+            <span>Ativa (categoria disponível para novas transações)</span>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-salvar-categoria-trans">Salvar</button>
         </div>
       </form>
     </div>

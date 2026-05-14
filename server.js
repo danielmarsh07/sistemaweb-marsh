@@ -23,6 +23,7 @@ const empresasRoutes = require('./routes/empresas');
 const clientesRoutes = require('./routes/clientes');
 const fornecedoresRoutes = require('./routes/fornecedores');
 const transacoesRoutes = require('./routes/transacoes');
+const categoriasTransacaoRoutes = require('./routes/categorias-transacao');
 const tecnologiasRoutes = require('./routes/tecnologias');
 const chamadosRoutes = require('./routes/chamados');
 const atendimentosRoutes = require('./routes/atendimentos');
@@ -38,6 +39,7 @@ app.use('/api/empresas', autenticar, empresasRoutes);
 app.use('/api/clientes', autenticar, clientesRoutes);
 app.use('/api/fornecedores', autenticar, fornecedoresRoutes);
 app.use('/api/transacoes', autenticar, transacoesRoutes);
+app.use('/api/categorias-transacao', autenticar, categoriasTransacaoRoutes);
 app.use('/api/tecnologias', autenticar, tecnologiasRoutes);
 app.use('/api/chamados', autenticar, chamadosRoutes);
 app.use('/api/chamados', autenticar, anexosRoutes); // anexos sob /api/chamados/:id/anexos
@@ -343,6 +345,40 @@ async function iniciar() {
       );
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_anexos_chamado ON chamados_anexos(chamado_id);`);
+
+    // 21. Categorias de transação (cadastro estruturado, evita string livre)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS categorias_transacao (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        nome VARCHAR(120) NOT NULL,
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('entrada','saída')),
+        descricao TEXT,
+        ativo BOOLEAN DEFAULT TRUE,
+        criado_por_usuario_id INTEGER,
+        atualizado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP,
+        UNIQUE(empresa_id, nome, tipo)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_cat_trans_emp ON categorias_transacao(empresa_id);`);
+
+    // Backfill: cria categorias a partir dos valores já usados em transacoes
+    // Inferimos o tipo pelo tipo majoritário de cada (empresa_id, categoria).
+    await pool.query(`
+      INSERT INTO categorias_transacao (empresa_id, nome, tipo, ativo)
+      SELECT empresa_id, categoria, tipo, TRUE
+      FROM (
+        SELECT empresa_id, categoria, tipo,
+               ROW_NUMBER() OVER (PARTITION BY empresa_id, categoria ORDER BY COUNT(*) DESC) AS rn
+        FROM transacoes
+        WHERE categoria IS NOT NULL AND TRIM(categoria) <> ''
+        GROUP BY empresa_id, categoria, tipo
+      ) ranked
+      WHERE rn = 1
+      ON CONFLICT (empresa_id, nome, tipo) DO NOTHING;
+    `);
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
