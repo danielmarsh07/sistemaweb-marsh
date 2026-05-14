@@ -147,6 +147,41 @@
           <button id="btn-novo-cliente" class="btn btn-primary">+ Novo Cliente</button>
         </div>
 
+        <!-- Filtros -->
+        <div class="filtros-bar">
+          <input type="text" id="filtro-clientes-busca" class="filtro-select"
+                 placeholder="Buscar por razão social, fantasia, CNPJ ou responsável..."
+                 style="min-width:240px; flex:1" oninput="onFiltroClientesChange(true)">
+          <select id="filtro-clientes-status" class="filtro-select" onchange="onFiltroClientesChange()">
+            <option value="">Todos os status</option>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+            <option value="suspenso">Suspenso</option>
+          </select>
+          <select id="filtro-clientes-segmento" class="filtro-select" onchange="onFiltroClientesChange()">
+            <option value="">Todos os segmentos</option>
+          </select>
+          <select id="filtro-clientes-porte" class="filtro-select" onchange="onFiltroClientesChange()">
+            <option value="">Todos os portes</option>
+            <option value="MEI">MEI</option>
+            <option value="Micro">Micro</option>
+            <option value="Pequena">Pequena</option>
+            <option value="Média">Média</option>
+            <option value="Grande">Grande</option>
+          </select>
+          <select id="filtro-clientes-uf" class="filtro-select" onchange="onFiltroClientesChange()">
+            <option value="">Todas as UFs</option>
+          </select>
+          <select id="filtro-clientes-ordenar" class="filtro-select" onchange="onFiltroClientesChange()">
+            <option value="razao_asc">Razão Social A-Z</option>
+            <option value="razao_desc">Razão Social Z-A</option>
+            <option value="recentes">Mais recentes</option>
+            <option value="antigos">Mais antigos</option>
+            <option value="chamados_desc">Mais chamados abertos</option>
+          </select>
+          <span id="filtro-clientes-contador" class="filtros-contador"></span>
+        </div>
+
         <div class="table-container">
           <table>
             <thead>
@@ -172,6 +207,36 @@
         <div class="page-header">
           <h2>Gerenciar Fornecedores</h2>
           <button id="btn-novo-fornecedor" class="btn btn-primary">+ Novo Fornecedor</button>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filtros-bar">
+          <input type="text" id="filtro-fornecedores-busca" class="filtro-select"
+                 placeholder="Buscar por razão social, fantasia, CNPJ ou contato..."
+                 style="min-width:240px; flex:1" oninput="onFiltroFornecedoresChange(true)">
+          <select id="filtro-fornecedores-tipo" class="filtro-select" onchange="onFiltroFornecedoresChange()">
+            <option value="">Todos os tipos</option>
+            <option value="software">Software</option>
+            <option value="hardware">Hardware</option>
+            <option value="servico">Serviço</option>
+            <option value="consultoria">Consultoria</option>
+            <option value="outro">Outro</option>
+          </select>
+          <select id="filtro-fornecedores-status" class="filtro-select" onchange="onFiltroFornecedoresChange()">
+            <option value="">Todos os status</option>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
+          <select id="filtro-fornecedores-uf" class="filtro-select" onchange="onFiltroFornecedoresChange()">
+            <option value="">Todas as UFs</option>
+          </select>
+          <select id="filtro-fornecedores-ordenar" class="filtro-select" onchange="onFiltroFornecedoresChange()">
+            <option value="razao_asc">Razão Social A-Z</option>
+            <option value="razao_desc">Razão Social Z-A</option>
+            <option value="recentes">Mais recentes</option>
+            <option value="antigos">Mais antigos</option>
+          </select>
+          <span id="filtro-fornecedores-contador" class="filtros-contador"></span>
         </div>
 
         <div class="table-container">
@@ -228,7 +293,7 @@
         </div>
 
         <!-- Filtros -->
-        <div style="display:flex; gap:0.75rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center;">
+        <div class="filtros-bar">
           <input type="text" id="filtro-busca" class="filtro-select" placeholder="Buscar por título, descrição ou #ID..."
                  style="min-width:260px; flex:1" oninput="onBuscaChamadosChange(this)">
           <select id="filtro-status" class="filtro-select" onchange="onFiltroChamadosChange()">
@@ -246,6 +311,11 @@
             <option value="media">Média</option>
             <option value="baixa">Baixa</option>
           </select>
+          <select id="filtro-chamados-cliente" class="filtro-select" onchange="onFiltroChamadosChange()">
+            <option value="">Todos os clientes</option>
+          </select>
+          <label class="filtros-label">De <input type="date" id="filtro-chamados-data-de" class="filtro-select" onchange="onFiltroChamadosChange()"></label>
+          <label class="filtros-label">Até <input type="date" id="filtro-chamados-data-ate" class="filtro-select" onchange="onFiltroChamadosChange()"></label>
         </div>
 
         <div class="table-container">
@@ -277,6 +347,36 @@
           <button id="btn-novo-usuario" class="btn btn-primary">+ Novo Usuário</button>
         </div>
 
+        <!-- Filtros -->
+        <div class="filtros-bar">
+          <input type="text" id="filtro-usuarios-busca" class="filtro-select"
+                 placeholder="Buscar por nome ou email..."
+                 style="min-width:240px; flex:1" oninput="onFiltroUsuariosChange(true)">
+          <select id="filtro-usuarios-perfil" class="filtro-select" onchange="onFiltroUsuariosChange()">
+            <option value="">Todos os perfis</option>
+            <option value="admin_sistema">Admin Sistema</option>
+            <option value="admin_empresa">Administrador</option>
+            <option value="tecnico">Técnico</option>
+            <option value="cliente">Cliente</option>
+          </select>
+          <select id="filtro-usuarios-status" class="filtro-select" onchange="onFiltroUsuariosChange()">
+            <option value="">Todos os status</option>
+            <option value="ativo">Ativos</option>
+            <option value="inativo">Inativos</option>
+          </select>
+          <select id="filtro-usuarios-cliente" class="filtro-select" onchange="onFiltroUsuariosChange()">
+            <option value="">Todos os vínculos</option>
+            <option value="sem_vinculo">Sem vínculo</option>
+          </select>
+          <select id="filtro-usuarios-ordenar" class="filtro-select" onchange="onFiltroUsuariosChange()">
+            <option value="nome_asc">Nome A-Z</option>
+            <option value="nome_desc">Nome Z-A</option>
+            <option value="perfil">Por perfil</option>
+            <option value="recentes">Mais recentes</option>
+          </select>
+          <span id="filtro-usuarios-contador" class="filtros-contador"></span>
+        </div>
+
         <div class="table-container">
           <table>
             <thead>
@@ -301,6 +401,51 @@
         <div class="page-header">
           <h2>Transações Financeiras</h2>
           <button id="btn-nova-transacao" class="btn btn-primary">+ Nova Transação</button>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filtros-bar">
+          <input type="text" id="filtro-transacoes-busca" class="filtro-select"
+                 placeholder="Buscar por categoria ou descrição..."
+                 style="min-width:240px; flex:1" oninput="onFiltroTransacoesChange(true)">
+          <select id="filtro-transacoes-tipo" class="filtro-select" onchange="onFiltroTransacoesChange()">
+            <option value="">Todos os tipos</option>
+            <option value="entrada">Entrada</option>
+            <option value="saída">Saída</option>
+          </select>
+          <select id="filtro-transacoes-categoria" class="filtro-select" onchange="onFiltroTransacoesChange()">
+            <option value="">Todas as categorias</option>
+          </select>
+          <label class="filtros-label">De <input type="date" id="filtro-transacoes-data-de" class="filtro-select" onchange="onFiltroTransacoesChange()"></label>
+          <label class="filtros-label">Até <input type="date" id="filtro-transacoes-data-ate" class="filtro-select" onchange="onFiltroTransacoesChange()"></label>
+          <select id="filtro-transacoes-ordenar" class="filtro-select" onchange="onFiltroTransacoesChange()">
+            <option value="data_desc">Data ↓ (mais recente)</option>
+            <option value="data_asc">Data ↑ (mais antiga)</option>
+            <option value="valor_desc">Valor ↓ (maior)</option>
+            <option value="valor_asc">Valor ↑ (menor)</option>
+            <option value="categoria_asc">Categoria A-Z</option>
+            <option value="tipo">Por tipo</option>
+          </select>
+          <button type="button" class="btn btn-secondary" onclick="limparFiltrosTransacoes()" style="padding:6px 12px; font-size:12.5px;">Limpar</button>
+        </div>
+
+        <!-- Totalizador -->
+        <div class="totais-finance" id="transacoes-totais">
+          <div class="totais-card totais-entrada">
+            <span class="totais-label">Entradas</span>
+            <span class="totais-valor" id="totais-entradas">R$ 0,00</span>
+            <span class="totais-qtd" id="totais-qtd-entradas">0 lançamento(s)</span>
+          </div>
+          <div class="totais-card totais-saida">
+            <span class="totais-label">Saídas</span>
+            <span class="totais-valor" id="totais-saidas">R$ 0,00</span>
+            <span class="totais-qtd" id="totais-qtd-saidas">0 lançamento(s)</span>
+          </div>
+          <div class="totais-card totais-saldo">
+            <span class="totais-label">Saldo</span>
+            <span class="totais-valor" id="totais-saldo">R$ 0,00</span>
+            <span class="totais-qtd" id="totais-qtd-total">0 lançamento(s) no filtro</span>
+          </div>
         </div>
 
         <div class="table-container">
@@ -925,10 +1070,11 @@
   <div id="modal-transacao" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Nova Transação</h3>
+        <h3 id="modal-transacao-titulo">Nova Transação</h3>
         <button class="btn-close">&times;</button>
       </div>
       <form id="form-transacao" class="form">
+        <input type="hidden" name="id" id="transacao-id">
         <div class="form-row">
           <div class="form-group">
             <label>Tipo *</label>
@@ -942,10 +1088,15 @@
             <label>Valor *</label>
             <input type="number" name="valor" step="0.01" required>
           </div>
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" name="data">
+          </div>
         </div>
         <div class="form-group">
           <label>Categoria *</label>
-          <input type="text" name="categoria" required>
+          <input type="text" name="categoria" required list="categorias-transacao">
+          <datalist id="categorias-transacao"></datalist>
         </div>
         <div class="form-group">
           <label>Descrição</label>
@@ -953,7 +1104,7 @@
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
+          <button type="submit" class="btn btn-primary" id="btn-salvar-transacao">Salvar</button>
         </div>
       </form>
     </div>

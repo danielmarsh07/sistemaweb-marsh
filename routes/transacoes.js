@@ -66,7 +66,7 @@ router.get('/:id', async (req, res) => {
 // POST - Criar nova transação
 router.post('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
-  const { tipo, valor, categoria, descricao } = req.body;
+  const { tipo, valor, categoria, descricao, data } = req.body;
 
   if (!tipo || !valor || !categoria) {
     return res.status(400).json({ erro: 'Tipo, valor e categoria são obrigatórios' });
@@ -78,9 +78,9 @@ router.post('/', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO transacoes (tipo, valor, categoria, descricao, empresa_id, usuario_id, criado_por_usuario_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
-      [tipo, parseFloat(valor), categoria, descricao || '', empresa_id, req.usuario.id]
+      `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id)
+       VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6, $7, $7) RETURNING *`,
+      [tipo, parseFloat(valor), categoria, descricao || '', data || null, empresa_id, req.usuario.id]
     );
     res.status(201).json({ mensagem: 'Transação criada com sucesso!', transacao: result.rows[0] });
   } catch (err) {
@@ -91,7 +91,7 @@ router.post('/', async (req, res) => {
 // PUT - Atualizar transação (filtrada por empresa)
 router.put('/:id', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
-  const { tipo, valor, categoria, descricao } = req.body;
+  const { tipo, valor, categoria, descricao, data } = req.body;
 
   if (tipo && !['entrada', 'saída'].includes(tipo)) {
     return res.status(400).json({ erro: 'Tipo deve ser "entrada" ou "saída"' });
@@ -108,14 +108,15 @@ router.put('/:id', async (req, res) => {
 
     const t = atual.rows[0];
     const result = await pool.query(
-      `UPDATE transacoes SET tipo=$1, valor=$2, categoria=$3, descricao=$4,
-        atualizado_por_usuario_id=$5, data_atualizacao=NOW()
-       WHERE id=$6 AND empresa_id=$7 RETURNING *`,
+      `UPDATE transacoes SET tipo=$1, valor=$2, categoria=$3, descricao=$4, data=$5,
+        atualizado_por_usuario_id=$6, data_atualizacao=NOW()
+       WHERE id=$7 AND empresa_id=$8 RETURNING *`,
       [
         tipo || t.tipo,
-        valor ? parseFloat(valor) : t.valor,
+        valor != null && valor !== '' ? parseFloat(valor) : t.valor,
         categoria || t.categoria,
-        descricao || t.descricao,
+        descricao != null ? descricao : t.descricao,
+        data || t.data,
         req.usuario.id,
         req.params.id, empresa_id
       ]

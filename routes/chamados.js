@@ -6,12 +6,12 @@ const { calcularSla } = require('../services/sla');
 const storage = require('../services/storage');
 
 // GET - Listar chamados (cliente vê só os seus; admin vê todos)
-// Suporta: status, prioridade, cliente_id, busca (texto), page, limit
+// Suporta: status, prioridade, cliente_id, busca (texto), data_de, data_ate, page, limit
 router.get('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   const usuario_id = req.usuario.id;
   const isCliente = req.usuario.tipo === 'cliente';
-  const { status, prioridade, cliente_id, busca } = req.query;
+  const { status, prioridade, cliente_id, busca, data_de, data_ate } = req.query;
 
   // Paginação (default: page=1, limit=50, max=200)
   const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -31,6 +31,8 @@ router.get('/', async (req, res) => {
     if (status) { where += ` AND ch.status = $${idx++}`; whereParams.push(status); }
     if (prioridade) { where += ` AND ch.prioridade = $${idx++}`; whereParams.push(prioridade); }
     if (!isCliente && cliente_id) { where += ` AND ch.cliente_id = $${idx++}`; whereParams.push(cliente_id); }
+    if (data_de) { where += ` AND ch.data_criacao >= $${idx++}::date`; whereParams.push(data_de); }
+    if (data_ate) { where += ` AND ch.data_criacao < ($${idx++}::date + INTERVAL '1 day')`; whereParams.push(data_ate); }
     if (busca && busca.trim()) {
       where += ` AND (ch.titulo ILIKE $${idx} OR ch.descricao ILIKE $${idx} OR CAST(ch.id AS TEXT) = $${idx + 1})`;
       whereParams.push(`%${busca.trim()}%`);

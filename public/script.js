@@ -51,6 +51,14 @@ let fornecedorEmEdicao = null;
 let tecnologiaEmEdicao = null;
 let chamadoEmEdicao = null;
 let usuarioEmEdicao = null;
+let transacaoEmEdicao = null;
+
+// Caches das listagens (para filtragem/ordenacao client-side)
+let _clientesCache = [];
+let _fornecedoresCache = [];
+let _usuariosCache = [];
+let _transacoesCache = [];
+let _clientesChamadosCache = [];
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -118,7 +126,12 @@ function setupEventListeners() {
   inicializarDropzoneChamado();
 
   document.getElementById('btn-nova-transacao').addEventListener('click', () => {
+    transacaoEmEdicao = null;
     resetForm('#form-transacao');
+    document.getElementById('modal-transacao-titulo').textContent = 'Nova Transação';
+    document.getElementById('transacao-id').value = '';
+    const btn = document.getElementById('btn-salvar-transacao');
+    if (btn) btn.textContent = 'Salvar';
     showModal('#modal-transacao');
   });
 
@@ -279,15 +292,54 @@ function renderDashboardChamados(chamados) {
 async function loadClientes() {
   const res = await apiFetch(`${API_URL}/clientes`);
   if (!res) return;
-  const clientes = await res.json();
-  const tbody = document.getElementById('clientes-tbody');
+  _clientesCache = await res.json();
+  popularSelectsClientes(_clientesCache);
+  renderClientes();
+}
 
-  if (!clientes.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum cliente cadastrado</td></tr>';
+function popularSelectsClientes(lista) {
+  const segmentos = [...new Set(lista.map(c => c.segmento).filter(Boolean))].sort();
+  const ufs = [...new Set(lista.map(c => c.uf).filter(Boolean))].sort();
+  preencherSelectOptions('filtro-clientes-segmento', segmentos);
+  preencherSelectOptions('filtro-clientes-uf', ufs);
+}
+
+function renderClientes() {
+  const tbody = document.getElementById('clientes-tbody');
+  const contador = document.getElementById('filtro-clientes-contador');
+
+  const busca = (document.getElementById('filtro-clientes-busca')?.value || '').trim().toLowerCase();
+  const status = document.getElementById('filtro-clientes-status')?.value || '';
+  const segmento = document.getElementById('filtro-clientes-segmento')?.value || '';
+  const porte = document.getElementById('filtro-clientes-porte')?.value || '';
+  const uf = document.getElementById('filtro-clientes-uf')?.value || '';
+  const ordem = document.getElementById('filtro-clientes-ordenar')?.value || 'razao_asc';
+
+  let lista = _clientesCache.filter(c => {
+    if (status && c.status !== status) return false;
+    if (segmento && c.segmento !== segmento) return false;
+    if (porte && c.porte !== porte) return false;
+    if (uf && c.uf !== uf) return false;
+    if (busca) {
+      const alvo = [
+        c.razao_social, c.nome, c.nome_fantasia, c.cpf_cnpj,
+        c.responsavel_nome, c.email, c.telefone, c.celular, c.cidade
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    return true;
+  });
+
+  lista = ordenarClientes(lista, ordem);
+
+  if (contador) contador.textContent = `${lista.length} de ${_clientesCache.length}`;
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center">${_clientesCache.length === 0 ? 'Nenhum cliente cadastrado' : 'Nenhum cliente para os filtros aplicados'}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = clientes.map(c => `
+  tbody.innerHTML = lista.map(c => `
     <tr>
       <td data-label="Razão Social">
         <strong>${escapeHtml(c.razao_social || c.nome)}</strong>
@@ -304,12 +356,39 @@ async function loadClientes() {
           : '<span style="color:#94a3b8">0</span>'
         }
       </td>
-      <td data-label="Ações">
-        <button class="btn btn-edit" onclick="editarCliente(${c.id})">Editar</button>
-        <button class="btn btn-danger" onclick="deletarCliente(${c.id})">Remover</button>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarCliente(${c.id})">✏️</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarCliente(${c.id})">🗑️</button>
       </td>
     </tr>
   `).join('');
+}
+
+function ordenarClientes(lista, ordem) {
+  const arr = [...lista];
+  switch (ordem) {
+    case 'razao_desc':
+      return arr.sort((a, b) => (b.razao_social || b.nome || '').localeCompare(a.razao_social || a.nome || '', 'pt-BR'));
+    case 'recentes':
+      return arr.sort((a, b) => new Date(b.data_criacao || 0) - new Date(a.data_criacao || 0));
+    case 'antigos':
+      return arr.sort((a, b) => new Date(a.data_criacao || 0) - new Date(b.data_criacao || 0));
+    case 'chamados_desc':
+      return arr.sort((a, b) => (parseInt(b.chamados_abertos) || 0) - (parseInt(a.chamados_abertos) || 0));
+    case 'razao_asc':
+    default:
+      return arr.sort((a, b) => (a.razao_social || a.nome || '').localeCompare(b.razao_social || b.nome || '', 'pt-BR'));
+  }
+}
+
+let _filtroClientesTimer = null;
+function onFiltroClientesChange(debounce = false) {
+  if (debounce) {
+    clearTimeout(_filtroClientesTimer);
+    _filtroClientesTimer = setTimeout(renderClientes, 250);
+  } else {
+    renderClientes();
+  }
 }
 
 async function salvarCliente() {
@@ -413,15 +492,54 @@ async function deletarCliente(id) {
 async function loadFornecedores() {
   const res = await apiFetch(`${API_URL}/fornecedores`);
   if (!res) return;
-  const lista = await res.json();
-  const tbody = document.getElementById('fornecedores-tbody');
+  _fornecedoresCache = await res.json();
+  popularSelectsFornecedores(_fornecedoresCache);
+  renderFornecedores();
+}
 
-  if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nenhum fornecedor cadastrado</td></tr>';
+function popularSelectsFornecedores(lista) {
+  const ufs = [...new Set(lista.map(f => f.uf).filter(Boolean))].sort();
+  preencherSelectOptions('filtro-fornecedores-uf', ufs);
+}
+
+function renderFornecedores() {
+  const tbody = document.getElementById('fornecedores-tbody');
+  const contador = document.getElementById('filtro-fornecedores-contador');
+
+  const busca = (document.getElementById('filtro-fornecedores-busca')?.value || '').trim().toLowerCase();
+  const tipo = document.getElementById('filtro-fornecedores-tipo')?.value || '';
+  const status = document.getElementById('filtro-fornecedores-status')?.value || '';
+  const uf = document.getElementById('filtro-fornecedores-uf')?.value || '';
+  const ordem = document.getElementById('filtro-fornecedores-ordenar')?.value || 'razao_asc';
+
+  let lista = _fornecedoresCache.filter(f => {
+    if (tipo && f.tipo !== tipo) return false;
+    if (status && f.status !== status) return false;
+    if (uf && f.uf !== uf) return false;
+    if (busca) {
+      const alvo = [f.razao_social, f.nome, f.nome_fantasia, f.cnpj, f.contato_nome, f.email, f.telefone, f.ramo, f.cidade]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    return true;
+  });
+
+  const arr = [...lista];
+  switch (ordem) {
+    case 'razao_desc': arr.sort((a, b) => (b.razao_social || b.nome || '').localeCompare(a.razao_social || a.nome || '', 'pt-BR')); break;
+    case 'recentes': arr.sort((a, b) => new Date(b.data_criacao || 0) - new Date(a.data_criacao || 0)); break;
+    case 'antigos': arr.sort((a, b) => new Date(a.data_criacao || 0) - new Date(b.data_criacao || 0)); break;
+    default: arr.sort((a, b) => (a.razao_social || a.nome || '').localeCompare(b.razao_social || b.nome || '', 'pt-BR'));
+  }
+
+  if (contador) contador.textContent = `${arr.length} de ${_fornecedoresCache.length}`;
+
+  if (!arr.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">${_fornecedoresCache.length === 0 ? 'Nenhum fornecedor cadastrado' : 'Nenhum fornecedor para os filtros aplicados'}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = lista.map(f => `
+  tbody.innerHTML = arr.map(f => `
     <tr>
       <td data-label="Razão Social">
         <strong>${escapeHtml(f.razao_social || f.nome)}</strong>
@@ -432,12 +550,22 @@ async function loadFornecedores() {
       <td data-label="Tipo">${f.tipo ? escapeHtml(capitalize(f.tipo)) : escapeHtml(f.ramo || '-')}</td>
       <td data-label="Contato">${escapeHtml(f.contato_nome || f.email || '-')}</td>
       <td data-label="Status">${badgeStatusGeral(f.status)}</td>
-      <td data-label="Ações">
-        <button class="btn btn-edit" onclick="editarFornecedor(${f.id})">Editar</button>
-        <button class="btn btn-danger" onclick="deletarFornecedor(${f.id})">Remover</button>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarFornecedor(${f.id})">✏️</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarFornecedor(${f.id})">🗑️</button>
       </td>
     </tr>
   `).join('');
+}
+
+let _filtroFornecedoresTimer = null;
+function onFiltroFornecedoresChange(debounce = false) {
+  if (debounce) {
+    clearTimeout(_filtroFornecedoresTimer);
+    _filtroFornecedoresTimer = setTimeout(renderFornecedores, 250);
+  } else {
+    renderFornecedores();
+  }
 }
 
 async function salvarFornecedor() {
@@ -548,9 +676,9 @@ async function loadTecnologias() {
       <td data-label="Versão">${escapeHtml(t.versao || '-')}</td>
       <td data-label="Clientes">${t.total_clientes || 0} cliente(s)</td>
       <td data-label="Status">${badgeStatusTec(t.status)}</td>
-      <td data-label="Ações">
-        <button class="btn btn-edit" onclick="editarTecnologia(${t.id})">Editar</button>
-        <button class="btn btn-danger" onclick="deletarTecnologia(${t.id})">Remover</button>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarTecnologia(${t.id})">✏️</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarTecnologia(${t.id})">🗑️</button>
       </td>
     </tr>
   `).join('');
@@ -634,11 +762,20 @@ async function loadChamados() {
   const status = document.getElementById('filtro-status')?.value || '';
   const prioridade = document.getElementById('filtro-prioridade')?.value || '';
   const busca = document.getElementById('filtro-busca')?.value?.trim() || '';
+  const clienteId = document.getElementById('filtro-chamados-cliente')?.value || '';
+  const dataDe = document.getElementById('filtro-chamados-data-de')?.value || '';
+  const dataAte = document.getElementById('filtro-chamados-data-ate')?.value || '';
+
+  // popula select de clientes (uma vez)
+  await popularSelectClientesChamados();
 
   const params = new URLSearchParams();
   if (status) params.set('status', status);
   if (prioridade) params.set('prioridade', prioridade);
   if (busca) params.set('busca', busca);
+  if (clienteId) params.set('cliente_id', clienteId);
+  if (dataDe) params.set('data_de', dataDe);
+  if (dataAte) params.set('data_ate', dataAte);
   params.set('page', chamadosPaginacao.page);
   params.set('limit', chamadosPaginacao.limit);
 
@@ -673,14 +810,28 @@ async function loadChamados() {
       <td data-label="Status">${badgeStatus(ch.status)}${badgeSlaInline(ch.sla)}</td>
       <td data-label="Prioridade">${badgePrioridade(ch.prioridade)}${ch.avaliacao_nota ? `<br><small style="color:#f59e0b">${'★'.repeat(ch.avaliacao_nota)}</small>` : ''}</td>
       <td data-label="Abertura">${formatData(ch.data_criacao)}</td>
-      <td data-label="Ações">
-        <button class="btn btn-edit" onclick="abrirDetalheChamado(${ch.id})">Ver</button>
-        <button class="btn btn-edit" onclick="editarChamado(${ch.id})">Editar</button>
-        <button class="btn btn-danger" onclick="deletarChamado(${ch.id})">Remover</button>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon btn-edit" title="Ver detalhes" aria-label="Ver detalhes" onclick="abrirDetalheChamado(${ch.id})">👁️</button>
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarChamado(${ch.id})">✏️</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarChamado(${ch.id})">🗑️</button>
       </td>
     </tr>
     `;
   }).join('');
+}
+
+async function popularSelectClientesChamados() {
+  const sel = document.getElementById('filtro-chamados-cliente');
+  if (!sel || _clientesChamadosCache.length) return;
+  try {
+    const r = await apiFetch(`${API_URL}/clientes`);
+    if (!r) return;
+    _clientesChamadosCache = await r.json();
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">Todos os clientes</option>' +
+      _clientesChamadosCache.map(c => `<option value="${c.id}">${escapeHtml(c.razao_social || c.nome)}</option>`).join('');
+    if (atual) sel.value = atual;
+  } catch (e) { /* silencioso */ }
 }
 
 function badgeSlaInline(sla) {
@@ -1100,15 +1251,89 @@ async function loadTransacoes() {
   const res = await apiFetch(`${API_URL}/transacoes`);
   if (!res) return;
   const dados = await res.json();
-  const transacoes = dados.transacoes || [];
+  _transacoesCache = dados.transacoes || [];
+  popularSelectsTransacoes(_transacoesCache);
+  renderTransacoes();
+}
+
+function popularSelectsTransacoes(lista) {
+  const categorias = [...new Set(lista.map(t => t.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  preencherSelectOptions('filtro-transacoes-categoria', categorias);
+
+  // datalist no modal
+  const dl = document.getElementById('categorias-transacao');
+  if (dl) dl.innerHTML = categorias.map(c => `<option value="${escapeHtml(c)}">`).join('');
+}
+
+function renderTransacoes() {
   const tbody = document.getElementById('transacoes-tbody');
 
-  if (!transacoes.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nenhuma transação cadastrada</td></tr>';
+  const busca = (document.getElementById('filtro-transacoes-busca')?.value || '').trim().toLowerCase();
+  const tipo = document.getElementById('filtro-transacoes-tipo')?.value || '';
+  const categoria = document.getElementById('filtro-transacoes-categoria')?.value || '';
+  const dataDe = document.getElementById('filtro-transacoes-data-de')?.value || '';
+  const dataAte = document.getElementById('filtro-transacoes-data-ate')?.value || '';
+  const ordem = document.getElementById('filtro-transacoes-ordenar')?.value || 'data_desc';
+
+  const dataDeMs = dataDe ? new Date(dataDe + 'T00:00:00').getTime() : null;
+  const dataAteMs = dataAte ? new Date(dataAte + 'T23:59:59').getTime() : null;
+
+  let lista = _transacoesCache.filter(t => {
+    if (tipo && t.tipo !== tipo) return false;
+    if (categoria && t.categoria !== categoria) return false;
+    if (dataDeMs || dataAteMs) {
+      const dms = t.data ? new Date(t.data).getTime() : 0;
+      if (dataDeMs && dms < dataDeMs) return false;
+      if (dataAteMs && dms > dataAteMs) return false;
+    }
+    if (busca) {
+      const alvo = [t.categoria, t.descricao].filter(Boolean).join(' ').toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    return true;
+  });
+
+  // Ordenação
+  switch (ordem) {
+    case 'data_asc': lista.sort((a, b) => new Date(a.data || 0) - new Date(b.data || 0)); break;
+    case 'valor_desc': lista.sort((a, b) => parseFloat(b.valor) - parseFloat(a.valor)); break;
+    case 'valor_asc': lista.sort((a, b) => parseFloat(a.valor) - parseFloat(b.valor)); break;
+    case 'categoria_asc': lista.sort((a, b) => (a.categoria || '').localeCompare(b.categoria || '', 'pt-BR')); break;
+    case 'tipo': lista.sort((a, b) => (a.tipo || '').localeCompare(b.tipo || '') || (new Date(b.data || 0) - new Date(a.data || 0))); break;
+    case 'data_desc':
+    default: lista.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+  }
+
+  // Totais (sobre o filtro)
+  let totEntradas = 0, totSaidas = 0, qtdEntradas = 0, qtdSaidas = 0;
+  lista.forEach(t => {
+    const v = parseFloat(t.valor) || 0;
+    if (t.tipo === 'entrada') { totEntradas += v; qtdEntradas++; }
+    else if (t.tipo === 'saída') { totSaidas += v; qtdSaidas++; }
+  });
+  const saldo = totEntradas - totSaidas;
+  const elEntradas = document.getElementById('totais-entradas');
+  const elSaidas = document.getElementById('totais-saidas');
+  const elSaldo = document.getElementById('totais-saldo');
+  if (elEntradas) elEntradas.textContent = formatMoeda(totEntradas);
+  if (elSaidas) elSaidas.textContent = formatMoeda(totSaidas);
+  if (elSaldo) {
+    elSaldo.textContent = formatMoeda(saldo);
+    elSaldo.style.color = saldo < 0 ? '#ef4444' : (saldo > 0 ? '#10b981' : '');
+  }
+  const elQtdE = document.getElementById('totais-qtd-entradas');
+  const elQtdS = document.getElementById('totais-qtd-saidas');
+  const elQtdT = document.getElementById('totais-qtd-total');
+  if (elQtdE) elQtdE.textContent = `${qtdEntradas} lançamento(s)`;
+  if (elQtdS) elQtdS.textContent = `${qtdSaidas} lançamento(s)`;
+  if (elQtdT) elQtdT.textContent = `${lista.length} de ${_transacoesCache.length} lançamento(s)`;
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">${_transacoesCache.length === 0 ? 'Nenhuma transação cadastrada' : 'Nenhuma transação para os filtros aplicados'}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = transacoes.map(t => `
+  tbody.innerHTML = lista.map(t => `
     <tr>
       <td data-label="Data">${formatData(t.data)}</td>
       <td data-label="Tipo"><span class="badge badge-${t.tipo === 'entrada' ? 'resolvido' : 'alta'}">${t.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
@@ -1117,12 +1342,55 @@ async function loadTransacoes() {
         ${auditMeta(t)}
       </td>
       <td data-label="Descrição">${escapeHtml(t.descricao || '-')}</td>
-      <td data-label="Valor"><strong>${formatMoeda(t.valor)}</strong></td>
-      <td data-label="Ações">
-        <button class="btn btn-danger" onclick="deletarTransacao(${t.id})">Deletar</button>
+      <td data-label="Valor"><strong style="color:${t.tipo === 'entrada' ? '#10b981' : '#ef4444'}">${t.tipo === 'saída' ? '- ' : ''}${formatMoeda(t.valor)}</strong></td>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarTransacao(${t.id})">✏️</button>
+        <button class="btn btn-icon btn-danger" title="Deletar" aria-label="Deletar" onclick="deletarTransacao(${t.id})">🗑️</button>
       </td>
     </tr>
   `).join('');
+}
+
+let _filtroTransacoesTimer = null;
+function onFiltroTransacoesChange(debounce = false) {
+  if (debounce) {
+    clearTimeout(_filtroTransacoesTimer);
+    _filtroTransacoesTimer = setTimeout(renderTransacoes, 250);
+  } else {
+    renderTransacoes();
+  }
+}
+
+function limparFiltrosTransacoes() {
+  ['filtro-transacoes-busca','filtro-transacoes-tipo','filtro-transacoes-categoria',
+   'filtro-transacoes-data-de','filtro-transacoes-data-ate'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const ord = document.getElementById('filtro-transacoes-ordenar');
+  if (ord) ord.value = 'data_desc';
+  renderTransacoes();
+}
+
+async function editarTransacao(id) {
+  const t = _transacoesCache.find(x => x.id === id);
+  if (!t) { alert('Transação não encontrada.'); return; }
+
+  transacaoEmEdicao = id;
+  const form = document.getElementById('form-transacao');
+  resetForm('#form-transacao');
+
+  document.getElementById('modal-transacao-titulo').textContent = `Editar Transação #${id}`;
+  document.getElementById('transacao-id').value = id;
+  form.tipo.value = t.tipo || '';
+  form.valor.value = t.valor != null ? parseFloat(t.valor) : '';
+  form.categoria.value = t.categoria || '';
+  form.descricao.value = t.descricao || '';
+  if (form.data) form.data.value = t.data ? String(t.data).split('T')[0] : '';
+
+  const btn = document.getElementById('btn-salvar-transacao');
+  if (btn) btn.textContent = 'Salvar Alterações';
+
+  showModal('#modal-transacao');
 }
 
 async function salvarTransacao() {
@@ -1131,14 +1399,18 @@ async function salvarTransacao() {
     tipo: form.tipo.value,
     valor: parseFloat(form.valor.value),
     categoria: form.categoria.value,
-    descricao: form.descricao.value
+    descricao: form.descricao.value,
+    data: form.data?.value || null
   };
 
   try {
-    const res = await apiFetch(`${API_URL}/transacoes`, { method: 'POST', body: JSON.stringify(dados) });
+    const url = transacaoEmEdicao ? `${API_URL}/transacoes/${transacaoEmEdicao}` : `${API_URL}/transacoes`;
+    const method = transacaoEmEdicao ? 'PUT' : 'POST';
+    const res = await apiFetch(url, { method, body: JSON.stringify(dados) });
     if (!res) return;
-    if (!res.ok) { const e = await res.json(); alert(e.erro); return; }
-    alert('Transação criada!');
+    if (!res.ok) { const e = await res.json(); alert(e.erro || 'Erro ao salvar'); return; }
+    alert(transacaoEmEdicao ? 'Transação atualizada!' : 'Transação criada!');
+    transacaoEmEdicao = null;
     closeModal(document.getElementById('modal-transacao'));
     loadTransacoes();
     loadDashboard();
@@ -1182,11 +1454,60 @@ function toggleClienteSelect() {
 async function loadUsuarios() {
   const res = await apiFetch(`${API_URL}/usuarios`);
   if (!res) return;
-  const lista = await res.json();
+  _usuariosCache = await res.json();
+  popularSelectsUsuarios(_usuariosCache);
+  renderUsuarios();
+}
+
+function popularSelectsUsuarios(lista) {
+  const clientes = [...new Map(lista
+    .filter(u => u.cliente_id && u.cliente_nome)
+    .map(u => [u.cliente_id, u.cliente_nome])
+  ).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'pt-BR'));
+
+  const sel = document.getElementById('filtro-usuarios-cliente');
+  if (!sel) return;
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">Todos os vínculos</option><option value="sem_vinculo">Sem vínculo</option>' +
+    clientes.map(([id, nome]) => `<option value="${id}">${escapeHtml(nome)}</option>`).join('');
+  if (atual) sel.value = atual;
+}
+
+function renderUsuarios() {
   const tbody = document.getElementById('usuarios-tbody');
+  const contador = document.getElementById('filtro-usuarios-contador');
+
+  const busca = (document.getElementById('filtro-usuarios-busca')?.value || '').trim().toLowerCase();
+  const perfil = document.getElementById('filtro-usuarios-perfil')?.value || '';
+  const status = document.getElementById('filtro-usuarios-status')?.value || '';
+  const cliente = document.getElementById('filtro-usuarios-cliente')?.value || '';
+  const ordem = document.getElementById('filtro-usuarios-ordenar')?.value || 'nome_asc';
+
+  let lista = _usuariosCache.filter(u => {
+    if (perfil && u.tipo !== perfil) return false;
+    if (status === 'ativo' && u.ativo === false) return false;
+    if (status === 'inativo' && u.ativo !== false) return false;
+    if (cliente === 'sem_vinculo' && u.cliente_id) return false;
+    if (cliente && cliente !== 'sem_vinculo' && String(u.cliente_id) !== String(cliente)) return false;
+    if (busca) {
+      const alvo = [u.nome, u.email, u.cliente_nome].filter(Boolean).join(' ').toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    return true;
+  });
+
+  switch (ordem) {
+    case 'nome_desc': lista.sort((a, b) => (b.nome || '').localeCompare(a.nome || '', 'pt-BR')); break;
+    case 'perfil': lista.sort((a, b) => (a.tipo || '').localeCompare(b.tipo || '') || (a.nome || '').localeCompare(b.nome || '', 'pt-BR')); break;
+    case 'recentes': lista.sort((a, b) => new Date(b.data_criacao || 0) - new Date(a.data_criacao || 0)); break;
+    case 'nome_asc':
+    default: lista.sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+  }
+
+  if (contador) contador.textContent = `${lista.length} de ${_usuariosCache.length}`;
 
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nenhum usuário cadastrado</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">${_usuariosCache.length === 0 ? 'Nenhum usuário cadastrado' : 'Nenhum usuário para os filtros aplicados'}</td></tr>`;
     return;
   }
 
@@ -1210,17 +1531,27 @@ async function loadUsuarios() {
           ? '<span style="background:#10b98120;color:#10b981;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Ativo</span>'
           : '<span style="background:#ef444420;color:#ef4444;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Inativo</span>'
         }</td>
-        <td data-label="Ações">
-          <button class="btn btn-edit" onclick="abrirEditarUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.tipo}', ${u.cliente_id || 'null'})">Editar</button>
-          <button class="btn btn-edit" onclick="abrirResetSenha(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Senha</button>
+        <td data-label="Ações" class="td-acoes">
+          <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="abrirEditarUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.tipo}', ${u.cliente_id || 'null'})">✏️</button>
+          <button class="btn btn-icon btn-edit" title="Redefinir senha" aria-label="Redefinir senha" onclick="abrirResetSenha(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">🔑</button>
           ${u.ativo !== false
-            ? `<button class="btn btn-danger" onclick="desativarUsuario(${u.id})"${ehVoce ? ' disabled title="Não pode desativar a si mesmo"' : ''}>Desativar</button>`
-            : `<button class="btn btn-edit" onclick="reativarUsuario(${u.id})">Reativar</button>`
+            ? `<button class="btn btn-icon btn-danger" title="${ehVoce ? 'Não pode desativar a si mesmo' : 'Desativar'}" aria-label="Desativar" onclick="desativarUsuario(${u.id})"${ehVoce ? ' disabled' : ''}>🚫</button>`
+            : `<button class="btn btn-icon btn-edit" title="Reativar" aria-label="Reativar" onclick="reativarUsuario(${u.id})">✅</button>`
           }
         </td>
       </tr>
     `;
   }).join('');
+}
+
+let _filtroUsuariosTimer = null;
+function onFiltroUsuariosChange(debounce = false) {
+  if (debounce) {
+    clearTimeout(_filtroUsuariosTimer);
+    _filtroUsuariosTimer = setTimeout(renderUsuarios, 250);
+  } else {
+    renderUsuarios();
+  }
 }
 
 async function abrirEditarUsuario(id, nome, email, tipo, cliente_id) {
@@ -1377,6 +1708,18 @@ function formatDataHora(val) {
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Preenche um <select> de filtro mantendo a 1ª <option> (placeholder) e o valor atualmente selecionado.
+function preencherSelectOptions(selectId, valores) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const placeholder = sel.querySelector('option:first-child');
+  const placeholderHTML = placeholder ? placeholder.outerHTML : '';
+  const atual = sel.value;
+  sel.innerHTML = placeholderHTML + valores
+    .map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  if (atual && valores.includes(atual)) sel.value = atual;
 }
 
 // Validação de CPF/CNPJ no client-side (mesma lógica do services/validacao.js)
