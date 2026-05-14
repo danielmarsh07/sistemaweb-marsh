@@ -101,6 +101,8 @@ async function iniciar() {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tipo VARCHAR(50) DEFAULT 'admin_empresa';`);
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;`);
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cliente_id INTEGER;`);
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tema VARCHAR(20) DEFAULT 'dark';`);
+    await pool.query(`UPDATE usuarios SET tema = 'dark' WHERE tema IS NULL;`);
     // Corrigir linhas com NULL (caso o ALTER anterior já existia sem DEFAULT aplicado)
     await pool.query(`UPDATE usuarios SET empresa_id = 1 WHERE empresa_id IS NULL;`);
     await pool.query(`UPDATE usuarios SET tipo = 'admin_empresa' WHERE tipo IS NULL;`);

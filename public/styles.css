@@ -64,6 +64,652 @@
   --green: #34d399;
 }
 
+/* =====================================================================
+   =====  TEMA: MARSH LIGHT (moderno, premium, vibe Vercel/Linear) =====
+   ===================================================================== */
+:root[data-theme="light"] {
+  --bg-main:        #f5f5f7;
+  --bg-card:        rgba(255, 255, 255, 0.78);
+  --bg-card-solid:  #ffffff;
+  --bg-elevated:    rgba(255, 255, 255, 0.94);
+  --bg-glass:       rgba(255, 255, 255, 0.6);
+  --bg-hover:       rgba(37, 99, 235, 0.06);
+
+  --primary:        #2563eb;
+  --primary-hover:  #1d4ed8;
+  --primary-glow:   rgba(37, 99, 235, 0.22);
+  --accent-cyan:    #0891b2;
+
+  --text-main:      #0a0a0a;
+  --text-secondary: #1f2937;
+  --text-muted:     #525252;
+  --text-subtle:    #737373;
+
+  --border:         rgba(15, 23, 42, 0.10);
+  --border-strong:  rgba(15, 23, 42, 0.18);
+  --border-hover:   rgba(37, 99, 235, 0.45);
+
+  --shadow:         0 4px 14px rgba(15, 23, 42, 0.08);
+  --shadow-elevated:0 12px 32px rgba(15, 23, 42, 0.14);
+  --shadow-primary: 0 8px 24px rgba(37, 99, 235, 0.22);
+
+  /* legacy aliases */
+  --navy:      #0a0a0a;
+  --navy-mid:  #1f2937;
+  --white:     #ffffff;
+  --grey-50:   #f8fafc;
+  --grey-100:  #f1f5f9;
+  --grey-200:  #e2e8f0;
+  --grey-300:  #cbd5e1;
+  --grey-400:  #94a3b8;
+  --grey-500:  #64748b;
+  --grey-600:  #475569;
+  --grey-800:  #1e293b;
+  --red: #ef4444;
+  --green: #10b981;
+}
+
+/* Light: overlay claro sobre o bg image — passa quase imperceptível, mantém glass */
+:root[data-theme="light"] body {
+  background-image:
+    linear-gradient(180deg, rgba(245, 245, 247, 0.86) 0%, rgba(245, 245, 247, 0.94) 60%, rgba(245, 245, 247, 0.98) 100%),
+    url('background-1.png');
+  color-scheme: light;
+}
+@supports (background-image: image-set(url(x.webp) type("image/webp"))) {
+  :root[data-theme="light"] body {
+    background-image:
+      linear-gradient(180deg, rgba(245, 245, 247, 0.86) 0%, rgba(245, 245, 247, 0.94) 60%, rgba(245, 245, 247, 0.98) 100%),
+      image-set(url('background-1.webp') type('image/webp'), url('background-1.png') type('image/png'));
+  }
+}
+:root[data-theme="light"] body::before {
+  background:
+    radial-gradient(700px circle at 12% 18%, rgba(37, 99, 235, 0.05), transparent 60%),
+    radial-gradient(700px circle at 88% 82%, rgba(8, 145, 178, 0.04), transparent 60%);
+}
+
+/* Light: sidebar permanece dark (contraste premium estilo Linear) */
+:root[data-theme="light"] .sidebar {
+  background: rgba(10, 10, 10, 0.92);
+}
+:root[data-theme="light"] .nav-link { color: rgba(245, 245, 247, 0.72); }
+:root[data-theme="light"] .nav-link:hover { color: #fff; }
+:root[data-theme="light"] .sidebar-header h2,
+:root[data-theme="light"] .sidebar-footer { color: rgba(245, 245, 247, 0.55); }
+
+/* Light: header glass claro */
+:root[data-theme="light"] .header {
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 1px 0 rgba(15,23,42,0.08), 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+:root[data-theme="light"] .user-info {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--text-secondary);
+}
+
+/* Light: gradients de texto perdem força (fica preto) */
+:root[data-theme="light"] .header h1,
+:root[data-theme="light"] .page-header h2,
+:root[data-theme="light"] .modal-header h3 { color: var(--text-main); }
+
+/* Light: stat-card */
+:root[data-theme="light"] .stat-card {
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root[data-theme="light"] .stat-card::before { opacity: 0.3; }
+:root[data-theme="light"] .stat-icon {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(8, 145, 178, 0.06));
+  color: var(--primary);
+}
+
+/* Light: tabelas */
+:root[data-theme="light"] thead {
+  background: rgba(15, 23, 42, 0.04);
+}
+:root[data-theme="light"] tbody tr:hover { background: var(--bg-hover); }
+:root[data-theme="light"] td { color: var(--text-secondary); }
+
+/* Light: badges com bg tonalizado */
+:root[data-theme="light"] .badge-aberto    { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+:root[data-theme="light"] .badge-resolvido { background: rgba(16, 185, 129, 0.12); color: #047857; }
+:root[data-theme="light"] .badge-alta      { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+
+/* Light: skeleton */
+:root[data-theme="light"] .skeleton-bar {
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.05) 0%,
+    rgba(15, 23, 42, 0.12) 50%,
+    rgba(15, 23, 42, 0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Light: botões secundários */
+:root[data-theme="light"] .btn-secondary {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+}
+:root[data-theme="light"] .btn-secondary:hover {
+  background: rgba(15, 23, 42, 0.08);
+  border-color: var(--border-strong);
+}
+
+/* Light: file selector */
+:root[data-theme="light"] .form-group input[type="file"]::file-selector-button {
+  background: rgba(37, 99, 235, 0.10);
+  color: var(--primary);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+/* Light: scrollbar */
+:root[data-theme="light"] *::-webkit-scrollbar-thumb {
+  background: rgba(37, 99, 235, 0.30);
+  background-clip: padding-box;
+}
+
+/* =====================================================================
+   =====  TEMA: MARSH ENTERPRISE (sério, corporativo, SAP Fiori) =====
+   ===================================================================== */
+:root[data-theme="enterprise"] {
+  --bg-main:        #f5f6f7;
+  --bg-card:        #ffffff;
+  --bg-card-solid:  #ffffff;
+  --bg-elevated:    #ffffff;
+  --bg-glass:       #ffffff;
+  --bg-hover:       #eaecee;
+
+  --primary:        #0070f2;
+  --primary-hover:  #0040b0;
+  --primary-glow:   rgba(0, 112, 242, 0.15);
+  --accent-cyan:    #0070f2;
+
+  --text-main:      #1d2d3e;
+  --text-secondary: #475e75;
+  --text-muted:     #6a6d70;
+  --text-subtle:    #89919a;
+
+  --border:         #d5dadc;
+  --border-strong:  #b9c0c4;
+  --border-hover:   #0070f2;
+
+  --blur:           0px;
+  --radius:         12px;
+  --radius-lg:      12px;
+
+  --shadow:         0 1px 2px rgba(29, 45, 62, 0.06);
+  --shadow-elevated:0 4px 12px rgba(29, 45, 62, 0.10);
+  --shadow-primary: 0 2px 6px rgba(0, 112, 242, 0.18);
+
+  /* legacy aliases */
+  --navy:      #1d2d3e;
+  --navy-mid:  #354a5f;
+  --white:     #ffffff;
+  --grey-50:   #f5f6f7;
+  --grey-100:  #eaecee;
+  --grey-200:  #d5dadc;
+  --grey-300:  #b9c0c4;
+  --grey-400:  #89919a;
+  --grey-500:  #6a6d70;
+  --grey-600:  #475e75;
+  --grey-800:  #1d2d3e;
+  --red: #bb0000;
+  --green: #107e3e;
+}
+
+/* Enterprise: sem bg image — superfície chapada, séria */
+:root[data-theme="enterprise"] body {
+  background-image: none;
+  background-color: var(--bg-main);
+  color-scheme: light;
+}
+:root[data-theme="enterprise"] body::before { display: none; }
+
+/* Enterprise: sidebar branca com texto escuro (estilo SAP shell) */
+:root[data-theme="enterprise"] .sidebar {
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-right: 1px solid var(--border);
+  box-shadow: none;
+}
+:root[data-theme="enterprise"] .sidebar-header { border-bottom-color: var(--border); }
+:root[data-theme="enterprise"] .sidebar-header h2 {
+  color: var(--text-main);
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+}
+:root[data-theme="enterprise"] .sidebar-footer {
+  color: var(--text-muted);
+  border-top-color: var(--border);
+}
+:root[data-theme="enterprise"] .logo-box {
+  background: var(--primary);
+  box-shadow: none;
+}
+:root[data-theme="enterprise"] .nav-link {
+  color: var(--text-secondary);
+  border-radius: 4px;
+}
+:root[data-theme="enterprise"] .nav-link::before { display: none; }
+:root[data-theme="enterprise"] .nav-link:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+  box-shadow: none;
+}
+:root[data-theme="enterprise"] .nav-link.active {
+  background: rgba(0, 112, 242, 0.10);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+:root[data-theme="enterprise"] .nav-link .icon { filter: none; }
+
+/* Enterprise: header chapado */
+:root[data-theme="enterprise"] .header {
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+}
+:root[data-theme="enterprise"] .header h1 {
+  color: var(--text-main);
+}
+:root[data-theme="enterprise"] .user-info {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border-color: var(--border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Enterprise: cards chapados, sem glass nem highlight */
+:root[data-theme="enterprise"] .stat-card,
+:root[data-theme="enterprise"] .table-container,
+:root[data-theme="enterprise"] .totais-card,
+:root[data-theme="enterprise"] .modal-content {
+  background: var(--bg-card);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+:root[data-theme="enterprise"] .stat-card::before { display: none; }
+:root[data-theme="enterprise"] .stat-card:hover {
+  transform: none;
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-elevated);
+}
+:root[data-theme="enterprise"] .stat-icon {
+  background: rgba(0, 112, 242, 0.08);
+  border-color: var(--border);
+  color: var(--primary);
+}
+:root[data-theme="enterprise"] .stat-content h3 { color: var(--text-muted); }
+:root[data-theme="enterprise"] .stat-number    { color: var(--text-main); }
+
+/* Enterprise: tabela */
+:root[data-theme="enterprise"] thead {
+  background: var(--bg-hover);
+}
+:root[data-theme="enterprise"] th { color: var(--text-muted); }
+:root[data-theme="enterprise"] td { color: var(--text-secondary); border-bottom-color: var(--border); }
+:root[data-theme="enterprise"] tbody tr:hover {
+  background: var(--bg-hover);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+:root[data-theme="enterprise"] tbody td strong { color: var(--text-main); }
+
+/* Enterprise: badges (cores SAP) */
+:root[data-theme="enterprise"] .badge { font-weight: 500; }
+:root[data-theme="enterprise"] .badge-aberto    { background: #e8f3ff; color: #0040b0; }
+:root[data-theme="enterprise"] .badge-resolvido { background: #ebf5eb; color: #107e3e; }
+:root[data-theme="enterprise"] .badge-alta      { background: #fbe6e6; color: #bb0000; }
+
+/* Enterprise: botões séries (SAP Fiori style) */
+:root[data-theme="enterprise"] .btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  border: 1px solid var(--primary-hover);
+  box-shadow: none;
+}
+:root[data-theme="enterprise"] .btn-primary:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 2px 4px rgba(0, 112, 242, 0.30);
+  transform: none;
+  filter: none;
+}
+:root[data-theme="enterprise"] .btn-secondary {
+  background: #ffffff;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+:root[data-theme="enterprise"] .btn-secondary:hover {
+  background: rgba(0, 112, 242, 0.06);
+  border-color: var(--primary-hover);
+}
+:root[data-theme="enterprise"] .btn-danger {
+  background: #bb0000;
+  border-color: #8b0000;
+  box-shadow: none;
+}
+:root[data-theme="enterprise"] .btn-danger:hover {
+  background: #8b0000;
+  box-shadow: 0 2px 4px rgba(187, 0, 0, 0.25);
+  filter: none;
+}
+:root[data-theme="enterprise"] .btn-edit {
+  background: rgba(0, 112, 242, 0.08);
+  color: var(--primary);
+  border-color: rgba(0, 112, 242, 0.25);
+}
+:root[data-theme="enterprise"] .btn-edit:hover { background: rgba(0, 112, 242, 0.16); color: var(--primary-hover); }
+
+/* Enterprise: ícones de ação */
+:root[data-theme="enterprise"] .btn-icon {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+:root[data-theme="enterprise"] .btn-icon.btn-edit {
+  background: rgba(0, 112, 242, 0.08);
+  border-color: rgba(0, 112, 242, 0.25);
+  color: var(--primary);
+}
+:root[data-theme="enterprise"] .btn-icon.btn-edit:hover:not(:disabled) {
+  background: rgba(0, 112, 242, 0.16);
+  border-color: var(--primary);
+  box-shadow: none;
+}
+:root[data-theme="enterprise"] .btn-icon.btn-danger {
+  background: #fbe6e6;
+  border-color: #f4c4c4;
+  color: #bb0000;
+}
+:root[data-theme="enterprise"] .btn-icon.btn-danger:hover:not(:disabled) {
+  background: #f6cccc;
+  border-color: #bb0000;
+  box-shadow: none;
+}
+
+/* Enterprise: forms (input claro SAP) */
+:root[data-theme="enterprise"] .form-group input,
+:root[data-theme="enterprise"] .form-group select,
+:root[data-theme="enterprise"] .form-group textarea,
+:root[data-theme="enterprise"] .filtro-select {
+  background: #ffffff;
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-theme="enterprise"] .form-group input:focus,
+:root[data-theme="enterprise"] .form-group select:focus,
+:root[data-theme="enterprise"] .form-group textarea:focus,
+:root[data-theme="enterprise"] .filtro-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(0, 112, 242, 0.22);
+  background: #ffffff;
+}
+:root[data-theme="enterprise"] .form-group select option { background: #ffffff; color: var(--text-main); }
+:root[data-theme="enterprise"] .filtros-contador {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+:root[data-theme="enterprise"] .form-section-title { color: var(--primary); border-bottom-color: var(--border); }
+
+/* Enterprise: totalizadores */
+:root[data-theme="enterprise"] .totais-card {
+  box-shadow: var(--shadow);
+}
+:root[data-theme="enterprise"] .totais-entrada .totais-valor { color: #107e3e; }
+:root[data-theme="enterprise"] .totais-saida   .totais-valor { color: #bb0000; }
+
+/* Enterprise: skeleton */
+:root[data-theme="enterprise"] .skeleton-bar {
+  background: linear-gradient(
+    90deg,
+    #eaecee 0%,
+    #f5f6f7 50%,
+    #eaecee 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Enterprise: scrollbar */
+:root[data-theme="enterprise"] *::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  background-clip: padding-box;
+}
+:root[data-theme="enterprise"] *::-webkit-scrollbar-thumb:hover {
+  background: #89919a;
+  background-clip: padding-box;
+}
+
+/* Enterprise: modal */
+:root[data-theme="enterprise"] .modal {
+  background: rgba(29, 45, 62, 0.45);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-theme="enterprise"] .modal-content {
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--border);
+}
+:root[data-theme="enterprise"] .modal-header { border-bottom-color: var(--border); }
+:root[data-theme="enterprise"] .btn-close { color: var(--text-muted); }
+:root[data-theme="enterprise"] .btn-close:hover { color: var(--text-main); }
+
+/* Enterprise: dropzone */
+:root[data-theme="enterprise"] .dropzone-dash {
+  background: var(--bg-hover);
+  border: 1.5px dashed var(--border-strong);
+}
+:root[data-theme="enterprise"] .dropzone-prompt-dash strong { color: var(--primary); }
+:root[data-theme="enterprise"] .arquivos-pendentes-dash li {
+  background: #ffffff;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+:root[data-theme="enterprise"] .thumb-card-dash {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+/* Enterprise: timeline */
+:root[data-theme="enterprise"] .timeline-content {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--text-main);
+}
+:root[data-theme="enterprise"] .timeline-item:not(:last-child)::before { background: var(--border); }
+:root[data-theme="enterprise"] .timeline-badge {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px var(--border);
+}
+
+/* Enterprise: filtros - file input */
+:root[data-theme="enterprise"] .form-group input[type="file"]::file-selector-button {
+  background: rgba(0, 112, 242, 0.08);
+  color: var(--primary);
+  border-color: rgba(0, 112, 242, 0.25);
+}
+
+/* Enterprise: text selection */
+:root[data-theme="enterprise"] ::selection {
+  background: rgba(0, 112, 242, 0.30);
+  color: var(--text-main);
+}
+
+/* Enterprise: bottom nav (mobile) */
+:root[data-theme="enterprise"] .bottom-nav {
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-top: 1px solid var(--border);
+}
+:root[data-theme="enterprise"] .bottom-nav-item { color: var(--text-muted); }
+:root[data-theme="enterprise"] .bottom-nav-item.active { color: var(--primary); }
+
+/* Enterprise: tabela mobile (cards) */
+@media (max-width: 768px) {
+  :root[data-theme="enterprise"] .table-container tbody tr {
+    background: #ffffff;
+    border-color: var(--border);
+  }
+  :root[data-theme="enterprise"] .modal-header { background: #ffffff; }
+}
+
+/* ==== Transição suave entre temas ==== */
+html { transition: background-color 0.25s ease; }
+.sidebar, .header, .stat-card, .table-container, .modal-content,
+.totais-card, .form-group input, .form-group select, .form-group textarea,
+.filtro-select, .btn-secondary, .btn-icon, .user-info, .nav-link, td, th {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+/* =====================================================================
+   ===========  PÁGINA CONFIGURAÇÕES + THEME PICKER  ===================
+   ===================================================================== */
+
+.config-secao {
+  background: var(--bg-card);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+  backdrop-filter: blur(var(--blur)) saturate(140%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+:root[data-theme="enterprise"] .config-secao {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--shadow);
+}
+
+.config-secao-header {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.config-secao-header h3 {
+  font-size: 16px;
+  color: var(--text-main);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.config-secao-header p {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.theme-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.theme-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: none;
+}
+.theme-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-elevated);
+}
+.theme-card.is-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow), var(--shadow);
+}
+.theme-card-check {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+.theme-card.is-active .theme-card-check { display: inline-flex; }
+
+.theme-preview {
+  height: 84px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+}
+.theme-preview-sidebar {
+  width: 28%;
+  height: 100%;
+}
+.theme-preview-main {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.theme-preview-bar {
+  height: 10px;
+  border-radius: 3px;
+}
+.theme-preview-bar.short { width: 50%; }
+.theme-preview-bar.long  { width: 80%; }
+.theme-preview-card {
+  flex: 1;
+  border-radius: 4px;
+  border: 1px solid;
+  margin-top: 2px;
+}
+
+.theme-card-info { display: flex; flex-direction: column; gap: 2px; }
+.theme-card-nome {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.theme-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.theme-card-swatches {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.theme-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
 html {
   scroll-behavior: smooth;
   background: var(--bg-main);

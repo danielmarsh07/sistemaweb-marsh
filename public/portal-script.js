@@ -24,7 +24,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
   inicializarDropzone();
   carregarPortal();
+
+  // Botão Aparência → abre modal com theme picker
+  const btnAp = document.getElementById('btn-aparencia');
+  if (btnAp) btnAp.addEventListener('click', abrirAparencia);
 });
+
+// ===== APARÊNCIA / TEMA =====
+function abrirAparencia() {
+  renderThemePickerPortal();
+  document.getElementById('modal-aparencia').classList.add('show');
+}
+function fecharAparencia() {
+  document.getElementById('modal-aparencia').classList.remove('show');
+}
+
+function renderThemePickerPortal() {
+  const root = document.getElementById('theme-picker-portal');
+  if (!root || !window.Theme) return;
+  const ativo = window.Theme.get();
+  const temas = window.Theme.list();
+  root.innerHTML = temas.map(t => `
+    <div class="theme-card ${t.id === ativo ? 'is-active' : ''}" data-theme-id="${t.id}" role="button" tabindex="0">
+      <span class="theme-card-check" aria-hidden="true">✓</span>
+      <div class="theme-preview" style="background:${t.swatches[0]}">
+        <div class="theme-preview-sidebar" style="background:${t.id === 'enterprise' ? '#ffffff' : (t.id === 'light' ? 'rgba(10,10,10,0.92)' : 'rgba(2,8,23,0.78)')}; border-right:1px solid ${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.08)'}"></div>
+        <div class="theme-preview-main">
+          <span class="theme-preview-bar long"  style="background:${t.swatches[3]}; opacity:0.85"></span>
+          <span class="theme-preview-bar short" style="background:${t.swatches[2]}"></span>
+          <span class="theme-preview-card"      style="background:${t.swatches[1]}; border-color:${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.10)'}"></span>
+        </div>
+      </div>
+      <div class="theme-card-info">
+        <span class="theme-card-nome">${t.nome}</span>
+        <span class="theme-card-desc">${t.descricao}</span>
+      </div>
+      <div class="theme-card-swatches" aria-hidden="true">
+        ${t.swatches.map(c => `<span class="theme-swatch" style="background:${c}"></span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  root.querySelectorAll('.theme-card').forEach(card => {
+    card.addEventListener('click', () => aplicarTemaPortal(card.dataset.themeId));
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aplicarTemaPortal(card.dataset.themeId); }
+    });
+  });
+}
+
+async function aplicarTemaPortal(id) {
+  if (!window.Theme) return;
+  await window.Theme.set(id);
+  document.querySelectorAll('#theme-picker-portal .theme-card').forEach(c => {
+    c.classList.toggle('is-active', c.dataset.themeId === id);
+  });
+}
 
 // ===== API HELPER =====
 async function apiFetch(url, options = {}) {

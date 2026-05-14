@@ -69,11 +69,29 @@ router.post('/login', loginLimiter, async (req, res) => {
         empresa_id: usuario.empresa_id || 1,
         tipo: usuario.tipo || 'admin_empresa',
         cliente_id: usuario.cliente_id || null,
-        empresa_nome: usuario.empresa_fantasia || usuario.empresa_nome || 'Marsh Consultoria'
+        empresa_nome: usuario.empresa_fantasia || usuario.empresa_nome || 'Marsh Consultoria',
+        tema: usuario.tema || 'dark'
       }
     });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao fazer login', detalhe: err.message });
+  }
+});
+
+// GET /api/auth/tema?email=...
+// Retorna apenas o tema salvo de um usuário (sem credenciais).
+// Usado pela tela de login para evitar FOUC ao digitar o email.
+router.get('/tema', async (req, res) => {
+  const email = (req.query.email || '').trim().toLowerCase();
+  if (!email) return res.json({ tema: 'dark' });
+  try {
+    const r = await pool.query(
+      'SELECT tema FROM usuarios WHERE LOWER(email) = $1 AND ativo IS NOT FALSE LIMIT 1',
+      [email]
+    );
+    res.json({ tema: r.rows[0]?.tema || 'dark' });
+  } catch (err) {
+    res.json({ tema: 'dark' });
   }
 });
 

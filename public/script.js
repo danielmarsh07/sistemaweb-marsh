@@ -221,7 +221,8 @@ function showPage(page) {
     tecnologias: 'Tecnologias',
     chamados: 'Chamados',
     transacoes: 'Transações Financeiras',
-    usuarios: 'Usuários do Sistema'
+    usuarios: 'Usuários do Sistema',
+    configuracoes: 'Configurações'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -233,6 +234,53 @@ function showPage(page) {
   if (page === 'chamados') loadChamados();
   if (page === 'transacoes') loadTransacoes();
   if (page === 'usuarios') loadUsuarios();
+  if (page === 'configuracoes') renderThemePicker();
+}
+
+// ===== CONFIGURAÇÕES / THEME PICKER =====
+function renderThemePicker() {
+  const root = document.getElementById('theme-picker');
+  if (!root || !window.Theme) return;
+  const ativo = window.Theme.get();
+  const temas = window.Theme.list();
+  root.innerHTML = temas.map(t => `
+    <div class="theme-card ${t.id === ativo ? 'is-active' : ''}" data-theme-id="${t.id}" role="button" tabindex="0" aria-pressed="${t.id === ativo}">
+      <span class="theme-card-check" aria-hidden="true">✓</span>
+      <div class="theme-preview" style="background:${t.swatches[0]}">
+        <div class="theme-preview-sidebar" style="background:${t.id === 'enterprise' ? '#ffffff' : (t.id === 'light' ? 'rgba(10,10,10,0.92)' : 'rgba(2,8,23,0.78)')}; border-right:1px solid ${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.08)'}"></div>
+        <div class="theme-preview-main">
+          <span class="theme-preview-bar long"  style="background:${t.swatches[3]}; opacity:0.85"></span>
+          <span class="theme-preview-bar short" style="background:${t.swatches[2]}"></span>
+          <span class="theme-preview-card"      style="background:${t.swatches[1]}; border-color:${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.10)'}"></span>
+        </div>
+      </div>
+      <div class="theme-card-info">
+        <span class="theme-card-nome">${escapeHtml(t.nome)}</span>
+        <span class="theme-card-desc">${escapeHtml(t.descricao)}</span>
+      </div>
+      <div class="theme-card-swatches" aria-hidden="true">
+        ${t.swatches.map(c => `<span class="theme-swatch" style="background:${c}"></span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  root.querySelectorAll('.theme-card').forEach(card => {
+    card.addEventListener('click', () => aplicarTema(card.dataset.themeId));
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aplicarTema(card.dataset.themeId); }
+    });
+  });
+}
+
+async function aplicarTema(id) {
+  if (!window.Theme) return;
+  await window.Theme.set(id);
+  // Atualiza estado visual dos cards
+  document.querySelectorAll('.theme-card').forEach(c => {
+    const isAtivo = c.dataset.themeId === id;
+    c.classList.toggle('is-active', isAtivo);
+    c.setAttribute('aria-pressed', isAtivo);
+  });
 }
 
 // ===== DASHBOARD =====

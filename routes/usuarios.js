@@ -13,6 +13,36 @@ function apenasAdmin(req, res, next) {
   next();
 }
 
+const TEMAS_VALIDOS = ['dark', 'light', 'enterprise'];
+
+// GET /api/usuarios/me — perfil + preferências do usuário logado
+router.get('/me', async (req, res) => {
+  try {
+    const r = await pool.query(
+      'SELECT id, nome, email, tipo, cliente_id, empresa_id, tema FROM usuarios WHERE id = $1',
+      [req.usuario.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ erro: 'Usuário não encontrado' });
+    res.json(r.rows[0]);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar perfil', detalhe: err.message });
+  }
+});
+
+// PUT /api/usuarios/me/tema — qualquer usuário logado altera o próprio tema
+router.put('/me/tema', async (req, res) => {
+  const { tema } = req.body || {};
+  if (!TEMAS_VALIDOS.includes(tema)) {
+    return res.status(400).json({ erro: `Tema inválido. Use: ${TEMAS_VALIDOS.join(', ')}` });
+  }
+  try {
+    await pool.query('UPDATE usuarios SET tema = $1 WHERE id = $2', [tema, req.usuario.id]);
+    res.json({ tema });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao salvar tema', detalhe: err.message });
+  }
+});
+
 // GET - Listar usuários da empresa
 router.get('/', apenasAdmin, async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
