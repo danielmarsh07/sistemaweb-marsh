@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login — Marsh Consultoria</title>
-  <script src="theme.js"></script>
   <link rel="stylesheet" href="styles.css" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0066cc" />
@@ -371,19 +370,6 @@
     document.addEventListener('keydown', e => {
       if (e.key === 'Enter') fazerLogin();
     });
-
-    // Anti-FOUC: ao digitar email, busca o tema do usuário e aplica antes do login
-    const _emailInput = document.getElementById('login-email');
-    let _temaLookupTimer = null;
-    if (_emailInput && window.Theme) {
-      _emailInput.addEventListener('blur', () => {
-        clearTimeout(_temaLookupTimer);
-        const email = _emailInput.value.trim();
-        if (email && email.includes('@')) {
-          _temaLookupTimer = setTimeout(() => window.Theme.lookupByEmail(email), 200);
-        }
-      });
-    }
   </script>
   <script>
     if ('serviceWorker' in navigator) {
