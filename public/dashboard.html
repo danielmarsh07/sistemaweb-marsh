@@ -1194,6 +1194,29 @@
           <label>Descrição</label>
           <textarea name="descricao" rows="3"></textarea>
         </div>
+        <div class="form-group" id="bloco-repetir-transacao">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="repetir-transacao-check" style="width:auto;">
+            <span>Repetir este lançamento</span>
+          </label>
+          <small class="form-hint">Cria várias cópias com o mesmo valor/categoria, uma por período, até a data final.</small>
+          <div id="repetir-transacao-opcoes" style="display:none; margin-top:10px;">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Periodicidade *</label>
+                <select id="repetir-periodicidade">
+                  <option value="mensal">Mensal</option>
+                  <option value="diaria">Diária</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Data final *</label>
+                <input type="date" id="repetir-data-final">
+              </div>
+            </div>
+            <small class="form-hint" id="repetir-preview" style="display:block;">Defina a data final para ver a quantidade.</small>
+          </div>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="btn-salvar-transacao">Salvar</button>

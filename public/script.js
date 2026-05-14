@@ -133,6 +133,7 @@ function setupEventListeners() {
     document.getElementById('modal-transacao-titulo').textContent = 'Nova Transação';
     document.getElementById('transacao-id').value = '';
     popularSelectCategoriaTransacao('', '');
+    resetRepetirTransacao(true); // mostra bloco repetir
     const btn = document.getElementById('btn-salvar-transacao');
     if (btn) btn.textContent = 'Salvar';
     showModal('#modal-transacao');
@@ -144,6 +145,19 @@ function setupEventListeners() {
     formTrans.tipo.addEventListener('change', (e) => {
       popularSelectCategoriaTransacao(e.target.value, '');
     });
+    formTrans.data?.addEventListener('change', atualizarPreviewRepetir);
+  }
+
+  // Bloco "Repetir lançamento" — toggle + preview
+  const repetirCheck = document.getElementById('repetir-transacao-check');
+  if (repetirCheck) {
+    repetirCheck.addEventListener('change', () => {
+      document.getElementById('repetir-transacao-opcoes').style.display =
+        repetirCheck.checked ? 'block' : 'none';
+      atualizarPreviewRepetir();
+    });
+    document.getElementById('repetir-periodicidade')?.addEventListener('change', atualizarPreviewRepetir);
+    document.getElementById('repetir-data-final')?.addEventListener('change', atualizarPreviewRepetir);
   }
 
   document.getElementById('btn-nova-categoria-trans').addEventListener('click', () => {
@@ -1605,11 +1619,73 @@ async function editarTransacao(id) {
   if (form.data) form.data.value = t.data ? String(t.data).split('T')[0] : '';
 
   popularSelectCategoriaTransacao(t.tipo || '', t.categoria || '');
+  resetRepetirTransacao(false); // esconde bloco repetir em modo edição
 
   const btn = document.getElementById('btn-salvar-transacao');
   if (btn) btn.textContent = 'Salvar Alterações';
 
   showModal('#modal-transacao');
+}
+
+function resetRepetirTransacao(visivel) {
+  const bloco = document.getElementById('bloco-repetir-transacao');
+  const check = document.getElementById('repetir-transacao-check');
+  const opcoes = document.getElementById('repetir-transacao-opcoes');
+  const periodicidade = document.getElementById('repetir-periodicidade');
+  const dataFinal = document.getElementById('repetir-data-final');
+  const preview = document.getElementById('repetir-preview');
+  if (!bloco) return;
+  bloco.style.display = visivel ? 'block' : 'none';
+  if (check) check.checked = false;
+  if (opcoes) opcoes.style.display = 'none';
+  if (periodicidade) periodicidade.value = 'mensal';
+  if (dataFinal) dataFinal.value = '';
+  if (preview) preview.textContent = 'Defina a data final para ver a quantidade.';
+}
+
+function atualizarPreviewRepetir() {
+  const preview = document.getElementById('repetir-preview');
+  if (!preview) return;
+  const check = document.getElementById('repetir-transacao-check');
+  if (!check || !check.checked) return;
+
+  const form = document.getElementById('form-transacao');
+  const dataBase = form.data?.value || new Date().toISOString().slice(0, 10);
+  const periodicidade = document.getElementById('repetir-periodicidade').value;
+  const dataFinalStr = document.getElementById('repetir-data-final').value;
+
+  if (!dataFinalStr) {
+    preview.textContent = 'Defina a data final para ver a quantidade.';
+    return;
+  }
+  const base = new Date(dataBase + 'T00:00:00');
+  const fim = new Date(dataFinalStr + 'T00:00:00');
+  if (fim < base) {
+    preview.textContent = '⚠ Data final é anterior à data inicial.';
+    return;
+  }
+
+  let qtd = 0;
+  if (periodicidade === 'diaria') {
+    qtd = Math.floor((fim - base) / 86400000) + 1;
+  } else {
+    const diaOriginal = base.getDate();
+    let i = 0;
+    while (true) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      const ult = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(diaOriginal, ult));
+      if (d > fim) break;
+      qtd += 1;
+      i += 1;
+      if (i > 600) break;
+    }
+  }
+  if (qtd > 600) {
+    preview.textContent = `⚠ Geraria ${qtd} lançamentos — reduza o intervalo (máx 600).`;
+  } else {
+    preview.textContent = `Serão criados ${qtd} lançamento(s).`;
+  }
 }
 
 async function salvarTransacao() {
@@ -1622,13 +1698,30 @@ async function salvarTransacao() {
     data: form.data?.value || null
   };
 
+  if (!transacaoEmEdicao) {
+    const check = document.getElementById('repetir-transacao-check');
+    if (check && check.checked) {
+      const periodicidade = document.getElementById('repetir-periodicidade').value;
+      const dataFinal = document.getElementById('repetir-data-final').value;
+      if (!dataFinal) { alert('Informe a data final para a repetição.'); return; }
+      dados.repetir = { periodicidade, data_final: dataFinal };
+    }
+  }
+
   try {
     const url = transacaoEmEdicao ? `${API_URL}/transacoes/${transacaoEmEdicao}` : `${API_URL}/transacoes`;
     const method = transacaoEmEdicao ? 'PUT' : 'POST';
     const res = await apiFetch(url, { method, body: JSON.stringify(dados) });
     if (!res) return;
     if (!res.ok) { const e = await res.json(); alert(e.erro || 'Erro ao salvar'); return; }
-    alert(transacaoEmEdicao ? 'Transação atualizada!' : 'Transação criada!');
+    const body = await res.json().catch(() => ({}));
+    if (transacaoEmEdicao) {
+      alert('Transação atualizada!');
+    } else if (body.transacoes && body.transacoes.length > 1) {
+      alert(`${body.transacoes.length} lançamentos criados!`);
+    } else {
+      alert('Transação criada!');
+    }
     transacaoEmEdicao = null;
     closeModal(document.getElementById('modal-transacao'));
     loadTransacoes();

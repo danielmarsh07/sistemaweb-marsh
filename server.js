@@ -193,6 +193,8 @@ async function iniciar() {
       );
     `);
     await pool.query(`ALTER TABLE transacoes ADD COLUMN IF NOT EXISTS empresa_id INTEGER DEFAULT 1;`);
+    await pool.query(`ALTER TABLE transacoes ADD COLUMN IF NOT EXISTS grupo_id UUID;`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_transacoes_grupo ON transacoes(grupo_id);`);
 
     // 10. Criar tabela de tecnologias
     await pool.query(`

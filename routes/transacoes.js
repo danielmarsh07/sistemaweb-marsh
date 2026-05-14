@@ -1,6 +1,52 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const pool = require('../db');
+
+// Gera a lista de datas a partir de uma data base + periodicidade + data final (inclusiva).
+// A data base é sempre o primeiro item. Periodicidades aceitas: 'mensal' | 'diaria'.
+function gerarDatasRepeticao(dataBaseStr, periodicidade, dataFinalStr) {
+  const datas = [];
+  const base = new Date(dataBaseStr + 'T00:00:00');
+  const limite = new Date(dataFinalStr + 'T00:00:00');
+  if (isNaN(base) || isNaN(limite)) return null;
+  if (limite < base) return null;
+
+  const fmt = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+
+  if (periodicidade === 'diaria') {
+    const cur = new Date(base);
+    while (cur <= limite) {
+      datas.push(fmt(cur));
+      cur.setDate(cur.getDate() + 1);
+      if (datas.length > 3650) break; // sanity: máximo 10 anos diários
+    }
+    return datas;
+  }
+
+  if (periodicidade === 'mensal') {
+    const diaOriginal = base.getDate();
+    let i = 0;
+    while (true) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      // mantém o mesmo dia, mas faz clamp para o último dia do mês quando necessário
+      const ultimoDiaMes = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(diaOriginal, ultimoDiaMes));
+      if (d > limite) break;
+      datas.push(fmt(d));
+      i += 1;
+      if (i > 600) break; // sanity: máximo 50 anos mensais
+    }
+    return datas;
+  }
+
+  return null;
+}
 
 // GET - Listar todas com resumo (filtrado por empresa)
 router.get('/', async (req, res) => {
@@ -63,10 +109,10 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST - Criar nova transação
+// POST - Criar nova transação (com opção de repetir em múltiplas datas)
 router.post('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
-  const { tipo, valor, categoria, descricao, data } = req.body;
+  const { tipo, valor, categoria, descricao, data, repetir } = req.body;
 
   if (!tipo || !valor || !categoria) {
     return res.status(400).json({ erro: 'Tipo, valor e categoria são obrigatórios' });
@@ -86,12 +132,55 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ erro: `Categoria "${categoria}" não está cadastrada para o tipo ${tipo}. Cadastre em "Categorias" antes.` });
     }
 
-    const result = await pool.query(
-      `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id)
-       VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6, $7, $7) RETURNING *`,
-      [tipo, parseFloat(valor), categoria, descricao || '', data || null, empresa_id, req.usuario.id]
-    );
-    res.status(201).json({ mensagem: 'Transação criada com sucesso!', transacao: result.rows[0] });
+    // Caso simples: sem repetição
+    if (!repetir || !repetir.periodicidade || !repetir.data_final) {
+      const result = await pool.query(
+        `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id)
+         VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6, $7, $7) RETURNING *`,
+        [tipo, parseFloat(valor), categoria, descricao || '', data || null, empresa_id, req.usuario.id]
+      );
+      return res.status(201).json({ mensagem: 'Transação criada com sucesso!', transacao: result.rows[0] });
+    }
+
+    // Caso com repetição
+    if (!['mensal', 'diaria'].includes(repetir.periodicidade)) {
+      return res.status(400).json({ erro: 'Periodicidade deve ser "mensal" ou "diaria"' });
+    }
+
+    const dataBase = data || new Date().toISOString().slice(0, 10);
+    const datas = gerarDatasRepeticao(dataBase, repetir.periodicidade, repetir.data_final);
+    if (!datas || datas.length === 0) {
+      return res.status(400).json({ erro: 'Data final inválida ou anterior à data inicial.' });
+    }
+    if (datas.length > 600) {
+      return res.status(400).json({ erro: 'Repetição gera lançamentos demais (>600). Reduza o intervalo.' });
+    }
+
+    const grupoId = crypto.randomUUID();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const criadas = [];
+      for (const dt of datas) {
+        const r = await client.query(
+          `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id, grupo_id)
+           VALUES ($1, $2, $3, $4, $5::date, $6, $7, $7, $8) RETURNING *`,
+          [tipo, parseFloat(valor), categoria, descricao || '', dt, empresa_id, req.usuario.id, grupoId]
+        );
+        criadas.push(r.rows[0]);
+      }
+      await client.query('COMMIT');
+      res.status(201).json({
+        mensagem: `${criadas.length} lançamentos criados com sucesso!`,
+        grupo_id: grupoId,
+        transacoes: criadas
+      });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao criar transação', detalhe: err.message });
   }
