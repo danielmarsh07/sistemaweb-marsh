@@ -6,7 +6,6 @@
   <title>Portal do Cliente — Marsh Consultoria</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0066cc" />
-  <script src="theme.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1143,92 +1142,6 @@
     @media (prefers-reduced-motion: reduce) {
       .stat-box, .chamado-card, .welcome-bar, .modal-box { animation: none !important; }
     }
-
-    /* ====== TEMA CLARO (opt-in via [data-theme="light"]) ====== */
-    :root[data-theme="light"] {
-      --bg-main:        #f1f5f9;
-      --bg-card:        rgba(255, 255, 255, 0.86);
-      --bg-card-solid:  #ffffff;
-      --bg-elevated:    rgba(255, 255, 255, 0.96);
-      --bg-glass:       rgba(255, 255, 255, 0.7);
-      --bg-hover:       rgba(37, 99, 235, 0.06);
-      --primary:        #2563eb;
-      --primary-hover:  #1d4ed8;
-      --primary-glow:   rgba(37, 99, 235, 0.22);
-      --accent-cyan:    #0891b2;
-      --text-main:      #0f172a;
-      --text-secondary: #334155;
-      --text-muted:     #475569;
-      --text-subtle:    #94a3b8;
-      --border:         rgba(15, 23, 42, 0.08);
-      --border-strong:  rgba(15, 23, 42, 0.14);
-      --border-hover:   rgba(37, 99, 235, 0.35);
-      --shadow:         0 4px 14px rgba(15, 23, 42, 0.08);
-      --shadow-elevated:0 12px 32px rgba(15, 23, 42, 0.14);
-      --navy:      #0f172a;
-      --navy-mid:  #1e293b;
-      --white:     #ffffff;
-      --grey-50:   #f8fafc;
-      --grey-100:  #f1f5f9;
-      --grey-200:  #e2e8f0;
-      --grey-400:  #94a3b8;
-      --grey-600:  #475569;
-      --grey-800:  #1e293b;
-      --red: #ef4444;
-      --green: #10b981;
-    }
-    :root[data-theme="light"] body {
-      background-image:
-        linear-gradient(180deg, rgba(241, 245, 249, 0.78) 0%, rgba(241, 245, 249, 0.92) 60%, rgba(241, 245, 249, 0.97) 100%),
-        url('background-1.png');
-      color-scheme: light;
-    }
-    @supports (background-image: image-set(url(x.webp) type("image/webp"))) {
-      :root[data-theme="light"] body {
-        background-image:
-          linear-gradient(180deg, rgba(241, 245, 249, 0.78) 0%, rgba(241, 245, 249, 0.92) 60%, rgba(241, 245, 249, 0.97) 100%),
-          image-set(url('background-1.webp') type('image/webp'), url('background-1.png') type('image/png'));
-      }
-    }
-    /* Portal header continua dark mesmo no tema claro (contraste premium) */
-    :root[data-theme="light"] .portal-header {
-      background: rgba(15, 23, 42, 0.92);
-    }
-
-    /* ====== BOTÃO DE TOGGLE ====== */
-    .theme-toggle {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      padding: 0;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: rgba(255, 255, 255, 0.7);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.25s ease;
-      margin-right: 8px;
-    }
-    .theme-toggle:hover {
-      background: rgba(255, 255, 255, 0.10);
-      border-color: rgba(255, 255, 255, 0.3);
-      color: #fff;
-      transform: translateY(-1px);
-    }
-    .theme-toggle svg { display: block; }
-    .theme-toggle .icon-moon { display: none; }
-    .theme-toggle .icon-sun  { display: block; }
-    :root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
-    :root[data-theme="light"] .theme-toggle .icon-sun  { display: none; }
-
-    html { transition: background-color 0.25s ease; }
-    .portal-header, .stat-box, .chamado-card, .modal-box,
-    .form-group input, .form-group select, .form-group textarea,
-    .filtro-btn, .btn-sair {
-      transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
-    }
   </style>
 </head>
 <body>
@@ -1243,10 +1156,6 @@
       </div>
     </div>
     <div class="portal-user">
-      <button id="theme-toggle" class="theme-toggle" type="button" title="Alternar tema" aria-label="Alternar tema claro/escuro">
-        <svg class="icon-sun"  xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-        <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-      </button>
       <span id="header-usuario">...</span>
       <button class="btn-sair" onclick="sair()">Sair</button>
     </div>
