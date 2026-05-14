@@ -1826,3 +1826,91 @@ tbody td strong {
   outline: 2px solid var(--primary-hover);
   outline-offset: 2px;
 }
+
+/* ===== SKELETON LOADERS (linha de tabela carregando) ===== */
+@keyframes skeletonShimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton-row td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.skeleton-bar {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.05) 0%,
+    rgba(255,255,255,0.12) 50%,
+    rgba(255,255,255,0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s linear infinite;
+}
+.skeleton-bar.sk-sm  { width: 35%; height: 10px; }
+.skeleton-bar.sk-md  { width: 60%; }
+.skeleton-bar.sk-lg  { width: 85%; }
+.skeleton-bar.sk-pill { width: 60px; height: 18px; border-radius: 999px; }
+
+/* No mobile (cards), o skeleton vira bloco */
+@media (max-width: 768px) {
+  .skeleton-row td { display: block; padding: 6px 0; border: none; }
+  .skeleton-row { display: block; padding: 12px 14px; }
+}
+
+/* ===== RIPPLE EFFECT (botões primários) ===== */
+.btn-primary,
+.btn-edit:not(.btn-icon),
+.btn-danger:not(.btn-icon),
+.btn-login {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-primary::after,
+.btn-edit:not(.btn-icon)::after,
+.btn-danger:not(.btn-icon)::after,
+.btn-login::after {
+  content: "";
+  position: absolute;
+  left: var(--ripple-x, 50%);
+  top: var(--ripple-y, 50%);
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+}
+.btn-primary.is-rippling::after,
+.btn-edit:not(.btn-icon).is-rippling::after,
+.btn-danger:not(.btn-icon).is-rippling::after,
+.btn-login.is-rippling::after {
+  animation: ripple 0.55s ease-out;
+}
+@keyframes ripple {
+  0%   { width: 0;     height: 0;     opacity: 0.55; }
+  100% { width: 380px; height: 380px; opacity: 0; }
+}
+
+/* ===== STAT NUMBER: contador animado tem easing suave ===== */
+.stat-number.is-counting {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Respeita usuários que preferem menos movimento ===== */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bar { animation: none; }
+  .btn-primary::after,
+  .btn-edit::after,
+  .btn-danger::after,
+  .btn-login::after { animation: none !important; }
+  .page.active,
+  .stat-card,
+  .totais-card,
+  .table-container,
+  .modal-content { animation: none !important; }
+}

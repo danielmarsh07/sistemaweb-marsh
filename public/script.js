@@ -237,6 +237,10 @@ function showPage(page) {
 
 // ===== DASHBOARD =====
 async function loadDashboard() {
+  const tbodyRecent = document.getElementById('dashboard-chamados-tbody');
+  if (tbodyRecent && tbodyRecent.querySelector('.text-center')) {
+    tbodyRecent.innerHTML = skeletonRows(6, 3);
+  }
   try {
     const [resumo, transacoes, chamadosResp] = await Promise.all([
       apiFetch(`${API_URL}/empresas/resumo`).then(r => r ? r.json() : {}),
@@ -246,21 +250,22 @@ async function loadDashboard() {
     const chamados = Array.isArray(chamadosResp) ? chamadosResp : (chamadosResp.chamados || []);
 
     if (resumo) {
-      document.getElementById('total-clientes').textContent = resumo.clientes || 0;
-      document.getElementById('total-fornecedores').textContent = resumo.fornecedores || 0;
-      document.getElementById('total-tecnologias').textContent = resumo.tecnologias || 0;
+      animateCounter(document.getElementById('total-clientes'), resumo.clientes || 0);
+      animateCounter(document.getElementById('total-fornecedores'), resumo.fornecedores || 0);
+      animateCounter(document.getElementById('total-tecnologias'), resumo.tecnologias || 0);
       if (resumo.chamados) {
         const abertos = parseInt(resumo.chamados.abertos || 0) + parseInt(resumo.chamados.em_andamento || 0);
-        document.getElementById('total-chamados-abertos').textContent = abertos;
+        animateCounter(document.getElementById('total-chamados-abertos'), abertos);
       }
     }
 
     if (transacoes && transacoes.resumo) {
       const { totalEntradas, totalSaidas, saldo } = transacoes.resumo;
-      document.getElementById('total-entradas').textContent = formatMoeda(totalEntradas);
-      document.getElementById('total-saidas').textContent = formatMoeda(totalSaidas);
-      document.getElementById('total-saldo').textContent = formatMoeda(saldo);
-      if (saldo < 0) document.getElementById('total-saldo').style.color = '#ef4444';
+      animateCounter(document.getElementById('total-entradas'), totalEntradas, { formatter: formatMoeda });
+      animateCounter(document.getElementById('total-saidas'), totalSaidas, { formatter: formatMoeda });
+      animateCounter(document.getElementById('total-saldo'), saldo, { formatter: formatMoeda });
+      const elSaldo = document.getElementById('total-saldo');
+      if (elSaldo) elSaldo.style.color = saldo < 0 ? '#ef4444' : (saldo > 0 ? '#10b981' : '');
     }
 
     // Chamados recentes
@@ -290,6 +295,8 @@ function renderDashboardChamados(chamados) {
 
 // ===== CLIENTES =====
 async function loadClientes() {
+  const tbody = document.getElementById('clientes-tbody');
+  if (tbody && _clientesCache.length === 0) tbody.innerHTML = skeletonRows(7);
   const res = await apiFetch(`${API_URL}/clientes`);
   if (!res) return;
   _clientesCache = await res.json();
@@ -490,6 +497,8 @@ async function deletarCliente(id) {
 
 // ===== FORNECEDORES =====
 async function loadFornecedores() {
+  const tbody = document.getElementById('fornecedores-tbody');
+  if (tbody && _fornecedoresCache.length === 0) tbody.innerHTML = skeletonRows(6);
   const res = await apiFetch(`${API_URL}/fornecedores`);
   if (!res) return;
   _fornecedoresCache = await res.json();
@@ -655,6 +664,8 @@ async function deletarFornecedor(id) {
 
 // ===== TECNOLOGIAS =====
 async function loadTecnologias() {
+  const tbodyPre = document.getElementById('tecnologias-tbody');
+  if (tbodyPre && tbodyPre.querySelector('.text-center')) tbodyPre.innerHTML = skeletonRows(7);
   const res = await apiFetch(`${API_URL}/tecnologias`);
   if (!res) return;
   const lista = await res.json();
@@ -759,6 +770,8 @@ async function preencherSelectsChamado() {
 let chamadosPaginacao = { page: 1, limit: 25 };
 
 async function loadChamados() {
+  const tbodyPre = document.getElementById('chamados-tbody');
+  if (tbodyPre && tbodyPre.querySelector('.text-center')) tbodyPre.innerHTML = skeletonRows(8);
   const status = document.getElementById('filtro-status')?.value || '';
   const prioridade = document.getElementById('filtro-prioridade')?.value || '';
   const busca = document.getElementById('filtro-busca')?.value?.trim() || '';
@@ -1248,6 +1261,8 @@ async function salvarAtendimento() {
 
 // ===== TRANSAÇÕES =====
 async function loadTransacoes() {
+  const tbody = document.getElementById('transacoes-tbody');
+  if (tbody && _transacoesCache.length === 0) tbody.innerHTML = skeletonRows(6);
   const res = await apiFetch(`${API_URL}/transacoes`);
   if (!res) return;
   const dados = await res.json();
@@ -1452,6 +1467,8 @@ function toggleClienteSelect() {
 }
 
 async function loadUsuarios() {
+  const tbody = document.getElementById('usuarios-tbody');
+  if (tbody && _usuariosCache.length === 0) tbody.innerHTML = skeletonRows(6);
   const res = await apiFetch(`${API_URL}/usuarios`);
   if (!res) return;
   _usuariosCache = await res.json();
@@ -1726,6 +1743,71 @@ function iconSVG(name, size = 16) {
   if (!body) return '';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 }
+
+/**
+ * Gera linhas-fantasma para uma tabela enquanto a API responde.
+ * @param {number} cols - quantas colunas (= colspan da tabela)
+ * @param {number} rows - quantas linhas-fantasma (default 5)
+ */
+function skeletonRows(cols, rows = 5) {
+  const padroes = ['sk-md', 'sk-lg', 'sk-sm', 'sk-pill', 'sk-md', 'sk-sm', 'sk-lg'];
+  let html = '';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr class="skeleton-row">';
+    for (let c = 0; c < cols; c++) {
+      const tipo = padroes[(r + c) % padroes.length];
+      html += `<td><span class="skeleton-bar ${tipo}"></span></td>`;
+    }
+    html += '</tr>';
+  }
+  return html;
+}
+
+/**
+ * Anima um contador numérico de 0 (ou valor atual) até o valor final.
+ * Aceita inteiros ou strings tipo "R$ 1.234,56" — preserva o prefixo/sufixo.
+ */
+function animateCounter(el, valorFinal, opts = {}) {
+  if (!el) return;
+  const dur = opts.duration ?? 700;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.textContent = opts.formatter ? opts.formatter(valorFinal) : String(valorFinal);
+    return;
+  }
+  el.classList.add('is-counting');
+  const start = performance.now();
+  const from = 0;
+  const to = Number(valorFinal) || 0;
+  function step(now) {
+    const t = Math.min(1, (now - start) / dur);
+    // easeOutCubic
+    const eased = 1 - Math.pow(1 - t, 3);
+    const v = from + (to - from) * eased;
+    el.textContent = opts.formatter ? opts.formatter(v) : Math.round(v).toString();
+    if (t < 1) requestAnimationFrame(step);
+    else { el.classList.remove('is-counting'); el.textContent = opts.formatter ? opts.formatter(to) : String(to); }
+  }
+  requestAnimationFrame(step);
+}
+
+/**
+ * Cola o efeito ripple em qualquer botão acionado por clique.
+ * Coordenadas relativas ao botão alimentam --ripple-x/y no CSS.
+ */
+function _bindRipple() {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-primary, .btn-login, .btn-edit:not(.btn-icon), .btn-danger:not(.btn-icon)');
+    if (!btn || btn.disabled) return;
+    const rect = btn.getBoundingClientRect();
+    btn.style.setProperty('--ripple-x', `${e.clientX - rect.left}px`);
+    btn.style.setProperty('--ripple-y', `${e.clientY - rect.top}px`);
+    btn.classList.remove('is-rippling');
+    void btn.offsetWidth; // força reflow para reiniciar animação
+    btn.classList.add('is-rippling');
+    setTimeout(() => btn.classList.remove('is-rippling'), 600);
+  });
+}
+document.addEventListener('DOMContentLoaded', _bindRipple);
 
 // Preenche um <select> de filtro mantendo a 1ª <option> (placeholder) e o valor atualmente selecionado.
 function preencherSelectOptions(selectId, valores) {
