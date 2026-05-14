@@ -11,10 +11,10 @@
 :root {
   /* === Paleta DARK premium (Linear / Vercel / fintech) === */
   --bg-main:        #020817;
-  --bg-card:        rgba(15, 23, 42, 0.72);
-  --bg-card-solid:  #0f172a;
-  --bg-elevated:    rgba(15, 23, 42, 0.88);
-  --bg-glass:       rgba(15, 23, 42, 0.55);
+  --bg-card:        rgba(30, 41, 59, 0.78);
+  --bg-card-solid:  #1e293b;
+  --bg-elevated:    rgba(30, 41, 59, 0.92);
+  --bg-glass:       rgba(30, 41, 59, 0.55);
   --bg-hover:       rgba(96, 165, 250, 0.08);
 
   --primary:        #2563eb;
@@ -27,9 +27,9 @@
   --text-muted:     #94a3b8;
   --text-subtle:    #64748b;
 
-  --border:         rgba(255, 255, 255, 0.08);
-  --border-strong:  rgba(255, 255, 255, 0.14);
-  --border-hover:   rgba(96, 165, 250, 0.35);
+  --border:         rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.16);
+  --border-hover:   rgba(96, 165, 250, 0.40);
 
   --blur:           14px;
   --radius:         12px;
@@ -1457,7 +1457,7 @@ tbody tr:last-child td {
   -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
   backdrop-filter: blur(var(--blur)) saturate(140%);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: var(--text-main);
   position: relative;
   overflow: hidden;
@@ -1500,7 +1500,7 @@ tbody tr:last-child td {
   -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
   backdrop-filter: blur(var(--blur)) saturate(140%);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 thead {
   background: rgba(2, 8, 23, 0.55);
@@ -1694,7 +1694,7 @@ tbody td strong {
   backdrop-filter: blur(var(--blur)) saturate(140%);
   border: 1px solid var(--border);
   border-left-width: 3px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .totais-entrada { border-left-color: #34d399; box-shadow: var(--shadow), inset 6px 0 24px -12px rgba(52,211,153,0.35); }
 .totais-saida   { border-left-color: #f87171; box-shadow: var(--shadow), inset 6px 0 24px -12px rgba(248,113,113,0.35); }
