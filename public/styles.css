@@ -77,13 +77,27 @@ body {
   background-color: var(--bg-main);
   background-image:
     linear-gradient(180deg, rgba(2, 8, 23, 0.78) 0%, rgba(2, 8, 23, 0.92) 60%, rgba(2, 8, 23, 0.96) 100%),
-    url('background%201.png');
+    url('background-1.png');
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+}
+
+/* WebP onde suportado (Chrome, Edge, Safari 14+, Firefox 65+) */
+@supports (background-image: -webkit-image-set(url(x.webp) type("image/webp"))) or
+          (background-image: image-set(url(x.webp) type("image/webp"))) {
+  body {
+    background-image:
+      linear-gradient(180deg, rgba(2, 8, 23, 0.78) 0%, rgba(2, 8, 23, 0.92) 60%, rgba(2, 8, 23, 0.96) 100%),
+      image-set(
+        url('background-1.webp') type('image/webp'),
+        url('background-1.png') type('image/png')
+      );
+  }
 }
 
 /* Iluminação ambiente sutil (glow neon discreto) */
@@ -1641,11 +1655,36 @@ tbody td strong {
 }
 .filtros-label { color: var(--text-muted); }
 
-/* Date pickers: ícone do calendário fica visível no dark */
+/* Date / file pickers: cores nativas em dark mode
+   - color-scheme: dark já invertia a maioria dos UI nativos no Firefox/Chromium
+     (foi aplicado no body); aqui só reforçamos ícone do calendário no Chromium */
+.filtro-select[type="date"],
+.form-group input[type="date"],
+.form-group input[type="file"] {
+  color-scheme: dark;
+}
 .filtro-select[type="date"]::-webkit-calendar-picker-indicator,
 .form-group input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) opacity(0.65);
   cursor: pointer;
+}
+/* Firefox: estiliza o botão "Browse" do file input */
+.form-group input[type="file"]::file-selector-button {
+  background: rgba(37, 99, 235, 0.16);
+  color: var(--primary-hover);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 6px;
+  padding: 4px 10px;
+  margin-right: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: var(--transition);
+}
+.form-group input[type="file"]::file-selector-button:hover {
+  background: rgba(37, 99, 235, 0.28);
+  border-color: var(--primary-hover);
+  color: #fff;
 }
 
 /* ===== TOTALIZADORES FINANCEIROS (glass) ===== */

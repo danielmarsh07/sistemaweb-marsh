@@ -357,8 +357,8 @@ function renderClientes() {
         }
       </td>
       <td data-label="Ações" class="td-acoes">
-        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarCliente(${c.id})">✏️</button>
-        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarCliente(${c.id})">🗑️</button>
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarCliente(${c.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarCliente(${c.id})">${iconSVG('trash')}</button>
       </td>
     </tr>
   `).join('');
@@ -551,8 +551,8 @@ function renderFornecedores() {
       <td data-label="Contato">${escapeHtml(f.contato_nome || f.email || '-')}</td>
       <td data-label="Status">${badgeStatusGeral(f.status)}</td>
       <td data-label="Ações" class="td-acoes">
-        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarFornecedor(${f.id})">✏️</button>
-        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarFornecedor(${f.id})">🗑️</button>
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarFornecedor(${f.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarFornecedor(${f.id})">${iconSVG('trash')}</button>
       </td>
     </tr>
   `).join('');
@@ -677,8 +677,8 @@ async function loadTecnologias() {
       <td data-label="Clientes">${t.total_clientes || 0} cliente(s)</td>
       <td data-label="Status">${badgeStatusTec(t.status)}</td>
       <td data-label="Ações" class="td-acoes">
-        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarTecnologia(${t.id})">✏️</button>
-        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarTecnologia(${t.id})">🗑️</button>
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarTecnologia(${t.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarTecnologia(${t.id})">${iconSVG('trash')}</button>
       </td>
     </tr>
   `).join('');
@@ -811,9 +811,9 @@ async function loadChamados() {
       <td data-label="Prioridade">${badgePrioridade(ch.prioridade)}${ch.avaliacao_nota ? `<br><small style="color:#f59e0b">${'★'.repeat(ch.avaliacao_nota)}</small>` : ''}</td>
       <td data-label="Abertura">${formatData(ch.data_criacao)}</td>
       <td data-label="Ações" class="td-acoes">
-        <button class="btn btn-icon btn-edit" title="Ver detalhes" aria-label="Ver detalhes" onclick="abrirDetalheChamado(${ch.id})">👁️</button>
-        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarChamado(${ch.id})">✏️</button>
-        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarChamado(${ch.id})">🗑️</button>
+        <button class="btn btn-icon btn-edit" title="Ver detalhes" aria-label="Ver detalhes" onclick="abrirDetalheChamado(${ch.id})">${iconSVG('eye')}</button>
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarChamado(${ch.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarChamado(${ch.id})">${iconSVG('trash')}</button>
       </td>
     </tr>
     `;
@@ -1344,8 +1344,8 @@ function renderTransacoes() {
       <td data-label="Descrição">${escapeHtml(t.descricao || '-')}</td>
       <td data-label="Valor"><strong style="color:${t.tipo === 'entrada' ? '#10b981' : '#ef4444'}">${t.tipo === 'saída' ? '- ' : ''}${formatMoeda(t.valor)}</strong></td>
       <td data-label="Ações" class="td-acoes">
-        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarTransacao(${t.id})">✏️</button>
-        <button class="btn btn-icon btn-danger" title="Deletar" aria-label="Deletar" onclick="deletarTransacao(${t.id})">🗑️</button>
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarTransacao(${t.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon btn-danger" title="Deletar" aria-label="Deletar" onclick="deletarTransacao(${t.id})">${iconSVG('trash')}</button>
       </td>
     </tr>
   `).join('');
@@ -1532,11 +1532,11 @@ function renderUsuarios() {
           : '<span style="background:#ef444420;color:#ef4444;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Inativo</span>'
         }</td>
         <td data-label="Ações" class="td-acoes">
-          <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="abrirEditarUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.tipo}', ${u.cliente_id || 'null'})">✏️</button>
-          <button class="btn btn-icon btn-edit" title="Redefinir senha" aria-label="Redefinir senha" onclick="abrirResetSenha(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">🔑</button>
+          <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="abrirEditarUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.tipo}', ${u.cliente_id || 'null'})">${iconSVG('edit')}</button>
+          <button class="btn btn-icon btn-edit" title="Redefinir senha" aria-label="Redefinir senha" onclick="abrirResetSenha(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">${iconSVG('key')}</button>
           ${u.ativo !== false
-            ? `<button class="btn btn-icon btn-danger" title="${ehVoce ? 'Não pode desativar a si mesmo' : 'Desativar'}" aria-label="Desativar" onclick="desativarUsuario(${u.id})"${ehVoce ? ' disabled' : ''}>🚫</button>`
-            : `<button class="btn btn-icon btn-edit" title="Reativar" aria-label="Reativar" onclick="reativarUsuario(${u.id})">✅</button>`
+            ? `<button class="btn btn-icon btn-danger" title="${ehVoce ? 'Não pode desativar a si mesmo' : 'Desativar'}" aria-label="Desativar" onclick="desativarUsuario(${u.id})"${ehVoce ? ' disabled' : ''}>${iconSVG('ban')}</button>`
+            : `<button class="btn btn-icon btn-edit" title="Reativar" aria-label="Reativar" onclick="reativarUsuario(${u.id})">${iconSVG('check')}</button>`
           }
         </td>
       </tr>
@@ -1708,6 +1708,23 @@ function formatDataHora(val) {
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Ícones Lucide (subset) — substitui emojis nos botões de ação.
+// Stroke=currentColor para herdar a cor do botão. 16x16 com stroke 2.
+const _ICONS = {
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+  eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="m18 5 2 2"/><path d="m15 8 2 2"/>',
+  ban: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
+};
+function iconSVG(name, size = 16) {
+  const body = _ICONS[name];
+  if (!body) return '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
 // Preenche um <select> de filtro mantendo a 1ª <option> (placeholder) e o valor atualmente selecionado.

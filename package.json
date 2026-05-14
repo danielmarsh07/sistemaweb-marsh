@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "optimize:images": "node scripts/optimize-images.js"
   },
   "repository": {
     "type": "git",
@@ -31,5 +32,8 @@
     "multer": "^2.1.1",
     "pg": "^8.20.0",
     "resend": "^6.10.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5"
   }
 }
