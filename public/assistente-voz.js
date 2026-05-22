@@ -40,6 +40,9 @@
   const canvasNebulosa = document.getElementById('assistente-nebulosa-canvas');
   const nebulosaWrap = document.getElementById('assistente-nebulosa');
   const nebulosaHint = document.getElementById('nebulosa-hint');
+  const canvasJarvis = document.getElementById('assistente-jarvis-canvas');
+  const jarvisWrap = document.getElementById('assistente-jarvis');
+  const jarvisHint = document.getElementById('jarvis-hint');
   const statusEl = document.getElementById('assistente-status');
   const transcriptEl = document.getElementById('assistente-transcript');
   const respostaEl = document.getElementById('assistente-resposta');
@@ -50,7 +53,7 @@
   const modeButtons = modal.querySelectorAll('.mode-btn');
 
   const MODO_KEY = 'assistente_modo_visual';
-  const MODOS_VALIDOS = ['holograma', 'texto', 'nebulosa'];
+  const MODOS_VALIDOS = ['holograma', 'texto', 'nebulosa', 'jarvis'];
   let modoSalvo = localStorage.getItem(MODO_KEY);
   let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'holograma';
 
@@ -80,6 +83,7 @@
     modoAtual = modo;
     body.setAttribute('data-modo', modo);
     modal.classList.toggle('modo-nebulosa-on', modo === 'nebulosa');
+    modal.classList.toggle('modo-jarvis-on', modo === 'jarvis');
     modeButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.modo === modo));
     localStorage.setItem(MODO_KEY, modo);
     pararVisualizer();
@@ -88,6 +92,10 @@
       ajustarCanvasNebulosa();
       inicializarParticulas();
       desenharNebulosa();
+    }
+    if (modo === 'jarvis') {
+      ajustarCanvasJarvis();
+      desenharJarvis();
     }
   }
 
@@ -111,6 +119,7 @@
     btnFalar.disabled = (novo === 'processing');
     btnFalarTexto.textContent = (novo === 'listening') ? 'Parar' : 'Falar';
     if (nebulosaHint) nebulosaHint.classList.toggle('hidden', novo !== 'idle');
+    if (jarvisHint)   jarvisHint.classList.toggle('hidden',   novo !== 'idle');
   }
 
   function mostrarTranscript(texto) {
@@ -329,6 +338,7 @@
 
   function iniciarVisualizerPorModo() {
     if (modoAtual === 'nebulosa') iniciarVisualizerNebulosa();
+    else if (modoAtual === 'jarvis') iniciarVisualizerJarvis();
     else iniciarVisualizer();
   }
 
@@ -351,6 +361,7 @@
     u.onend = () => { pararVisualizer(); setEstado('idle'); };
     u.onerror = () => { pararVisualizer(); setEstado('idle'); };
     if (modoAtual === 'nebulosa') iniciarVisualizerNebulosaFake();
+    else if (modoAtual === 'jarvis') iniciarVisualizerJarvisFake();
     else iniciarVisualizerFake();
     speechSynth.speak(u);
   }
@@ -441,6 +452,7 @@
     rafId = null;
     if (modoAtual === 'holograma') desenharHolograma();
     if (modoAtual === 'nebulosa')  desenharNebulosa();
+    if (modoAtual === 'jarvis')    desenharJarvis();
   }
 
   // ---------- Nebulosa ----------
@@ -617,6 +629,226 @@
     tick();
   }
 
+  // ---------- JARVIS HUD (fullscreen, visualizer polar + esfera + brackets) ----------
+
+  function ajustarCanvasJarvis() {
+    if (!canvasJarvis || !jarvisWrap) return;
+    const rect = jarvisWrap.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvasJarvis.width  = Math.max(1, Math.floor(rect.width  * dpr));
+    canvasJarvis.height = Math.max(1, Math.floor(rect.height * dpr));
+    const ctx = canvasJarvis.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function corJarvis() {
+    const cs = getComputedStyle(modalContent);
+    const cor1 = cs.getPropertyValue('--holo-stroke').trim()   || '#22d3ee';
+    const cor2 = cs.getPropertyValue('--holo-stroke-2').trim() || '#2563eb';
+    return { cor1, cor2 };
+  }
+
+  // JARVIS idle (sem áudio) — esfera central pulsante + barras radiais sutis
+  function desenharJarvis() {
+    if (!canvasJarvis || modoAtual !== 'jarvis') return;
+    const ctx = canvasJarvis.getContext('2d');
+    const rect = jarvisWrap.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const { cor1, cor2 } = corJarvis();
+    const [r1, g1, b1] = hexToRgb(cor1);
+    const [r2, g2, b2] = hexToRgb(cor2);
+    const cx = w / 2, cy = h / 2;
+    const t = Date.now() / 1000;
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Esfera central com glow pulsante
+    const breath = 0.85 + Math.sin(t * 1.6) * 0.15;
+    const coreR = 22 * breath;
+    const glowR = 90 * breath;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+    g.addColorStop(0,    `rgba(${r1}, ${g1}, ${b1}, 0.85)`);
+    g.addColorStop(0.25, `rgba(${r1}, ${g1}, ${b1}, 0.35)`);
+    g.addColorStop(1,    `rgba(${r2}, ${g2}, ${b2}, 0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Núcleo
+    ctx.fillStyle = `rgba(255, 255, 255, 0.92)`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, coreR * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Barras radiais idle (sutis, rotacionando devagar)
+    const bars = 64;
+    const innerR = 110;
+    const outerR = 140;
+    for (let i = 0; i < bars; i++) {
+      const ang = (i / bars) * Math.PI * 2 + t * 0.05;
+      const amp = 0.3 + 0.3 * Math.abs(Math.sin(i * 0.5 + t * 0.7));
+      const len = (outerR - innerR) * amp;
+      const x1 = cx + Math.cos(ang) * innerR;
+      const y1 = cy + Math.sin(ang) * innerR;
+      const x2 = cx + Math.cos(ang) * (innerR + len);
+      const y2 = cy + Math.sin(ang) * (innerR + len);
+      ctx.strokeStyle = `rgba(${r1}, ${g1}, ${b1}, ${0.25 + amp * 0.35})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function iniciarVisualizerJarvis() {
+    cancelAnimationFrame(rafId);
+    const data = new Uint8Array(analyser ? analyser.frequencyBinCount : 64);
+    const ctx = canvasJarvis.getContext('2d');
+
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
+      if (modoAtual !== 'jarvis') return;
+      const rect = jarvisWrap.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Amplitude média (0..1)
+      let amp = 0;
+      if (analyser) {
+        analyser.getByteFrequencyData(data);
+        let s = 0; for (let i = 0; i < data.length; i++) s += data[i];
+        amp = (s / data.length) / 255;
+      }
+      const ampSmooth = Math.pow(amp, 0.7);
+
+      const { cor1, cor2 } = corJarvis();
+      const [r1, g1, b1] = hexToRgb(cor1);
+      const [r2, g2, b2] = hexToRgb(cor2);
+      const cx = w / 2, cy = h / 2;
+      const t = Date.now() / 1000;
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Esfera central reagindo à amplitude
+      const breath = 1 + ampSmooth * 1.6;
+      const glowR = 130 * breath;
+      const g1grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      g1grad.addColorStop(0,    `rgba(255, 255, 255, ${0.85 + ampSmooth * 0.15})`);
+      g1grad.addColorStop(0.15, `rgba(${r1}, ${g1}, ${b1}, ${0.75 + ampSmooth * 0.25})`);
+      g1grad.addColorStop(0.5,  `rgba(${r1}, ${g1}, ${b1}, ${0.25 + ampSmooth * 0.20})`);
+      g1grad.addColorStop(1,    `rgba(${r2}, ${g2}, ${b2}, 0)`);
+      ctx.fillStyle = g1grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Núcleo branco
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.95})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 12 + ampSmooth * 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Visualizer polar (barras radiais reagindo às bandas de frequência)
+      const bars = data.length || 64;
+      const passo = Math.PI * 2 / bars;
+      const innerR = 110;
+      const maxLen = Math.min(w, h) * 0.32;
+
+      for (let i = 0; i < bars; i++) {
+        const v = analyser ? (data[i] / 255) : (0.3 + Math.random() * 0.2);
+        const len = Math.max(2, v * maxLen);
+        const ang = i * passo + t * 0.1;
+        const x1 = cx + Math.cos(ang) * innerR;
+        const y1 = cy + Math.sin(ang) * innerR;
+        const x2 = cx + Math.cos(ang) * (innerR + len);
+        const y2 = cy + Math.sin(ang) * (innerR + len);
+
+        const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+        grad.addColorStop(0, `rgba(${r1}, ${g1}, ${b1}, ${0.85})`);
+        grad.addColorStop(1, `rgba(${r2}, ${g2}, ${b2}, 0.1)`);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+    };
+    tick();
+  }
+
+  function iniciarVisualizerJarvisFake() {
+    cancelAnimationFrame(rafId);
+    let amp = 0;
+    const ctx = canvasJarvis.getContext('2d');
+
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
+      if (modoAtual !== 'jarvis') return;
+      amp = amp * 0.82 + Math.random() * 0.18;
+      const rect = jarvisWrap.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const { cor1, cor2 } = corJarvis();
+      const [r1, g1, b1] = hexToRgb(cor1);
+      const [r2, g2, b2] = hexToRgb(cor2);
+      const cx = w / 2, cy = h / 2;
+      const t = Date.now() / 1000;
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      const breath = 1 + amp * 1.2;
+      const glowR = 130 * breath;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      grad.addColorStop(0,    `rgba(255, 255, 255, ${0.75 + amp * 0.2})`);
+      grad.addColorStop(0.2,  `rgba(${r1}, ${g1}, ${b1}, ${0.6 + amp * 0.2})`);
+      grad.addColorStop(1,    `rgba(${r2}, ${g2}, ${b2}, 0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(255, 255, 255, 0.85)`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 10 + amp * 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      const bars = 64;
+      const passo = Math.PI * 2 / bars;
+      const innerR = 110;
+      const maxLen = Math.min(w, h) * 0.28;
+      for (let i = 0; i < bars; i++) {
+        const v = 0.2 + amp * 0.6 + Math.sin(i * 0.5 + t * 1.5) * 0.15;
+        const len = Math.max(2, v * maxLen);
+        const ang = i * passo + t * 0.1;
+        const x1 = cx + Math.cos(ang) * innerR;
+        const y1 = cy + Math.sin(ang) * innerR;
+        const x2 = cx + Math.cos(ang) * (innerR + len);
+        const y2 = cy + Math.sin(ang) * (innerR + len);
+        const lg = ctx.createLinearGradient(x1, y1, x2, y2);
+        lg.addColorStop(0, `rgba(${r1}, ${g1}, ${b1}, 0.7)`);
+        lg.addColorStop(1, `rgba(${r2}, ${g2}, ${b2}, 0.05)`);
+        ctx.strokeStyle = lg;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    };
+    tick();
+  }
+
   // ---------- Listeners ----------
 
   function toggleFalar() {
@@ -642,17 +874,28 @@
       toggleFalar();
     });
   }
+  if (jarvisWrap) {
+    jarvisWrap.addEventListener('click', (e) => {
+      if (modoAtual !== 'jarvis') return;
+      e.stopPropagation();
+      toggleFalar();
+    });
+  }
   window.addEventListener('resize', () => {
-    if (modoAtual === 'nebulosa' && modal.classList.contains('show')) {
+    if (!modal.classList.contains('show')) return;
+    if (modoAtual === 'nebulosa') {
       ajustarCanvasNebulosa();
       inicializarParticulas();
+    }
+    if (modoAtual === 'jarvis') {
+      ajustarCanvasJarvis();
     }
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('show')) fecharModal();
   });
   modal.addEventListener('click', (e) => {
-    if (modoAtual === 'nebulosa') return;
+    if (modoAtual === 'nebulosa' || modoAtual === 'jarvis') return;
     if (e.target === modal) fecharModal();
   });
   if (hasWebTTS) speechSynth.onvoiceschanged = () => {};
