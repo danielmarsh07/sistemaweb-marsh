@@ -2373,3 +2373,268 @@ function badgeTipoAtendimento(tipo) {
   const t = map[tipo] || { label: tipo, color: '#64748b' };
   return `<span style="background:${t.color}20; color:${t.color}; padding:2px 6px; border-radius:4px; font-size:0.78rem; font-weight:600">${t.label}</span>`;
 }
+
+// ============================================================================
+// ASSISTENTE DE VOZ — Web Speech API (STT/TTS) + /api/assistente/chat
+// ============================================================================
+(function initAssistenteVoz() {
+  const fab = document.getElementById('btn-assistente-voz');
+  const modal = document.getElementById('modal-assistente');
+  if (!fab || !modal) return;
+
+  const orb = document.getElementById('assistente-orb');
+  const statusEl = document.getElementById('assistente-status');
+  const transcriptEl = document.getElementById('assistente-transcript');
+  const respostaEl = document.getElementById('assistente-resposta');
+  const btnFalar = document.getElementById('btn-falar-assistente');
+  const btnFalarTexto = document.getElementById('btn-falar-texto');
+  const btnFechar = document.getElementById('btn-fechar-assistente');
+  const btnReset = document.getElementById('btn-reset-assistente');
+
+  // Histórico curto pra continuidade entre turnos
+  let historico = [];
+  let recognition = null;
+  let estado = 'idle'; // idle | listening | processing | speaking
+  let textoUltimo = '';
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const speechSynth = window.speechSynthesis;
+  const hasSTT = !!SpeechRecognition;
+  const hasTTS = !!speechSynth;
+
+  function setEstado(novo) {
+    estado = novo;
+    orb.classList.remove('listening', 'processing', 'speaking');
+    if (novo !== 'idle') orb.classList.add(novo);
+
+    const labels = {
+      idle:       'Toque no microfone e fale',
+      listening:  '🎙️ Ouvindo... fale agora',
+      processing: '⚙️ Processando...',
+      speaking:   '🔊 Respondendo...'
+    };
+    statusEl.textContent = labels[novo] || labels.idle;
+
+    btnFalar.disabled = (novo === 'processing');
+    btnFalarTexto.textContent = (novo === 'listening') ? 'Parar' : 'Falar';
+  }
+
+  function mostrarTranscript(texto) {
+    if (!texto) {
+      transcriptEl.classList.remove('show');
+      transcriptEl.textContent = '';
+      return;
+    }
+    transcriptEl.textContent = `"${texto}"`;
+    transcriptEl.classList.add('show');
+  }
+
+  function mostrarResposta(texto) {
+    if (!texto) {
+      respostaEl.classList.remove('show');
+      respostaEl.textContent = '';
+      return;
+    }
+    respostaEl.textContent = texto;
+    respostaEl.classList.add('show');
+  }
+
+  function abrirModal() {
+    if (!hasSTT) {
+      alert('Seu navegador não suporta reconhecimento de voz. Use Chrome ou Edge no celular/desktop.');
+      return;
+    }
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    setEstado('idle');
+  }
+
+  function fecharModal() {
+    pararEscuta();
+    if (hasTTS) speechSynth.cancel();
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    setEstado('idle');
+  }
+
+  function resetar() {
+    pararEscuta();
+    if (hasTTS) speechSynth.cancel();
+    historico = [];
+    textoUltimo = '';
+    mostrarTranscript('');
+    mostrarResposta('');
+    setEstado('idle');
+  }
+
+  function pararEscuta() {
+    if (recognition) {
+      try { recognition.stop(); } catch {}
+      recognition = null;
+    }
+  }
+
+  function iniciarEscuta() {
+    if (!hasSTT) return;
+    if (hasTTS) speechSynth.cancel();
+    mostrarTranscript('');
+    mostrarResposta('');
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    let textoFinal = '';
+
+    recognition.onstart = () => setEstado('listening');
+
+    recognition.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) textoFinal += t;
+        else interim += t;
+      }
+      mostrarTranscript(textoFinal + interim);
+    };
+
+    recognition.onerror = (e) => {
+      console.error('[assistente STT]', e.error);
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        statusEl.textContent = '❌ Permissão de microfone negada.';
+      } else if (e.error === 'no-speech') {
+        statusEl.textContent = 'Nada escutado. Tente novamente.';
+      } else {
+        statusEl.textContent = `Erro: ${e.error}`;
+      }
+      setEstado('idle');
+    };
+
+    recognition.onend = () => {
+      const texto = textoFinal.trim();
+      recognition = null;
+      if (!texto) {
+        if (estado === 'listening') setEstado('idle');
+        return;
+      }
+      mostrarTranscript(texto);
+      textoUltimo = texto;
+      enviarParaAssistente(texto);
+    };
+
+    try {
+      recognition.start();
+    } catch (err) {
+      console.error('[assistente STT] start falhou', err);
+      setEstado('idle');
+    }
+  }
+
+  async function enviarParaAssistente(texto) {
+    setEstado('processing');
+    try {
+      const res = await apiFetch(`${API_URL}/assistente/chat`, {
+        method: 'POST',
+        body: JSON.stringify({ texto, historico })
+      });
+      if (!res) return; // 401 já redirecionou
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.erro || 'Erro ao conversar com o assistente.';
+        mostrarResposta(msg);
+        falar(msg);
+        return;
+      }
+
+      const resposta = data.resposta || 'Pronto.';
+      mostrarResposta(resposta);
+
+      // Atualiza histórico curto pro próximo turno
+      if (Array.isArray(data.mensagens_para_proximo_turno)) {
+        historico = [...historico, ...data.mensagens_para_proximo_turno].slice(-6);
+      }
+
+      // Atualiza listas que foram afetadas
+      if (Array.isArray(data.ui_refresh)) {
+        data.ui_refresh.forEach(refreshPage);
+      }
+
+      falar(resposta);
+    } catch (err) {
+      console.error('[assistente chat]', err);
+      const msg = 'Falha ao conversar com o assistente. Verifique sua conexão.';
+      mostrarResposta(msg);
+      falar(msg);
+    }
+  }
+
+  function refreshPage(page) {
+    // Recarrega a página atual quando relevante
+    try {
+      if (page === 'dashboard' && typeof loadDashboard === 'function') loadDashboard();
+      if (page === 'transacoes' && typeof loadTransacoes === 'function' && currentPage === 'transacoes') loadTransacoes();
+      if (page === 'clientes' && typeof loadClientes === 'function' && currentPage === 'clientes') loadClientes();
+      if (page === 'fornecedores' && typeof loadFornecedores === 'function' && currentPage === 'fornecedores') loadFornecedores();
+      if (page === 'chamados' && typeof loadChamados === 'function' && currentPage === 'chamados') loadChamados();
+    } catch (e) {
+      console.warn('[assistente refresh]', page, e);
+    }
+  }
+
+  function escolherVozPtBr() {
+    if (!hasTTS) return null;
+    const vozes = speechSynth.getVoices();
+    return vozes.find(v => v.lang === 'pt-BR')
+        || vozes.find(v => v.lang && v.lang.startsWith('pt'))
+        || null;
+  }
+
+  function falar(texto) {
+    if (!hasTTS || !texto) {
+      setEstado('idle');
+      return;
+    }
+    setEstado('speaking');
+    speechSynth.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'pt-BR';
+    u.rate = 1.05;
+    u.pitch = 1.0;
+    const voz = escolherVozPtBr();
+    if (voz) u.voice = voz;
+    u.onend = () => setEstado('idle');
+    u.onerror = () => setEstado('idle');
+    speechSynth.speak(u);
+  }
+
+  // Carrega vozes (algumas plataformas só populam após o evento)
+  if (hasTTS) {
+    speechSynth.onvoiceschanged = () => { /* trigger reload */ };
+  }
+
+  // Listeners
+  fab.addEventListener('click', abrirModal);
+  btnFechar.addEventListener('click', fecharModal);
+  btnReset.addEventListener('click', resetar);
+  btnFalar.addEventListener('click', () => {
+    if (estado === 'listening') {
+      pararEscuta();
+      setEstado('idle');
+    } else if (estado === 'speaking') {
+      if (hasTTS) speechSynth.cancel();
+      iniciarEscuta();
+    } else {
+      iniciarEscuta();
+    }
+  });
+  // ESC fecha
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('show')) fecharModal();
+  });
+  // Clique no backdrop fecha
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) fecharModal();
+  });
+})();

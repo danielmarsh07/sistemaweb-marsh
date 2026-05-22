@@ -1,0 +1,702 @@
+// ============================================================================
+// Catálogo de tools do assistente de voz.
+//
+// Cada tool tem:
+//   - definition: schema JSON no formato OpenAI function tool
+//   - run(ctx, args): implementação. ctx = { empresa_id, usuario_id, tipo, nome }
+//                     vem SEMPRE do JWT — o LLM nunca passa empresa_id.
+//
+// Regras de segurança aplicadas em todas as tools:
+//   1. Queries parametrizadas (nunca interpolação)
+//   2. empresa_id e usuario_id vêm do ctx (JWT), nunca dos args
+//   3. Resultados truncados pra não estourar contexto/custo do LLM
+// ============================================================================
+
+const pool = require('../db');
+const { validarDocumento, validarCNPJ } = require('./validacao');
+
+const MAX_LIST_ROWS = 30;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function fmtData(d) {
+  if (!d) return null;
+  const dt = new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+// Normaliza tipo: "saida" → "saída", "entrada" → "entrada"
+function normalizarTipoTransacao(t) {
+  if (!t) return null;
+  const s = String(t).toLowerCase().trim();
+  if (s === 'entrada' || s === 'receita' || s === 'recebimento') return 'entrada';
+  if (s === 'saida' || s === 'saída' || s === 'despesa' || s === 'pagamento' || s === 'gasto') return 'saída';
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// TOOL: data_hoje — helper pro modelo entender datas relativas
+// ---------------------------------------------------------------------------
+
+const data_hoje = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'data_hoje',
+      description: 'Retorna a data atual do servidor (formato YYYY-MM-DD) e o nome do dia da semana. Use sempre que precisar resolver expressões como "hoje", "ontem", "esse mês", "no dia 5".',
+      parameters: { type: 'object', properties: {}, additionalProperties: false }
+    }
+  },
+  run: async () => {
+    const hoje = new Date();
+    const dias = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+    return {
+      data: fmtData(hoje),
+      dia_semana: dias[hoje.getDay()],
+      mes: hoje.getMonth() + 1,
+      ano: hoje.getFullYear()
+    };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// TOOLS: transações
+// ---------------------------------------------------------------------------
+
+const criar_transacao = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'criar_transacao',
+      description: 'Cria uma transação financeira (entrada ou saída). A categoria precisa estar cadastrada no sistema para o tipo informado — se não souber qual categoria existe, chame listar_categorias antes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tipo: { type: 'string', enum: ['entrada', 'saída'], description: 'Tipo da transação' },
+          valor: { type: 'number', description: 'Valor em reais (positivo, ex: 350.50)' },
+          categoria: { type: 'string', description: 'Nome exato da categoria já cadastrada (ex: "Alimentação", "Salário")' },
+          descricao: { type: 'string', description: 'Descrição livre (ex: "Padaria Central", "Pagamento freelancer João")' },
+          data: { type: 'string', description: 'Data no formato YYYY-MM-DD. Se omitido, usa hoje.' }
+        },
+        required: ['tipo', 'valor', 'categoria'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const tipo = normalizarTipoTransacao(args.tipo);
+    if (!tipo) return { erro: 'Tipo inválido. Use "entrada" ou "saída".' };
+    const valor = Number(args.valor);
+    if (!Number.isFinite(valor) || valor <= 0) return { erro: 'Valor deve ser um número positivo.' };
+
+    const cat = await pool.query(
+      `SELECT nome FROM categorias_transacao
+       WHERE empresa_id = $1 AND LOWER(nome) = LOWER($2) AND tipo = $3 AND ativo = TRUE`,
+      [ctx.empresa_id, args.categoria, tipo]
+    );
+    if (cat.rows.length === 0) {
+      const sugestoes = await pool.query(
+        `SELECT nome FROM categorias_transacao
+         WHERE empresa_id = $1 AND tipo = $2 AND ativo = TRUE ORDER BY nome`,
+        [ctx.empresa_id, tipo]
+      );
+      return {
+        erro: `Categoria "${args.categoria}" não está cadastrada para ${tipo}.`,
+        categorias_disponiveis: sugestoes.rows.map(r => r.nome)
+      };
+    }
+
+    const result = await pool.query(
+      `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id)
+       VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6, $7, $7) RETURNING *`,
+      [tipo, valor, cat.rows[0].nome, args.descricao || '', args.data || null, ctx.empresa_id, ctx.usuario_id]
+    );
+    const t = result.rows[0];
+    return {
+      sucesso: true,
+      id: t.id,
+      tipo: t.tipo,
+      valor: Number(t.valor),
+      categoria: t.categoria,
+      descricao: t.descricao,
+      data: fmtData(t.data),
+      _ui_refresh: ['transacoes', 'dashboard']
+    };
+  }
+};
+
+const listar_transacoes = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'listar_transacoes',
+      description: 'Lista transações financeiras com filtros opcionais. Útil para "minhas últimas saídas", "transações de maio", etc. Retorna no máximo 30 itens (mais recentes primeiro).',
+      parameters: {
+        type: 'object',
+        properties: {
+          tipo: { type: 'string', enum: ['entrada', 'saída'] },
+          categoria: { type: 'string', description: 'Filtra por categoria exata' },
+          data_de: { type: 'string', description: 'YYYY-MM-DD (inclusivo)' },
+          data_ate: { type: 'string', description: 'YYYY-MM-DD (inclusivo)' },
+          busca: { type: 'string', description: 'Termo livre buscado em descricao ou categoria' },
+          limit: { type: 'number', description: 'Máximo de resultados (padrão 10, máx 30)' }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const params = [ctx.empresa_id];
+    let where = 'WHERE empresa_id = $1';
+    let i = 2;
+    const tipo = normalizarTipoTransacao(args.tipo);
+    if (tipo) { where += ` AND tipo = $${i++}`; params.push(tipo); }
+    if (args.categoria) { where += ` AND LOWER(categoria) = LOWER($${i++})`; params.push(args.categoria); }
+    if (args.data_de) { where += ` AND data >= $${i++}::date`; params.push(args.data_de); }
+    if (args.data_ate) { where += ` AND data <= $${i++}::date`; params.push(args.data_ate); }
+    if (args.busca) { where += ` AND (descricao ILIKE $${i} OR categoria ILIKE $${i})`; params.push(`%${args.busca}%`); i++; }
+
+    const limit = Math.min(MAX_LIST_ROWS, Math.max(1, Number(args.limit) || 10));
+    params.push(limit);
+
+    const result = await pool.query(
+      `SELECT id, tipo, valor, categoria, descricao, data
+       FROM transacoes ${where}
+       ORDER BY data DESC, id DESC
+       LIMIT $${i}`,
+      params
+    );
+    return {
+      total: result.rows.length,
+      transacoes: result.rows.map(r => ({
+        id: r.id, tipo: r.tipo, valor: Number(r.valor),
+        categoria: r.categoria, descricao: r.descricao, data: fmtData(r.data)
+      }))
+    };
+  }
+};
+
+const consultar_saldo = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'consultar_saldo',
+      description: 'Calcula o saldo total (entradas - saídas) em um período. Se nenhuma data for passada, usa o histórico completo.',
+      parameters: {
+        type: 'object',
+        properties: {
+          data_de: { type: 'string', description: 'YYYY-MM-DD' },
+          data_ate: { type: 'string', description: 'YYYY-MM-DD' }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const params = [ctx.empresa_id];
+    let where = 'WHERE empresa_id = $1';
+    let i = 2;
+    if (args.data_de) { where += ` AND data >= $${i++}::date`; params.push(args.data_de); }
+    if (args.data_ate) { where += ` AND data <= $${i++}::date`; params.push(args.data_ate); }
+
+    const r = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN tipo='entrada' THEN valor ELSE 0 END), 0) AS entradas,
+         COALESCE(SUM(CASE WHEN tipo='saída'   THEN valor ELSE 0 END), 0) AS saidas,
+         COUNT(*) AS total
+       FROM transacoes ${where}`,
+      params
+    );
+    const row = r.rows[0];
+    const entradas = Number(row.entradas);
+    const saidas = Number(row.saidas);
+    return {
+      entradas, saidas, saldo: entradas - saidas, total_transacoes: Number(row.total),
+      periodo: { data_de: args.data_de || null, data_ate: args.data_ate || null }
+    };
+  }
+};
+
+const resumo_periodo = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'resumo_periodo',
+      description: 'Agrupa as transações por categoria em um período (top categorias de entrada e saída). Ideal para "onde gastei mais em maio?".',
+      parameters: {
+        type: 'object',
+        properties: {
+          data_de: { type: 'string', description: 'YYYY-MM-DD' },
+          data_ate: { type: 'string', description: 'YYYY-MM-DD' }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const params = [ctx.empresa_id];
+    let where = 'WHERE empresa_id = $1';
+    let i = 2;
+    if (args.data_de) { where += ` AND data >= $${i++}::date`; params.push(args.data_de); }
+    if (args.data_ate) { where += ` AND data <= $${i++}::date`; params.push(args.data_ate); }
+
+    const r = await pool.query(
+      `SELECT tipo, categoria, SUM(valor) AS total, COUNT(*) AS qtd
+       FROM transacoes ${where}
+       GROUP BY tipo, categoria
+       ORDER BY tipo, total DESC`,
+      params
+    );
+    return {
+      periodo: { data_de: args.data_de || null, data_ate: args.data_ate || null },
+      por_categoria: r.rows.map(x => ({
+        tipo: x.tipo, categoria: x.categoria,
+        total: Number(x.total), qtd: Number(x.qtd)
+      }))
+    };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// TOOLS: categorias
+// ---------------------------------------------------------------------------
+
+const listar_categorias = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'listar_categorias',
+      description: 'Lista as categorias de transação cadastradas. Use antes de criar uma transação se não tiver certeza do nome exato.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tipo: { type: 'string', enum: ['entrada', 'saída'] }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const params = [ctx.empresa_id];
+    let where = 'WHERE empresa_id = $1 AND ativo = TRUE';
+    const tipo = normalizarTipoTransacao(args.tipo);
+    if (tipo) { where += ` AND tipo = $2`; params.push(tipo); }
+    const r = await pool.query(
+      `SELECT nome, tipo FROM categorias_transacao ${where} ORDER BY tipo, nome`,
+      params
+    );
+    return { categorias: r.rows };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// TOOLS: clientes
+// ---------------------------------------------------------------------------
+
+const listar_clientes = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'listar_clientes',
+      description: 'Lista clientes da empresa (no máximo 30). Aceita filtro por nome.',
+      parameters: {
+        type: 'object',
+        properties: {
+          busca: { type: 'string', description: 'Termo buscado no nome/razão social' }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const params = [ctx.empresa_id];
+    let where = 'WHERE empresa_id = $1 AND ativo = TRUE';
+    if (args.busca) {
+      where += ` AND (razao_social ILIKE $2 OR nome ILIKE $2 OR nome_fantasia ILIKE $2)`;
+      params.push(`%${args.busca}%`);
+    }
+    const r = await pool.query(
+      `SELECT id, COALESCE(razao_social, nome) AS nome, nome_fantasia, cpf_cnpj, telefone, email, status
+       FROM clientes ${where}
+       ORDER BY COALESCE(razao_social, nome)
+       LIMIT ${MAX_LIST_ROWS}`,
+      params
+    );
+    return { total: r.rows.length, clientes: r.rows };
+  }
+};
+
+const buscar_cliente = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'buscar_cliente',
+      description: 'Busca um cliente específico por nome aproximado ou CPF/CNPJ. Retorna o melhor match com todos os dados.',
+      parameters: {
+        type: 'object',
+        properties: {
+          termo: { type: 'string', description: 'Nome, razão social ou documento' }
+        },
+        required: ['termo'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const r = await pool.query(
+      `SELECT id, COALESCE(razao_social, nome) AS nome, nome_fantasia, cpf_cnpj,
+              email, telefone, celular, cidade, uf, status, segmento, porte
+       FROM clientes
+       WHERE empresa_id = $1 AND ativo = TRUE
+         AND (razao_social ILIKE $2 OR nome ILIKE $2 OR nome_fantasia ILIKE $2 OR cpf_cnpj = $3)
+       ORDER BY COALESCE(razao_social, nome)
+       LIMIT 5`,
+      [ctx.empresa_id, `%${args.termo}%`, args.termo.replace(/\D/g, '')]
+    );
+    if (r.rows.length === 0) return { encontrados: 0, clientes: [] };
+    return { encontrados: r.rows.length, clientes: r.rows };
+  }
+};
+
+const criar_cliente = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'criar_cliente',
+      description: 'Cria um novo cliente. Apenas razao_social é obrigatório. CPF/CNPJ é validado se informado.',
+      parameters: {
+        type: 'object',
+        properties: {
+          razao_social: { type: 'string' },
+          nome_fantasia: { type: 'string' },
+          cpf_cnpj: { type: 'string' },
+          email: { type: 'string' },
+          telefone: { type: 'string' },
+          celular: { type: 'string' },
+          cidade: { type: 'string' },
+          uf: { type: 'string', description: 'Sigla do estado, 2 letras' }
+        },
+        required: ['razao_social'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    if (args.cpf_cnpj && !validarDocumento(args.cpf_cnpj)) {
+      return { erro: 'CPF/CNPJ inválido. Verifique os dígitos.' };
+    }
+    if (args.cpf_cnpj) {
+      const dup = await pool.query(
+        'SELECT id FROM clientes WHERE cpf_cnpj = $1 AND empresa_id = $2 AND ativo = TRUE',
+        [args.cpf_cnpj, ctx.empresa_id]
+      );
+      if (dup.rows.length > 0) return { erro: 'CPF/CNPJ já cadastrado para outro cliente.' };
+    }
+    const r = await pool.query(
+      `INSERT INTO clientes (empresa_id, nome, razao_social, nome_fantasia, cpf_cnpj,
+        email, telefone, celular, cidade, uf, status, criado_por_usuario_id, ativo)
+       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, 'ativo', $10, TRUE)
+       RETURNING id, razao_social, nome_fantasia`,
+      [ctx.empresa_id, args.razao_social, args.nome_fantasia || null, args.cpf_cnpj || null,
+       args.email || null, args.telefone || null, args.celular || null,
+       args.cidade || null, args.uf || null, ctx.usuario_id]
+    );
+    return { sucesso: true, cliente: r.rows[0], _ui_refresh: ['clientes'] };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// TOOLS: fornecedores
+// ---------------------------------------------------------------------------
+
+const listar_fornecedores = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'listar_fornecedores',
+      description: 'Lista fornecedores da empresa (máx 30). Filtro opcional por nome.',
+      parameters: {
+        type: 'object',
+        properties: { busca: { type: 'string' } },
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const params = [ctx.empresa_id];
+    let where = 'WHERE empresa_id = $1 AND ativo = TRUE';
+    if (args.busca) {
+      where += ` AND (razao_social ILIKE $2 OR nome ILIKE $2 OR nome_fantasia ILIKE $2)`;
+      params.push(`%${args.busca}%`);
+    }
+    const r = await pool.query(
+      `SELECT id, COALESCE(razao_social, nome) AS nome, nome_fantasia, cnpj, ramo, telefone, email, status
+       FROM fornecedores ${where}
+       ORDER BY COALESCE(razao_social, nome)
+       LIMIT ${MAX_LIST_ROWS}`,
+      params
+    );
+    return { total: r.rows.length, fornecedores: r.rows };
+  }
+};
+
+const buscar_fornecedor = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'buscar_fornecedor',
+      description: 'Busca um fornecedor por nome aproximado ou CNPJ.',
+      parameters: {
+        type: 'object',
+        properties: { termo: { type: 'string' } },
+        required: ['termo'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const r = await pool.query(
+      `SELECT id, COALESCE(razao_social, nome) AS nome, nome_fantasia, cnpj,
+              ramo, email, telefone, celular, cidade, uf, status
+       FROM fornecedores
+       WHERE empresa_id = $1 AND ativo = TRUE
+         AND (razao_social ILIKE $2 OR nome ILIKE $2 OR nome_fantasia ILIKE $2 OR cnpj = $3)
+       ORDER BY COALESCE(razao_social, nome)
+       LIMIT 5`,
+      [ctx.empresa_id, `%${args.termo}%`, args.termo.replace(/\D/g, '')]
+    );
+    return { encontrados: r.rows.length, fornecedores: r.rows };
+  }
+};
+
+const criar_fornecedor = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'criar_fornecedor',
+      description: 'Cria um novo fornecedor. Apenas razao_social é obrigatório. CNPJ é validado se informado.',
+      parameters: {
+        type: 'object',
+        properties: {
+          razao_social: { type: 'string' },
+          nome_fantasia: { type: 'string' },
+          cnpj: { type: 'string' },
+          email: { type: 'string' },
+          telefone: { type: 'string' },
+          ramo: { type: 'string' },
+          cidade: { type: 'string' },
+          uf: { type: 'string' }
+        },
+        required: ['razao_social'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    if (args.cnpj && !validarCNPJ(args.cnpj)) return { erro: 'CNPJ inválido.' };
+    if (args.cnpj) {
+      const dup = await pool.query(
+        'SELECT id FROM fornecedores WHERE cnpj = $1 AND empresa_id = $2 AND ativo = TRUE',
+        [args.cnpj, ctx.empresa_id]
+      );
+      if (dup.rows.length > 0) return { erro: 'CNPJ já cadastrado.' };
+    }
+    const r = await pool.query(
+      `INSERT INTO fornecedores (empresa_id, nome, razao_social, nome_fantasia, cnpj,
+        email, telefone, ramo, cidade, uf, status, criado_por_usuario_id, ativo)
+       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, 'ativo', $10, TRUE)
+       RETURNING id, razao_social, nome_fantasia`,
+      [ctx.empresa_id, args.razao_social, args.nome_fantasia || null, args.cnpj || null,
+       args.email || null, args.telefone || null, args.ramo || null,
+       args.cidade || null, args.uf || null, ctx.usuario_id]
+    );
+    return { sucesso: true, fornecedor: r.rows[0], _ui_refresh: ['fornecedores'] };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// TOOLS: chamados
+// ---------------------------------------------------------------------------
+
+const listar_chamados = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'listar_chamados',
+      description: 'Lista chamados da empresa (máx 30, mais recentes primeiro). Filtros por status, prioridade, cliente, busca textual.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['aberto', 'em_andamento', 'aguardando_cliente', 'resolvido', 'fechado'] },
+          prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'critica'] },
+          cliente_id: { type: 'number' },
+          busca: { type: 'string', description: 'Termo livre buscado em título/descrição' }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    const params = [ctx.empresa_id];
+    let where = 'WHERE ch.empresa_id = $1 AND ch.ativo = TRUE';
+    let i = 2;
+    if (args.status) { where += ` AND ch.status = $${i++}`; params.push(args.status); }
+    if (args.prioridade) { where += ` AND ch.prioridade = $${i++}`; params.push(args.prioridade); }
+    if (args.cliente_id) { where += ` AND ch.cliente_id = $${i++}`; params.push(args.cliente_id); }
+    if (args.busca) {
+      where += ` AND (ch.titulo ILIKE $${i} OR ch.descricao ILIKE $${i})`;
+      params.push(`%${args.busca}%`); i++;
+    }
+    const r = await pool.query(
+      `SELECT ch.id, ch.titulo, ch.status, ch.prioridade, ch.data_criacao,
+              COALESCE(c.razao_social, c.nome) AS cliente_nome
+       FROM chamados ch
+       LEFT JOIN clientes c ON c.id = ch.cliente_id
+       ${where}
+       ORDER BY ch.data_criacao DESC
+       LIMIT ${MAX_LIST_ROWS}`,
+      params
+    );
+    return { total: r.rows.length, chamados: r.rows };
+  }
+};
+
+const criar_chamado = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'criar_chamado',
+      description: 'Abre um novo chamado. Precisa do id do cliente (use buscar_cliente antes se necessário). Título obrigatório.',
+      parameters: {
+        type: 'object',
+        properties: {
+          cliente_id: { type: 'number' },
+          titulo: { type: 'string' },
+          descricao: { type: 'string' },
+          prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'critica'] }
+        },
+        required: ['cliente_id', 'titulo'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    if (ctx.tipo === 'cliente') return { erro: 'Apenas administradores e técnicos podem usar essa funcionalidade por voz.' };
+    const cliExiste = await pool.query(
+      'SELECT id FROM clientes WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
+      [args.cliente_id, ctx.empresa_id]
+    );
+    if (cliExiste.rows.length === 0) return { erro: 'Cliente não encontrado.' };
+    const r = await pool.query(
+      `INSERT INTO chamados (empresa_id, cliente_id, aberto_por_usuario_id,
+        titulo, descricao, prioridade, status, ativo)
+       VALUES ($1, $2, $3, $4, $5, $6, 'aberto', TRUE)
+       RETURNING id, titulo, status, prioridade`,
+      [ctx.empresa_id, args.cliente_id, ctx.usuario_id,
+       args.titulo, args.descricao || null, args.prioridade || 'media']
+    );
+    const chamado = r.rows[0];
+    await pool.query(
+      `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+       VALUES ($1, $2, $3, NULL, 'aberto', 'Chamado aberto via assistente de voz')`,
+      [chamado.id, ctx.empresa_id, ctx.usuario_id]
+    );
+    return { sucesso: true, chamado, _ui_refresh: ['chamados', 'dashboard'] };
+  }
+};
+
+const criar_atendimento = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'criar_atendimento',
+      description: 'Registra um atendimento (comentário, solução ou escalonamento) em um chamado existente. tipo="solucao" muda o chamado para resolvido.',
+      parameters: {
+        type: 'object',
+        properties: {
+          chamado_id: { type: 'number' },
+          descricao: { type: 'string' },
+          tipo: { type: 'string', enum: ['comentario', 'solucao', 'escalonamento'] },
+          tempo_gasto_minutos: { type: 'number' }
+        },
+        required: ['chamado_id', 'descricao'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    if (ctx.tipo === 'cliente') args.tipo = 'comentario';
+    const ch = await pool.query(
+      'SELECT id, status FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
+      [args.chamado_id, ctx.empresa_id]
+    );
+    if (ch.rows.length === 0) return { erro: 'Chamado não encontrado.' };
+
+    const tipo = args.tipo || 'comentario';
+    const r = await pool.query(
+      `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, tempo_gasto_minutos, data_atendimento)
+       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id`,
+      [args.chamado_id, ctx.usuario_id, tipo, args.descricao, args.tempo_gasto_minutos || 0]
+    );
+
+    const statusAtual = ch.rows[0].status;
+    if (tipo === 'solucao' && statusAtual !== 'resolvido') {
+      await pool.query(
+        `UPDATE chamados SET status = 'resolvido', data_fechamento = NOW() WHERE id = $1`,
+        [args.chamado_id]
+      );
+    } else if (tipo !== 'solucao' && statusAtual === 'aberto') {
+      await pool.query(
+        `UPDATE chamados SET status = 'em_andamento' WHERE id = $1`,
+        [args.chamado_id]
+      );
+    }
+    return {
+      sucesso: true, atendimento_id: r.rows[0].id, chamado_id: args.chamado_id, tipo,
+      _ui_refresh: ['chamados']
+    };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Catálogo + dispatcher
+// ---------------------------------------------------------------------------
+
+const TOOLS = {
+  data_hoje,
+  criar_transacao,
+  listar_transacoes,
+  consultar_saldo,
+  resumo_periodo,
+  listar_categorias,
+  listar_clientes,
+  buscar_cliente,
+  criar_cliente,
+  listar_fornecedores,
+  buscar_fornecedor,
+  criar_fornecedor,
+  listar_chamados,
+  criar_chamado,
+  criar_atendimento
+};
+
+function getToolDefinitions() {
+  return Object.values(TOOLS).map(t => t.definition);
+}
+
+async function runTool(name, ctx, args) {
+  const tool = TOOLS[name];
+  if (!tool) return { erro: `Tool desconhecida: ${name}` };
+  try {
+    return await tool.run(ctx, args || {});
+  } catch (e) {
+    return { erro: `Falha ao executar ${name}: ${e.message}` };
+  }
+}
+
+module.exports = { getToolDefinitions, runTool, TOOLS };

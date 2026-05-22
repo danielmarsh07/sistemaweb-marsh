@@ -29,6 +29,7 @@ const chamadosRoutes = require('./routes/chamados');
 const atendimentosRoutes = require('./routes/atendimentos');
 const usuariosRoutes = require('./routes/usuarios');
 const anexosRoutes = require('./routes/anexos');
+const assistenteRoutes = require('./routes/assistente');
 const autenticar = require('./middleware/autenticar');
 
 // Rotas públicas
@@ -45,6 +46,7 @@ app.use('/api/chamados', autenticar, chamadosRoutes);
 app.use('/api/chamados', autenticar, anexosRoutes); // anexos sob /api/chamados/:id/anexos
 app.use('/api/atendimentos', autenticar, atendimentosRoutes);
 app.use('/api/usuarios', autenticar, usuariosRoutes);
+app.use('/api/assistente', autenticar, assistenteRoutes);
 
 // Rota de teste
 app.get('/api/ping', (req, res) => {

@@ -1266,6 +1266,58 @@
     </div>
   </div>
 
+  <!-- ASSISTENTE DE VOZ - Botão flutuante -->
+  <button id="btn-assistente-voz" class="assistente-fab" type="button" aria-label="Assistente de voz">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="8" y1="23" x2="16" y2="23"></line>
+    </svg>
+  </button>
+
+  <!-- ASSISTENTE DE VOZ - Modal -->
+  <div id="modal-assistente" class="assistente-modal" aria-hidden="true">
+    <div class="assistente-modal-content">
+      <div class="assistente-header">
+        <h3>Assistente Marsh</h3>
+        <button type="button" class="assistente-close" id="btn-fechar-assistente" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="assistente-body">
+        <div class="assistente-orb" id="assistente-orb">
+          <div class="orb-pulse"></div>
+          <div class="orb-pulse delay-1"></div>
+          <div class="orb-pulse delay-2"></div>
+          <div class="orb-mic">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </div>
+        </div>
+
+        <p class="assistente-status" id="assistente-status">Toque no microfone e fale</p>
+
+        <div class="assistente-transcript" id="assistente-transcript"></div>
+        <div class="assistente-resposta" id="assistente-resposta"></div>
+      </div>
+
+      <div class="assistente-footer">
+        <button type="button" class="btn btn-secondary" id="btn-reset-assistente">Limpar</button>
+        <button type="button" class="btn btn-primary" id="btn-falar-assistente">
+          <span id="btn-falar-texto">Falar</span>
+        </button>
+      </div>
+
+      <p class="assistente-hint">
+        Exemplos: <i>"saída de 350 reais na padaria, categoria alimentação"</i> · <i>"qual meu saldo desse mês?"</i> · <i>"liste meus chamados abertos"</i>
+      </p>
+    </div>
+  </div>
+
   <!-- BOTTOM NAV (mobile) -->
   <nav class="bottom-nav">
     <button class="bottom-nav-item active" data-page="dashboard">
