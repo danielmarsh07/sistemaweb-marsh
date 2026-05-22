@@ -55,7 +55,7 @@
   const MODO_KEY = 'assistente_modo_visual';
   const MODOS_VALIDOS = ['holograma', 'texto', 'nebulosa', 'jarvis'];
   let modoSalvo = localStorage.getItem(MODO_KEY);
-  let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'holograma';
+  let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'jarvis';
 
   let particulas = [];
 

@@ -724,14 +724,19 @@ const listar_chamados = {
     type: 'function',
     function: {
       name: 'listar_chamados',
-      description: 'Lista chamados da empresa (máx 30, mais recentes primeiro). Filtros por status, prioridade, cliente, busca textual.',
+      description: 'Lista chamados com filtros (status, prioridade, cliente, tecnologia, data). Retorna até 30 chamados (mais recentes primeiro) E o TOTAL real de chamados que casam com o filtro (mesmo se passar de 30). Use sempre que o usuário perguntar sobre quantidade, listagem, status, ou chamados de uma tecnologia/data específica. Quando o usuário citar uma tecnologia pelo nome ("telemedicina", "holter"), passe o nome em tecnologia_nome.',
       parameters: {
         type: 'object',
         properties: {
           status: { type: 'string', enum: ['aberto', 'em_andamento', 'aguardando_cliente', 'resolvido', 'fechado'] },
           prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'critica'] },
           cliente_id: { type: 'number' },
-          busca: { type: 'string', description: 'Termo livre buscado em título/descrição' }
+          tecnologia_id: { type: 'number' },
+          tecnologia_nome: { type: 'string', description: 'Nome aproximado da tecnologia (busca ILIKE em tecnologias.nome e tecnologias.categoria). Use quando o usuário falar "telemedicina", "holter", etc.' },
+          data: { type: 'string', description: 'YYYY-MM-DD — chamados criados nesse dia exato' },
+          data_de: { type: 'string', description: 'YYYY-MM-DD inclusivo (criados a partir desta data)' },
+          data_ate: { type: 'string', description: 'YYYY-MM-DD inclusivo (criados até esta data)' },
+          busca: { type: 'string', description: 'Termo livre em título/descrição' }
         },
         additionalProperties: false
       }
@@ -754,21 +759,74 @@ const listar_chamados = {
 
     if (args.status) { where += ` AND ch.status = $${i++}`; params.push(args.status); }
     if (args.prioridade) { where += ` AND ch.prioridade = $${i++}`; params.push(args.prioridade); }
+    if (args.tecnologia_id) { where += ` AND ch.tecnologia_id = $${i++}`; params.push(args.tecnologia_id); }
+    if (args.tecnologia_nome) {
+      where += ` AND EXISTS (
+        SELECT 1 FROM tecnologias t
+        WHERE t.id = ch.tecnologia_id AND (t.nome ILIKE $${i} OR t.categoria ILIKE $${i})
+      )`;
+      params.push(`%${args.tecnologia_nome}%`);
+      i++;
+    }
+    if (args.data) {
+      where += ` AND ch.data_criacao::date = $${i++}::date`;
+      params.push(args.data);
+    } else {
+      if (args.data_de)  { where += ` AND ch.data_criacao::date >= $${i++}::date`; params.push(args.data_de); }
+      if (args.data_ate) { where += ` AND ch.data_criacao::date <= $${i++}::date`; params.push(args.data_ate); }
+    }
     if (args.busca) {
       where += ` AND (ch.titulo ILIKE $${i} OR ch.descricao ILIKE $${i})`;
       params.push(`%${args.busca}%`); i++;
     }
+
+    // Total real (sem LIMIT) pra IA poder responder "tenho 47 chamados abertos" mesmo que só mostre 30
+    const totalRes = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM chamados ch ${where}`,
+      params
+    );
+    const totalReal = totalRes.rows[0].total;
+
     const r = await pool.query(
       `SELECT ch.id, ch.titulo, ch.status, ch.prioridade, ch.data_criacao,
-              COALESCE(c.razao_social, c.nome) AS cliente_nome
+              ch.tecnologia_id,
+              COALESCE(c.razao_social, c.nome) AS cliente_nome,
+              t.nome AS tecnologia_nome,
+              t.categoria AS tecnologia_categoria
        FROM chamados ch
        LEFT JOIN clientes c ON c.id = ch.cliente_id
+       LEFT JOIN tecnologias t ON t.id = ch.tecnologia_id
        ${where}
        ORDER BY ch.data_criacao DESC
        LIMIT ${MAX_LIST_ROWS}`,
       params
     );
-    return { total: r.rows.length, chamados: r.rows };
+
+    return {
+      total_real: totalReal,
+      mostrados: r.rows.length,
+      filtros_aplicados: {
+        status: args.status || null,
+        prioridade: args.prioridade || null,
+        tecnologia_nome: args.tecnologia_nome || null,
+        tecnologia_id: args.tecnologia_id || null,
+        data: args.data || null,
+        data_de: args.data_de || null,
+        data_ate: args.data_ate || null,
+        cliente_id: args.cliente_id || (ctx.tipo === 'cliente' ? ctx.cliente_id : null),
+        busca: args.busca || null
+      },
+      chamados: r.rows.map(c => ({
+        id: c.id,
+        titulo: c.titulo,
+        status: c.status,
+        prioridade: c.prioridade,
+        data_criacao: c.data_criacao,
+        cliente: c.cliente_nome,
+        tecnologia: c.tecnologia_nome,
+        categoria: c.tecnologia_categoria
+      }))
+    };
   }
 };
 
