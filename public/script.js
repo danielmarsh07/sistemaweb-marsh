@@ -2386,6 +2386,9 @@ function badgeTipoAtendimento(tipo) {
   const body = modal.querySelector('.assistente-body');
   const orb = document.getElementById('assistente-orb');
   const canvas = document.getElementById('assistente-canvas');
+  const canvasNebulosa = document.getElementById('assistente-nebulosa-canvas');
+  const nebulosaWrap = document.getElementById('assistente-nebulosa');
+  const nebulosaHint = document.getElementById('nebulosa-hint');
   const statusEl = document.getElementById('assistente-status');
   const transcriptEl = document.getElementById('assistente-transcript');
   const respostaEl = document.getElementById('assistente-resposta');
@@ -2393,13 +2396,17 @@ function badgeTipoAtendimento(tipo) {
   const btnFalarTexto = document.getElementById('btn-falar-texto');
   const btnFechar = document.getElementById('btn-fechar-assistente');
   const btnReset = document.getElementById('btn-reset-assistente');
-  const btnModo = document.getElementById('btn-modo-assistente');
-  const iconHolo = document.getElementById('icon-modo-holograma');
-  const iconTexto = document.getElementById('icon-modo-texto');
+  const modeButtons = modal.querySelectorAll('.mode-btn');
 
   // Persistência da preferência de modo visual
   const MODO_KEY = 'assistente_modo_visual';
-  let modoAtual = localStorage.getItem(MODO_KEY) || 'holograma'; // 'holograma' | 'texto'
+  const MODOS_VALIDOS = ['holograma', 'texto', 'nebulosa'];
+  let modoSalvo = localStorage.getItem(MODO_KEY);
+  let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'holograma';
+
+  // Sistema de partículas da nebulosa
+  let particulas = [];
+  let nebulosaResizeObserver = null;
 
   // Histórico curto pra continuidade entre turnos
   let historico = [];
@@ -2423,12 +2430,28 @@ function badgeTipoAtendimento(tipo) {
   // ---------- Modo visual ----------
 
   function aplicarModo(modo) {
+    if (!MODOS_VALIDOS.includes(modo)) modo = 'holograma';
     modoAtual = modo;
     body.setAttribute('data-modo', modo);
-    iconHolo.style.display  = modo === 'holograma' ? 'block' : 'none';
-    iconTexto.style.display = modo === 'holograma' ? 'none'  : 'block';
+
+    // Modal vira fullscreen no modo nebulosa
+    modal.classList.toggle('modo-nebulosa-on', modo === 'nebulosa');
+
+    // Atualiza visual dos botões pill
+    modeButtons.forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.modo === modo);
+    });
+
     localStorage.setItem(MODO_KEY, modo);
+
+    // Inicializa visualizer adequado pro modo
+    pararVisualizer();
     if (modo === 'holograma') desenharHolograma();
+    if (modo === 'nebulosa') {
+      ajustarCanvasNebulosa();
+      inicializarParticulas();
+      desenharNebulosa();
+    }
   }
 
   // ---------- Tom ----------
@@ -2456,6 +2479,9 @@ function badgeTipoAtendimento(tipo) {
 
     btnFalar.disabled = (novo === 'processing');
     btnFalarTexto.textContent = (novo === 'listening') ? 'Parar' : 'Falar';
+
+    // No modo nebulosa, o hint "toque para falar" some quando não está idle
+    if (nebulosaHint) nebulosaHint.classList.toggle('hidden', novo !== 'idle');
   }
 
   function mostrarTranscript(texto) {
@@ -2676,12 +2702,12 @@ function badgeTipoAtendimento(tipo) {
 
         audioSourceNode = audioCtx.createMediaElementSource(audioEl);
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 128;
+        analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.75;
         audioSourceNode.connect(analyser);
         analyser.connect(audioCtx.destination);
 
-        iniciarVisualizer();
+        iniciarVisualizerPorModo();
 
         audioEl.onended = () => {
           URL.revokeObjectURL(url);
@@ -2711,6 +2737,11 @@ function badgeTipoAtendimento(tipo) {
     });
   }
 
+  function iniciarVisualizerPorModo() {
+    if (modoAtual === 'nebulosa') iniciarVisualizerNebulosa();
+    else iniciarVisualizer();
+  }
+
   function pararAudio() {
     if (audioEl) {
       try { audioEl.pause(); } catch {}
@@ -2735,7 +2766,8 @@ function badgeTipoAtendimento(tipo) {
     if (vozPt) u.voice = vozPt;
     u.onend = () => { pararVisualizer(); setEstado('idle'); };
     u.onerror = () => { pararVisualizer(); setEstado('idle'); };
-    iniciarVisualizerFake(); // sem analyser real, anima ondulação suave
+    if (modoAtual === 'nebulosa') iniciarVisualizerNebulosaFake();
+    else iniciarVisualizerFake();
     speechSynth.speak(u);
   }
 
@@ -2853,18 +2885,212 @@ function badgeTipoAtendimento(tipo) {
   function pararVisualizer() {
     cancelAnimationFrame(rafId);
     rafId = null;
-    desenharHolograma();
+    if (modoAtual === 'holograma') desenharHolograma();
+    if (modoAtual === 'nebulosa')  desenharNebulosa();
+  }
+
+  // ---------- Nebulosa (fullscreen, partículas reativas) ----------
+
+  function ajustarCanvasNebulosa() {
+    if (!canvasNebulosa) return;
+    const rect = nebulosaWrap.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvasNebulosa.width  = Math.max(1, Math.floor(rect.width  * dpr));
+    canvasNebulosa.height = Math.max(1, Math.floor(rect.height * dpr));
+    const ctx = canvasNebulosa.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function inicializarParticulas() {
+    const rect = nebulosaWrap.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    const n = Math.min(50, Math.max(24, Math.floor((w * h) / 18000)));
+    particulas = [];
+    for (let i = 0; i < n; i++) {
+      particulas.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        raioBase: 60 + Math.random() * 180,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: (Math.random() - 0.5) * 0.25,
+        fase: Math.random() * Math.PI * 2,
+        intensidadeBase: 0.22 + Math.random() * 0.35,
+        hueShift: (Math.random() - 0.5) * 0.4
+      });
+    }
+  }
+
+  function corNebulosa() {
+    const cs = getComputedStyle(modalContent);
+    const cor1 = cs.getPropertyValue('--holo-stroke').trim()   || '#22d3ee';
+    const cor2 = cs.getPropertyValue('--holo-stroke-2').trim() || '#2563eb';
+    return { cor1, cor2 };
+  }
+
+  // Quebra "#rrggbb" em [r,g,b]
+  function hexToRgb(hex) {
+    hex = (hex || '').replace('#', '').trim();
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    if (hex.length !== 6) return [34, 211, 238];
+    return [
+      parseInt(hex.slice(0, 2), 16),
+      parseInt(hex.slice(2, 4), 16),
+      parseInt(hex.slice(4, 6), 16)
+    ];
+  }
+
+  // Nebulosa parada (sem áudio)
+  function desenharNebulosa() {
+    if (!canvasNebulosa || modoAtual !== 'nebulosa') return;
+    if (!particulas.length) inicializarParticulas();
+    const ctx = canvasNebulosa.getContext('2d');
+    const rect = nebulosaWrap.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+
+    ctx.clearRect(0, 0, w, h);
+    const { cor1, cor2 } = corNebulosa();
+    const [r1, g1, b1] = hexToRgb(cor1);
+    const [r2, g2, b2] = hexToRgb(cor2);
+    const t = Date.now() / 4000;
+
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of particulas) {
+      const r = p.raioBase * (0.9 + Math.sin(t + p.fase) * 0.08) * p.intensidadeBase;
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      const mix = (Math.sin(t * 0.7 + p.fase) + 1) / 2; // 0..1
+      const rc = Math.round(r1 * mix + r2 * (1 - mix));
+      const gc = Math.round(g1 * mix + g2 * (1 - mix));
+      const bc = Math.round(b1 * mix + b2 * (1 - mix));
+      grad.addColorStop(0, `rgba(${rc}, ${gc}, ${bc}, ${0.22 * p.intensidadeBase})`);
+      grad.addColorStop(1, `rgba(${rc}, ${gc}, ${bc}, 0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function iniciarVisualizerNebulosa() {
+    cancelAnimationFrame(rafId);
+    if (!particulas.length) inicializarParticulas();
+    const data = new Uint8Array(analyser ? analyser.frequencyBinCount : 64);
+    const ctx = canvasNebulosa.getContext('2d');
+
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
+      if (modoAtual !== 'nebulosa') return;
+      const rect = nebulosaWrap.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Amplitude média (0..1)
+      let amp = 0;
+      if (analyser) {
+        analyser.getByteFrequencyData(data);
+        let s = 0; for (let i = 0; i < data.length; i++) s += data[i];
+        amp = (s / data.length) / 255;
+      }
+      const ampSmooth = Math.pow(amp, 0.7);
+
+      const { cor1, cor2 } = corNebulosa();
+      const [r1, g1, b1] = hexToRgb(cor1);
+      const [r2, g2, b2] = hexToRgb(cor2);
+      const t = Date.now() / 1600;
+
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of particulas) {
+        // Atualiza posição (drift suave)
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < -200) p.x = w + 200; if (p.x > w + 200) p.x = -200;
+        if (p.y < -200) p.y = h + 200; if (p.y > h + 200) p.y = -200;
+        p.fase += 0.005;
+
+        // Raio reage à amplitude
+        const pulse = 1 + ampSmooth * 1.4;
+        const r = p.raioBase * (0.85 + Math.sin(t + p.fase) * 0.1) * p.intensidadeBase * pulse;
+        const alpha = (0.18 + ampSmooth * 0.45) * p.intensidadeBase;
+
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        const mix = (Math.sin(t * 0.7 + p.fase) + 1) / 2;
+        const rc = Math.round(r1 * mix + r2 * (1 - mix));
+        const gc = Math.round(g1 * mix + g2 * (1 - mix));
+        const bc = Math.round(b1 * mix + b2 * (1 - mix));
+        grad.addColorStop(0, `rgba(${rc}, ${gc}, ${bc}, ${alpha})`);
+        grad.addColorStop(0.6, `rgba(${rc}, ${gc}, ${bc}, ${alpha * 0.25})`);
+        grad.addColorStop(1, `rgba(${rc}, ${gc}, ${bc}, 0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Núcleo central — orb pulsante reagindo à amplitude
+      const cx = w / 2, cy = h / 2;
+      const coreR = 30 + ampSmooth * 90;
+      const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2);
+      coreGrad.addColorStop(0,   `rgba(${r1}, ${g1}, ${b1}, ${0.5 + ampSmooth * 0.4})`);
+      coreGrad.addColorStop(0.4, `rgba(${r2}, ${g2}, ${b2}, ${0.25 + ampSmooth * 0.2})`);
+      coreGrad.addColorStop(1,   `rgba(${r2}, ${g2}, ${b2}, 0)`);
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreR * 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalCompositeOperation = 'source-over';
+    };
+    tick();
+  }
+
+  function iniciarVisualizerNebulosaFake() {
+    cancelAnimationFrame(rafId);
+    if (!particulas.length) inicializarParticulas();
+    let amp = 0;
+    const ctx = canvasNebulosa.getContext('2d');
+
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
+      if (modoAtual !== 'nebulosa') return;
+      amp = amp * 0.85 + Math.random() * 0.15;
+      const rect = nebulosaWrap.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const { cor1, cor2 } = corNebulosa();
+      const [r1, g1, b1] = hexToRgb(cor1);
+      const [r2, g2, b2] = hexToRgb(cor2);
+      const t = Date.now() / 1600;
+
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of particulas) {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < -200) p.x = w + 200; if (p.x > w + 200) p.x = -200;
+        if (p.y < -200) p.y = h + 200; if (p.y > h + 200) p.y = -200;
+        p.fase += 0.005;
+
+        const pulse = 1 + amp * 1.2;
+        const r = p.raioBase * (0.85 + Math.sin(t + p.fase) * 0.1) * p.intensidadeBase * pulse;
+        const alpha = (0.18 + amp * 0.35) * p.intensidadeBase;
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        const mix = (Math.sin(t * 0.7 + p.fase) + 1) / 2;
+        const rc = Math.round(r1 * mix + r2 * (1 - mix));
+        const gc = Math.round(g1 * mix + g2 * (1 - mix));
+        const bc = Math.round(b1 * mix + b2 * (1 - mix));
+        grad.addColorStop(0, `rgba(${rc}, ${gc}, ${bc}, ${alpha})`);
+        grad.addColorStop(1, `rgba(${rc}, ${gc}, ${bc}, 0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    };
+    tick();
   }
 
   // ---------- Listeners ----------
 
-  fab.addEventListener('click', abrirModal);
-  btnFechar.addEventListener('click', fecharModal);
-  btnReset.addEventListener('click', resetar);
-  btnModo.addEventListener('click', () => {
-    aplicarModo(modoAtual === 'holograma' ? 'texto' : 'holograma');
-  });
-  btnFalar.addEventListener('click', () => {
+  function toggleFalar() {
     if (estado === 'listening') {
       pararEscuta();
       setEstado('idle');
@@ -2875,11 +3101,49 @@ function badgeTipoAtendimento(tipo) {
     } else {
       iniciarEscuta();
     }
+    atualizarHintNebulosa();
+  }
+
+  function atualizarHintNebulosa() {
+    if (!nebulosaHint) return;
+    nebulosaHint.classList.toggle('hidden', estado !== 'idle');
+  }
+
+  fab.addEventListener('click', abrirModal);
+  btnFechar.addEventListener('click', fecharModal);
+  btnReset.addEventListener('click', resetar);
+
+  // Botões pill — 3 modos
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      aplicarModo(btn.dataset.modo);
+    });
   });
+
+  btnFalar.addEventListener('click', toggleFalar);
+
+  // No modo nebulosa, tap em qualquer ponto da tela inicia/para fala
+  nebulosaWrap.addEventListener('click', (e) => {
+    if (modoAtual !== 'nebulosa') return;
+    e.stopPropagation();
+    toggleFalar();
+  });
+
+  // Redimensiona canvas nebulosa quando janela muda
+  window.addEventListener('resize', () => {
+    if (modoAtual === 'nebulosa' && modal.classList.contains('show')) {
+      ajustarCanvasNebulosa();
+      inicializarParticulas();
+    }
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('show')) fecharModal();
   });
   modal.addEventListener('click', (e) => {
+    // No modo nebulosa o backdrop é o próprio modal (tela cheia) — não fecha por clique fora
+    if (modoAtual === 'nebulosa') return;
     if (e.target === modal) fecharModal();
   });
 
