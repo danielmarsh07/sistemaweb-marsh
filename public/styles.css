@@ -2688,4 +2688,60 @@ tbody td strong {
   .modal-content { animation: none !important; }
 }
 
+/* === Tecnologias liberadas no form-cliente — grid de checkboxes === */
+.tec-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  background: var(--bg-glass, rgba(30,41,59,0.55));
+  border: 1px solid var(--border, rgba(255,255,255,0.10));
+  border-radius: 10px;
+}
+.tec-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--bg-card-solid, #1e293b);
+  border: 1px solid var(--border, rgba(255,255,255,0.10));
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tec-checkbox-item:hover {
+  border-color: var(--border-hover, rgba(96,165,250,0.40));
+  background: var(--bg-hover, rgba(96,165,250,0.08));
+}
+.tec-checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary, #2563eb);
+  cursor: pointer;
+  margin: 0;
+}
+.tec-checkbox-item.is-active {
+  border-color: var(--primary, #2563eb);
+  background: rgba(37, 99, 235, 0.10);
+}
+.tec-checkbox-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.88rem;
+  color: var(--text-main, #f8fafc);
+}
+.tec-checkbox-label small {
+  font-size: 0.72rem;
+  color: var(--text-muted, #94a3b8);
+}
+.tec-empty-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted, #94a3b8);
+  padding: 0.5rem;
+}
+
 /* Estilos do assistente de voz foram movidos para public/assistente-voz.css */

@@ -80,10 +80,11 @@ function setupEventListeners() {
   });
 
   // Botões de novo
-  document.getElementById('btn-novo-cliente').addEventListener('click', () => {
+  document.getElementById('btn-novo-cliente').addEventListener('click', async () => {
     clienteEmEdicao = null;
     resetForm('#form-cliente');
     document.getElementById('modal-cliente-titulo').textContent = 'Novo Cliente';
+    await renderTecnologiasClienteCheckboxes([]);
     showModal('#modal-cliente');
   });
 
@@ -540,6 +541,24 @@ async function salvarCliente() {
       return;
     }
 
+    const payload = await res.json();
+    const clienteId = clienteEmEdicao || payload?.cliente?.id;
+
+    // Sincroniza tecnologias vinculadas
+    if (clienteId) {
+      const idsDesejados = _lerTecnologiasSelecionadasForm();
+      let idsAtuais = [];
+      if (clienteEmEdicao) {
+        // Cliente em edição: busca novamente as vinculadas pra fazer o diff
+        const rGet = await apiFetch(`${API_URL}/clientes/${clienteId}`);
+        if (rGet && rGet.ok) {
+          const cAtual = await rGet.json();
+          idsAtuais = (cAtual.tecnologias || []).map(t => t.id);
+        }
+      }
+      await _sincronizarTecnologiasDoCliente(clienteId, idsDesejados, idsAtuais);
+    }
+
     alert(clienteEmEdicao ? 'Cliente atualizado!' : 'Cliente criado!');
     closeModal(document.getElementById('modal-cliente'));
     loadClientes();
@@ -572,8 +591,86 @@ async function editarCliente(id) {
   if (form.data_inicio_contrato) form.data_inicio_contrato.value = c.data_inicio_contrato ? c.data_inicio_contrato.split('T')[0] : '';
   if (form.data_fim_contrato) form.data_fim_contrato.value = c.data_fim_contrato ? c.data_fim_contrato.split('T')[0] : '';
 
+  // Popula checkboxes com tecnologias vinculadas (do GET /clientes/:id que já retorna a lista)
+  const idsAtuais = (c.tecnologias || []).map(t => t.id);
+  await renderTecnologiasClienteCheckboxes(idsAtuais);
+
   document.getElementById('modal-cliente-titulo').textContent = 'Editar Cliente';
   showModal('#modal-cliente');
+}
+
+// Cache da lista de tecnologias da empresa (evita refetch a cada abertura do modal)
+let _tecnologiasEmpresaCache = null;
+async function _carregarTecnologiasDaEmpresa() {
+  if (_tecnologiasEmpresaCache) return _tecnologiasEmpresaCache;
+  const res = await apiFetch(`${API_URL}/tecnologias`);
+  if (!res) return [];
+  _tecnologiasEmpresaCache = await res.json();
+  return _tecnologiasEmpresaCache;
+}
+
+// Renderiza checkboxes de tecnologias no form-cliente, marcando as do array idsMarcados
+async function renderTecnologiasClienteCheckboxes(idsMarcados = []) {
+  const grid = document.getElementById('cliente-tecnologias-checkboxes');
+  if (!grid) return;
+  grid.innerHTML = '<span class="tec-empty-hint">Carregando tecnologias...</span>';
+
+  const tecnologias = await _carregarTecnologiasDaEmpresa();
+  if (!tecnologias || tecnologias.length === 0) {
+    grid.innerHTML = '<span class="tec-empty-hint">Nenhuma tecnologia cadastrada. Cadastre em <strong>Tecnologias</strong> primeiro.</span>';
+    return;
+  }
+
+  const marcadas = new Set(idsMarcados);
+  grid.innerHTML = tecnologias.map(t => {
+    const checked = marcadas.has(t.id) ? 'checked' : '';
+    const active  = marcadas.has(t.id) ? 'is-active' : '';
+    return `
+      <label class="tec-checkbox-item ${active}" data-tec-id="${t.id}">
+        <input type="checkbox" value="${t.id}" ${checked}>
+        <span class="tec-checkbox-label">
+          <strong>${escapeHtml(t.nome)}</strong>
+          ${t.categoria ? `<small>${escapeHtml(t.categoria)}</small>` : ''}
+        </span>
+      </label>
+    `;
+  }).join('');
+
+  // Toggle visual ao marcar/desmarcar
+  grid.querySelectorAll('.tec-checkbox-item input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      e.target.closest('.tec-checkbox-item').classList.toggle('is-active', e.target.checked);
+    });
+  });
+}
+
+// Lê os ids marcados no form-cliente
+function _lerTecnologiasSelecionadasForm() {
+  return Array.from(document.querySelectorAll('#cliente-tecnologias-checkboxes input[type="checkbox"]:checked'))
+    .map(cb => parseInt(cb.value, 10))
+    .filter(Number.isFinite);
+}
+
+// Sincroniza os vínculos cliente_tecnologias: adiciona o que falta, remove o que sobra.
+// Erros individuais não bloqueiam o save geral — só logamos.
+async function _sincronizarTecnologiasDoCliente(clienteId, idsDesejados, idsAtuais) {
+  const atuais   = new Set(idsAtuais);
+  const desejados = new Set(idsDesejados);
+
+  const adicionar = [...desejados].filter(id => !atuais.has(id));
+  const remover   = [...atuais].filter(id => !desejados.has(id));
+
+  await Promise.allSettled([
+    ...adicionar.map(tec_id =>
+      apiFetch(`${API_URL}/clientes/${clienteId}/tecnologias`, {
+        method: 'POST',
+        body: JSON.stringify({ tecnologia_id: tec_id })
+      })
+    ),
+    ...remover.map(tec_id =>
+      apiFetch(`${API_URL}/clientes/${clienteId}/tecnologias/${tec_id}`, { method: 'DELETE' })
+    )
+  ]);
 }
 
 async function deletarCliente(id) {
@@ -807,6 +904,7 @@ async function salvarTecnologia() {
 
     alert(tecnologiaEmEdicao ? 'Tecnologia atualizada!' : 'Tecnologia criada!');
     closeModal(document.getElementById('modal-tecnologia'));
+    _tecnologiasEmpresaCache = null; // invalida cache pro form-cliente reler
     loadTecnologias();
     loadDashboard();
   } catch (err) {

@@ -588,6 +588,30 @@ const criar_fornecedor = {
 // TOOLS: chamados
 // ---------------------------------------------------------------------------
 
+const listar_tecnologias_do_cliente = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'listar_tecnologias_do_cliente',
+      description: 'Retorna as tecnologias (produtos) que o cliente da conta atual tem habilitadas para abrir chamados. Use ANTES de criar um chamado quando o usuário do portal não disser explicitamente qual tecnologia é, ou quando precisar confirmar se ele tem mais de uma. Cada tecnologia retornada tem id, nome e categoria.',
+      parameters: { type: 'object', properties: {}, additionalProperties: false }
+    }
+  },
+  run: async (ctx) => {
+    if (ctx.tipo !== 'cliente') return { erro: 'Esta tool é apenas para usuários do portal do cliente.' };
+    if (!ctx.cliente_id) return { erro: 'Sua conta não está vinculada a um cliente.' };
+    const r = await pool.query(
+      `SELECT t.id, t.nome, t.categoria
+       FROM cliente_tecnologias ct
+       JOIN tecnologias t ON t.id = ct.tecnologia_id
+       WHERE ct.cliente_id = $1 AND ct.status = 'ativo' AND t.ativo = TRUE
+       ORDER BY t.nome`,
+      [ctx.cliente_id]
+    );
+    return { total: r.rows.length, tecnologias: r.rows };
+  }
+};
+
 const listar_chamados = {
   definition: {
     type: 'function',
@@ -646,13 +670,14 @@ const criar_chamado = {
     type: 'function',
     function: {
       name: 'criar_chamado',
-      description: 'Abre um novo chamado. Para o tipo "cliente" o sistema vincula automaticamente ao cliente da conta — não passe cliente_id. Para admin/técnico, cliente_id é obrigatório (use buscar_cliente antes).',
+      description: 'Abre um novo chamado. Para o tipo "cliente" o sistema vincula automaticamente ao cliente da conta (não passe cliente_id). Para admin/técnico, cliente_id é obrigatório (use buscar_cliente antes). Se a tecnologia for relevante para o chamado, passe tecnologia_id (no caso do cliente, ela precisa estar nas tecnologias liberadas para a conta dele).',
       parameters: {
         type: 'object',
         properties: {
           cliente_id: { type: 'number', description: 'Obrigatório para admin/técnico; ignorado para cliente (vem do JWT).' },
+          tecnologia_id: { type: 'number', description: 'ID da tecnologia/produto do chamado. Para clientes do portal, OBRIGATÓRIO e deve vir de listar_tecnologias_do_cliente.' },
           titulo: { type: 'string' },
-          descricao: { type: 'string', description: 'Para chamados de telemedicina, use o formato estruturado com Paciente / Unidade / Exame-Produto / Problema.' },
+          descricao: { type: 'string', description: 'Telemedicina: use bloco estruturado (Paciente/Unidade/Exame/Problema). Outras tecnologias: descreva o que está acontecendo de forma clara.' },
           prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'critica'] }
         },
         required: ['titulo'],
@@ -677,12 +702,40 @@ const criar_chamado = {
     );
     if (cliExiste.rows.length === 0) return { erro: 'Cliente não encontrado.' };
 
+    // Valida tecnologia_id (se informada)
+    let tecnologia_id = args.tecnologia_id || null;
+    if (tecnologia_id) {
+      const tecCheck = await pool.query(
+        `SELECT t.id, t.nome FROM tecnologias t
+         WHERE t.id = $1 AND t.empresa_id = $2 AND t.ativo = TRUE`,
+        [tecnologia_id, ctx.empresa_id]
+      );
+      if (tecCheck.rows.length === 0) return { erro: 'Tecnologia não encontrada nesta empresa.' };
+
+      // Cliente: tecnologia precisa estar vinculada à conta dele
+      if (ctx.tipo === 'cliente') {
+        const link = await pool.query(
+          `SELECT 1 FROM cliente_tecnologias
+           WHERE cliente_id = $1 AND tecnologia_id = $2 AND status = 'ativo'`,
+          [cliente_id, tecnologia_id]
+        );
+        if (link.rows.length === 0) {
+          return { erro: `Sua conta não está habilitada para abrir chamados da tecnologia "${tecCheck.rows[0].nome}". Solicite a liberação ao administrador.` };
+        }
+      }
+    }
+
+    // Cliente DEVE informar tecnologia (regra de negócio do portal)
+    if (ctx.tipo === 'cliente' && !tecnologia_id) {
+      return { erro: 'tecnologia_id é obrigatória para abrir chamados pelo portal. Use listar_tecnologias_do_cliente antes.' };
+    }
+
     const r = await pool.query(
-      `INSERT INTO chamados (empresa_id, cliente_id, aberto_por_usuario_id,
+      `INSERT INTO chamados (empresa_id, cliente_id, tecnologia_id, aberto_por_usuario_id,
         titulo, descricao, prioridade, status, ativo)
-       VALUES ($1, $2, $3, $4, $5, $6, 'aberto', TRUE)
-       RETURNING id, titulo, status, prioridade`,
-      [ctx.empresa_id, cliente_id, ctx.usuario_id,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'aberto', TRUE)
+       RETURNING id, titulo, status, prioridade, tecnologia_id`,
+      [ctx.empresa_id, cliente_id, tecnologia_id, ctx.usuario_id,
        args.titulo, args.descricao || null, args.prioridade || 'media']
     );
     const chamado = r.rows[0];
@@ -772,6 +825,7 @@ const TOOLS = {
   listar_fornecedores,
   buscar_fornecedor,
   criar_fornecedor,
+  listar_tecnologias_do_cliente,
   listar_chamados,
   criar_chamado,
   criar_atendimento
@@ -781,6 +835,7 @@ const TOOLS = {
 // Tudo mais é admin/técnico-only.
 const TOOLS_PERMITIDAS_CLIENTE = new Set([
   'data_hoje',
+  'listar_tecnologias_do_cliente',
   'criar_chamado',
   'listar_chamados',
   'criar_atendimento'
