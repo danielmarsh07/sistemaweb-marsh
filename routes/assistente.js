@@ -8,8 +8,8 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const OpenAI = require('openai');
-const { getToolDefinitions, runTool } = require('../services/assistente-tools');
-const elevenLabs = require('../services/assistente-tts');
+const { getToolDefinitionsParaContexto, runTool } = require('../services/assistente-tools');
+const tts = require('../services/assistente-tts');
 
 const router = express.Router();
 
@@ -43,15 +43,13 @@ const chatLimiter = rateLimit({
   message: { erro: 'Muitas solicitações ao assistente. Aguarde um minuto.' }
 });
 
-function systemPrompt(ctx) {
-  const hoje = new Date();
-  const dataIso = hoje.toISOString().slice(0, 10);
+function systemPromptAdmin(ctx, dataIso) {
   return `Você é o assistente de voz do Sistema Marsh, um ERP empresarial multi-empresa.
 Você ajuda o usuário a registrar transações financeiras, abrir chamados, cadastrar clientes/fornecedores e consultar dados do sistema, tudo por voz.
 
 Contexto do usuário atual:
 - Nome: ${ctx.nome || 'usuário'}
-- Tipo: ${ctx.tipo || 'usuario'}
+- Tipo: ${ctx.tipo || 'admin'}
 - Data de hoje: ${dataIso}
 
 Regras importantes:
@@ -87,6 +85,59 @@ Regras anti-acidente:
 - Nunca crie mais de uma categoria por turno sem confirmação individual.`;
 }
 
+function systemPromptCliente(ctx, dataIso) {
+  return `Você é a assistente de voz do Portal Marsh — uma plataforma de Telemedicina.
+Sua única função é ajudar o cliente a abrir e acompanhar chamados de suporte por voz.
+
+Contexto do usuário atual:
+- Nome: ${ctx.nome || 'cliente'}
+- Data de hoje: ${dataIso}
+
+REGRAS GERAIS:
+1. Responda sempre em português do Brasil, em tom cordial e profissional.
+2. Seja conciso. Confirme o que foi feito sem listar campos técnicos nem IDs.
+3. Nunca exponha estrutura interna do banco, nomes de tabelas ou SQL.
+4. Se faltar informação obrigatória, pergunte ao usuário — nunca invente dados (especialmente nome do paciente ou número de exame).
+5. Você NÃO tem acesso a dados financeiros, cadastros de clientes/fornecedores nem nada fora do escopo de chamados. Se o usuário pedir algo fora desse escopo, explique gentilmente que aquele recurso não está disponível pelo assistente.
+
+FLUXO PARA ABRIR UM CHAMADO (TELEMEDICINA) — OBRIGATÓRIO COLETAR TUDO ANTES DE CRIAR:
+Antes de chamar criar_chamado, você DEVE ter coletado do cliente:
+  (a) NOME COMPLETO DO PACIENTE (ex: "João da Silva")
+  (b) UNIDADE / CLÍNICA responsável pelo paciente (ex: "Unidade Vila Mariana", "Clínica São José")
+  (c) TIPO DE EXAME ou produto envolvido (ex: "Eletrocardiograma", "Holter 24h", "MAPA", "Espirometria")
+  (d) DESCRIÇÃO DO PROBLEMA (o que está acontecendo)
+
+Se o cliente não mencionar algum desses 4 itens, PERGUNTE antes de criar o chamado, um item por vez. Confirme o nome do paciente repetindo ("é José da Silva, está correto?") sempre que tiver dúvida na transcrição.
+
+Quando chamar criar_chamado, monte os campos assim:
+  - titulo: "<TIPO_EXAME> — <NOME_PACIENTE>"   (ex: "ECG — João Silva")
+  - descricao: bloco estruturado, exatamente neste formato:
+        Paciente: <nome completo>
+        Unidade: <unidade/clínica>
+        Exame/Produto: <tipo>
+
+        Problema:
+        <descrição livre do problema>
+  - prioridade: pergunte se o cliente não disser — ofereça baixa/média/alta/crítica. Se ele não souber, use "media".
+  - cliente_id: NÃO PASSE este campo (o sistema preenche automaticamente com base na sua conta).
+
+CONFIRMAÇÃO FINAL antes de criar:
+Antes de efetivamente chamar criar_chamado, faça um resumo curto e pergunte: "Vou abrir o chamado <título>, prioridade <X>, para o paciente <nome>. Confirma a abertura?" — só execute após resposta afirmativa.
+
+OUTRAS AÇÕES PERMITIDAS:
+- Listar seus chamados em aberto (listar_chamados).
+- Adicionar comentário/observação em um chamado existente (criar_atendimento, tipo "comentario"). Pra isso, ou o cliente cita o número do chamado, ou você lista os abertos primeiro e pergunta em qual ele quer comentar.
+
+DATAS RELATIVAS: use a data de hoje acima ou chame data_hoje quando necessário.`;
+}
+
+function systemPrompt(ctx) {
+  const dataIso = new Date().toISOString().slice(0, 10);
+  return ctx.tipo === 'cliente'
+    ? systemPromptCliente(ctx, dataIso)
+    : systemPromptAdmin(ctx, dataIso);
+}
+
 router.post('/chat', chatLimiter, async (req, res) => {
   if (!openai) {
     return res.status(503).json({
@@ -106,7 +157,8 @@ router.post('/chat', chatLimiter, async (req, res) => {
     empresa_id: req.usuario.empresa_id || 1,
     usuario_id: req.usuario.id,
     tipo: req.usuario.tipo,
-    nome: req.usuario.nome
+    nome: req.usuario.nome,
+    cliente_id: req.usuario.cliente_id || null
   };
 
   // Reconstrói o histórico curto (últimas 6 mensagens) se enviado pelo cliente,
@@ -121,7 +173,7 @@ router.post('/chat', chatLimiter, async (req, res) => {
     { role: 'user', content: texto }
   ];
 
-  const tools = getToolDefinitions();
+  const tools = getToolDefinitionsParaContexto(ctx);
   const acoes = [];
   const uiRefresh = new Set();
 
@@ -145,7 +197,7 @@ router.post('/chat', chatLimiter, async (req, res) => {
         return res.json({
           resposta,
           tom: detectarTom(resposta, acoes),
-          tts_disponivel: elevenLabs.isConfigured(),
+          tts_disponivel: tts.isConfigured(),
           acoes,
           ui_refresh: Array.from(uiRefresh),
           mensagens_para_proximo_turno: [
@@ -199,7 +251,7 @@ const ttsLimiter = rateLimit({
 });
 
 router.post('/tts', ttsLimiter, async (req, res) => {
-  if (!elevenLabs.isConfigured()) {
+  if (!tts.isConfigured()) {
     return res.status(503).json({
       erro: 'TTS não configurado. ELEVENLABS_API_KEY ausente no servidor.'
     });
@@ -212,7 +264,7 @@ router.post('/tts', ttsLimiter, async (req, res) => {
     return res.status(400).json({ erro: 'Texto muito longo para TTS (máx 1500 caracteres).' });
   }
   try {
-    const audioBuffer = await elevenLabs.sintetizar(texto);
+    const audioBuffer = await tts.sintetizar(texto);
     res.set('Content-Type', 'audio/mpeg');
     res.set('Cache-Control', 'no-store');
     res.send(audioBuffer);

@@ -610,9 +610,19 @@ const listar_chamados = {
     const params = [ctx.empresa_id];
     let where = 'WHERE ch.empresa_id = $1 AND ch.ativo = TRUE';
     let i = 2;
+
+    // Cliente: força filtro pelo cliente_id do JWT (não vê chamados de outros)
+    if (ctx.tipo === 'cliente') {
+      if (!ctx.cliente_id) return { erro: 'Sua conta não está vinculada a um cliente.' };
+      where += ` AND ch.cliente_id = $${i++}`;
+      params.push(ctx.cliente_id);
+    } else if (args.cliente_id) {
+      where += ` AND ch.cliente_id = $${i++}`;
+      params.push(args.cliente_id);
+    }
+
     if (args.status) { where += ` AND ch.status = $${i++}`; params.push(args.status); }
     if (args.prioridade) { where += ` AND ch.prioridade = $${i++}`; params.push(args.prioridade); }
-    if (args.cliente_id) { where += ` AND ch.cliente_id = $${i++}`; params.push(args.cliente_id); }
     if (args.busca) {
       where += ` AND (ch.titulo ILIKE $${i} OR ch.descricao ILIKE $${i})`;
       params.push(`%${args.busca}%`); i++;
@@ -636,33 +646,43 @@ const criar_chamado = {
     type: 'function',
     function: {
       name: 'criar_chamado',
-      description: 'Abre um novo chamado. Precisa do id do cliente (use buscar_cliente antes se necessário). Título obrigatório.',
+      description: 'Abre um novo chamado. Para o tipo "cliente" o sistema vincula automaticamente ao cliente da conta — não passe cliente_id. Para admin/técnico, cliente_id é obrigatório (use buscar_cliente antes).',
       parameters: {
         type: 'object',
         properties: {
-          cliente_id: { type: 'number' },
+          cliente_id: { type: 'number', description: 'Obrigatório para admin/técnico; ignorado para cliente (vem do JWT).' },
           titulo: { type: 'string' },
-          descricao: { type: 'string' },
+          descricao: { type: 'string', description: 'Para chamados de telemedicina, use o formato estruturado com Paciente / Unidade / Exame-Produto / Problema.' },
           prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'critica'] }
         },
-        required: ['cliente_id', 'titulo'],
+        required: ['titulo'],
         additionalProperties: false
       }
     }
   },
   run: async (ctx, args) => {
-    if (ctx.tipo === 'cliente') return { erro: 'Apenas administradores e técnicos podem usar essa funcionalidade por voz.' };
+    // Cliente: cliente_id sempre vem do JWT, ignora args
+    let cliente_id;
+    if (ctx.tipo === 'cliente') {
+      if (!ctx.cliente_id) return { erro: 'Sua conta não está vinculada a um cliente. Contate o administrador.' };
+      cliente_id = ctx.cliente_id;
+    } else {
+      cliente_id = args.cliente_id;
+      if (!cliente_id) return { erro: 'cliente_id é obrigatório para admins/técnicos. Use buscar_cliente antes.' };
+    }
+
     const cliExiste = await pool.query(
       'SELECT id FROM clientes WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
-      [args.cliente_id, ctx.empresa_id]
+      [cliente_id, ctx.empresa_id]
     );
     if (cliExiste.rows.length === 0) return { erro: 'Cliente não encontrado.' };
+
     const r = await pool.query(
       `INSERT INTO chamados (empresa_id, cliente_id, aberto_por_usuario_id,
         titulo, descricao, prioridade, status, ativo)
        VALUES ($1, $2, $3, $4, $5, $6, 'aberto', TRUE)
        RETURNING id, titulo, status, prioridade`,
-      [ctx.empresa_id, args.cliente_id, ctx.usuario_id,
+      [ctx.empresa_id, cliente_id, ctx.usuario_id,
        args.titulo, args.descricao || null, args.prioridade || 'media']
     );
     const chamado = r.rows[0];
@@ -696,10 +716,16 @@ const criar_atendimento = {
   },
   run: async (ctx, args) => {
     if (ctx.tipo === 'cliente') args.tipo = 'comentario';
-    const ch = await pool.query(
-      'SELECT id, status FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE',
-      [args.chamado_id, ctx.empresa_id]
-    );
+
+    // Cliente só pode comentar nos próprios chamados
+    let q = 'SELECT id, status FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE';
+    const params = [args.chamado_id, ctx.empresa_id];
+    if (ctx.tipo === 'cliente') {
+      if (!ctx.cliente_id) return { erro: 'Sua conta não está vinculada a um cliente.' };
+      q += ' AND cliente_id = $3';
+      params.push(ctx.cliente_id);
+    }
+    const ch = await pool.query(q, params);
     if (ch.rows.length === 0) return { erro: 'Chamado não encontrado.' };
 
     const tipo = args.tipo || 'comentario';
@@ -751,13 +777,35 @@ const TOOLS = {
   criar_atendimento
 };
 
+// Tools que clientes (usuários do portal) podem acessar via voz.
+// Tudo mais é admin/técnico-only.
+const TOOLS_PERMITIDAS_CLIENTE = new Set([
+  'data_hoje',
+  'criar_chamado',
+  'listar_chamados',
+  'criar_atendimento'
+]);
+
 function getToolDefinitions() {
   return Object.values(TOOLS).map(t => t.definition);
+}
+
+function getToolDefinitionsParaContexto(ctx) {
+  if (ctx && ctx.tipo === 'cliente') {
+    return Object.entries(TOOLS)
+      .filter(([name]) => TOOLS_PERMITIDAS_CLIENTE.has(name))
+      .map(([, t]) => t.definition);
+  }
+  return getToolDefinitions();
 }
 
 async function runTool(name, ctx, args) {
   const tool = TOOLS[name];
   if (!tool) return { erro: `Tool desconhecida: ${name}` };
+  // Defense-in-depth: cliente só executa tools da whitelist
+  if (ctx && ctx.tipo === 'cliente' && !TOOLS_PERMITIDAS_CLIENTE.has(name)) {
+    return { erro: `Operação "${name}" não está disponível pelo portal do cliente.` };
+  }
   try {
     return await tool.run(ctx, args || {});
   } catch (e) {
@@ -765,4 +813,4 @@ async function runTool(name, ctx, args) {
   }
 }
 
-module.exports = { getToolDefinitions, runTool, TOOLS };
+module.exports = { getToolDefinitions, getToolDefinitionsParaContexto, runTool, TOOLS };

@@ -1,0 +1,463 @@
+/* =====================================================================
+   ASSISTENTE DE VOZ — estilos compartilhados (dashboard + portal)
+   ===================================================================== */
+
+.assistente-fab {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #2563eb 0%, #22d3ee 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.45), 0 0 0 1px rgba(255,255,255,0.08) inset;
+  z-index: 998;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.assistente-fab:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.6), 0 0 0 1px rgba(255,255,255,0.12) inset;
+}
+.assistente-fab:active { transform: translateY(0) scale(0.98); }
+
+@media (max-width: 768px) {
+  .assistente-fab {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    right: 1rem;
+    width: 52px;
+    height: 52px;
+  }
+}
+
+.assistente-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+}
+.assistente-modal.show { display: flex; }
+
+.assistente-modal-content {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card-solid, #1e293b);
+  border: 1px solid var(--border, rgba(255,255,255,0.10));
+  border-radius: 20px;
+  box-shadow: var(--shadow-elevated, 0 12px 40px rgba(0,0,0,0.55));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.assistente-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.10));
+}
+.assistente-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-main, #f8fafc);
+  font-weight: 600;
+}
+.assistente-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.4rem;
+  border-radius: 6px;
+}
+.assistente-close:hover {
+  background: var(--bg-hover, rgba(96,165,250,0.08));
+  color: var(--text-main, #f8fafc);
+}
+
+.assistente-body {
+  padding: 1.5rem 1.25rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 240px;
+}
+
+/* Orb com pulsos */
+.assistente-orb {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.orb-mic {
+  position: relative;
+  z-index: 2;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb 0%, #22d3ee 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.45);
+}
+.orb-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.35);
+  opacity: 0;
+}
+.assistente-orb.listening .orb-pulse {
+  animation: orb-pulse 1.6s ease-out infinite;
+}
+.assistente-orb.listening .orb-pulse.delay-1 { animation-delay: 0.5s; }
+.assistente-orb.listening .orb-pulse.delay-2 { animation-delay: 1.0s; }
+.assistente-orb.processing .orb-mic {
+  animation: orb-spin 1.2s linear infinite;
+}
+.assistente-orb.speaking .orb-mic {
+  animation: orb-bounce 0.9s ease-in-out infinite;
+}
+@keyframes orb-pulse {
+  0%   { transform: scale(1);   opacity: 0.5; }
+  100% { transform: scale(1.8); opacity: 0;   }
+}
+@keyframes orb-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes orb-bounce {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+.assistente-status {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary, #cbd5e1);
+  text-align: center;
+}
+
+.assistente-transcript {
+  width: 100%;
+  min-height: 32px;
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  background: var(--bg-glass, rgba(30,41,59,0.55));
+  border: 1px solid var(--border, rgba(255,255,255,0.10));
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.9rem;
+  font-style: italic;
+  display: none;
+}
+.assistente-transcript.show { display: block; }
+
+.assistente-resposta {
+  width: 100%;
+  padding: 0.75rem 0.95rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(37,99,235,0.10), rgba(34,211,238,0.08));
+  border: 1px solid rgba(96,165,250,0.25);
+  color: var(--text-main, #f8fafc);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  display: none;
+}
+.assistente-resposta.show { display: block; }
+
+.assistente-footer {
+  padding: 0.85rem 1.25rem 1rem;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border, rgba(255,255,255,0.10));
+  margin-top: 0.5rem;
+}
+
+/* Botões do footer — self-contained pra funcionar em ambos dashboard e portal */
+.assistente-footer .btn {
+  min-width: 100px;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.assistente-footer .btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #22d3ee 100%);
+  color: #fff;
+  border-color: transparent;
+}
+.assistente-footer .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.4); }
+.assistente-footer .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+.assistente-footer .btn-secondary {
+  background: var(--bg-glass, rgba(30,41,59,0.55));
+  color: var(--text-secondary, #cbd5e1);
+  border-color: var(--border, rgba(255,255,255,0.10));
+}
+.assistente-footer .btn-secondary:hover {
+  border-color: var(--border-hover, rgba(96,165,250,0.40));
+  color: var(--text-main, #f8fafc);
+}
+
+.assistente-hint {
+  margin: 0;
+  padding: 0 1.25rem 1rem;
+  font-size: 0.75rem;
+  color: var(--text-subtle, #64748b);
+  text-align: center;
+  line-height: 1.5;
+}
+.assistente-hint i {
+  color: var(--text-muted, #94a3b8);
+  font-style: normal;
+  background: var(--bg-glass, rgba(30,41,59,0.55));
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  margin: 0 0.1rem;
+  display: inline-block;
+}
+
+/* === Toggle de modos: holograma | texto | nebulosa === */
+.assistente-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.assistente-mode-group {
+  display: inline-flex;
+  background: var(--bg-glass, rgba(30,41,59,0.55));
+  border: 1px solid var(--border, rgba(255,255,255,0.10));
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  width: 28px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mode-btn:hover {
+  color: var(--text-main, #f8fafc);
+  background: var(--bg-hover, rgba(96,165,250,0.08));
+}
+.mode-btn.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb 0%, #22d3ee 100%);
+  box-shadow: 0 0 0 1px rgba(34,211,238,0.35), 0 2px 8px rgba(37,99,235,0.25);
+}
+
+/* === Visibilidade entre modos === */
+.assistente-body[data-modo="holograma"] .assistente-orb,
+.assistente-body[data-modo="holograma"] .assistente-resposta,
+.assistente-body[data-modo="holograma"] .assistente-nebulosa {
+  display: none !important;
+}
+.assistente-body[data-modo="texto"] .assistente-holograma,
+.assistente-body[data-modo="texto"] .assistente-nebulosa {
+  display: none !important;
+}
+.assistente-body[data-modo="nebulosa"] .assistente-holograma,
+.assistente-body[data-modo="nebulosa"] .assistente-orb,
+.assistente-body[data-modo="nebulosa"] .assistente-status,
+.assistente-body[data-modo="nebulosa"] .assistente-transcript,
+.assistente-body[data-modo="nebulosa"] .assistente-resposta {
+  display: none !important;
+}
+
+/* === HOLOGRAMA === */
+.assistente-holograma {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -0.5rem 0 0.5rem;
+}
+#assistente-canvas {
+  position: relative;
+  z-index: 2;
+  max-width: 320px;
+  width: 100%;
+  height: 160px;
+  display: block;
+}
+.holograma-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 1px solid var(--holo-color, rgba(34, 211, 238, 0.18));
+  box-shadow:
+    0 0 60px var(--holo-glow, rgba(34, 211, 238, 0.18)) inset,
+    0 0 50px var(--holo-glow, rgba(34, 211, 238, 0.10));
+  z-index: 1;
+  pointer-events: none;
+  animation: holo-rotate 14s linear infinite;
+}
+.holograma-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--holo-glow, rgba(34, 211, 238, 0.10)) 0%, transparent 70%);
+  z-index: 0;
+  pointer-events: none;
+}
+@keyframes holo-rotate {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Paleta do holograma: azul cyan (padrão) ou laranja/vermelho (alerta) */
+.assistente-modal-content[data-tom="normal"] {
+  --holo-color:    rgba(34, 211, 238, 0.45);
+  --holo-glow:     rgba(34, 211, 238, 0.18);
+  --holo-stroke:   #22d3ee;
+  --holo-stroke-2: #2563eb;
+}
+.assistente-modal-content[data-tom="alerta"] {
+  --holo-color:    rgba(249, 115, 22, 0.55);
+  --holo-glow:     rgba(249, 115, 22, 0.22);
+  --holo-stroke:   #f97316;
+  --holo-stroke-2: #ef4444;
+}
+
+.holograma-ring,
+.holograma-glow,
+#assistente-canvas {
+  transition: filter 0.3s ease;
+}
+
+/* =====================================================================
+   MODO NEBULOSA — fullscreen, sem chrome
+   ===================================================================== */
+.assistente-modal.modo-nebulosa-on {
+  padding: 0;
+}
+.assistente-modal.modo-nebulosa-on .assistente-modal-content {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  border-radius: 0;
+  border: none;
+  background: radial-gradient(ellipse at center, #0b1430 0%, #020617 60%, #000 100%);
+  display: flex;
+  flex-direction: column;
+}
+.assistente-modal.modo-nebulosa-on .assistente-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  background: linear-gradient(180deg, rgba(2,6,23,0.7) 0%, transparent 100%);
+  border-bottom: none;
+  padding: 0.85rem 1.25rem;
+}
+.assistente-modal.modo-nebulosa-on .assistente-header h3 {
+  opacity: 0.7;
+  font-size: 0.95rem;
+}
+.assistente-modal.modo-nebulosa-on .assistente-body {
+  flex: 1;
+  padding: 0;
+  min-height: 0;
+}
+.assistente-modal.modo-nebulosa-on .assistente-footer,
+.assistente-modal.modo-nebulosa-on .assistente-hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  background: linear-gradient(0deg, rgba(2,6,23,0.7) 0%, transparent 100%);
+  border-top: none;
+}
+.assistente-modal.modo-nebulosa-on .assistente-hint {
+  bottom: 4.5rem;
+  background: transparent;
+  font-size: 0.7rem;
+  opacity: 0.55;
+  padding: 0 1.5rem;
+}
+
+.assistente-nebulosa {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+#assistente-nebulosa-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.nebulosa-hint {
+  position: relative;
+  z-index: 3;
+  color: rgba(255,255,255,0.55);
+  font-size: 0.95rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 300;
+  text-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+  pointer-events: none;
+  animation: nebulosa-hint-pulse 2.4s ease-in-out infinite;
+}
+.nebulosa-hint.hidden { opacity: 0; }
+@keyframes nebulosa-hint-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.9;  }
+}
+
+.assistente-modal.modo-nebulosa-on .assistente-modal-content[data-tom="alerta"] {
+  background: radial-gradient(ellipse at center, #1a0a0a 0%, #170707 60%, #000 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistente-fab,
+  .orb-pulse,
+  .holograma-ring,
+  .nebulosa-hint { animation: none !important; }
+}
