@@ -2699,6 +2699,11 @@ function badgeTipoAtendimento(tipo) {
         const url = URL.createObjectURL(blob);
         audioEl = new Audio(url);
         audioEl.crossOrigin = 'anonymous';
+        // Acelera a fala 10% sem alterar o tom (preservesPitch mantém timbre natural)
+        audioEl.playbackRate = 1.1;
+        try { audioEl.preservesPitch = true; } catch {}
+        try { audioEl.mozPreservesPitch = true; } catch {}
+        try { audioEl.webkitPreservesPitch = true; } catch {}
 
         audioSourceNode = audioCtx.createMediaElementSource(audioEl);
         analyser = audioCtx.createAnalyser();
