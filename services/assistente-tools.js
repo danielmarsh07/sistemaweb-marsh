@@ -294,6 +294,71 @@ const listar_categorias = {
   }
 };
 
+const criar_categoria = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'criar_categoria',
+      description: 'Cria uma nova categoria de transação. CRÍTICO: só chame APÓS o usuário confirmar explicitamente que quer criar (resposta tipo "sim", "pode", "vai", "claro"). Não crie sem confirmação afirmativa. Após criar a categoria, geralmente o próximo passo é chamar criar_transacao usando ela.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nome: { type: 'string', description: 'Nome da categoria (ex: "Combustível", "Marketing")' },
+          tipo: { type: 'string', enum: ['entrada', 'saída'] },
+          descricao: { type: 'string', description: 'Opcional. Descrição livre da categoria.' },
+          usuario_confirmou: {
+            type: 'boolean',
+            description: 'Marque true SOMENTE se o usuário respondeu de forma afirmativa à pergunta de confirmação no turno anterior. Se ainda não confirmou, não chame esta tool.'
+          }
+        },
+        required: ['nome', 'tipo', 'usuario_confirmou'],
+        additionalProperties: false
+      }
+    }
+  },
+  run: async (ctx, args) => {
+    if (args.usuario_confirmou !== true) {
+      return { erro: 'Criação de categoria requer confirmação explícita do usuário. Pergunte primeiro e só chame esta tool após resposta afirmativa.' };
+    }
+    const tipo = normalizarTipoTransacao(args.tipo);
+    if (!tipo) return { erro: 'Tipo inválido. Use entrada ou saída.' };
+    const nome = (args.nome || '').trim();
+    if (!nome) return { erro: 'Nome da categoria é obrigatório.' };
+
+    // Já existe? (case-insensitive)
+    const existe = await pool.query(
+      `SELECT id, nome FROM categorias_transacao
+       WHERE empresa_id = $1 AND LOWER(nome) = LOWER($2) AND tipo = $3`,
+      [ctx.empresa_id, nome, tipo]
+    );
+    if (existe.rows.length > 0) {
+      return {
+        sucesso: false,
+        ja_existe: true,
+        categoria: { nome: existe.rows[0].nome, tipo }
+      };
+    }
+
+    try {
+      const r = await pool.query(
+        `INSERT INTO categorias_transacao (empresa_id, nome, tipo, descricao, criado_por_usuario_id, ativo)
+         VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING id, nome, tipo`,
+        [ctx.empresa_id, nome, tipo, args.descricao || null, ctx.usuario_id]
+      );
+      return {
+        sucesso: true,
+        categoria: r.rows[0],
+        _ui_refresh: ['categorias-transacao']
+      };
+    } catch (err) {
+      if (err.code === '23505') {
+        return { erro: 'Categoria duplicada (já existe com esse nome e tipo).' };
+      }
+      return { erro: `Falha ao criar categoria: ${err.message}` };
+    }
+  }
+};
+
 // ---------------------------------------------------------------------------
 // TOOLS: clientes
 // ---------------------------------------------------------------------------
@@ -674,6 +739,7 @@ const TOOLS = {
   consultar_saldo,
   resumo_periodo,
   listar_categorias,
+  criar_categoria,
   listar_clientes,
   buscar_cliente,
   criar_cliente,
