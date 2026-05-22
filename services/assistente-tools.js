@@ -15,6 +15,7 @@
 const crypto = require('crypto');
 const pool = require('../db');
 const { validarDocumento, validarCNPJ } = require('./validacao');
+const { notificarNovoChamado, notificarNovoAtendimento } = require('./email');
 
 // Gera datas de repetição (mesmo algoritmo de routes/transacoes.js)
 function gerarDatasRepeticao(dataBaseStr, periodicidade, dataFinalStr) {
@@ -899,7 +900,7 @@ const criar_chamado = {
       `INSERT INTO chamados (empresa_id, cliente_id, tecnologia_id, aberto_por_usuario_id,
         titulo, descricao, prioridade, status, ativo)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'aberto', TRUE)
-       RETURNING id, titulo, status, prioridade, tecnologia_id`,
+       RETURNING id, titulo, descricao, status, prioridade, tecnologia_id, cliente_id`,
       [ctx.empresa_id, cliente_id, tecnologia_id, ctx.usuario_id,
        args.titulo, args.descricao || null, args.prioridade || 'media']
     );
@@ -909,6 +910,14 @@ const criar_chamado = {
        VALUES ($1, $2, $3, NULL, 'aberto', 'Chamado aberto via assistente de voz')`,
       [chamado.id, ctx.empresa_id, ctx.usuario_id]
     );
+
+    // Dispara notificação de e-mail aos admins/técnicos da empresa (fire-and-forget)
+    notificarNovoChamado({
+      chamado,
+      empresa_id: ctx.empresa_id,
+      aberto_por: ctx.nome || 'Assistente JARVIS'
+    }).catch(err => console.error('[JARVIS criar_chamado] falha ao notificar:', err.message));
+
     return { sucesso: true, chamado, _ui_refresh: ['chamados', 'dashboard'] };
   }
 };
@@ -935,8 +944,8 @@ const criar_atendimento = {
   run: async (ctx, args) => {
     if (ctx.tipo === 'cliente') args.tipo = 'comentario';
 
-    // Cliente só pode comentar nos próprios chamados
-    let q = 'SELECT id, status FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE';
+    // Busca chamado (incluindo titulo e cliente_id) — cliente só pode comentar nos próprios
+    let q = 'SELECT id, status, titulo, cliente_id FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE';
     const params = [args.chamado_id, ctx.empresa_id];
     if (ctx.tipo === 'cliente') {
       if (!ctx.cliente_id) return { erro: 'Sua conta não está vinculada a um cliente.' };
@@ -945,15 +954,17 @@ const criar_atendimento = {
     }
     const ch = await pool.query(q, params);
     if (ch.rows.length === 0) return { erro: 'Chamado não encontrado.' };
+    const chamado = ch.rows[0];
 
     const tipo = args.tipo || 'comentario';
     const r = await pool.query(
       `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, tempo_gasto_minutos, data_atendimento)
-       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, tipo, descricao`,
       [args.chamado_id, ctx.usuario_id, tipo, args.descricao, args.tempo_gasto_minutos || 0]
     );
+    const atendimento = r.rows[0];
 
-    const statusAtual = ch.rows[0].status;
+    const statusAtual = chamado.status;
     if (tipo === 'solucao' && statusAtual !== 'resolvido') {
       await pool.query(
         `UPDATE chamados SET status = 'resolvido', data_fechamento = NOW() WHERE id = $1`,
@@ -965,8 +976,21 @@ const criar_atendimento = {
         [args.chamado_id]
       );
     }
+
+    // Notifica a outra parte (cliente comentou → avisa admins; admin comentou → avisa cliente)
+    notificarNovoAtendimento({
+      atendimento,
+      chamado,
+      remetente_tipo: ctx.tipo || 'admin_empresa',
+      remetente_nome: ctx.nome || 'Assistente JARVIS',
+      empresa_id: ctx.empresa_id
+    }).catch(err => console.error('[JARVIS criar_atendimento] falha ao notificar:', err.message));
+
     return {
-      sucesso: true, atendimento_id: r.rows[0].id, chamado_id: args.chamado_id, tipo,
+      sucesso: true,
+      atendimento_id: atendimento.id,
+      chamado_id: args.chamado_id,
+      tipo,
       _ui_refresh: ['chamados']
     };
   }
