@@ -12,8 +12,52 @@
 //   3. Resultados truncados pra não estourar contexto/custo do LLM
 // ============================================================================
 
+const crypto = require('crypto');
 const pool = require('../db');
 const { validarDocumento, validarCNPJ } = require('./validacao');
+
+// Gera datas de repetição (mesmo algoritmo de routes/transacoes.js)
+function gerarDatasRepeticao(dataBaseStr, periodicidade, dataFinalStr) {
+  const datas = [];
+  const base = new Date(dataBaseStr + 'T00:00:00');
+  const limite = new Date(dataFinalStr + 'T00:00:00');
+  if (isNaN(base) || isNaN(limite)) return null;
+  if (limite < base) return null;
+
+  const fmt = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+
+  if (periodicidade === 'diaria') {
+    const cur = new Date(base);
+    while (cur <= limite) {
+      datas.push(fmt(cur));
+      cur.setDate(cur.getDate() + 1);
+      if (datas.length > 3650) break;
+    }
+    return datas;
+  }
+
+  if (periodicidade === 'mensal') {
+    const diaOriginal = base.getDate();
+    let i = 0;
+    while (true) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      const ultimoDiaMes = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(diaOriginal, ultimoDiaMes));
+      if (d > limite) break;
+      datas.push(fmt(d));
+      i += 1;
+      if (i > 600) break;
+    }
+    return datas;
+  }
+
+  return null;
+}
 
 const MAX_LIST_ROWS = 30;
 
@@ -73,15 +117,25 @@ const criar_transacao = {
     type: 'function',
     function: {
       name: 'criar_transacao',
-      description: 'Cria uma transação financeira (entrada ou saída). A categoria precisa estar cadastrada no sistema para o tipo informado — se não souber qual categoria existe, chame listar_categorias antes.',
+      description: 'Cria uma transação financeira (entrada ou saída). Categoria precisa estar cadastrada no sistema. Para lançamentos recorrentes (ex: aluguel mensal, salário fixo), use o campo "repetir" — uma transação será criada para cada data no intervalo.',
       parameters: {
         type: 'object',
         properties: {
           tipo: { type: 'string', enum: ['entrada', 'saída'], description: 'Tipo da transação' },
           valor: { type: 'number', description: 'Valor em reais (positivo, ex: 350.50)' },
           categoria: { type: 'string', description: 'Nome exato da categoria já cadastrada (ex: "Alimentação", "Salário")' },
-          descricao: { type: 'string', description: 'Descrição livre (ex: "Padaria Central", "Pagamento freelancer João")' },
-          data: { type: 'string', description: 'Data no formato YYYY-MM-DD. Se omitido, usa hoje.' }
+          descricao: { type: 'string', description: 'Descrição livre. Opcional.' },
+          data: { type: 'string', description: 'Data no formato YYYY-MM-DD. Se omitido, usa hoje. Quando há repetição, é a data do PRIMEIRO lançamento.' },
+          repetir: {
+            type: 'object',
+            description: 'Opcional. Se informado, cria uma cópia da transação para cada data até "data_final" (inclusive). Exemplo: aluguel mensal de janeiro a dezembro = data="2026-01-05", repetir={ periodicidade: "mensal", data_final: "2026-12-05" }.',
+            properties: {
+              periodicidade: { type: 'string', enum: ['mensal', 'diaria'] },
+              data_final: { type: 'string', description: 'YYYY-MM-DD (último lançamento incluído)' }
+            },
+            required: ['periodicidade', 'data_final'],
+            additionalProperties: false
+          }
         },
         required: ['tipo', 'valor', 'categoria'],
         additionalProperties: false
@@ -111,22 +165,75 @@ const criar_transacao = {
       };
     }
 
-    const result = await pool.query(
-      `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id)
-       VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6, $7, $7) RETURNING *`,
-      [tipo, valor, cat.rows[0].nome, args.descricao || '', args.data || null, ctx.empresa_id, ctx.usuario_id]
-    );
-    const t = result.rows[0];
-    return {
-      sucesso: true,
-      id: t.id,
-      tipo: t.tipo,
-      valor: Number(t.valor),
-      categoria: t.categoria,
-      descricao: t.descricao,
-      data: fmtData(t.data),
-      _ui_refresh: ['transacoes', 'dashboard']
-    };
+    const categoriaCanonica = cat.rows[0].nome;
+    const dataInicial = args.data || new Date().toISOString().slice(0, 10);
+
+    // Caso simples: sem repetição
+    if (!args.repetir || !args.repetir.periodicidade || !args.repetir.data_final) {
+      const result = await pool.query(
+        `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id)
+         VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6, $7, $7) RETURNING *`,
+        [tipo, valor, categoriaCanonica, args.descricao || '', args.data || null, ctx.empresa_id, ctx.usuario_id]
+      );
+      const t = result.rows[0];
+      return {
+        sucesso: true,
+        id: t.id,
+        tipo: t.tipo,
+        valor: Number(t.valor),
+        categoria: t.categoria,
+        descricao: t.descricao,
+        data: fmtData(t.data),
+        _ui_refresh: ['transacoes', 'dashboard']
+      };
+    }
+
+    // Caso com repetição
+    const periodicidade = args.repetir.periodicidade;
+    if (!['mensal', 'diaria'].includes(periodicidade)) {
+      return { erro: 'Periodicidade deve ser "mensal" ou "diaria".' };
+    }
+    const datas = gerarDatasRepeticao(dataInicial, periodicidade, args.repetir.data_final);
+    if (!datas || datas.length === 0) {
+      return { erro: 'Data final inválida ou anterior à data inicial.' };
+    }
+    if (datas.length > 600) {
+      return { erro: 'Repetição gera lançamentos demais (mais de 600). Reduza o intervalo.' };
+    }
+
+    const grupoId = crypto.randomUUID();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const criadas = [];
+      for (const dt of datas) {
+        const r = await client.query(
+          `INSERT INTO transacoes (tipo, valor, categoria, descricao, data, empresa_id, usuario_id, criado_por_usuario_id, grupo_id)
+           VALUES ($1, $2, $3, $4, $5::date, $6, $7, $7, $8) RETURNING id, data`,
+          [tipo, valor, categoriaCanonica, args.descricao || '', dt, ctx.empresa_id, ctx.usuario_id, grupoId]
+        );
+        criadas.push(r.rows[0]);
+      }
+      await client.query('COMMIT');
+      return {
+        sucesso: true,
+        repeticao: true,
+        total_criadas: criadas.length,
+        periodicidade,
+        primeira_data: fmtData(criadas[0].data),
+        ultima_data: fmtData(criadas[criadas.length - 1].data),
+        valor: valor,
+        tipo,
+        categoria: categoriaCanonica,
+        descricao: args.descricao || '',
+        _ui_refresh: ['transacoes', 'dashboard']
+      };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      return { erro: `Falha ao criar lançamentos repetidos: ${e.message}` };
+    } finally {
+      client.release();
+    }
   }
 };
 
