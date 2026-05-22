@@ -2375,14 +2375,17 @@ function badgeTipoAtendimento(tipo) {
 }
 
 // ============================================================================
-// ASSISTENTE DE VOZ — Web Speech API (STT/TTS) + /api/assistente/chat
+// ASSISTENTE DE VOZ — Web Speech (STT) + ElevenLabs TTS + holograma visualizer
 // ============================================================================
 (function initAssistenteVoz() {
   const fab = document.getElementById('btn-assistente-voz');
   const modal = document.getElementById('modal-assistente');
   if (!fab || !modal) return;
 
+  const modalContent = modal.querySelector('.assistente-modal-content');
+  const body = modal.querySelector('.assistente-body');
   const orb = document.getElementById('assistente-orb');
+  const canvas = document.getElementById('assistente-canvas');
   const statusEl = document.getElementById('assistente-status');
   const transcriptEl = document.getElementById('assistente-transcript');
   const respostaEl = document.getElementById('assistente-resposta');
@@ -2390,17 +2393,53 @@ function badgeTipoAtendimento(tipo) {
   const btnFalarTexto = document.getElementById('btn-falar-texto');
   const btnFechar = document.getElementById('btn-fechar-assistente');
   const btnReset = document.getElementById('btn-reset-assistente');
+  const btnModo = document.getElementById('btn-modo-assistente');
+  const iconHolo = document.getElementById('icon-modo-holograma');
+  const iconTexto = document.getElementById('icon-modo-texto');
+
+  // Persistência da preferência de modo visual
+  const MODO_KEY = 'assistente_modo_visual';
+  let modoAtual = localStorage.getItem(MODO_KEY) || 'holograma'; // 'holograma' | 'texto'
 
   // Histórico curto pra continuidade entre turnos
   let historico = [];
   let recognition = null;
   let estado = 'idle'; // idle | listening | processing | speaking
-  let textoUltimo = '';
+  let tomAtual = 'normal'; // 'normal' | 'alerta'
+
+  // Audio context + analyser pro holograma
+  let audioCtx = null;
+  let analyser = null;
+  let audioEl = null;
+  let audioSourceNode = null;
+  let rafId = null;
+  let ttsDisponivel = null; // descoberto na primeira resposta do /chat
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechSynth = window.speechSynthesis;
   const hasSTT = !!SpeechRecognition;
-  const hasTTS = !!speechSynth;
+  const hasWebTTS = !!speechSynth;
+
+  // ---------- Modo visual ----------
+
+  function aplicarModo(modo) {
+    modoAtual = modo;
+    body.setAttribute('data-modo', modo);
+    iconHolo.style.display  = modo === 'holograma' ? 'block' : 'none';
+    iconTexto.style.display = modo === 'holograma' ? 'none'  : 'block';
+    localStorage.setItem(MODO_KEY, modo);
+    if (modo === 'holograma') desenharHolograma();
+  }
+
+  // ---------- Tom ----------
+
+  function setTom(tom) {
+    tomAtual = (tom === 'alerta') ? 'alerta' : 'normal';
+    modalContent.setAttribute('data-tom', tomAtual);
+  }
+  setTom('normal');
+
+  // ---------- Estado ----------
 
   function setEstado(novo) {
     estado = novo;
@@ -2439,6 +2478,8 @@ function badgeTipoAtendimento(tipo) {
     respostaEl.classList.add('show');
   }
 
+  // ---------- Modal ----------
+
   function abrirModal() {
     if (!hasSTT) {
       alert('Seu navegador não suporta reconhecimento de voz. Use Chrome ou Edge no celular/desktop.');
@@ -2446,24 +2487,30 @@ function badgeTipoAtendimento(tipo) {
     }
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
+    aplicarModo(modoAtual);
+    setTom('normal');
     setEstado('idle');
+    desenharHolograma();
   }
 
   function fecharModal() {
     pararEscuta();
-    if (hasTTS) speechSynth.cancel();
+    pararAudio();
+    if (hasWebTTS) speechSynth.cancel();
     modal.classList.remove('show');
     modal.setAttribute('aria-hidden', 'true');
+    pararVisualizer();
     setEstado('idle');
   }
 
   function resetar() {
     pararEscuta();
-    if (hasTTS) speechSynth.cancel();
+    pararAudio();
+    if (hasWebTTS) speechSynth.cancel();
     historico = [];
-    textoUltimo = '';
     mostrarTranscript('');
     mostrarResposta('');
+    setTom('normal');
     setEstado('idle');
   }
 
@@ -2474,11 +2521,15 @@ function badgeTipoAtendimento(tipo) {
     }
   }
 
+  // ---------- STT ----------
+
   function iniciarEscuta() {
     if (!hasSTT) return;
-    if (hasTTS) speechSynth.cancel();
+    pararAudio();
+    if (hasWebTTS) speechSynth.cancel();
     mostrarTranscript('');
     mostrarResposta('');
+    setTom('normal');
 
     recognition = new SpeechRecognition();
     recognition.lang = 'pt-BR';
@@ -2520,7 +2571,6 @@ function badgeTipoAtendimento(tipo) {
         return;
       }
       mostrarTranscript(texto);
-      textoUltimo = texto;
       enviarParaAssistente(texto);
     };
 
@@ -2531,6 +2581,8 @@ function badgeTipoAtendimento(tipo) {
       setEstado('idle');
     }
   }
+
+  // ---------- Chat ----------
 
   async function enviarParaAssistente(texto) {
     setEstado('processing');
@@ -2543,20 +2595,20 @@ function badgeTipoAtendimento(tipo) {
       const data = await res.json();
       if (!res.ok) {
         const msg = data.erro || 'Erro ao conversar com o assistente.';
+        setTom('alerta');
         mostrarResposta(msg);
         falar(msg);
         return;
       }
 
       const resposta = data.resposta || 'Pronto.';
+      setTom(data.tom);
       mostrarResposta(resposta);
+      ttsDisponivel = !!data.tts_disponivel;
 
-      // Atualiza histórico curto pro próximo turno
       if (Array.isArray(data.mensagens_para_proximo_turno)) {
         historico = [...historico, ...data.mensagens_para_proximo_turno].slice(-6);
       }
-
-      // Atualiza listas que foram afetadas
       if (Array.isArray(data.ui_refresh)) {
         data.ui_refresh.forEach(refreshPage);
       }
@@ -2565,13 +2617,13 @@ function badgeTipoAtendimento(tipo) {
     } catch (err) {
       console.error('[assistente chat]', err);
       const msg = 'Falha ao conversar com o assistente. Verifique sua conexão.';
+      setTom('alerta');
       mostrarResposta(msg);
       falar(msg);
     }
   }
 
   function refreshPage(page) {
-    // Recarrega a página atual quando relevante
     try {
       if (page === 'dashboard' && typeof loadDashboard === 'function') loadDashboard();
       if (page === 'transacoes' && typeof loadTransacoes === 'function' && currentPage === 'transacoes') loadTransacoes();
@@ -2583,58 +2635,253 @@ function badgeTipoAtendimento(tipo) {
     }
   }
 
-  function escolherVozPtBr() {
-    if (!hasTTS) return null;
-    const vozes = speechSynth.getVoices();
-    return vozes.find(v => v.lang === 'pt-BR')
-        || vozes.find(v => v.lang && v.lang.startsWith('pt'))
-        || null;
+  // ---------- TTS (ElevenLabs com fallback Web Speech) ----------
+
+  async function falar(texto) {
+    if (!texto) { setEstado('idle'); return; }
+    setEstado('speaking');
+
+    // 1) Tenta ElevenLabs (se o backend confirmou disponibilidade)
+    if (ttsDisponivel !== false) {
+      try {
+        const res = await apiFetch(`${API_URL}/assistente/tts`, {
+          method: 'POST',
+          body: JSON.stringify({ texto })
+        });
+        if (res && res.ok) {
+          const blob = await res.blob();
+          await tocarAudioComVisualizer(blob);
+          return;
+        }
+        if (res && res.status === 503) ttsDisponivel = false;
+      } catch (e) {
+        console.warn('[assistente TTS ElevenLabs falhou, fallback Web Speech]', e);
+      }
+    }
+
+    // 2) Fallback: Web Speech API
+    falarComWebSpeech(texto);
   }
 
-  function falar(texto) {
-    if (!hasTTS || !texto) {
-      setEstado('idle');
-      return;
+  function tocarAudioComVisualizer(blob) {
+    return new Promise((resolve) => {
+      pararAudio();
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const url = URL.createObjectURL(blob);
+        audioEl = new Audio(url);
+        audioEl.crossOrigin = 'anonymous';
+
+        audioSourceNode = audioCtx.createMediaElementSource(audioEl);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.75;
+        audioSourceNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        iniciarVisualizer();
+
+        audioEl.onended = () => {
+          URL.revokeObjectURL(url);
+          pararVisualizer();
+          pararAudio();
+          setEstado('idle');
+          resolve();
+        };
+        audioEl.onerror = () => {
+          URL.revokeObjectURL(url);
+          pararVisualizer();
+          pararAudio();
+          setEstado('idle');
+          resolve();
+        };
+
+        audioEl.play().catch(err => {
+          console.warn('[assistente TTS play()]', err);
+          setEstado('idle');
+          resolve();
+        });
+      } catch (e) {
+        console.error('[assistente TTS visualizer]', e);
+        setEstado('idle');
+        resolve();
+      }
+    });
+  }
+
+  function pararAudio() {
+    if (audioEl) {
+      try { audioEl.pause(); } catch {}
+      audioEl = null;
     }
-    setEstado('speaking');
+    if (audioSourceNode) {
+      try { audioSourceNode.disconnect(); } catch {}
+      audioSourceNode = null;
+    }
+    analyser = null;
+  }
+
+  function falarComWebSpeech(texto) {
+    if (!hasWebTTS) { setEstado('idle'); return; }
     speechSynth.cancel();
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = 'pt-BR';
-    u.rate = 1.05;
-    u.pitch = 1.0;
-    const voz = escolherVozPtBr();
-    if (voz) u.voice = voz;
-    u.onend = () => setEstado('idle');
-    u.onerror = () => setEstado('idle');
+    u.rate = 0.98;
+    u.pitch = 0.92;
+    const vozes = speechSynth.getVoices();
+    const vozPt = vozes.find(v => v.lang === 'pt-BR') || vozes.find(v => v.lang && v.lang.startsWith('pt'));
+    if (vozPt) u.voice = vozPt;
+    u.onend = () => { pararVisualizer(); setEstado('idle'); };
+    u.onerror = () => { pararVisualizer(); setEstado('idle'); };
+    iniciarVisualizerFake(); // sem analyser real, anima ondulação suave
     speechSynth.speak(u);
   }
 
-  // Carrega vozes (algumas plataformas só populam após o evento)
-  if (hasTTS) {
-    speechSynth.onvoiceschanged = () => { /* trigger reload */ };
+  // ---------- Holograma (canvas) ----------
+
+  // Onda parada quando não há som
+  function desenharHolograma() {
+    if (!canvas || modoAtual !== 'holograma') return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const cs = getComputedStyle(modalContent);
+    const cor1 = cs.getPropertyValue('--holo-stroke').trim()   || '#22d3ee';
+    const cor2 = cs.getPropertyValue('--holo-stroke-2').trim() || '#2563eb';
+
+    // Linha central com ondulação suave
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, cor2);
+    grad.addColorStop(0.5, cor1);
+    grad.addColorStop(1, cor2);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x++) {
+      const y = h / 2 + Math.sin((x / w) * Math.PI * 6 + Date.now() / 600) * 4;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
   }
 
-  // Listeners
+  function iniciarVisualizer() {
+    cancelAnimationFrame(rafId);
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const data = new Uint8Array(analyser ? analyser.frequencyBinCount : 64);
+
+    const desenha = () => {
+      rafId = requestAnimationFrame(desenha);
+      if (modoAtual !== 'holograma') return;
+      if (analyser) analyser.getByteFrequencyData(data);
+      ctx.clearRect(0, 0, w, h);
+
+      const cs = getComputedStyle(modalContent);
+      const cor1 = cs.getPropertyValue('--holo-stroke').trim()   || '#22d3ee';
+      const cor2 = cs.getPropertyValue('--holo-stroke-2').trim() || '#2563eb';
+
+      // Barras simétricas refletidas
+      const bars = 48;
+      const step = data.length / bars;
+      const barW = (w - (bars - 1) * 2) / bars;
+
+      for (let i = 0; i < bars; i++) {
+        const v = data[Math.floor(i * step)] / 255;
+        const altura = Math.max(2, v * (h * 0.55));
+        const x = i * (barW + 2);
+        const y = (h - altura) / 2;
+
+        const grad = ctx.createLinearGradient(0, y, 0, y + altura);
+        grad.addColorStop(0, cor1);
+        grad.addColorStop(1, cor2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, barW, altura);
+
+        // Reflexo glow
+        ctx.fillStyle = `${cor1}33`;
+        ctx.fillRect(x, y - 2, barW, 2);
+        ctx.fillRect(x, y + altura, barW, 2);
+      }
+
+      // Linha central sutil
+      ctx.strokeStyle = `${cor1}40`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2);
+      ctx.lineTo(w, h / 2);
+      ctx.stroke();
+    };
+    desenha();
+  }
+
+  // Quando não temos analyser (Web Speech fallback) — anima ondulação aleatória
+  function iniciarVisualizerFake() {
+    cancelAnimationFrame(rafId);
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const bars = 48;
+    const data = new Array(bars).fill(0);
+
+    const desenha = () => {
+      rafId = requestAnimationFrame(desenha);
+      if (modoAtual !== 'holograma') return;
+      ctx.clearRect(0, 0, w, h);
+
+      const cs = getComputedStyle(modalContent);
+      const cor1 = cs.getPropertyValue('--holo-stroke').trim()   || '#22d3ee';
+      const cor2 = cs.getPropertyValue('--holo-stroke-2').trim() || '#2563eb';
+
+      const barW = (w - (bars - 1) * 2) / bars;
+      for (let i = 0; i < bars; i++) {
+        data[i] = data[i] * 0.7 + Math.random() * 0.3;
+        const altura = Math.max(2, data[i] * (h * 0.5));
+        const x = i * (barW + 2);
+        const y = (h - altura) / 2;
+
+        const grad = ctx.createLinearGradient(0, y, 0, y + altura);
+        grad.addColorStop(0, cor1);
+        grad.addColorStop(1, cor2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, barW, altura);
+      }
+    };
+    desenha();
+  }
+
+  function pararVisualizer() {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+    desenharHolograma();
+  }
+
+  // ---------- Listeners ----------
+
   fab.addEventListener('click', abrirModal);
   btnFechar.addEventListener('click', fecharModal);
   btnReset.addEventListener('click', resetar);
+  btnModo.addEventListener('click', () => {
+    aplicarModo(modoAtual === 'holograma' ? 'texto' : 'holograma');
+  });
   btnFalar.addEventListener('click', () => {
     if (estado === 'listening') {
       pararEscuta();
       setEstado('idle');
     } else if (estado === 'speaking') {
-      if (hasTTS) speechSynth.cancel();
+      pararAudio();
+      if (hasWebTTS) speechSynth.cancel();
       iniciarEscuta();
     } else {
       iniciarEscuta();
     }
   });
-  // ESC fecha
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('show')) fecharModal();
   });
-  // Clique no backdrop fecha
   modal.addEventListener('click', (e) => {
     if (e.target === modal) fecharModal();
   });
+
+  if (hasWebTTS) speechSynth.onvoiceschanged = () => {};
 })();

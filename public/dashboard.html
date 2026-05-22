@@ -1281,10 +1281,31 @@
     <div class="assistente-modal-content">
       <div class="assistente-header">
         <h3>Assistente Marsh</h3>
-        <button type="button" class="assistente-close" id="btn-fechar-assistente" aria-label="Fechar">×</button>
+        <div class="assistente-header-actions">
+          <button type="button" class="assistente-mode-toggle" id="btn-modo-assistente" aria-label="Alternar entre holograma e texto" title="Alternar visual">
+            <svg id="icon-modo-holograma" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12h2M19 12h2M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"></path>
+              <circle cx="12" cy="12" r="4"></circle>
+            </svg>
+            <svg id="icon-modo-texto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <line x1="4" y1="6" x2="20" y2="6"></line>
+              <line x1="4" y1="12" x2="20" y2="12"></line>
+              <line x1="4" y1="18" x2="14" y2="18"></line>
+            </svg>
+          </button>
+          <button type="button" class="assistente-close" id="btn-fechar-assistente" aria-label="Fechar">×</button>
+        </div>
       </div>
 
-      <div class="assistente-body">
+      <div class="assistente-body" data-modo="holograma">
+        <!-- Modo HOLOGRAMA (padrão) -->
+        <div class="assistente-holograma" id="assistente-holograma">
+          <canvas id="assistente-canvas" width="320" height="160" aria-hidden="true"></canvas>
+          <div class="holograma-ring"></div>
+          <div class="holograma-glow"></div>
+        </div>
+
+        <!-- Modo TEXTO (orb clássico + caixa de resposta) -->
         <div class="assistente-orb" id="assistente-orb">
           <div class="orb-pulse"></div>
           <div class="orb-pulse delay-1"></div>

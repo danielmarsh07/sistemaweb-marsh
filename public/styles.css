@@ -2899,3 +2899,108 @@ tbody td strong {
   margin: 0 0.1rem;
   display: inline-block;
 }
+
+/* === Toggle holograma/texto no header do modal === */
+.assistente-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.assistente-mode-toggle {
+  background: transparent;
+  border: 1px solid var(--border, rgba(255,255,255,0.10));
+  color: var(--text-muted, #94a3b8);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.assistente-mode-toggle:hover {
+  border-color: var(--border-hover, rgba(96,165,250,0.40));
+  color: var(--text-main, #f8fafc);
+  background: var(--bg-hover, rgba(96,165,250,0.08));
+}
+
+/* === Visibilidade dos modos: holograma vs texto === */
+.assistente-body[data-modo="holograma"] .assistente-orb,
+.assistente-body[data-modo="holograma"] .assistente-resposta {
+  display: none !important;
+}
+.assistente-body[data-modo="texto"] .assistente-holograma {
+  display: none !important;
+}
+
+/* === HOLOGRAMA === */
+.assistente-holograma {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -0.5rem 0 0.5rem;
+}
+#assistente-canvas {
+  position: relative;
+  z-index: 2;
+  max-width: 320px;
+  width: 100%;
+  height: 160px;
+  display: block;
+}
+.holograma-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 1px solid var(--holo-color, rgba(34, 211, 238, 0.18));
+  box-shadow:
+    0 0 60px var(--holo-glow, rgba(34, 211, 238, 0.18)) inset,
+    0 0 50px var(--holo-glow, rgba(34, 211, 238, 0.10));
+  z-index: 1;
+  pointer-events: none;
+  animation: holo-rotate 14s linear infinite;
+}
+.holograma-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--holo-glow, rgba(34, 211, 238, 0.10)) 0%, transparent 70%);
+  z-index: 0;
+  pointer-events: none;
+}
+@keyframes holo-rotate {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Paleta do holograma: azul cyan (padrão) ou laranja/vermelho (alerta) */
+.assistente-modal-content[data-tom="normal"] {
+  --holo-color:    rgba(34, 211, 238, 0.45);
+  --holo-glow:     rgba(34, 211, 238, 0.18);
+  --holo-stroke:   #22d3ee;
+  --holo-stroke-2: #2563eb;
+}
+.assistente-modal-content[data-tom="alerta"] {
+  --holo-color:    rgba(249, 115, 22, 0.55);
+  --holo-glow:     rgba(249, 115, 22, 0.22);
+  --holo-stroke:   #f97316;
+  --holo-stroke-2: #ef4444;
+}
+
+/* Transição suave de cor quando muda o tom */
+.holograma-ring,
+.holograma-glow,
+#assistente-canvas {
+  transition: filter 0.3s ease;
+}

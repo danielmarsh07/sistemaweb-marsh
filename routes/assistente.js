@@ -9,8 +9,24 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const OpenAI = require('openai');
 const { getToolDefinitions, runTool } = require('../services/assistente-tools');
+const elevenLabs = require('../services/assistente-tts');
 
 const router = express.Router();
+
+// Detecta o "tom" da resposta pro frontend pintar o holograma na cor certa.
+// 'alerta' quando houve algum erro nas tools OU a resposta menciona problemas.
+function detectarTom(respostaTexto, acoes) {
+  const erroNaTool = (acoes || []).some(a => a && a.resultado && a.resultado.erro);
+  if (erroNaTool) return 'alerta';
+  if (!respostaTexto) return 'normal';
+  const t = respostaTexto.toLowerCase();
+  const palavrasAlerta = [
+    'erro', 'falha', 'não consegui', 'nao consegui', 'não foi possível', 'nao foi possivel',
+    'atenção', 'atencao', 'cuidado', 'problema', 'inválid', 'invalid',
+    'não encontr', 'nao encontr', 'não está cadastr', 'nao esta cadastr'
+  ];
+  return palavrasAlerta.some(p => t.includes(p)) ? 'alerta' : 'normal';
+}
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const MODELO = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -47,7 +63,14 @@ Regras importantes:
 6. Se faltar informação obrigatória (ex: valor, categoria) pergunte ao usuário em vez de inventar. Não invente dados.
 7. Se uma tool retornar erro, explique brevemente ao usuário em linguagem natural o que faltou e ofereça a correção.
 8. Nunca exponha estrutura interna do banco, nomes de tabelas, IDs longos ou SQL ao falar com o usuário.
-9. Responda sempre em português do Brasil.`;
+9. Responda sempre em português do Brasil.
+
+REGRA DE ESCRITA NO BANCO (CRÍTICA):
+Você só pode INSERIR dados nestas entidades: transações, clientes, fornecedores, chamados e atendimentos.
+Você NUNCA pode criar/cadastrar:
+- Categorias de transação (se o usuário pedir transação numa categoria inexistente, liste as disponíveis e oriente: "Essa categoria ainda não está cadastrada. Você pode criar pela tela de Categorias no menu lateral, ou escolher uma destas: ...". NÃO crie a categoria.)
+- Tecnologias, usuários, empresas, temas ou qualquer outra entidade não listada acima.
+Se o usuário pedir explicitamente pra criar algo fora dessas 5 entidades permitidas, recuse educadamente e oriente a fazer pela tela correspondente do dashboard.`;
 }
 
 router.post('/chat', chatLimiter, async (req, res) => {
@@ -104,13 +127,16 @@ router.post('/chat', chatLimiter, async (req, res) => {
 
       // Sem chamada de tool: é a resposta final ao usuário.
       if (!msg.tool_calls || msg.tool_calls.length === 0) {
+        const resposta = msg.content || '';
         return res.json({
-          resposta: msg.content || '',
+          resposta,
+          tom: detectarTom(resposta, acoes),
+          tts_disponivel: elevenLabs.isConfigured(),
           acoes,
           ui_refresh: Array.from(uiRefresh),
           mensagens_para_proximo_turno: [
             { role: 'user', content: texto },
-            { role: 'assistant', content: msg.content || '' }
+            { role: 'assistant', content: resposta }
           ]
         });
       }
@@ -144,6 +170,41 @@ router.post('/chat', chatLimiter, async (req, res) => {
       erro: 'Falha ao processar mensagem.',
       detalhe: err.message
     });
+  }
+});
+
+// ----------------------------------------------------------------------------
+// POST /api/assistente/tts — sintetiza texto em áudio MP3 via ElevenLabs
+// ----------------------------------------------------------------------------
+const ttsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Muitas solicitações de TTS. Aguarde um minuto.' }
+});
+
+router.post('/tts', ttsLimiter, async (req, res) => {
+  if (!elevenLabs.isConfigured()) {
+    return res.status(503).json({
+      erro: 'TTS não configurado. ELEVENLABS_API_KEY ausente no servidor.'
+    });
+  }
+  const { texto } = req.body || {};
+  if (!texto || typeof texto !== 'string') {
+    return res.status(400).json({ erro: 'Campo "texto" é obrigatório.' });
+  }
+  if (texto.length > 1500) {
+    return res.status(400).json({ erro: 'Texto muito longo para TTS (máx 1500 caracteres).' });
+  }
+  try {
+    const audioBuffer = await elevenLabs.sintetizar(texto);
+    res.set('Content-Type', 'audio/mpeg');
+    res.set('Cache-Control', 'no-store');
+    res.send(audioBuffer);
+  } catch (err) {
+    console.error('[assistente/tts]', err);
+    res.status(500).json({ erro: 'Falha ao gerar áudio.', detalhe: err.message });
   }
 });
 
