@@ -5,56 +5,102 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Marsh Consultoria</title>
   <script src="theme.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="assistente-voz.css">
   <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#0066cc" />
+  <meta name="theme-color" content="#1d6fd8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Marsh" />
-  <link rel="apple-touch-icon" href="/icon.svg" />
+  <link rel="icon" type="image/png" href="/img/logo-simbolo.png" />
+  <link rel="apple-touch-icon" href="/img/logo-simbolo-512.png" />
 </head>
 <body>
+
+  <!-- Ícones de linha (estilo Lucide, licença MIT) — usar: <svg class="icon"><use href="#i-nome"/></svg> -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-building" viewBox="0 0 24 24"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><path d="M2.6 17.4A2 2 0 0 0 2 18.8V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.2a2 2 0 0 0 1.4-.6l.8-.8a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r="1"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-contraste" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-trend-up" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+    <symbol id="i-trend-down" viewBox="0 0 24 24"><path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M7 7l-4 8a4 4 0 0 0 8 0zM17 7l-4 8a4 4 0 0 0 8 0z"/></symbol>
+  </svg>
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <div class="logo-box">M</div>
-      <h2>Marsh Sistema</h2>
+      <div class="logo-box logo-img"><img src="img/logo-simbolo.png" alt="Marsh"></div>
+      <div class="sidebar-marca">
+        <h2 class="marca-palavra">MARSH</h2>
+        <span id="sidebar-empresa">Marsh Consultoria</span>
+      </div>
     </div>
 
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Menu principal">
       <a href="#" data-page="dashboard" class="nav-link active">
-        <span class="icon">📊</span> Dashboard
+        <svg class="icon"><use href="#i-dash"/></svg> Visão geral
+      </a>
+
+      <div class="nav-group-title">Atendimento</div>
+      <a href="#" data-page="chamados" class="nav-link">
+        <svg class="icon"><use href="#i-ticket"/></svg> Chamados
       </a>
       <a href="#" data-page="clientes" class="nav-link">
-        <span class="icon">👥</span> Clientes
+        <svg class="icon"><use href="#i-users"/></svg> Clientes
       </a>
-      <a href="#" data-page="fornecedores" class="nav-link">
-        <span class="icon">🏢</span> Fornecedores
+
+      <div class="nav-group-title">Produtos SAP</div>
+      <a href="#" data-page="licencas" class="nav-link">
+        <svg class="icon"><use href="#i-shield"/></svg> Licenças
+      </a>
+      <a href="#" data-page="treinamentos" class="nav-link">
+        <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
       </a>
       <a href="#" data-page="tecnologias" class="nav-link">
-        <span class="icon">💻</span> Tecnologias
+        <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
       </a>
-      <a href="#" data-page="chamados" class="nav-link">
-        <span class="icon">🎫</span> Chamados
-      </a>
+
+      <div class="nav-group-title">Financeiro</div>
       <a href="#" data-page="transacoes" class="nav-link">
-        <span class="icon">💰</span> Transações
+        <svg class="icon"><use href="#i-wallet"/></svg> Transações
       </a>
       <a href="#" data-page="categorias-transacao" class="nav-link">
-        <span class="icon">🏷️</span> Categorias
+        <svg class="icon"><use href="#i-tag"/></svg> Categorias
       </a>
+      <a href="#" data-page="fornecedores" class="nav-link">
+        <svg class="icon"><use href="#i-building"/></svg> Fornecedores
+      </a>
+
+      <div class="nav-group-title">Sistema</div>
       <a href="#" data-page="usuarios" class="nav-link">
-        <span class="icon">🔑</span> Usuários
+        <svg class="icon"><use href="#i-key"/></svg> Usuários
       </a>
       <a href="#" data-page="configuracoes" class="nav-link">
-        <span class="icon">⚙️</span> Configurações
+        <svg class="icon"><use href="#i-sliders"/></svg> Configurações
       </a>
     </nav>
 
-    <div class="sidebar-footer">
-      <p id="sidebar-empresa">Marsh Consultoria</p>
-      <p>v2.0.0</p>
+    <div class="sidebar-footer sidebar-usuario">
+      <div class="avatar" id="usuario-avatar" aria-hidden="true">··</div>
+      <div class="who">
+        <strong id="usuario-nome">Carregando...</strong>
+        <span id="usuario-perfil"></span>
+      </div>
+      <button class="icon-btn" onclick="logout()" title="Sair" aria-label="Sair">
+        <svg class="icon"><use href="#i-out"/></svg>
+      </button>
     </div>
   </aside>
 
@@ -62,10 +108,17 @@
   <main class="main-content">
     <!-- Header -->
     <header class="header">
-      <h1 id="page-title">Dashboard</h1>
+      <div class="header-titulo">
+        <span class="crumb">Marsh /</span>
+        <h1 id="page-title">Visão geral</h1>
+      </div>
       <div class="header-right">
-        <span class="user-info" id="usuario-nome">Carregando...</span>
-        <button onclick="logout()" style="margin-left:1rem; padding:0.4rem 0.9rem; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#94a3b8; border-radius:8px; cursor:pointer; font-size:0.85rem;">Sair</button>
+        <button class="icon-btn" onclick="alternarClaroEscuro()" title="Alternar claro / escuro" aria-label="Alternar claro / escuro">
+          <svg class="icon"><use href="#i-contraste"/></svg>
+        </button>
+        <button class="icon-btn so-mobile" onclick="logout()" title="Sair" aria-label="Sair">
+          <svg class="icon"><use href="#i-out"/></svg>
+        </button>
       </div>
     </header>
 
@@ -73,51 +126,59 @@
 
       <!-- ========== DASHBOARD PAGE ========== -->
       <section id="dashboard-page" class="page active">
+        <!-- Banner de boas-vindas (imagem da marca em img/sereno-cidade.webp) -->
+        <div class="hero">
+          <div class="hero-texto">
+            <h2 id="hero-saudacao">Olá</h2>
+            <p id="hero-resumo">Resumo do dia no Sistema Marsh.</p>
+          </div>
+        </div>
+
         <div class="stats-grid">
           <div class="stat-card" style="cursor:pointer" onclick="showPage('clientes')">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon"><svg class="icon"><use href="#i-users"/></svg></div>
             <div class="stat-content">
               <h3>Clientes</h3>
               <p id="total-clientes" class="stat-number">0</p>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer" onclick="showPage('fornecedores')">
-            <div class="stat-icon">🏢</div>
+            <div class="stat-icon"><svg class="icon"><use href="#i-building"/></svg></div>
             <div class="stat-content">
               <h3>Fornecedores</h3>
               <p id="total-fornecedores" class="stat-number">0</p>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer" onclick="showPage('tecnologias')">
-            <div class="stat-icon">💻</div>
+            <div class="stat-icon"><svg class="icon"><use href="#i-cpu"/></svg></div>
             <div class="stat-content">
               <h3>Tecnologias</h3>
               <p id="total-tecnologias" class="stat-number">0</p>
             </div>
           </div>
           <div class="stat-card" style="cursor:pointer" onclick="showPage('chamados')">
-            <div class="stat-icon">🎫</div>
+            <div class="stat-icon"><svg class="icon"><use href="#i-ticket"/></svg></div>
             <div class="stat-content">
-              <h3>Chamados Abertos</h3>
+              <h3>Chamados abertos</h3>
               <p id="total-chamados-abertos" class="stat-number">0</p>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">💵</div>
+            <div class="stat-icon"><svg class="icon"><use href="#i-trend-up"/></svg></div>
             <div class="stat-content">
               <h3>Entradas</h3>
               <p id="total-entradas" class="stat-number">R$ 0</p>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">📉</div>
+            <div class="stat-icon"><svg class="icon"><use href="#i-trend-down"/></svg></div>
             <div class="stat-content">
               <h3>Saídas</h3>
               <p id="total-saidas" class="stat-number">R$ 0</p>
             </div>
           </div>
           <div class="stat-card stat-card-full">
-            <div class="stat-icon">📊</div>
+            <div class="stat-icon"><svg class="icon"><use href="#i-scale"/></svg></div>
             <div class="stat-content">
               <h3>Saldo</h3>
               <p id="total-saldo" class="stat-number stat-saldo">R$ 0</p>
@@ -127,7 +188,7 @@
 
         <!-- Chamados recentes no dashboard -->
         <div style="margin-top:2rem;">
-          <h3 style="margin-bottom:1rem; color:#1e293b;">Chamados Recentes</h3>
+          <h3 class="secao-titulo">Chamados recentes</h3>
           <div class="table-container">
             <table>
               <thead>
@@ -288,6 +349,68 @@
             </thead>
             <tbody id="tecnologias-tbody">
               <tr><td colspan="7" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== LICENÇAS PAGE (conector Claude <-> SAP) ========== -->
+      <section id="licencas-page" class="page">
+        <div class="page-header">
+          <h2>Licenças do conector SAP</h2>
+          <button id="btn-nova-licenca" class="btn btn-primary">+ Nova licença</button>
+        </div>
+        <p class="pagina-descricao">
+          Contratos do conector Claude ↔ SAP por cliente. O uso mostra só contadores —
+          nunca código-fonte nem dados do SAP do cliente.
+        </p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Plano</th>
+                <th>Usuários (30 dias)</th>
+                <th>Sistemas</th>
+                <th>Validade</th>
+                <th>Status</th>
+                <th>Último contato</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="licencas-tbody">
+              <tr><td colspan="8" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== TREINAMENTOS PAGE (cursos em vídeo do portal) ========== -->
+      <section id="treinamentos-page" class="page">
+        <div class="page-header">
+          <h2>Treinamentos</h2>
+          <button id="btn-novo-curso" class="btn btn-primary">+ Novo curso</button>
+        </div>
+        <p class="pagina-descricao">
+          Cursos em vídeo para o portal do cliente. Só aparecem para o cliente quando estão
+          <strong>publicados</strong> e <strong>liberados</strong> para a empresa dele.
+          Vídeos: YouTube (não listado), Vimeo, Panda Video ou Bunny Stream.
+        </p>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Curso</th>
+                <th>Aulas</th>
+                <th>Com vídeo</th>
+                <th>Clientes</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="cursos-tbody">
+              <tr><td colspan="6" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -969,6 +1092,228 @@
     </div>
   </div>
 
+  <!-- MODAL: LICENÇA (cadastro / edição) -->
+  <div id="modal-licenca" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-licenca-titulo">Nova licença</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-licenca" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cliente *</label>
+            <select name="cliente_id" required></select>
+          </div>
+          <div class="form-group">
+            <label>Plano *</label>
+            <select name="plano" required>
+              <option value="leitura">Leitura (funcionais)</option>
+              <option value="desenvolvimento">Desenvolvimento (leitura + escrita)</option>
+              <option value="empresa">Empresa (time inteiro)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Sistemas SAP (SIDs) *</label>
+            <input type="text" name="sids" placeholder="DEV, QAS" required>
+            <small class="form-hint">Somente DEV/QAS. Separe por vírgula.</small>
+          </div>
+          <div class="form-group">
+            <label>Máximo de usuários</label>
+            <input type="number" name="max_usuarios" min="1" placeholder="Vazio = ilimitado">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Início do contrato</label>
+            <input type="date" name="data_inicio">
+          </div>
+          <div class="form-group">
+            <label>Fim do contrato *</label>
+            <input type="date" name="data_fim" required>
+          </div>
+        </div>
+        <div class="form-row" id="licenca-status-row" style="display:none">
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status">
+              <option value="ativa">Ativa</option>
+              <option value="suspensa">Suspensa (bloqueia o conector)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea name="observacoes" rows="2" placeholder="Ex.: proposta 2026-014, implantação inclusa"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar licença</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHAVE DA LICENÇA (exibida uma única vez) -->
+  <div id="modal-licenca-chave" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Chave da licença</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <div class="licenca-chave-corpo">
+        <p>Envie esta chave ao cliente (vai no <code>.env</code> do conector, em <code>SAP_LICENSE_KEY</code>).
+           <strong>Ela não será exibida de novo</strong> — se perder, gere uma nova.</p>
+        <div class="licenca-chave-box">
+          <code id="licenca-chave-texto">MRSH-XXXX-XXXX-XXXX</code>
+          <button type="button" class="btn btn-secondary" onclick="copiarChaveLicenca()">Copiar</button>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary btn-cancel">Já copiei</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CURSO (cadastro / edição) -->
+  <div id="modal-curso" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-curso-titulo">Novo curso</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-curso" class="form">
+        <div class="form-group">
+          <label>Título *</label>
+          <input type="text" name="titulo" required maxlength="200">
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea name="descricao" rows="2"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Capa</label>
+            <select name="capa">
+              <option value="abap">ABAP (azul)</option>
+              <option value="func">Funcional (azul-verde)</option>
+              <option value="fiori">Fiori (índigo)</option>
+              <option value="cpi">CPI / Integração</option>
+              <option value="geral">Geral</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Carga horária</label>
+            <input type="text" name="carga_horaria" placeholder="Ex.: ~20 h">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select name="status">
+            <option value="rascunho">Rascunho (invisível para clientes)</option>
+            <option value="publicado">Publicado</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar curso</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: AULAS DO CURSO -->
+  <div id="modal-aulas" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-aulas-titulo">Aulas</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <div id="aulas-lista" class="aulas-lista"></div>
+      <form id="form-aula" class="form aula-form">
+        <div class="form-section-title" id="form-aula-titulo">Nova aula</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Módulo</label>
+            <input type="text" name="modulo" placeholder="Ex.: Módulo 7">
+          </div>
+          <div class="form-group">
+            <label>Título *</label>
+            <input type="text" name="titulo" required maxlength="200">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Link do vídeo</label>
+            <input type="url" name="video_url" placeholder="https://youtu.be/... ou https://vimeo.com/...">
+          </div>
+          <div class="form-group">
+            <label>Duração (min)</label>
+            <input type="number" name="duracao_min" min="1">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Material de apoio (link)</label>
+            <input type="url" name="material_url" placeholder="https://... (PDF, slides)">
+          </div>
+          <div class="form-group">
+            <label>Ordem</label>
+            <input type="number" name="ordem" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea name="descricao" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="limparFormAula()">Limpar</button>
+          <button type="submit" class="btn btn-primary" id="btn-salvar-aula">Adicionar aula</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: LIBERAR CURSO PARA CLIENTES -->
+  <div id="modal-liberar" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-liberar-titulo">Liberar para clientes</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <p class="pagina-descricao" style="margin:0 0 12px">Os usuários do portal das empresas marcadas passam a ver o curso (se estiver publicado).</p>
+      <div id="liberar-lista" class="liberar-lista"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="salvarLiberacoes()">Salvar liberação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PROGRESSO DOS ALUNOS -->
+  <div id="modal-progresso" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-progresso-titulo">Progresso dos alunos</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <div id="progresso-corpo">Carregando...</div>
+    </div>
+  </div>
+
+  <!-- MODAL: USO DA LICENÇA (contadores dos últimos 30 dias) -->
+  <div id="modal-licenca-uso" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-licenca-uso-titulo">Uso nos últimos 30 dias</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <div id="licenca-uso-corpo" class="licenca-uso-corpo">Carregando...</div>
+    </div>
+  </div>
+
   <!-- MODAL: CHAMADO -->
   <div id="modal-chamado" class="modal">
     <div class="modal-content modal-lg">
@@ -1392,35 +1737,43 @@
   <!-- BOTTOM NAV (mobile) -->
   <nav class="bottom-nav">
     <button class="bottom-nav-item active" data-page="dashboard">
-      <span class="bn-icon">📊</span>
-      <span>Home</span>
-    </button>
-    <button class="bottom-nav-item" data-page="clientes">
-      <span class="bn-icon">👥</span>
-      <span>Clientes</span>
-    </button>
-    <button class="bottom-nav-item" data-page="tecnologias">
-      <span class="bn-icon">💻</span>
-      <span>Tecno</span>
+      <span class="bn-icon"><svg class="icon"><use href="#i-dash"/></svg></span>
+      <span>Início</span>
     </button>
     <button class="bottom-nav-item" data-page="chamados">
-      <span class="bn-icon">🎫</span>
+      <span class="bn-icon"><svg class="icon"><use href="#i-ticket"/></svg></span>
       <span>Chamados</span>
     </button>
+    <button class="bottom-nav-item" data-page="clientes">
+      <span class="bn-icon"><svg class="icon"><use href="#i-users"/></svg></span>
+      <span>Clientes</span>
+    </button>
+    <button class="bottom-nav-item" data-page="licencas">
+      <span class="bn-icon"><svg class="icon"><use href="#i-shield"/></svg></span>
+      <span>Licenças</span>
+    </button>
+    <button class="bottom-nav-item" data-page="treinamentos">
+      <span class="bn-icon"><svg class="icon"><use href="#i-cap"/></svg></span>
+      <span>Cursos</span>
+    </button>
+    <button class="bottom-nav-item" data-page="tecnologias">
+      <span class="bn-icon"><svg class="icon"><use href="#i-cpu"/></svg></span>
+      <span>Tecno</span>
+    </button>
     <button class="bottom-nav-item" data-page="transacoes">
-      <span class="bn-icon">💰</span>
+      <span class="bn-icon"><svg class="icon"><use href="#i-wallet"/></svg></span>
       <span>Finanças</span>
     </button>
     <button class="bottom-nav-item" data-page="categorias-transacao">
-      <span class="bn-icon">🏷️</span>
+      <span class="bn-icon"><svg class="icon"><use href="#i-tag"/></svg></span>
       <span>Categ.</span>
     </button>
     <button class="bottom-nav-item" data-page="usuarios">
-      <span class="bn-icon">🔑</span>
+      <span class="bn-icon"><svg class="icon"><use href="#i-key"/></svg></span>
       <span>Usuários</span>
     </button>
     <button class="bottom-nav-item" data-page="configuracoes">
-      <span class="bn-icon">⚙️</span>
+      <span class="bn-icon"><svg class="icon"><use href="#i-sliders"/></svg></span>
       <span>Config</span>
     </button>
   </nav>

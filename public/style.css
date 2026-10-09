@@ -139,6 +139,8 @@ h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 12px; }
   font-weight: 500;
 }
 .logo strong { font-weight: 700; }
+/* Símbolo "M" do logo (img/logo-simbolo.png, fundo transparente) */
+.logo-icon.logo-icon-img { background: none; box-shadow: none; object-fit: contain; padding: 0; }
 .logo-icon {
   width: 40px;
   height: 40px;

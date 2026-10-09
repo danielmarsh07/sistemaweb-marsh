@@ -30,10 +30,14 @@ const atendimentosRoutes = require('./routes/atendimentos');
 const usuariosRoutes = require('./routes/usuarios');
 const anexosRoutes = require('./routes/anexos');
 const assistenteRoutes = require('./routes/assistente');
+const licencasRoutes = require('./routes/licencas');
+const licencasConectorRoutes = require('./routes/licencas-conector');
+const treinamentosRoutes = require('./routes/treinamentos');
 const autenticar = require('./middleware/autenticar');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
+app.use('/api/licencas-conector', licencasConectorRoutes); // conector SAP: autentica pela chave da licença
 
 // Rotas protegidas
 app.use('/api/empresas', autenticar, empresasRoutes);
@@ -47,6 +51,8 @@ app.use('/api/chamados', autenticar, anexosRoutes); // anexos sob /api/chamados/
 app.use('/api/atendimentos', autenticar, atendimentosRoutes);
 app.use('/api/usuarios', autenticar, usuariosRoutes);
 app.use('/api/assistente', autenticar, assistenteRoutes);
+app.use('/api/licencas', autenticar, licencasRoutes);
+app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 
 // Rota de teste
 app.get('/api/ping', (req, res) => {
@@ -105,8 +111,25 @@ async function iniciar() {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tipo VARCHAR(50) DEFAULT 'admin_empresa';`);
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;`);
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cliente_id INTEGER;`);
-    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tema VARCHAR(20) DEFAULT 'dark';`);
-    await pool.query(`UPDATE usuarios SET tema = 'dark' WHERE tema IS NULL;`);
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tema VARCHAR(20) DEFAULT 'sereno';`);
+    await pool.query(`ALTER TABLE usuarios ALTER COLUMN tema SET DEFAULT 'sereno';`);
+    await pool.query(`UPDATE usuarios SET tema = 'sereno' WHERE tema IS NULL;`);
+
+    // Migrações de dados que devem rodar UMA vez só (o iniciar() roda a cada deploy)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS migracoes_app (
+        nome VARCHAR(100) PRIMARY KEY,
+        executada_em TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    // Tema Marsh Sereno vira o padrão de todos; depois disso cada um troca à vontade
+    const migTema = await pool.query(
+      `INSERT INTO migracoes_app (nome) VALUES ('tema_sereno_padrao') ON CONFLICT DO NOTHING RETURNING nome;`
+    );
+    if (migTema.rowCount) {
+      await pool.query(`UPDATE usuarios SET tema = 'sereno';`);
+      console.log('Migração tema_sereno_padrao: todos os usuários no tema Marsh Sereno');
+    }
     // Corrigir linhas com NULL (caso o ALTER anterior já existia sem DEFAULT aplicado)
     await pool.query(`UPDATE usuarios SET empresa_id = 1 WHERE empresa_id IS NULL;`);
     await pool.query(`UPDATE usuarios SET tipo = 'admin_empresa' WHERE tipo IS NULL;`);
@@ -383,6 +406,132 @@ async function iniciar() {
       WHERE rn = 1
       ON CONFLICT (empresa_id, nome, tipo) DO NOTHING;
     `);
+
+    // 20. Licenças do conector Claude <-> SAP (produto Marsh)
+    //     A chave nunca é guardada em texto: só o hash SHA-256 e o prefixo para exibição.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS licencas (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER DEFAULT 1,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        produto VARCHAR(50) DEFAULT 'conector_sap',
+        plano VARCHAR(30) NOT NULL DEFAULT 'leitura',
+        max_usuarios INTEGER,
+        sids VARCHAR(255) NOT NULL DEFAULT 'DEV',
+        data_inicio DATE NOT NULL DEFAULT CURRENT_DATE,
+        data_fim DATE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'ativa',
+        chave_hash VARCHAR(64) UNIQUE NOT NULL,
+        chave_prefixo VARCHAR(20) NOT NULL,
+        ultima_validacao TIMESTAMP,
+        versao_conector VARCHAR(30),
+        observacoes TEXT,
+        ativo BOOLEAN DEFAULT TRUE,
+        criado_por_usuario_id INTEGER,
+        atualizado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_licencas_emp ON licencas(empresa_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_licencas_cliente ON licencas(cliente_id);`);
+
+    //     Uso: só contadores por dia/SID/usuário (hash)/ferramenta — nunca código ou dados do SAP
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS licencas_uso (
+        id SERIAL PRIMARY KEY,
+        licenca_id INTEGER NOT NULL REFERENCES licencas(id),
+        data DATE NOT NULL,
+        sid VARCHAR(10) NOT NULL,
+        usuario_hash VARCHAR(64) NOT NULL,
+        ferramenta VARCHAR(50) NOT NULL,
+        chamadas INTEGER NOT NULL DEFAULT 0,
+        recusas INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (licenca_id, data, sid, usuario_hash, ferramenta)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_licencas_uso_lic_data ON licencas_uso(licenca_id, data);`);
+
+    // 21. Treinamentos (portal do cliente): cursos, aulas, liberação por cliente, progresso por usuário
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cursos (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER DEFAULT 1,
+        titulo VARCHAR(200) NOT NULL,
+        descricao TEXT,
+        capa VARCHAR(20) DEFAULT 'abap',
+        carga_horaria VARCHAR(50),
+        status VARCHAR(20) NOT NULL DEFAULT 'rascunho',
+        ordem INTEGER DEFAULT 0,
+        ativo BOOLEAN DEFAULT TRUE,
+        criado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP
+      );
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cursos_aulas (
+        id SERIAL PRIMARY KEY,
+        curso_id INTEGER NOT NULL REFERENCES cursos(id),
+        modulo VARCHAR(200),
+        titulo VARCHAR(200) NOT NULL,
+        descricao TEXT,
+        video_url VARCHAR(500),
+        material_url VARCHAR(500),
+        duracao_min INTEGER,
+        ordem INTEGER DEFAULT 0,
+        ativo BOOLEAN DEFAULT TRUE
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_cursos_aulas_curso ON cursos_aulas(curso_id);`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cursos_liberacoes (
+        id SERIAL PRIMARY KEY,
+        curso_id INTEGER NOT NULL REFERENCES cursos(id),
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        data_fim DATE,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        UNIQUE (curso_id, cliente_id)
+      );
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cursos_progresso (
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+        aula_id INTEGER NOT NULL REFERENCES cursos_aulas(id),
+        concluida_em TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (usuario_id, aula_id)
+      );
+    `);
+
+    // Pontapé inicial (uma vez): os dois cursos da grade v0.1 como rascunho, um item por módulo
+    const migCursos = await pool.query(
+      `INSERT INTO migracoes_app (nome) VALUES ('cursos_iniciais') ON CONFLICT DO NOTHING RETURNING nome;`
+    );
+    if (migCursos.rowCount) {
+      const cursosIniciais = [
+        ['IA no Desenvolvimento ABAP', 'Ler, entender, alterar e testar código SAP com IA e governança.', 'abap', '~20 h', [
+          'Por que mudar a forma de desenvolver', 'Fundamentos de IA para quem programa',
+          'Segurança e dados: a conversa com a TI', 'Montando o ambiente', 'Lendo o sistema com IA',
+          'Entendendo e documentando legado', 'Alterando código com governança',
+          'Classes, includes, funções e formulários', 'Qualidade: testes e revisão',
+          'Casos Brasil: fiscal', 'Trabalhando em equipe e em escala', 'Projeto final']],
+        ['IA para Consultores Funcionais SAP', 'Consultar o sistema, entender os Z, especificar e testar sem depender do ABAP.', 'func', '~16 h', [
+          'O funcional com superpoderes', 'Fundamentos e segurança', 'Consultando o SAP em linguagem natural',
+          'Entendendo os desenvolvimentos Z', 'Especificações com IA', 'Testes', 'Suporte e AMS',
+          'Trilhas por módulo (SD, MM, FI/CO, Fiscal BR)', 'Documentação e comunicação', 'Projeto final']]
+      ];
+      for (const [i, [titulo, descricao, capa, carga, modulos]] of cursosIniciais.entries()) {
+        const c = await pool.query(
+          `INSERT INTO cursos (empresa_id, titulo, descricao, capa, carga_horaria, status, ordem)
+           VALUES (1, $1, $2, $3, $4, 'rascunho', $5) RETURNING id`, [titulo, descricao, capa, carga, i]);
+        for (const [j, m] of modulos.entries()) {
+          await pool.query(
+            `INSERT INTO cursos_aulas (curso_id, modulo, titulo, ordem) VALUES ($1, $2, $3, $4)`,
+            [c.rows[0].id, `Módulo ${j + 1}`, m, j]);
+        }
+      }
+      console.log('Migração cursos_iniciais: cursos ABAP e Funcional criados como rascunho');
+    }
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

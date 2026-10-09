@@ -13,7 +13,7 @@ function apenasAdmin(req, res, next) {
   next();
 }
 
-const TEMAS_VALIDOS = ['dark', 'light', 'enterprise'];
+const TEMAS_VALIDOS = ['sereno', 'sereno-escuro', 'dark', 'light', 'enterprise'];
 
 // GET /api/usuarios/me — perfil + preferências do usuário logado
 router.get('/me', async (req, res) => {

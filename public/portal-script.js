@@ -48,11 +48,11 @@ function renderThemePickerPortal() {
     <div class="theme-card ${t.id === ativo ? 'is-active' : ''}" data-theme-id="${t.id}" role="button" tabindex="0">
       <span class="theme-card-check" aria-hidden="true">✓</span>
       <div class="theme-preview" style="background:${t.swatches[0]}">
-        <div class="theme-preview-sidebar" style="background:${t.id === 'enterprise' ? '#ffffff' : (t.id === 'light' ? 'rgba(10,10,10,0.92)' : 'rgba(2,8,23,0.78)')}; border-right:1px solid ${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.08)'}"></div>
+        <div class="theme-preview-sidebar" style="background:${t.sidebar}; border-right:1px solid ${t.borda}"></div>
         <div class="theme-preview-main">
           <span class="theme-preview-bar long"  style="background:${t.swatches[3]}; opacity:0.85"></span>
           <span class="theme-preview-bar short" style="background:${t.swatches[2]}"></span>
-          <span class="theme-preview-card"      style="background:${t.swatches[1]}; border-color:${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.10)'}"></span>
+          <span class="theme-preview-card"      style="background:${t.swatches[1]}; border-color:${t.borda}"></span>
         </div>
       </div>
       <div class="theme-card-info">
@@ -112,7 +112,9 @@ function sair() {
 async function carregarPortal() {
   await Promise.all([
     carregarChamados(),
-    carregarTecnologias()
+    carregarTecnologias(),
+    carregarTreinamentos(),
+    carregarLicencasPortal()
   ]);
 }
 
@@ -687,6 +689,180 @@ async function salvarNovoChamado(e) {
   arquivosPendentes = [];
   fecharModal('modal-novo-chamado');
   await carregarChamados();
+}
+
+// ===== TREINAMENTOS =====
+let cursosPortal = [];
+let cursoAberto = null;   // { ...curso, aulas: [...] }
+let aulaAtual = 0;
+
+const ICONE_CURSO = {
+  abap: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+  func: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
+  fiori: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  cpi: '<path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/>',
+  geral: '<path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>'
+};
+const svgCurso = capa => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_CURSO[capa] || ICONE_CURSO.geral}</svg>`;
+
+async function carregarTreinamentos() {
+  const res = await apiFetch(`${API}/treinamentos/meus`);
+  if (!res || !res.ok) return;
+  cursosPortal = await res.json();
+  const secao = document.getElementById('secao-treinamentos');
+  secao.hidden = !cursosPortal.length;
+  document.getElementById('lista-cursos').innerHTML = cursosPortal.map(c => {
+    const pct = c.total_aulas ? Math.round(100 * c.concluidas / c.total_aulas) : 0;
+    const capa = ICONE_CURSO[c.capa] ? c.capa : 'geral';
+    return `
+      <div class="curso-card" role="button" tabindex="0" onclick="abrirCurso(${c.id})"
+           onkeydown="if(event.key==='Enter'){abrirCurso(${c.id})}">
+        <div class="curso-capa capa-${capa}">${svgCurso(capa)}</div>
+        <div class="curso-corpo">
+          <h4>${escapeHtml(c.titulo)}</h4>
+          <p>${escapeHtml(c.descricao || '')}</p>
+          <div class="curso-meta"><span>${c.total_aulas} aulas${c.carga_horaria ? ' · ' + escapeHtml(c.carga_horaria) : ''}</span><span>${pct}%</span></div>
+          <div class="barra-curso"><i style="width:${pct}%"></i></div>
+          <div class="curso-acoes">
+            <span class="btn-curso">${pct === 0 ? 'Começar' : pct === 100 ? 'Rever' : 'Continuar'}</span>
+            ${pct === 100 ? `<button class="btn-curso secundario" type="button" onclick="event.stopPropagation(); emitirCertificado(${c.id})">Certificado</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function abrirCurso(id) {
+  const res = await apiFetch(`${API}/treinamentos/meus/${id}`);
+  if (!res) return;
+  const dados = await res.json();
+  if (!res.ok) { alert(dados.erro); return; }
+  cursoAberto = dados;
+  document.getElementById('curso-titulo').textContent = dados.titulo;
+  const primeiraPendente = dados.aulas.findIndex(a => !a.concluida);
+  selecionarAula(primeiraPendente >= 0 ? primeiraPendente : 0);
+  abrirModal('modal-curso');
+}
+
+function renderListaAulas() {
+  const aulas = cursoAberto.aulas;
+  const feitas = aulas.filter(a => a.concluida).length;
+  const pct = aulas.length ? Math.round(100 * feitas / aulas.length) : 0;
+  document.getElementById('curso-progresso-txt').textContent = `${feitas} de ${aulas.length} aulas concluídas (${pct}%)`;
+  document.getElementById('curso-progresso-barra').style.width = `${pct}%`;
+  document.getElementById('curso-aulas').innerHTML = aulas.map((a, i) => `
+    <li class="${a.concluida ? 'feita' : ''}">
+      <button type="button" class="${i === aulaAtual ? 'ativa' : ''}" onclick="selecionarAula(${i})">
+        <span class="marca">${a.concluida ? '✓' : i + 1}</span>
+        <span>${escapeHtml(a.titulo)}<small>${escapeHtml(a.modulo || '')}${a.duracao_min ? ' · ' + a.duracao_min + ' min' : ''}</small></span>
+      </button>
+    </li>`).join('');
+}
+
+function selecionarAula(i) {
+  aulaAtual = i;
+  const a = cursoAberto.aulas[i];
+  const wrap = document.getElementById('video-wrap');
+  if (a && a.video_url) {
+    // URL vem normalizada pelo servidor (só players permitidos); escapada mesmo assim
+    wrap.innerHTML = `<iframe src="${escapeHtml(a.video_url)}" title="${escapeHtml(a.titulo)}"
+      allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  } else {
+    wrap.textContent = 'Vídeo desta aula em breve.';
+  }
+  document.getElementById('aula-titulo').textContent = a ? a.titulo : '';
+  document.getElementById('aula-descricao').textContent = a ? (a.descricao || '') : '';
+  const mat = document.getElementById('aula-material');
+  mat.hidden = !(a && a.material_url);
+  if (a && a.material_url) mat.href = a.material_url;
+  const btn = document.getElementById('btn-concluir');
+  btn.textContent = a && a.concluida ? '✓ Concluída (desfazer)' : 'Marcar como concluída';
+  btn.classList.toggle('feito', !!(a && a.concluida));
+  renderListaAulas();
+}
+
+async function alternarConclusao() {
+  const a = cursoAberto.aulas[aulaAtual];
+  if (!a) return;
+  const res = await apiFetch(`${API}/treinamentos/aulas/${a.id}/concluir`, {
+    method: 'POST', body: JSON.stringify({ concluida: !a.concluida }) });
+  if (!res || !res.ok) return;
+  a.concluida = !a.concluida;
+  // Concluiu: avança para a próxima pendente
+  const proxima = cursoAberto.aulas.findIndex((x, i) => i > aulaAtual && !x.concluida);
+  selecionarAula(a.concluida && proxima >= 0 ? proxima : aulaAtual);
+}
+
+function fecharCurso() {
+  document.getElementById('video-wrap').innerHTML = ''; // para o vídeo
+  fecharModal('modal-curso');
+  carregarTreinamentos();
+}
+
+// Fechar clicando fora também precisa parar o vídeo e atualizar o progresso nos cartões
+document.getElementById('modal-curso')?.addEventListener('click', e => {
+  if (e.target.id === 'modal-curso') fecharCurso();
+});
+
+function emitirCertificado(id) {
+  const c = cursosPortal.find(x => x.id === id);
+  if (!c) return;
+  const data = new Date(c.ultima_conclusao || Date.now()).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const w = window.open('', '_blank');
+  if (!w) { alert('Permita pop-ups para abrir o certificado.'); return; }
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Certificado</title>
+    <style>
+      @page { size: A4 landscape; margin: 0; }
+      body { margin: 0; font-family: Inter, 'Segoe UI', Arial, sans-serif; color: #13233a; }
+      .folha { box-sizing: border-box; width: 297mm; height: 210mm; padding: 22mm 26mm; position: relative;
+        background: linear-gradient(135deg, #f2f6fb 0%, #ffffff 55%, #e3effc 100%); border: 10px solid #1d6fd8; }
+      .marca { display: flex; align-items: center; gap: 12px; }
+      .m { width: 52px; height: 52px; object-fit: contain; }
+      .marca strong { display: block; letter-spacing: .2em; font-size: 20px; }
+      .marca span { display: block; letter-spacing: .42em; font-size: 10px; color: #5f7088; }
+      h1 { font-size: 40px; margin: 22mm 0 6mm; letter-spacing: -.01em; }
+      .nome { font-size: 34px; font-weight: 700; color: #1d6fd8; margin: 4mm 0; }
+      p { font-size: 17px; line-height: 1.6; max-width: 200mm; }
+      .rodape { position: absolute; bottom: 20mm; left: 26mm; right: 26mm; display: flex; justify-content: space-between; font-size: 13px; color: #5f7088; }
+      @media print { .nao-imprimir { display: none; } }
+    </style></head><body>
+    <div class="folha">
+      <div class="marca"><img class="m" src="${location.origin}/img/logo-simbolo.png" alt=""><div><strong>MARSH</strong><span>CONSULTORIA</span></div></div>
+      <h1>Certificado de conclusão</h1>
+      <p>Certificamos que</p>
+      <div class="nome">${escapeHtml(usuario.nome)}</div>
+      <p>concluiu o curso <strong>${escapeHtml(c.titulo)}</strong>${c.carga_horaria ? `, com carga horária de ${escapeHtml(c.carga_horaria)}` : ''},
+         oferecido pela Marsh Consultoria${usuario.empresa_nome ? ` à ${escapeHtml(usuario.empresa_nome)}` : ''}.</p>
+      <div class="rodape"><span>Emitido em ${escapeHtml(data)}</span><span>Marsh Consultoria — SAP | IA</span></div>
+    </div>
+    <p class="nao-imprimir" style="text-align:center"><button onclick="print()">Imprimir / salvar em PDF</button></p>
+    </body></html>`);
+  w.document.close();
+}
+
+// ===== LICENÇA DO CONECTOR SAP (só leitura para o cliente) =====
+async function carregarLicencasPortal() {
+  const res = await apiFetch(`${API}/licencas/minhas`);
+  if (!res || !res.ok) return;
+  const lista = await res.json();
+  document.getElementById('secao-licenca').hidden = !lista.length;
+  const planos = { leitura: 'Leitura', desenvolvimento: 'Desenvolvimento', empresa: 'Empresa' };
+  const hoje = new Date().toISOString().slice(0, 10);
+  document.getElementById('lista-licencas').innerHTML = lista.map(l => {
+    const fim = String(l.data_fim).slice(0, 10);
+    const vencida = fim < hoje;
+    const st = l.status === 'suspensa' ? ['Suspensa', '#f59e0b'] : vencida ? ['Vencida', '#ef4444'] : ['Ativa', '#10b981'];
+    return `
+      <div class="licenca-card">
+        <h4>Plano ${escapeHtml(planos[l.plano] || l.plano)}
+          <span style="background:${st[1]}20; color:${st[1]}; padding:2px 8px; border-radius:20px; font-size:0.75rem; font-weight:600">${st[0]}</span></h4>
+        <div class="linha"><span>Válida até</span><strong>${fim.split('-').reverse().join('/')}</strong></div>
+        <div class="linha"><span>Sistemas</span><strong>${escapeHtml(String(l.sids).replace(/,/g, ', '))}</strong></div>
+        <div class="linha"><span>Usuários ativos (30 dias)</span><strong>${l.usuarios_ativos}${l.max_usuarios ? ' de ' + l.max_usuarios : ''}</strong></div>
+        <div class="linha"><span>Uso do conector (30 dias)</span><strong>${Number(l.chamadas_30d).toLocaleString('pt-BR')} operações</strong></div>
+      </div>`;
+  }).join('');
 }
 
 // ===== MODAL HELPERS =====

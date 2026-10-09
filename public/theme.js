@@ -1,5 +1,5 @@
 /**
- * theme.js — gerencia tema da aplicação (dark / light / enterprise).
+ * theme.js — gerencia tema da aplicação (sereno / sereno-escuro / dark / light / enterprise).
  *
  * Carrega no <head> ANTES do CSS para aplicar instantaneamente e
  * evitar "flash of unstyled content" (FOUC).
@@ -12,7 +12,7 @@
  *      dispositivo. setTheme() envia PUT /api/usuarios/me/tema.
  *
  * API global:
- *   Theme.get()                → string ('dark'|'light'|'enterprise')
+ *   Theme.get()                → string ('sereno'|'sereno-escuro'|'dark'|'light'|'enterprise')
  *   Theme.set(t, {persist})    → aplica + grava local + (se logado) salva server
  *   Theme.list()               → metadata dos temas (para UI)
  *   Theme.onChange(cb)         → escuta mudanças
@@ -21,27 +21,47 @@
   'use strict';
 
   const KEY = 'marsh.theme';
-  const VALID = ['dark', 'light', 'enterprise'];
-  const DEFAULT = 'dark';
+  const VALID = ['sereno', 'sereno-escuro', 'dark', 'light', 'enterprise'];
+  const DEFAULT = 'sereno';
+  // 'dark' é o CSS base (:root sem atributo); todos os outros usam data-theme
+  const BASE_CSS = 'dark';
 
+  // sidebar/borda: usados pela miniatura do seletor de tema (Configurações)
   const META = {
+    sereno: {
+      id: 'sereno',
+      nome: 'Marsh Sereno',
+      descricao: 'Tema padrão. Claro, sóbrio e confortável para longas jornadas — azul céu e branco gelo.',
+      swatches: ['#f2f6fb', '#fcfdff', '#1d6fd8', '#13233a'],
+      sidebar: '#e9f0f8', borda: '#dde6f0'
+    },
+    'sereno-escuro': {
+      id: 'sereno-escuro',
+      nome: 'Marsh Sereno Escuro',
+      descricao: 'A mesma paleta do Sereno para trabalhar à noite: marinho profundo, sem brilho.',
+      swatches: ['#0b1424', '#121e33', '#4f9cf0', '#e4ecf6'],
+      sidebar: '#0e192c', borda: 'rgba(148,178,214,0.14)'
+    },
     dark: {
       id: 'dark',
       nome: 'Marsh Dark',
-      descricao: 'Tema padrão. Futurista, com glassmorphism e neon discreto.',
-      swatches: ['#020817', '#1e293b', '#2563eb', '#22d3ee']
+      descricao: 'Futurista, com glassmorphism e neon discreto.',
+      swatches: ['#020817', '#1e293b', '#2563eb', '#22d3ee'],
+      sidebar: 'rgba(2,8,23,0.78)', borda: 'rgba(255,255,255,0.10)'
     },
     light: {
       id: 'light',
       nome: 'Marsh Light',
       descricao: 'Claro e moderno. Inspirado em Vercel e Linear, mantém o glass.',
-      swatches: ['#f5f5f7', '#ffffff', '#2563eb', '#0a0a0a']
+      swatches: ['#f5f5f7', '#ffffff', '#2563eb', '#0a0a0a'],
+      sidebar: 'rgba(10,10,10,0.92)', borda: 'rgba(255,255,255,0.10)'
     },
     enterprise: {
       id: 'enterprise',
       nome: 'Marsh Enterprise',
       descricao: 'Sério e corporativo. Visual SAP Fiori — sem glass, foco em formalidade.',
-      swatches: ['#f5f6f7', '#ffffff', '#0070f2', '#1d2d3e']
+      swatches: ['#f5f6f7', '#ffffff', '#0070f2', '#1d2d3e'],
+      sidebar: '#ffffff', borda: '#d5dadc'
     }
   };
 
@@ -61,7 +81,7 @@
 
   function aplicar(t) {
     const valor = VALID.includes(t) ? t : DEFAULT;
-    if (valor === DEFAULT) {
+    if (valor === BASE_CSS) {
       document.documentElement.removeAttribute('data-theme');
     } else {
       document.documentElement.setAttribute('data-theme', valor);
@@ -75,7 +95,7 @@
 
   const Theme = {
     get() {
-      return document.documentElement.getAttribute('data-theme') || DEFAULT;
+      return document.documentElement.getAttribute('data-theme') || BASE_CSS;
     },
 
     list() {

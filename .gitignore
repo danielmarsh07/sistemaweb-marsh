@@ -9,6 +9,9 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Chave privada das licenças (vai só para o Render > Environment)
+.licenca_chave_privada.txt
+
 # IDE
 .vscode/
 .idea/

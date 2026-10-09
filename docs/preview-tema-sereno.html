@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prévia — Tema Marsh Sereno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Marsh Sereno — prévia estática (dados fictícios)
+   Tokens com os mesmos nomes do styles.css para migrar direto.
+   ===================================================================== */
+:root {
+  /* Paleta tirada das imagens da marca: branco gelo, azul ceu, ciano de rede, marinho */
+  --bg-main:        #f2f6fb;   /* gelo azulado: menos ofuscante que branco puro */
+  --bg-card:        #fcfdff;
+  --bg-card-solid:  #fcfdff;
+  --bg-sidebar:     #e9f0f8;
+  --bg-hover:       #edf3fa;
+  --bg-subtle:      #f5f8fc;
+
+  --primary:        #1d6fd8;   /* azul ceu das imagens */
+  --primary-hover:  #155bb5;
+  --primary-soft:   #e3effc;
+  --primary-ring:   rgba(29, 111, 216, 0.22);
+  --accent-cyan:    #13a8e0;   /* linhas de rede / brilho */
+  --navy:           #0b2a55;   /* marinho profundo */
+
+  --text-main:      #13233a;   /* marinho-grafite, nao preto */
+  --text-secondary: #34465e;
+  --text-muted:     #5f7088;
+  --text-subtle:    #8494aa;
+
+  --border:         #dde6f0;
+  --border-strong:  #c8d4e2;
+
+  --green:  #2e7d4f;  --green-soft:  #e6f2ea;
+  --red:    #b42318;  --red-soft:    #fbeae8;
+  --amber:  #a15c07;  --amber-soft:  #fbf0de;
+  --violet: #6941c6;  --violet-soft: #f0ebfa;
+
+  --radius:    10px;
+  --radius-lg: 14px;
+  --shadow:    0 1px 2px rgba(11, 42, 85, 0.05), 0 1px 1px rgba(11, 42, 85, 0.03);
+  --shadow-elevated: 0 12px 32px rgba(11, 42, 85, 0.14), 0 2px 6px rgba(11, 42, 85, 0.06);
+
+  /* Imagens da marca (salvar em public/img/). Sem o arquivo, fica o degrade de reserva. */
+  --img-cidade: url("../public/img/sereno-cidade.webp");
+  --img-ia:     url("../public/img/sereno-ia.webp");
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font); font-size: 14px; line-height: 1.5;
+  background: var(--bg-main); color: var(--text-main);
+  display: flex; min-height: 100vh;
+}
+button { font-family: inherit; }
+.icon { width: 18px; height: 18px; flex-shrink: 0; stroke: currentColor; fill: none;
+        stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Faixa da prévia (não faz parte do sistema) ---------- */
+.preview-bar {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50;
+  display: flex; gap: 4px; padding: 4px; border-radius: 999px;
+  background: #1c1f24; box-shadow: var(--shadow-elevated);
+}
+.preview-bar button {
+  border: 0; background: transparent; color: #c9ccd1; padding: 6px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.preview-bar button.on { background: #fff; color: #1c1f24; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: 248px; flex-shrink: 0; background: var(--bg-sidebar);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+}
+.sidebar-header { display: flex; align-items: center; gap: 10px; padding: 18px 18px 14px; }
+.logo-box {
+  width: 32px; height: 32px; border-radius: 9px; color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
+  display: grid; place-items: center; font-weight: 700; font-size: 15px; letter-spacing: -0.02em;
+}
+.sidebar-header strong { display: block; font-size: 14px; font-weight: 600; }
+.sidebar-header span { display: block; font-size: 12px; color: var(--text-muted); }
+.sidebar-search {
+  margin: 4px 12px 10px; display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-subtle); font-size: 13px;
+}
+.sidebar-search kbd {
+  margin-left: auto; font-family: inherit; font-size: 11px; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; background: var(--bg-subtle);
+}
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 4px 10px 12px; }
+.nav-group { margin-top: 14px; }
+.nav-group-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-subtle); padding: 0 10px 6px;
+}
+.nav-link {
+  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px;
+  border-radius: 8px; color: var(--text-secondary); text-decoration: none; font-weight: 500;
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.nav-link:hover { background: rgba(11, 42, 85, 0.05); color: var(--text-main); }
+.nav-link.active { background: var(--bg-card); color: var(--primary); box-shadow: var(--shadow), 0 0 0 1px var(--border); }
+.nav-link .count {
+  margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text-muted);
+  background: rgba(11, 42, 85, 0.06); border-radius: 999px; padding: 1px 7px;
+}
+.nav-link.active .count { background: var(--primary-soft); color: var(--primary); }
+.nav-link .tag-novo {
+  margin-left: auto; font-size: 10px; font-weight: 600; color: var(--violet);
+  background: var(--violet-soft); border-radius: 999px; padding: 1px 7px;
+}
+.sidebar-footer {
+  border-top: 1px solid var(--border); padding: 12px; display: flex; align-items: center; gap: 10px;
+}
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--primary-soft); color: var(--primary);
+  display: grid; place-items: center; font-weight: 600; font-size: 12px; flex-shrink: 0;
+}
+.sidebar-footer .who { min-width: 0; }
+.sidebar-footer .who strong { display: block; font-size: 13px; font-weight: 600; }
+.sidebar-footer .who span { display: block; font-size: 12px; color: var(--text-muted); }
+.icon-btn {
+  margin-left: auto; width: 32px; height: 32px; border-radius: 8px; border: 0; background: transparent;
+  color: var(--text-muted); display: grid; place-items: center; cursor: pointer;
+}
+.icon-btn:hover { background: rgba(11, 42, 85, 0.06); color: var(--text-main); }
+
+/* ---------- Main ---------- */
+.main-content { flex: 1; min-width: 0; }
+.header {
+  height: 64px; display: flex; align-items: center; gap: 16px; padding: 0 32px;
+  border-bottom: 1px solid var(--border); background: rgba(242, 246, 251, 0.85);
+  position: sticky; top: 0; z-index: 5; backdrop-filter: saturate(140%) blur(8px);
+}
+.breadcrumb { font-size: 13px; color: var(--text-muted); }
+.breadcrumb b { color: var(--text-main); font-weight: 600; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.dot { position: relative; }
+.dot::after { content: ""; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--red); border: 2px solid var(--bg-main); }
+.container { padding: 28px 32px 48px; max-width: 1280px; }
+
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.page-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.page-header p { color: var(--text-muted); margin-top: 2px; }
+
+/* ---------- Botões ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
+  border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent;
+  transition: background .15s, border-color .15s, box-shadow .15s; white-space: nowrap;
+}
+.btn .icon { width: 16px; height: 16px; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-secondary { background: var(--bg-card); color: var(--text-main); border-color: var(--border-strong); }
+.btn-secondary:hover { background: var(--bg-hover); }
+.btn-ghost { background: transparent; color: var(--text-secondary); }
+.btn-ghost:hover { background: rgba(11, 42, 85, 0.05); }
+.btn-danger-soft { background: var(--red-soft); color: var(--red); }
+.btn:focus-visible, .nav-link:focus-visible, .icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+
+/* ---------- Cards / stats ---------- */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.stat-card { padding: 16px 18px; }
+.stat-top { display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); font-size: 13px; font-weight: 500; }
+.stat-icon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--bg-subtle); color: var(--text-secondary); border: 1px solid var(--border); }
+.stat-number { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin-top: 8px; }
+.stat-delta { font-size: 12px; font-weight: 500; margin-top: 2px; display: inline-flex; align-items: center; gap: 4px; }
+.stat-delta .icon { width: 14px; height: 14px; }
+.up { color: var(--green); } .down { color: var(--red); } .muted { color: var(--text-muted); }
+
+.grid-2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.card-header h3 { font-size: 15px; font-weight: 600; }
+.card-header a { font-size: 13px; color: var(--primary); text-decoration: none; font-weight: 500; }
+
+/* ---------- Tabela ---------- */
+.table-container { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted);
+  padding: 10px 18px; border-bottom: 1px solid var(--border); background: var(--bg-subtle); white-space: nowrap;
+}
+td { padding: 12px 18px; border-bottom: 1px solid var(--border); color: var(--text-secondary); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { transition: background .12s; }
+tbody tr:hover { background: var(--bg-hover); }
+td strong { color: var(--text-main); font-weight: 500; }
+td .sub { display: block; font-size: 12px; color: var(--text-muted); }
+.td-actions { text-align: right; white-space: nowrap; }
+
+/* ---------- Badges ---------- */
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .85; }
+.badge-aberto { background: var(--primary-soft); color: var(--primary); }
+.badge-andamento { background: var(--amber-soft); color: var(--amber); }
+.badge-resolvido { background: var(--green-soft); color: var(--green); }
+.badge-alta { background: var(--red-soft); color: var(--red); }
+.badge-neutro { background: rgba(11, 42, 85, 0.06); color: var(--text-secondary); }
+.badge-plano { background: var(--violet-soft); color: var(--violet); }
+
+/* ---------- Filtros / inputs ---------- */
+.filtros-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); }
+.input {
+  height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-strong);
+  background: var(--bg-card); color: var(--text-main); font: inherit; min-width: 0;
+}
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
+.input-search { flex: 1 1 240px; padding-left: 34px; background-repeat: no-repeat; background-position: 11px center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c9198' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E"); }
+.filtros-contador { align-self: center; margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+/* ---------- Licenças ---------- */
+.lic-uso { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.meter-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.meter-label span:last-child { color: var(--text-muted); }
+.meter { height: 8px; border-radius: 999px; background: rgba(11, 42, 85, 0.07); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.meter i.warn { background: var(--amber); }
+.key { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 12px; background: var(--bg-subtle);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; color: var(--text-secondary); }
+
+/* ---------- Treinamentos (portal) ---------- */
+.cursos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.curso { overflow: hidden; display: flex; flex-direction: column; }
+.curso-capa { height: 112px; display: grid; place-items: center; color: #fff; }
+.curso-capa.abap { background: linear-gradient(135deg, #0b2a55, #1d6fd8 70%, #13a8e0); }
+.curso-capa.func { background: linear-gradient(135deg, #0e3a6b, #1785c9 70%, #3cc3e8); }
+.curso-capa.fiori { background: linear-gradient(135deg, #1b2f6e, #4a63d6 70%, #7fa7f0); }
+
+/* ---------- Banner com imagem da marca ---------- */
+.hero {
+  position: relative; overflow: hidden; border-radius: var(--radius-lg); border: 1px solid var(--border);
+  min-height: 148px; padding: 24px 28px; margin-bottom: 20px; display: flex; align-items: center;
+  /* fundo: imagem + veu claro a esquerda para o texto ficar legivel; reserva em degrade */
+  background:
+    linear-gradient(90deg, rgba(242,246,251,0.97) 0%, rgba(242,246,251,0.85) 38%, rgba(242,246,251,0) 70%),
+    var(--img-cidade) right center / cover no-repeat,
+    radial-gradient(120% 140% at 85% 50%, #9fd2f5 0%, #d6ebfa 35%, #eef5fc 70%);
+}
+.hero.ia {
+  background:
+    linear-gradient(90deg, rgba(242,246,251,0.97) 0%, rgba(242,246,251,0.85) 40%, rgba(242,246,251,0) 72%),
+    var(--img-ia) right center / cover no-repeat,
+    radial-gradient(120% 140% at 85% 50%, #5aa9ec 0%, #b9dcf7 38%, #eef5fc 72%);
+}
+.hero h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--navy); }
+.hero p { color: var(--text-secondary); margin-top: 4px; max-width: 46ch; }
+.hero .btn { margin-top: 14px; }
+.curso-capa .icon { width: 34px; height: 34px; stroke-width: 1.5; }
+.curso-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.curso-body h4 { font-size: 15px; font-weight: 600; }
+.curso-body p { color: var(--text-muted); font-size: 13px; }
+.curso-body .meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: auto; }
+
+/* ---------- Modal (amostra) ---------- */
+.modal-demo { padding: 0; max-width: 520px; box-shadow: var(--shadow-elevated); }
+.modal-demo .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.modal-demo .modal-header h3 { font-size: 16px; font-weight: 600; }
+.modal-demo .modal-body { padding: 18px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+.form-group .input { width: 100%; }
+.form-group.full { grid-column: 1 / -1; }
+.hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.modal-demo .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--bg-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+
+.section-title { font-size: 15px; font-weight: 600; margin: 26px 0 12px; }
+.view { display: none; } .view.on { display: block; }
+
+/* ---------- Mobile (convenção do projeto: 768px) ---------- */
+.bottom-nav { display: none; }
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .header { padding: 0 16px; }
+  .container { padding: 18px 16px 90px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .grid-2, .cursos { grid-template-columns: 1fr; }
+  .page-header { flex-direction: column; align-items: stretch; }
+  .modal-demo .modal-body { grid-template-columns: 1fr; }
+  .table-container thead { display: none; }
+  .table-container tr { display: block; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .table-container td { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border: 0; }
+  .table-container td::before { content: attr(data-label); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+  .bottom-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: var(--bg-card);
+    border-top: 1px solid var(--border); justify-content: space-around; align-items: center; z-index: 20; }
+  .bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--text-muted); text-decoration: none; min-width: 44px; min-height: 44px; justify-content: center; }
+  .bottom-nav a.active { color: var(--primary); }
+  .preview-bar { top: auto; bottom: 76px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Ícones de linha (estilo Lucide, MIT) -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M2.6 17.4A2 2 0 0 0 2 18.8V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.2a2 2 0 0 0 1.4-.6l.8-.8a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r="1"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4z"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></symbol>
+</svg>
+
+<div class="preview-bar" role="tablist" aria-label="Escolher tela da prévia">
+  <button class="on" data-view="admin">Painel Marsh</button>
+  <button data-view="licencas">Licenças</button>
+  <button data-view="portal">Portal do cliente</button>
+</div>
+
+<!-- ===================== SIDEBAR ===================== -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo-box">M</div>
+    <div><strong>Marsh</strong><span>Consultoria SAP</span></div>
+  </div>
+  <div class="sidebar-search"><svg class="icon" style="width:15px;height:15px"><use href="#i-search"/></svg> Buscar <kbd>Ctrl K</kbd></div>
+  <nav class="sidebar-nav" aria-label="Menu principal">
+    <a class="nav-link active" data-view="admin"><svg class="icon"><use href="#i-dash"/></svg> Visão geral</a>
+    <div class="nav-group">
+      <div class="nav-group-title">Atendimento</div>
+      <a class="nav-link"><svg class="icon"><use href="#i-ticket"/></svg> Chamados <span class="count">7</span></a>
+      <a class="nav-link"><svg class="icon"><use href="#i-users"/></svg> Clientes</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">Produtos SAP</div>
+      <a class="nav-link" data-view="licencas"><svg class="icon"><use href="#i-shield"/></svg> Licenças <span class="tag-novo">novo</span></a>
+      <a class="nav-link" data-view="portal"><svg class="icon"><use href="#i-cap"/></svg> Treinamentos <span class="tag-novo">novo</span></a>
+      <a class="nav-link"><svg class="icon"><use href="#i-cpu"/></svg> Tecnologias</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">Financeiro</div>
+      <a class="nav-link"><svg class="icon"><use href="#i-wallet"/></svg> Transações</a>
+      <a class="nav-link"><svg class="icon"><use href="#i-tag"/></svg> Categorias</a>
+      <a class="nav-link"><svg class="icon"><use href="#i-building"/></svg> Fornecedores</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">Sistema</div>
+      <a class="nav-link"><svg class="icon"><use href="#i-key"/></svg> Usuários</a>
+      <a class="nav-link"><svg class="icon"><use href="#i-sliders"/></svg> Configurações</a>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="avatar">DL</div>
+    <div class="who"><strong>Daniel Lopes</strong><span>Administrador</span></div>
+    <button class="icon-btn" title="Sair" aria-label="Sair"><svg class="icon"><use href="#i-out"/></svg></button>
+  </div>
+</aside>
+
+<!-- ===================== MAIN ===================== -->
+<main class="main-content">
+  <header class="header">
+    <div class="breadcrumb" id="crumb">Marsh / <b>Visão geral</b></div>
+    <div class="header-right">
+      <button class="icon-btn" aria-label="Buscar"><svg class="icon"><use href="#i-search"/></svg></button>
+      <button class="icon-btn dot" aria-label="Notificações"><svg class="icon"><use href="#i-bell"/></svg></button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ========== VISÃO GERAL (admin) ========== -->
+    <section class="view on" id="v-admin">
+      <div class="hero">
+        <div>
+          <h1>Bom dia, Daniel</h1>
+          <p>Resumo de hoje, 9 de outubro: 7 chamados abertos, 2 com SLA vencendo e 3 licenças para renovar no mês.</p>
+          <button class="btn btn-primary"><svg class="icon"><use href="#i-plus"/></svg> Novo chamado</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card stat-card">
+          <div class="stat-top">Chamados abertos <span class="stat-icon"><svg class="icon"><use href="#i-ticket"/></svg></span></div>
+          <div class="stat-number num">7</div>
+          <div class="stat-delta muted">2 com SLA vencendo hoje</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-top">Clientes ativos <span class="stat-icon"><svg class="icon"><use href="#i-users"/></svg></span></div>
+          <div class="stat-number num">18</div>
+          <div class="stat-delta up"><svg class="icon"><use href="#i-up"/></svg> 2 este mês</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-top">Licenças ativas <span class="stat-icon"><svg class="icon"><use href="#i-shield"/></svg></span></div>
+          <div class="stat-number num">42</div>
+          <div class="stat-delta muted">3 renovam em 30 dias</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-top">Saldo do mês <span class="stat-icon"><svg class="icon"><use href="#i-wallet"/></svg></span></div>
+          <div class="stat-number num">R$ 48.320</div>
+          <div class="stat-delta up"><svg class="icon"><use href="#i-up"/></svg> 12% vs. setembro</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><h3>Chamados recentes</h3><a href="#">Ver todos</a></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>#</th><th>Título</th><th>Cliente</th><th>Status</th><th>Prioridade</th><th>SLA</th></tr></thead>
+              <tbody>
+                <tr><td data-label="#" class="num">#128</td><td data-label="Título"><strong>Rejeição 539 na NF-e de devolução</strong></td><td data-label="Cliente">Indústria Aurora</td><td data-label="Status"><span class="badge badge-andamento">Em andamento</span></td><td data-label="Prioridade"><span class="badge badge-alta">Alta</span></td><td data-label="SLA" class="num">2 h</td></tr>
+                <tr><td data-label="#" class="num">#127</td><td data-label="Título"><strong>Novo campo IBS/CBS no DANFE</strong></td><td data-label="Cliente">Grupo Vale Verde</td><td data-label="Status"><span class="badge badge-aberto">Aberto</span></td><td data-label="Prioridade"><span class="badge badge-neutro">Média</span></td><td data-label="SLA" class="num">1 dia</td></tr>
+                <tr><td data-label="#" class="num">#126</td><td data-label="Título"><strong>Ajuste no relatório de comissões</strong></td><td data-label="Cliente">Lumen Varejo</td><td data-label="Status"><span class="badge badge-resolvido">Resolvido</span></td><td data-label="Prioridade"><span class="badge badge-neutro">Baixa</span></td><td data-label="SLA" class="num">—</td></tr>
+                <tr><td data-label="#" class="num">#125</td><td data-label="Título"><strong>Dump no monitor de NFS-e</strong></td><td data-label="Cliente">Indústria Aurora</td><td data-label="Status"><span class="badge badge-resolvido">Resolvido</span></td><td data-label="Prioridade"><span class="badge badge-alta">Alta</span></td><td data-label="SLA" class="num">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card modal-demo">
+          <div class="modal-header"><h3>Novo chamado</h3><button class="icon-btn" aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button></div>
+          <div class="modal-body">
+            <div class="form-group full"><label>Título</label><input class="input" value="Rejeição 539 na NF-e de devolução"></div>
+            <div class="form-group"><label>Cliente</label><select class="input"><option>Indústria Aurora</option></select></div>
+            <div class="form-group"><label>Prioridade</label><select class="input"><option>Alta</option></select></div>
+            <div class="form-group full"><label>Descrição</label><input class="input" placeholder="Descreva o problema"><div class="hint">O cliente é avisado por e-mail ao abrir.</div></div>
+          </div>
+          <div class="modal-footer"><button class="btn btn-secondary">Cancelar</button><button class="btn btn-primary">Abrir chamado</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== LICENÇAS (admin) ========== -->
+    <section class="view" id="v-licencas">
+      <div class="page-header">
+        <div><h1>Licenças</h1><p>Contratos do conector Claude ↔ SAP por cliente.</p></div>
+        <button class="btn btn-primary"><svg class="icon"><use href="#i-plus"/></svg> Nova licença</button>
+      </div>
+      <div class="card">
+        <div class="filtros-bar">
+          <input class="input input-search" placeholder="Buscar cliente, chave ou SID">
+          <select class="input"><option>Todos os planos</option></select>
+          <select class="input"><option>Todos os status</option></select>
+          <span class="filtros-contador">4 licenças</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Cliente</th><th>Plano</th><th>Usuários</th><th>Sistemas</th><th>Validade</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td data-label="Cliente"><strong>Indústria Aurora</strong><span class="sub"><span class="key">MRSH-7Q2K-4XPA</span></span></td><td data-label="Plano"><span class="badge badge-plano">Desenvolvimento</span></td><td data-label="Usuários" class="num">8 / 10</td><td data-label="Sistemas">DEV, QAS</td><td data-label="Validade" class="num">30/09/2027</td><td data-label="Status"><span class="badge badge-resolvido">Ativa</span></td><td class="td-actions" data-label="Ações"><button class="btn btn-ghost"><svg class="icon"><use href="#i-pencil"/></svg> Editar</button></td></tr>
+              <tr><td data-label="Cliente"><strong>Grupo Vale Verde</strong><span class="sub"><span class="key">MRSH-9DLM-21RT</span></span></td><td data-label="Plano"><span class="badge badge-neutro">Leitura</span></td><td data-label="Usuários" class="num">14 / 15</td><td data-label="Sistemas">DEV</td><td data-label="Validade" class="num">05/11/2026</td><td data-label="Status"><span class="badge badge-andamento">Renova em 27 dias</span></td><td class="td-actions" data-label="Ações"><button class="btn btn-ghost"><svg class="icon"><use href="#i-pencil"/></svg> Editar</button></td></tr>
+              <tr><td data-label="Cliente"><strong>Lumen Varejo</strong><span class="sub"><span class="key">MRSH-3HNB-8KWE</span></span></td><td data-label="Plano"><span class="badge badge-plano">Empresa</span></td><td data-label="Usuários" class="num">23 / ∞</td><td data-label="Sistemas">DEV, QAS</td><td data-label="Validade" class="num">31/12/2027</td><td data-label="Status"><span class="badge badge-resolvido">Ativa</span></td><td class="td-actions" data-label="Ações"><button class="btn btn-ghost"><svg class="icon"><use href="#i-pencil"/></svg> Editar</button></td></tr>
+              <tr><td data-label="Cliente"><strong>Atlas Logística</strong><span class="sub"><span class="key">MRSH-5TZC-0PQV</span></span></td><td data-label="Plano"><span class="badge badge-neutro">Leitura</span></td><td data-label="Usuários" class="num">0 / 5</td><td data-label="Sistemas">DEV</td><td data-label="Validade" class="num">01/08/2026</td><td data-label="Status"><span class="badge badge-alta">Vencida</span></td><td class="td-actions" data-label="Ações"><button class="btn btn-ghost"><svg class="icon"><use href="#i-pencil"/></svg> Editar</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h2 class="section-title">Uso nos últimos 30 dias — Indústria Aurora</h2>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><h3>Atividade do conector</h3><span class="badge badge-neutro">Só contadores — nunca código ou dados</span></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Operação</th><th>Chamadas</th><th>Tendência</th></tr></thead>
+              <tbody>
+                <tr><td data-label="Operação"><strong>Leitura de fonte</strong></td><td data-label="Chamadas" class="num">1.284</td><td data-label="Tendência" class="up">+18%</td></tr>
+                <tr><td data-label="Operação"><strong>Consultas ao DDIC</strong></td><td data-label="Chamadas" class="num">642</td><td data-label="Tendência" class="up">+9%</td></tr>
+                <tr><td data-label="Operação"><strong>Gravações com request</strong></td><td data-label="Chamadas" class="num">57</td><td data-label="Tendência" class="up">+31%</td></tr>
+                <tr><td data-label="Operação"><strong>Gravações recusadas pelas travas</strong></td><td data-label="Chamadas" class="num">6</td><td data-label="Tendência" class="muted">estável</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Contrato</h3><span class="badge badge-resolvido">Ativa</span></div>
+          <div class="lic-uso">
+            <div><div class="meter-label"><span>Usuários</span><span class="num">8 de 10</span></div><div class="meter"><i style="width:80%"></i></div></div>
+            <div><div class="meter-label"><span>Vigência</span><span class="num">11 de 12 meses restantes</span></div><div class="meter"><i style="width:92%"></i></div></div>
+            <div><div class="meter-label"><span>Horas de implantação</span><span class="num">34 de 40 h</span></div><div class="meter"><i class="warn" style="width:85%"></i></div></div>
+            <button class="btn btn-secondary" style="align-self:flex-start">Gerar nova chave</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== PORTAL DO CLIENTE ========== -->
+    <section class="view" id="v-portal">
+      <div class="hero ia">
+        <div>
+          <h1>Olá, Mariana</h1>
+          <p>Indústria Aurora · plano Desenvolvimento. Seu time e a IA trabalhando juntos no SAP, com segurança.</p>
+          <button class="btn btn-primary"><svg class="icon"><use href="#i-plus"/></svg> Abrir chamado</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card stat-card"><div class="stat-top">Meus chamados <span class="stat-icon"><svg class="icon"><use href="#i-ticket"/></svg></span></div><div class="stat-number num">3</div><div class="stat-delta muted">1 aguardando você</div></div>
+        <div class="card stat-card"><div class="stat-top">Licença <span class="stat-icon"><svg class="icon"><use href="#i-shield"/></svg></span></div><div class="stat-number" style="font-size:20px;margin-top:12px">Ativa</div><div class="stat-delta muted">até 30/09/2027</div></div>
+        <div class="card stat-card"><div class="stat-top">Uso do conector <span class="stat-icon"><svg class="icon"><use href="#i-activity"/></svg></span></div><div class="stat-number num">1.989</div><div class="stat-delta up"><svg class="icon"><use href="#i-up"/></svg> 21% no mês</div></div>
+        <div class="card stat-card"><div class="stat-top">Treinamento da equipe <span class="stat-icon"><svg class="icon"><use href="#i-cap"/></svg></span></div><div class="stat-number num">64%</div><div class="stat-delta muted">5 de 8 pessoas em dia</div></div>
+      </div>
+
+      <h2 class="section-title">Treinamentos</h2>
+      <div class="cursos">
+        <div class="card curso">
+          <div class="curso-capa abap"><svg class="icon"><use href="#i-code"/></svg></div>
+          <div class="curso-body">
+            <h4>IA no Desenvolvimento ABAP</h4>
+            <p>Ler, alterar e testar código SAP com IA e governança.</p>
+            <div><div class="meter-label"><span>Módulo 7 de 12</span><span class="num">58%</span></div><div class="meter"><i style="width:58%"></i></div></div>
+            <button class="btn btn-primary" style="margin-top:6px"><svg class="icon"><use href="#i-play"/></svg> Continuar</button>
+          </div>
+        </div>
+        <div class="card curso">
+          <div class="curso-capa func"><svg class="icon"><use href="#i-layers"/></svg></div>
+          <div class="curso-body">
+            <h4>IA para Consultores Funcionais</h4>
+            <p>Consultar o sistema, entender os Z e especificar sem depender do ABAP.</p>
+            <div><div class="meter-label"><span>Concluído</span><span class="num">100%</span></div><div class="meter"><i style="width:100%;background:var(--green)"></i></div></div>
+            <button class="btn btn-secondary" style="margin-top:6px">Ver certificado</button>
+          </div>
+        </div>
+        <div class="card curso">
+          <div class="curso-capa fiori"><svg class="icon"><use href="#i-dash"/></svg></div>
+          <div class="curso-body">
+            <h4>Fiori e OData com IA</h4>
+            <p>Módulo extra: apps UI5 integrados ao backend SAP.</p>
+            <div class="meta"><span>8 aulas · 4 h</span><span class="badge badge-plano">Em breve</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<nav class="bottom-nav" aria-label="Menu mobile">
+  <a class="active" data-view="admin"><svg class="icon"><use href="#i-dash"/></svg>Início</a>
+  <a><svg class="icon"><use href="#i-ticket"/></svg>Chamados</a>
+  <a data-view="licencas"><svg class="icon"><use href="#i-shield"/></svg>Licenças</a>
+  <a data-view="portal"><svg class="icon"><use href="#i-cap"/></svg>Cursos</a>
+</nav>
+
+<script>
+  const nomes = { admin: 'Visão geral', licencas: 'Licenças', portal: 'Portal do cliente' };
+  function mostrar(v) {
+    document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
+    document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle(b.closest('.preview-bar') ? 'on' : 'active', b.dataset.view === v));
+    document.getElementById('crumb').innerHTML = (v === 'portal' ? 'Portal' : 'Marsh') + ' / <b>' + nomes[v] + '</b>';
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => mostrar(b.dataset.view)));
+</script>
+</body>
+</html>

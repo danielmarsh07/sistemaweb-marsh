@@ -15,6 +15,34 @@ if (usuario) {
 
   const emp = document.getElementById('sidebar-empresa');
   if (emp) emp.textContent = usuario.empresa_nome || 'Marsh Consultoria';
+
+  // Rodapé do menu: iniciais e perfil do usuário
+  const partes = (usuario.nome || '').trim().split(/\s+/).filter(Boolean);
+  const iniciais = ((partes[0] || '?')[0] + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
+  const av = document.getElementById('usuario-avatar');
+  if (av) av.textContent = iniciais;
+  const perfis = { admin_sistema: 'Administrador do sistema', admin_empresa: 'Administrador',
+                   tecnico: 'Técnico', cliente: 'Cliente' };
+  const pf = document.getElementById('usuario-perfil');
+  if (pf) pf.textContent = perfis[usuario.tipo] || '';
+
+  // Banner da visão geral: saudação pelo horário + data por extenso
+  const hora = new Date().getHours();
+  const saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+  const hs = document.getElementById('hero-saudacao');
+  if (hs) hs.textContent = `${saud}, ${partes[0] || ''}`.trim();
+  const hr = document.getElementById('hero-resumo');
+  if (hr) {
+    const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    hr.textContent = `Hoje é ${hoje}. Aqui está o resumo do Sistema Marsh.`;
+  }
+}
+
+// Botão do cabeçalho: alterna entre o Sereno claro e o escuro
+function alternarClaroEscuro() {
+  if (!window.Theme) return;
+  const escuros = ['sereno-escuro', 'dark'];
+  Theme.set(escuros.includes(Theme.get()) ? 'sereno' : 'sereno-escuro');
 }
 
 // Helper: fetch com token automático
@@ -221,6 +249,16 @@ function setupEventListeners() {
     salvarTecnologia();
   });
 
+  document.getElementById('btn-novo-curso').addEventListener('click', abrirNovoCurso);
+  document.getElementById('form-curso').addEventListener('submit', (e) => { e.preventDefault(); salvarCurso(); });
+  document.getElementById('form-aula').addEventListener('submit', (e) => { e.preventDefault(); salvarAula(); });
+
+  document.getElementById('btn-nova-licenca').addEventListener('click', abrirNovaLicenca);
+  document.getElementById('form-licenca').addEventListener('submit', (e) => {
+    e.preventDefault();
+    salvarLicenca();
+  });
+
   document.getElementById('form-chamado').addEventListener('submit', (e) => {
     e.preventDefault();
     salvarChamado();
@@ -257,7 +295,7 @@ function showPage(page) {
   if (pageEl) pageEl.classList.add('active');
 
   const titles = {
-    dashboard: 'Dashboard',
+    dashboard: 'Visão geral',
     clientes: 'Clientes',
     fornecedores: 'Fornecedores',
     tecnologias: 'Tecnologias',
@@ -265,7 +303,9 @@ function showPage(page) {
     transacoes: 'Transações Financeiras',
     'categorias-transacao': 'Categorias de Transação',
     usuarios: 'Usuários do Sistema',
-    configuracoes: 'Configurações'
+    configuracoes: 'Configurações',
+    licencas: 'Licenças',
+    treinamentos: 'Treinamentos'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -279,6 +319,8 @@ function showPage(page) {
   if (page === 'categorias-transacao') loadCategoriasTransacao();
   if (page === 'usuarios') loadUsuarios();
   if (page === 'configuracoes') renderThemePicker();
+  if (page === 'licencas') loadLicencas();
+  if (page === 'treinamentos') loadCursos();
 }
 
 // ===== CONFIGURAÇÕES / THEME PICKER =====
@@ -291,11 +333,11 @@ function renderThemePicker() {
     <div class="theme-card ${t.id === ativo ? 'is-active' : ''}" data-theme-id="${t.id}" role="button" tabindex="0" aria-pressed="${t.id === ativo}">
       <span class="theme-card-check" aria-hidden="true">✓</span>
       <div class="theme-preview" style="background:${t.swatches[0]}">
-        <div class="theme-preview-sidebar" style="background:${t.id === 'enterprise' ? '#ffffff' : (t.id === 'light' ? 'rgba(10,10,10,0.92)' : 'rgba(2,8,23,0.78)')}; border-right:1px solid ${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.08)'}"></div>
+        <div class="theme-preview-sidebar" style="background:${t.sidebar}; border-right:1px solid ${t.borda}"></div>
         <div class="theme-preview-main">
           <span class="theme-preview-bar long"  style="background:${t.swatches[3]}; opacity:0.85"></span>
           <span class="theme-preview-bar short" style="background:${t.swatches[2]}"></span>
-          <span class="theme-preview-card"      style="background:${t.swatches[1]}; border-color:${t.id === 'enterprise' ? '#d5dadc' : 'rgba(255,255,255,0.10)'}"></span>
+          <span class="theme-preview-card"      style="background:${t.swatches[1]}; border-color:${t.borda}"></span>
         </div>
       </div>
       <div class="theme-card-info">
@@ -938,6 +980,425 @@ async function deletarTecnologia(id) {
   alert('Tecnologia removida!');
   loadTecnologias();
   loadDashboard();
+}
+
+// ===== LICENÇAS (conector Claude <-> SAP) =====
+let licencaEmEdicao = null;
+let _licencasCache = [];
+
+const PLANOS_LICENCA = { leitura: 'Leitura', desenvolvimento: 'Desenvolvimento', empresa: 'Empresa' };
+const FERRAMENTAS_CONECTOR = {
+  get_source: 'Leitura de fonte', search_object: 'Busca de objetos', where_used: 'Lista de utilização',
+  get_table_structure: 'Estrutura de tabela', get_data_element: 'Elemento de dados', get_domain: 'Domínio',
+  read_table_data: 'Consulta a dados', run_select: 'Consulta SQL', syntax_check: 'Verificação de sintaxe',
+  check_update: 'Prévia de gravação', update_source: 'Gravação com request', activate: 'Ativação',
+  connection_info: 'Conexão'
+};
+
+// Datas DATE do Postgres chegam como ISO; usar só AAAA-MM-DD evita "voltar um dia" no fuso BR
+const diaIso = v => (v ? String(v).slice(0, 10) : '');
+const diaBr = v => { const d = diaIso(v); return d ? d.split('-').reverse().join('/') : '-'; };
+
+function badgeLicenca(l) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const fim = diaIso(l.data_fim);
+  const dias = Math.round((Date.parse(fim) - Date.parse(hoje)) / 86400000);
+  let txt, cor;
+  if (l.status === 'suspensa') { txt = 'Suspensa'; cor = '#f59e0b'; }
+  else if (fim < hoje) { txt = 'Vencida'; cor = '#ef4444'; }
+  else if (dias <= 30) { txt = `Renova em ${dias} dia(s)`; cor = '#f59e0b'; }
+  else { txt = 'Ativa'; cor = '#10b981'; }
+  return `<span style="background:${cor}20; color:${cor}; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">${txt}</span>`;
+}
+
+async function loadLicencas() {
+  const tbody = document.getElementById('licencas-tbody');
+  if (tbody && tbody.querySelector('.text-center')) tbody.innerHTML = skeletonRows(8);
+  const res = await apiFetch(`${API_URL}/licencas`);
+  if (!res) return;
+  if (!res.ok) { const e = await res.json(); tbody.innerHTML = `<tr><td colspan="8" class="text-center">${escapeHtml(e.erro)}</td></tr>`; return; }
+  _licencasCache = await res.json();
+
+  if (!_licencasCache.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhuma licença cadastrada. Use "+ Nova licença".</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _licencasCache.map(l => `
+    <tr>
+      <td data-label="Cliente">
+        <strong>${escapeHtml(l.cliente_nome)}</strong>
+        <span class="licenca-prefixo">${escapeHtml(l.chave_prefixo)}-••••-••••</span>
+      </td>
+      <td data-label="Plano">${escapeHtml(PLANOS_LICENCA[l.plano] || l.plano)}</td>
+      <td data-label="Usuários (30 dias)">${l.usuarios_ativos} / ${l.max_usuarios ? l.max_usuarios : '∞'}</td>
+      <td data-label="Sistemas">${escapeHtml(l.sids.replace(/,/g, ', '))}</td>
+      <td data-label="Validade">${diaBr(l.data_fim)}</td>
+      <td data-label="Status">${badgeLicenca(l)}</td>
+      <td data-label="Último contato">${l.ultima_validacao ? new Date(l.ultima_validacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca'}</td>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon" title="Ver uso" aria-label="Ver uso" onclick="verUsoLicenca(${l.id})">${iconSVG('eye')}</button>
+        <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarLicenca(${l.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon" title="Gerar nova chave" aria-label="Gerar nova chave" onclick="novaChaveLicenca(${l.id})">${iconSVG('key')}</button>
+        <button class="btn btn-icon btn-danger" title="Cancelar licença" aria-label="Cancelar licença" onclick="cancelarLicenca(${l.id})">${iconSVG('ban')}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function preencherClientesLicenca(selecionado) {
+  const sel = document.querySelector('#form-licenca select[name="cliente_id"]');
+  const res = await apiFetch(`${API_URL}/clientes`);
+  if (!res) return;
+  const clientes = await res.json();
+  sel.innerHTML = '<option value="">Selecione...</option>' + clientes.map(c =>
+    `<option value="${c.id}">${escapeHtml(c.nome_fantasia || c.razao_social || c.nome)}</option>`).join('');
+  if (selecionado) sel.value = selecionado;
+}
+
+async function abrirNovaLicenca() {
+  licencaEmEdicao = null;
+  resetForm('#form-licenca');
+  const form = document.getElementById('form-licenca');
+  form.sids.value = 'DEV';
+  form.data_inicio.value = new Date().toISOString().slice(0, 10);
+  const fim = new Date(); fim.setFullYear(fim.getFullYear() + 1);
+  form.data_fim.value = fim.toISOString().slice(0, 10);
+  form.cliente_id.disabled = false;
+  document.getElementById('licenca-status-row').style.display = 'none';
+  document.getElementById('modal-licenca-titulo').textContent = 'Nova licença';
+  await preencherClientesLicenca();
+  showModal('#modal-licenca');
+}
+
+async function editarLicenca(id) {
+  const l = _licencasCache.find(x => x.id === id);
+  if (!l) return;
+  licencaEmEdicao = id;
+  await preencherClientesLicenca(l.cliente_id);
+  const form = document.getElementById('form-licenca');
+  form.cliente_id.disabled = true; // licença não troca de cliente: cancele e crie outra
+  form.plano.value = l.plano;
+  form.sids.value = l.sids.replace(/,/g, ', ');
+  form.max_usuarios.value = l.max_usuarios || '';
+  form.data_inicio.value = diaIso(l.data_inicio);
+  form.data_fim.value = diaIso(l.data_fim);
+  form.status.value = l.status === 'suspensa' ? 'suspensa' : 'ativa';
+  form.observacoes.value = l.observacoes || '';
+  document.getElementById('licenca-status-row').style.display = '';
+  document.getElementById('modal-licenca-titulo').textContent = `Editar licença — ${l.cliente_nome}`;
+  showModal('#modal-licenca');
+}
+
+async function salvarLicenca() {
+  const form = document.getElementById('form-licenca');
+  const dados = {
+    plano: form.plano.value,
+    sids: form.sids.value,
+    max_usuarios: form.max_usuarios.value,
+    data_inicio: form.data_inicio.value,
+    data_fim: form.data_fim.value,
+    observacoes: form.observacoes.value
+  };
+  if (licencaEmEdicao) dados.status = form.status.value;
+  else dados.cliente_id = form.cliente_id.value;
+
+  try {
+    const url = licencaEmEdicao ? `${API_URL}/licencas/${licencaEmEdicao}` : `${API_URL}/licencas`;
+    const res = await apiFetch(url, { method: licencaEmEdicao ? 'PUT' : 'POST', body: JSON.stringify(dados) });
+    if (!res) return;
+    const r = await res.json();
+    if (!res.ok) { alert(r.erro); return; }
+    closeModal(document.getElementById('modal-licenca'));
+    if (r.chave) mostrarChaveLicenca(r.chave); else alert('Licença atualizada!');
+    loadLicencas();
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+function mostrarChaveLicenca(chave) {
+  document.getElementById('licenca-chave-texto').textContent = chave;
+  showModal('#modal-licenca-chave');
+}
+
+async function copiarChaveLicenca() {
+  const chave = document.getElementById('licenca-chave-texto').textContent;
+  try { await navigator.clipboard.writeText(chave); alert('Chave copiada!'); }
+  catch (e) { prompt('Copie a chave:', chave); }
+}
+
+async function novaChaveLicenca(id) {
+  if (!confirm('Gerar uma nova chave? A chave atual deixa de funcionar imediatamente e o cliente precisará atualizar o conector.')) return;
+  const res = await apiFetch(`${API_URL}/licencas/${id}/nova-chave`, { method: 'POST' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  mostrarChaveLicenca(r.chave);
+}
+
+async function cancelarLicenca(id) {
+  const l = _licencasCache.find(x => x.id === id);
+  if (!confirm(`Cancelar a licença de ${l ? l.cliente_nome : 'este cliente'}? O conector deixa de funcionar quando a licença em cache expirar (até 7 dias). O histórico de uso é mantido.`)) return;
+  const res = await apiFetch(`${API_URL}/licencas/${id}`, { method: 'DELETE' });
+  if (!res) return;
+  if (!res.ok) { const e = await res.json(); alert(e.erro); return; }
+  loadLicencas();
+}
+
+async function verUsoLicenca(id) {
+  const l = _licencasCache.find(x => x.id === id);
+  const corpo = document.getElementById('licenca-uso-corpo');
+  document.getElementById('modal-licenca-uso-titulo').textContent = `Uso nos últimos 30 dias — ${l ? l.cliente_nome : ''}`;
+  corpo.textContent = 'Carregando...';
+  showModal('#modal-licenca-uso');
+
+  const res = await apiFetch(`${API_URL}/licencas/${id}/uso`);
+  if (!res) return;
+  const u = await res.json();
+  if (!res.ok) { corpo.textContent = u.erro; return; }
+
+  const total = u.por_ferramenta.reduce((s, f) => s + f.chamadas, 0);
+  const recusas = u.por_ferramenta.reduce((s, f) => s + f.recusas, 0);
+  corpo.innerHTML = `
+    <div class="licenca-uso-resumo">
+      <div><span>Chamadas</span><strong>${total.toLocaleString('pt-BR')}</strong></div>
+      <div><span>Usuários ativos</span><strong>${u.usuarios_ativos}${l && l.max_usuarios ? ' / ' + l.max_usuarios : ''}</strong></div>
+      <div><span>Recusadas pelas travas</span><strong>${recusas.toLocaleString('pt-BR')}</strong></div>
+      <div><span>Sistemas</span><strong>${u.por_sid.map(s => escapeHtml(s.sid)).join(', ') || '-'}</strong></div>
+    </div>
+    <p class="pagina-descricao">Somente contadores enviados pelo conector — nenhum código-fonte ou dado do SAP do cliente.</p>
+    ${u.por_ferramenta.length ? `
+    <div class="table-container"><table>
+      <thead><tr><th>Operação</th><th>Chamadas</th><th>Recusadas</th></tr></thead>
+      <tbody>${u.por_ferramenta.map(f => `
+        <tr>
+          <td data-label="Operação"><strong>${escapeHtml(FERRAMENTAS_CONECTOR[f.ferramenta] || f.ferramenta)}</strong></td>
+          <td data-label="Chamadas">${f.chamadas.toLocaleString('pt-BR')}</td>
+          <td data-label="Recusadas">${f.recusas.toLocaleString('pt-BR')}</td>
+        </tr>`).join('')}
+      </tbody></table></div>` : '<p class="text-center">Nenhum uso registrado ainda.</p>'}
+  `;
+}
+
+// ===== TREINAMENTOS (cursos em vídeo do portal) =====
+let cursoEmEdicao = null;
+let cursoAulasAtual = null;   // curso aberto no modal de aulas (com a lista de aulas)
+let aulaEmEdicao = null;
+let cursoLiberarAtual = null;
+let _cursosCache = [];
+
+function badgeCurso(status) {
+  const pub = status === 'publicado';
+  const cor = pub ? '#10b981' : '#64748b';
+  return `<span style="background:${cor}20; color:${cor}; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">${pub ? 'Publicado' : 'Rascunho'}</span>`;
+}
+
+async function loadCursos() {
+  const tbody = document.getElementById('cursos-tbody');
+  if (tbody && tbody.querySelector('.text-center')) tbody.innerHTML = skeletonRows(6);
+  const res = await apiFetch(`${API_URL}/treinamentos/cursos`);
+  if (!res) return;
+  if (!res.ok) { const e = await res.json(); tbody.innerHTML = `<tr><td colspan="6" class="text-center">${escapeHtml(e.erro)}</td></tr>`; return; }
+  _cursosCache = await res.json();
+  if (!_cursosCache.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nenhum curso. Use "+ Novo curso".</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _cursosCache.map(c => `
+    <tr>
+      <td data-label="Curso">
+        <strong>${escapeHtml(c.titulo)}</strong>
+        <span class="licenca-prefixo">${escapeHtml(c.carga_horaria || '')}</span>
+      </td>
+      <td data-label="Aulas">${c.total_aulas}</td>
+      <td data-label="Com vídeo">${c.aulas_com_video} / ${c.total_aulas}</td>
+      <td data-label="Clientes">${c.total_clientes}</td>
+      <td data-label="Status">${badgeCurso(c.status)}</td>
+      <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-secondary btn-sm" onclick="abrirAulas(${c.id})">Aulas</button>
+        <button class="btn btn-secondary btn-sm" onclick="abrirLiberar(${c.id})">Liberar</button>
+        <button class="btn btn-icon" title="Progresso dos alunos" aria-label="Progresso dos alunos" onclick="verProgressoCurso(${c.id})">${iconSVG('eye')}</button>
+        <button class="btn btn-icon btn-edit" title="Editar curso" aria-label="Editar curso" onclick="editarCurso(${c.id})">${iconSVG('edit')}</button>
+        <button class="btn btn-icon btn-danger" title="Remover curso" aria-label="Remover curso" onclick="removerCurso(${c.id})">${iconSVG('trash')}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function abrirNovoCurso() {
+  cursoEmEdicao = null;
+  resetForm('#form-curso');
+  document.getElementById('modal-curso-titulo').textContent = 'Novo curso';
+  showModal('#modal-curso');
+}
+
+function editarCurso(id) {
+  const c = _cursosCache.find(x => x.id === id);
+  if (!c) return;
+  cursoEmEdicao = id;
+  const f = document.getElementById('form-curso');
+  f.titulo.value = c.titulo || '';
+  f.descricao.value = c.descricao || '';
+  f.capa.value = c.capa || 'geral';
+  f.carga_horaria.value = c.carga_horaria || '';
+  f.status.value = c.status || 'rascunho';
+  document.getElementById('modal-curso-titulo').textContent = 'Editar curso';
+  showModal('#modal-curso');
+}
+
+async function salvarCurso() {
+  const f = document.getElementById('form-curso');
+  const dados = { titulo: f.titulo.value, descricao: f.descricao.value, capa: f.capa.value,
+                  carga_horaria: f.carga_horaria.value, status: f.status.value };
+  const url = cursoEmEdicao ? `${API_URL}/treinamentos/cursos/${cursoEmEdicao}` : `${API_URL}/treinamentos/cursos`;
+  const res = await apiFetch(url, { method: cursoEmEdicao ? 'PUT' : 'POST', body: JSON.stringify(dados) });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  closeModal(document.getElementById('modal-curso'));
+  loadCursos();
+}
+
+async function removerCurso(id) {
+  const c = _cursosCache.find(x => x.id === id);
+  if (!confirm(`Remover o curso "${c ? c.titulo : ''}"? Ele some do portal dos clientes.`)) return;
+  const res = await apiFetch(`${API_URL}/treinamentos/cursos/${id}`, { method: 'DELETE' });
+  if (!res) return;
+  if (!res.ok) { const e = await res.json(); alert(e.erro); return; }
+  loadCursos();
+}
+
+async function abrirAulas(id) {
+  const res = await apiFetch(`${API_URL}/treinamentos/cursos/${id}`);
+  if (!res) return;
+  cursoAulasAtual = await res.json();
+  if (!res.ok) { alert(cursoAulasAtual.erro); return; }
+  document.getElementById('modal-aulas-titulo').textContent = `Aulas — ${cursoAulasAtual.titulo}`;
+  limparFormAula();
+  renderAulas();
+  showModal('#modal-aulas');
+}
+
+function renderAulas() {
+  const el = document.getElementById('aulas-lista');
+  const aulas = cursoAulasAtual.aulas || [];
+  if (!aulas.length) { el.innerHTML = '<p class="text-center">Nenhuma aula ainda.</p>'; return; }
+  el.innerHTML = aulas.map(a => `
+    <div class="aula-item">
+      <span class="aula-ordem">${a.ordem}</span>
+      <div class="aula-info">
+        <strong>${escapeHtml(a.titulo)}</strong>
+        <span>${escapeHtml(a.modulo || '')}${a.duracao_min ? ` · ${a.duracao_min} min` : ''}
+          · ${a.video_url ? 'com vídeo' : '<em>sem vídeo</em>'}${a.material_url ? ' · material' : ''}</span>
+      </div>
+      <button class="btn btn-icon btn-edit" title="Editar aula" aria-label="Editar aula" onclick="editarAula(${a.id})">${iconSVG('edit')}</button>
+      <button class="btn btn-icon btn-danger" title="Remover aula" aria-label="Remover aula" onclick="removerAula(${a.id})">${iconSVG('trash')}</button>
+    </div>
+  `).join('');
+}
+
+function limparFormAula() {
+  aulaEmEdicao = null;
+  resetForm('#form-aula');
+  document.getElementById('form-aula-titulo').textContent = 'Nova aula';
+  document.getElementById('btn-salvar-aula').textContent = 'Adicionar aula';
+}
+
+function editarAula(id) {
+  const a = (cursoAulasAtual.aulas || []).find(x => x.id === id);
+  if (!a) return;
+  aulaEmEdicao = id;
+  const f = document.getElementById('form-aula');
+  f.modulo.value = a.modulo || '';
+  f.titulo.value = a.titulo || '';
+  f.video_url.value = a.video_url || '';
+  f.duracao_min.value = a.duracao_min || '';
+  f.material_url.value = a.material_url || '';
+  f.ordem.value = a.ordem ?? '';
+  f.descricao.value = a.descricao || '';
+  document.getElementById('form-aula-titulo').textContent = `Editando: ${a.titulo}`;
+  document.getElementById('btn-salvar-aula').textContent = 'Salvar aula';
+  f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function salvarAula() {
+  const f = document.getElementById('form-aula');
+  const dados = { modulo: f.modulo.value, titulo: f.titulo.value, video_url: f.video_url.value,
+                  duracao_min: f.duracao_min.value, material_url: f.material_url.value, descricao: f.descricao.value };
+  if (f.ordem.value !== '') dados.ordem = f.ordem.value;
+  const url = aulaEmEdicao ? `${API_URL}/treinamentos/aulas/${aulaEmEdicao}`
+                           : `${API_URL}/treinamentos/cursos/${cursoAulasAtual.id}/aulas`;
+  const res = await apiFetch(url, { method: aulaEmEdicao ? 'PUT' : 'POST', body: JSON.stringify(dados) });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  await abrirAulas(cursoAulasAtual.id);
+  loadCursos();
+}
+
+async function removerAula(id) {
+  if (!confirm('Remover esta aula?')) return;
+  const res = await apiFetch(`${API_URL}/treinamentos/aulas/${id}`, { method: 'DELETE' });
+  if (!res) return;
+  if (!res.ok) { const e = await res.json(); alert(e.erro); return; }
+  await abrirAulas(cursoAulasAtual.id);
+  loadCursos();
+}
+
+async function abrirLiberar(id) {
+  const [rc, rcl] = await Promise.all([
+    apiFetch(`${API_URL}/treinamentos/cursos/${id}`),
+    apiFetch(`${API_URL}/clientes`)
+  ]);
+  if (!rc || !rcl) return;
+  cursoLiberarAtual = await rc.json();
+  const clientes = await rcl.json();
+  const liberados = new Set((cursoLiberarAtual.liberacoes || []).map(l => l.cliente_id));
+  document.getElementById('modal-liberar-titulo').textContent = `Liberar — ${cursoLiberarAtual.titulo}`;
+  document.getElementById('liberar-lista').innerHTML = clientes.length ? clientes.map(c => `
+    <label class="liberar-item">
+      <input type="checkbox" value="${c.id}" ${liberados.has(c.id) ? 'checked' : ''}>
+      <span>${escapeHtml(c.nome_fantasia || c.razao_social || c.nome)}</span>
+    </label>`).join('') : '<p class="text-center">Nenhum cliente cadastrado.</p>';
+  showModal('#modal-liberar');
+}
+
+async function salvarLiberacoes() {
+  const ids = [...document.querySelectorAll('#liberar-lista input:checked')].map(i => Number(i.value));
+  const res = await apiFetch(`${API_URL}/treinamentos/cursos/${cursoLiberarAtual.id}/liberacoes`,
+    { method: 'PUT', body: JSON.stringify({ cliente_ids: ids }) });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  closeModal(document.getElementById('modal-liberar'));
+  if (cursoLiberarAtual.status !== 'publicado' && ids.length) {
+    alert(`${r.mensagem}\n\nAtenção: o curso ainda está como RASCUNHO e não aparece no portal até ser publicado.`);
+  }
+  loadCursos();
+}
+
+async function verProgressoCurso(id) {
+  const c = _cursosCache.find(x => x.id === id);
+  document.getElementById('modal-progresso-titulo').textContent = `Progresso — ${c ? c.titulo : ''}`;
+  const corpo = document.getElementById('progresso-corpo');
+  corpo.textContent = 'Carregando...';
+  showModal('#modal-progresso');
+  const res = await apiFetch(`${API_URL}/treinamentos/cursos/${id}/progresso`);
+  if (!res) return;
+  const lista = await res.json();
+  if (!res.ok) { corpo.textContent = lista.erro; return; }
+  if (!lista.length) { corpo.innerHTML = '<p class="text-center">Nenhum aluno ainda (libere o curso para um cliente com usuários do portal).</p>'; return; }
+  corpo.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Aluno</th><th>Cliente</th><th>Progresso</th></tr></thead>
+    <tbody>${lista.map(p => {
+      const pct = p.total ? Math.round(100 * p.concluidas / p.total) : 0;
+      return `<tr>
+        <td data-label="Aluno"><strong>${escapeHtml(p.nome)}</strong></td>
+        <td data-label="Cliente">${escapeHtml(p.cliente)}</td>
+        <td data-label="Progresso"><div class="barra-progresso"><i style="width:${pct}%"></i></div>
+          <span class="licenca-prefixo">${p.concluidas} de ${p.total} aulas (${pct}%)</span></td>
+      </tr>`; }).join('')}
+    </tbody></table></div>`;
 }
 
 // ===== CHAMADOS =====

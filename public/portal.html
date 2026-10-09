@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal do Cliente — Marsh Consultoria</title>
   <link rel="manifest" href="/manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assistente-voz.css">
+  <link rel="icon" type="image/png" href="/img/logo-simbolo.png">
   <meta name="theme-color" content="#0066cc" />
   <script src="theme.js"></script>
   <style>
@@ -1487,6 +1490,351 @@
       color: #fff;
       border-color: var(--primary);
     }
+
+    /* =====================================================================
+       ===== TEMA: MARSH SERENO (padrão) — mesma paleta do painel ==========
+       Branco gelo, azul céu, ciano de rede, marinho. Faixa de boas-vindas
+       com a imagem da marca (img/sereno-ia.webp) e véu para leitura.
+       ===================================================================== */
+    :root[data-theme="sereno"] {
+      --bg-main:        #f2f6fb;
+      --bg-card:        #fcfdff;
+      --bg-card-solid:  #fcfdff;
+      --bg-elevated:    #ffffff;
+      --bg-glass:       #fcfdff;
+      --bg-hover:       #edf3fa;
+      --bg-subtle:      #f5f8fc;
+      --primary:        #1d6fd8;
+      --primary-hover:  #155bb5;
+      --primary-glow:   rgba(29, 111, 216, 0.18);
+      --primary-soft:   #e3effc;
+      --primary-ring:   rgba(29, 111, 216, 0.22);
+      --accent-cyan:    #13a8e0;
+      --text-main:      #13233a;
+      --text-secondary: #34465e;
+      --text-muted:     #5f7088;
+      --text-subtle:    #8494aa;
+      --border:         #dde6f0;
+      --border-strong:  #c8d4e2;
+      --border-hover:   #1d6fd8;
+      --blur:           0px;
+      --shadow:         0 1px 2px rgba(11, 42, 85, 0.05), 0 1px 1px rgba(11, 42, 85, 0.03);
+      --shadow-elevated:0 12px 32px rgba(11, 42, 85, 0.14), 0 2px 6px rgba(11, 42, 85, 0.06);
+      --navy:      #13233a;
+      --navy-mid:  #34465e;
+      --white:     #fcfdff;
+      --grey-50:   #f5f8fc;
+      --grey-100:  #edf3fa;
+      --grey-200:  #dde6f0;
+      --grey-400:  #8494aa;
+      --grey-600:  #34465e;
+      --grey-800:  #13233a;
+      --red: #b42318;
+      --green: #2e7d4f;
+      --veu:       rgba(242, 246, 251, 0.97);
+      --veu-meio:  rgba(242, 246, 251, 0.85);
+      --veu-fim:   rgba(242, 246, 251, 0);
+    }
+    :root[data-theme="sereno"] body {
+      background-image: none;
+      background-color: var(--bg-main);
+      color-scheme: light;
+    }
+    :root[data-theme="sereno"] body::before { display: none; }
+    :root[data-theme="sereno"] .portal-header {
+      background: rgba(242, 246, 251, 0.9);
+      -webkit-backdrop-filter: saturate(140%) blur(8px);
+      backdrop-filter: saturate(140%) blur(8px);
+      border-bottom: 1px solid var(--border);
+      box-shadow: none;
+    }
+    :root[data-theme="sereno"] .portal-brand .logo {
+      background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
+      box-shadow: none;
+    }
+    :root[data-theme="sereno"] .portal-brand h1 {
+      background: none;
+      -webkit-background-clip: initial;
+      background-clip: initial;
+      color: var(--text-main);
+    }
+    :root[data-theme="sereno"] .portal-brand small { color: var(--text-muted); }
+    :root[data-theme="sereno"] .portal-user { color: var(--text-secondary); }
+    :root[data-theme="sereno"] .btn-sair,
+    :root[data-theme="sereno"] .btn-aparencia {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      color: var(--text-secondary);
+    }
+    :root[data-theme="sereno"] .btn-sair:hover,
+    :root[data-theme="sereno"] .btn-aparencia:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+      color: var(--text-main);
+    }
+    :root[data-theme="sereno"] .welcome-bar {
+      min-height: 140px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      color: var(--text-main);
+      background:
+        linear-gradient(90deg, var(--veu) 0%, var(--veu-meio) 40%, var(--veu-fim) 72%),
+        url('img/sereno-ia.webp') right center / cover no-repeat,
+        radial-gradient(120% 140% at 85% 50%, #5aa9ec 0%, #b9dcf7 38%, #eef5fc 72%);
+    }
+    :root[data-theme="sereno"] .welcome-bar h2 { color: var(--text-main); font-size: 1.35rem; font-weight: 600; letter-spacing: -0.02em; }
+    :root[data-theme="sereno"] .welcome-bar p { color: var(--text-secondary); }
+    :root[data-theme="sereno"] .btn-novo-chamado {
+      background: var(--primary);
+      color: #fff;
+      border: 1px solid transparent;
+      box-shadow: none;
+      font-weight: 600;
+    }
+    :root[data-theme="sereno"] .btn-novo-chamado:hover { background: var(--primary-hover); filter: none; box-shadow: 0 2px 6px rgba(29, 111, 216, 0.2); }
+    :root[data-theme="sereno"] .stat-box,
+    :root[data-theme="sereno"] .chamado-card,
+    :root[data-theme="sereno"] .modal-box {
+      background: var(--bg-card);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    :root[data-theme="sereno"] .stat-box:hover,
+    :root[data-theme="sereno"] .chamado-card:hover { transform: none; border-color: var(--border-strong); box-shadow: var(--shadow-elevated); }
+    :root[data-theme="sereno"] .stat-box .num { font-variant-numeric: tabular-nums; }
+    :root[data-theme="sereno"] .stat-box .lbl { color: var(--text-muted); }
+    :root[data-theme="sereno"] .chamado-titulo { color: var(--text-main); }
+    :root[data-theme="sereno"] .chamado-meta { color: var(--text-muted); }
+    :root[data-theme="sereno"] .section-header h3 { color: var(--text-main); }
+    :root[data-theme="sereno"] .filtro-btn {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-strong);
+    }
+    :root[data-theme="sereno"] .filtro-btn.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      border-color: transparent;
+      box-shadow: none;
+    }
+    :root[data-theme="sereno"] .modal-overlay {
+      background: rgba(11, 42, 85, 0.32);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+    }
+    :root[data-theme="sereno"] .modal-top { background: var(--bg-card); border-bottom-color: var(--border); }
+    :root[data-theme="sereno"] .chamado-info-grid,
+    :root[data-theme="sereno"] .tl-content,
+    :root[data-theme="sereno"] .bloco-concluido,
+    :root[data-theme="sereno"] .bloco-anexos {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+    }
+    :root[data-theme="sereno"] .form-group input,
+    :root[data-theme="sereno"] .form-group select,
+    :root[data-theme="sereno"] .form-group textarea,
+    :root[data-theme="sereno"] .form-comentario textarea,
+    :root[data-theme="sereno"] #csat-comentario {
+      background: #ffffff;
+      border: 1px solid var(--border-strong);
+      color: var(--text-main);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    :root[data-theme="sereno"] .form-group input:focus,
+    :root[data-theme="sereno"] .form-group select:focus,
+    :root[data-theme="sereno"] .form-group textarea:focus,
+    :root[data-theme="sereno"] .form-comentario textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-ring);
+      background: #ffffff;
+    }
+    :root[data-theme="sereno"] .btn-comentar,
+    :root[data-theme="sereno"] .btn-salvar,
+    :root[data-theme="sereno"] .btn-enviar-csat {
+      background: var(--primary);
+      border: 1px solid transparent;
+      box-shadow: none;
+    }
+
+    /* =====================================================================
+       ===== TEMA: MARSH SERENO ESCURO — mesma paleta para a noite =========
+       ===================================================================== */
+    :root[data-theme="sereno-escuro"] {
+      --bg-main:        #0b1424;
+      --bg-card:        #111c30;
+      --bg-card-solid:  #111c30;
+      --bg-elevated:    #15223a;
+      --bg-glass:       #111c30;
+      --bg-hover:       rgba(79, 156, 240, 0.08);
+      --bg-subtle:      #0f1a2d;
+      --primary:        #4f9cf0;
+      --primary-hover:  #6aaef5;
+      --primary-glow:   rgba(79, 156, 240, 0.20);
+      --primary-soft:   rgba(79, 156, 240, 0.14);
+      --primary-ring:   rgba(79, 156, 240, 0.30);
+      --accent-cyan:    #38bdf8;
+      --text-main:      #e4ecf6;
+      --text-secondary: #b6c4d6;
+      --text-muted:     #8a9bb2;
+      --text-subtle:    #66788f;
+      --border:         rgba(148, 178, 214, 0.14);
+      --border-strong:  rgba(148, 178, 214, 0.24);
+      --border-hover:   rgba(79, 156, 240, 0.45);
+      --blur:           0px;
+      --shadow:         0 1px 2px rgba(0, 0, 0, 0.30);
+      --shadow-elevated:0 16px 40px rgba(0, 0, 0, 0.45);
+      --navy:      #0e192c;
+      --navy-mid:  #111c30;
+      --white:     #e4ecf6;
+      --red: #f2877b;
+      --green: #5cc489;
+      --veu:       rgba(11, 20, 36, 0.96);
+      --veu-meio:  rgba(11, 20, 36, 0.80);
+      --veu-fim:   rgba(11, 20, 36, 0.15);
+    }
+    :root[data-theme="sereno-escuro"] body {
+      background-image: none;
+      background-color: var(--bg-main);
+      color-scheme: dark;
+    }
+    :root[data-theme="sereno-escuro"] body::before { display: none; }
+    :root[data-theme="sereno-escuro"] .portal-header {
+      background: rgba(11, 20, 36, 0.94);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      border-bottom: 1px solid var(--border);
+      box-shadow: none;
+    }
+    :root[data-theme="sereno-escuro"] .portal-brand .logo { background: linear-gradient(135deg, #1d6fd8, var(--accent-cyan)); box-shadow: none; }
+    :root[data-theme="sereno-escuro"] .portal-brand h1 { background: none; -webkit-background-clip: initial; background-clip: initial; color: var(--text-main); }
+    :root[data-theme="sereno-escuro"] .portal-brand small { color: var(--text-muted); }
+    :root[data-theme="sereno-escuro"] .welcome-bar {
+      min-height: 140px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background:
+        linear-gradient(90deg, var(--veu) 0%, var(--veu-meio) 40%, var(--veu-fim) 72%),
+        url('img/sereno-ia.webp') right center / cover no-repeat,
+        radial-gradient(120% 140% at 85% 50%, #1d6fd8 0%, #12345f 45%, #0b1424 75%);
+    }
+    :root[data-theme="sereno-escuro"] .welcome-bar h2 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.02em; }
+    :root[data-theme="sereno-escuro"] .btn-novo-chamado { background: var(--primary); color: #06101f; border: 1px solid transparent; box-shadow: none; font-weight: 600; }
+    :root[data-theme="sereno-escuro"] .btn-novo-chamado:hover { background: var(--primary-hover); color: #06101f; filter: none; }
+    :root[data-theme="sereno-escuro"] .stat-box,
+    :root[data-theme="sereno-escuro"] .chamado-card,
+    :root[data-theme="sereno-escuro"] .modal-box {
+      background: var(--bg-card);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    :root[data-theme="sereno-escuro"] .stat-box:hover,
+    :root[data-theme="sereno-escuro"] .chamado-card:hover { transform: none; border-color: var(--border-strong); }
+    :root[data-theme="sereno-escuro"] .filtro-btn.active { background: var(--primary-soft); color: var(--primary-hover); border-color: transparent; box-shadow: none; }
+    :root[data-theme="sereno-escuro"] .modal-overlay { background: rgba(3, 8, 18, 0.62); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+    :root[data-theme="sereno-escuro"] .form-group input,
+    :root[data-theme="sereno-escuro"] .form-group select,
+    :root[data-theme="sereno-escuro"] .form-group textarea,
+    :root[data-theme="sereno-escuro"] .form-comentario textarea,
+    :root[data-theme="sereno-escuro"] #csat-comentario {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-strong);
+      color: var(--text-main);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    :root[data-theme="sereno-escuro"] .form-group input:focus,
+    :root[data-theme="sereno-escuro"] .form-group select:focus,
+    :root[data-theme="sereno-escuro"] .form-group textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-ring);
+    }
+
+    /* Logo: símbolo "M" (img/logo-simbolo.png) no lugar da caixa colorida */
+    .portal-brand .logo.logo-img { background: none !important; box-shadow: none !important; overflow: visible; }
+    .portal-brand .logo.logo-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+    /* =====================================================================
+       ===== TREINAMENTOS E LICENÇA NO PORTAL (todos os temas) =============
+       ===================================================================== */
+    .portal-secao { margin-bottom: 2rem; }
+    .cursos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    .curso-card {
+      display: flex; flex-direction: column; overflow: hidden; cursor: pointer; text-align: left;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+      box-shadow: var(--shadow); color: var(--text-main); font: inherit; padding: 0;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .curso-card:hover, .curso-card:focus-visible { border-color: var(--border-hover); box-shadow: var(--shadow-elevated); outline: none; }
+    .curso-capa { height: 104px; display: grid; place-items: center; color: #fff; }
+    .curso-capa svg { width: 34px; height: 34px; }
+    .capa-abap  { background: linear-gradient(135deg, #0b2a55, #1d6fd8 70%, #13a8e0); }
+    .capa-func  { background: linear-gradient(135deg, #0e3a6b, #1785c9 70%, #3cc3e8); }
+    .capa-fiori { background: linear-gradient(135deg, #1b2f6e, #4a63d6 70%, #7fa7f0); }
+    .capa-cpi   { background: linear-gradient(135deg, #12304f, #0f7c91 70%, #2fc4b2); }
+    .capa-geral { background: linear-gradient(135deg, #1d2d3e, #475e75 70%, #89a3bd); }
+    .curso-corpo { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .curso-corpo h4 { font-size: 1rem; font-weight: 600; }
+    .curso-corpo p { font-size: 0.85rem; color: var(--text-muted); }
+    .curso-meta { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); margin-top: auto; padding-top: 6px; }
+    .barra-curso { height: 7px; border-radius: 999px; background: var(--bg-hover, rgba(148,163,184,0.15)); overflow: hidden; }
+    .barra-curso i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--primary); transition: width 0.3s ease; }
+    .curso-acoes { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-curso, .btn-concluir, .btn-material {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px;
+      padding: 0 14px; border-radius: 9px; font: inherit; font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; border: 1px solid transparent;
+    }
+    .btn-curso, .btn-concluir { background: var(--primary); color: #fff; }
+    .btn-curso.secundario, .btn-material { background: transparent; color: var(--text-main); border-color: var(--border-strong); }
+    .btn-concluir.feito { background: rgba(16, 185, 129, 0.14); color: #10b981; border-color: transparent; }
+
+    .licencas-portal { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    .licenca-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+    .licenca-card .linha { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; padding: 4px 0; color: var(--text-secondary); }
+    .licenca-card .linha strong { color: var(--text-main); font-weight: 600; }
+    .licenca-card h4 { font-size: 1rem; margin-bottom: 8px; color: var(--text-main); display: flex; justify-content: space-between; align-items: center; }
+
+    .modal-curso-box { width: 96vw; max-width: 1120px; }
+    .curso-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; padding: 18px; }
+    .video-wrap { position: relative; aspect-ratio: 16 / 9; background: #0b1424; border-radius: 12px; overflow: hidden; display: grid; place-items: center; color: #8a9bb2; font-size: 0.9rem; }
+    .video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .curso-player h4 { margin-top: 14px; font-size: 1.05rem; color: var(--text-main); }
+    .curso-player p { margin-top: 4px; font-size: 0.88rem; color: var(--text-muted); white-space: pre-line; }
+    .aula-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .curso-lado { min-width: 0; }
+    .curso-progresso-txt { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 6px; }
+    .curso-aulas { list-style: none; margin: 12px 0 0; padding: 0; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+    .curso-aulas button {
+      width: 100%; display: flex; align-items: flex-start; gap: 10px; text-align: left; padding: 9px 10px;
+      border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--text-secondary);
+      font: inherit; font-size: 0.86rem; cursor: pointer;
+    }
+    .curso-aulas button:hover { background: var(--bg-hover, rgba(148,163,184,0.10)); }
+    .curso-aulas button.ativa { background: var(--bg-hover, rgba(148,163,184,0.12)); border-color: var(--border); color: var(--text-main); }
+    .curso-aulas .marca {
+      width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; display: grid; place-items: center;
+      font-size: 11px; font-weight: 700; border: 1.5px solid var(--border-strong); color: var(--text-muted);
+    }
+    .curso-aulas .feita .marca { background: #10b981; border-color: #10b981; color: #fff; }
+    .curso-aulas small { display: block; font-size: 0.74rem; color: var(--text-muted); }
+
+    @media (max-width: 768px) {
+      .curso-layout { grid-template-columns: 1fr; padding: 12px; }
+      .curso-aulas { max-height: none; }
+      .btn-curso, .btn-concluir, .btn-material { min-height: 44px; }
+    }
   </style>
 </head>
 <body>
@@ -1494,7 +1842,7 @@
   <!-- HEADER -->
   <header class="portal-header">
     <div class="portal-brand">
-      <div class="logo">M</div>
+      <div class="logo logo-img"><img src="img/logo-simbolo.png" alt="Marsh"></div>
       <div>
         <h1>Marsh Consultoria</h1>
         <small id="header-empresa">Portal do Cliente</small>
@@ -1559,6 +1907,18 @@
       </div>
     </div>
 
+    <!-- Treinamentos (cursos liberados para a empresa; some se não houver) -->
+    <section id="secao-treinamentos" class="portal-secao" hidden>
+      <div class="section-header"><h3>Treinamentos</h3></div>
+      <div id="lista-cursos" class="cursos-grid"></div>
+    </section>
+
+    <!-- Licença do conector SAP (some se a empresa não tiver) -->
+    <section id="secao-licenca" class="portal-secao" hidden>
+      <div class="section-header"><h3>Licença do conector SAP</h3></div>
+      <div id="lista-licencas" class="licencas-portal"></div>
+    </section>
+
     <!-- Lista de chamados -->
     <div>
       <div class="section-header">
@@ -1576,6 +1936,32 @@
     </div>
 
   </main>
+
+  <!-- MODAL: CURSO (player + lista de aulas) -->
+  <div class="modal-overlay" id="modal-curso">
+    <div class="modal-box modal-curso-box">
+      <div class="modal-top">
+        <h3 id="curso-titulo">Curso</h3>
+        <button class="btn-fechar" type="button" onclick="fecharCurso()" aria-label="Fechar">×</button>
+      </div>
+      <div class="curso-layout">
+        <div class="curso-player">
+          <div class="video-wrap" id="video-wrap"></div>
+          <h4 id="aula-titulo"></h4>
+          <p id="aula-descricao"></p>
+          <div class="aula-acoes">
+            <a id="aula-material" class="btn-material" target="_blank" rel="noopener noreferrer" hidden>Material de apoio</a>
+            <button id="btn-concluir" class="btn-concluir" type="button" onclick="alternarConclusao()">Marcar como concluída</button>
+          </div>
+        </div>
+        <div class="curso-lado">
+          <div class="curso-progresso-txt" id="curso-progresso-txt"></div>
+          <div class="barra-curso"><i id="curso-progresso-barra"></i></div>
+          <ol class="curso-aulas" id="curso-aulas"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL: DETALHE DO CHAMADO -->
   <div class="modal-overlay" id="modal-detalhe">

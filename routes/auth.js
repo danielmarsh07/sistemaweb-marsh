@@ -70,7 +70,7 @@ router.post('/login', loginLimiter, async (req, res) => {
         tipo: usuario.tipo || 'admin_empresa',
         cliente_id: usuario.cliente_id || null,
         empresa_nome: usuario.empresa_fantasia || usuario.empresa_nome || 'Marsh Consultoria',
-        tema: usuario.tema || 'dark'
+        tema: usuario.tema || 'sereno'
       }
     });
   } catch (err) {
@@ -83,15 +83,15 @@ router.post('/login', loginLimiter, async (req, res) => {
 // Usado pela tela de login para evitar FOUC ao digitar o email.
 router.get('/tema', async (req, res) => {
   const email = (req.query.email || '').trim().toLowerCase();
-  if (!email) return res.json({ tema: 'dark' });
+  if (!email) return res.json({ tema: 'sereno' });
   try {
     const r = await pool.query(
       'SELECT tema FROM usuarios WHERE LOWER(email) = $1 AND ativo IS NOT FALSE LIMIT 1',
       [email]
     );
-    res.json({ tema: r.rows[0]?.tema || 'dark' });
+    res.json({ tema: r.rows[0]?.tema || 'sereno' });
   } catch (err) {
-    res.json({ tema: 'dark' });
+    res.json({ tema: 'sereno' });
   }
 });
 
