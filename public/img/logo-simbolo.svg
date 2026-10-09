@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Marsh Consultoria">
+  <defs>
+    <linearGradient id="perna" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2fdcf6"/>
+      <stop offset="0.5" stop-color="#1b93de"/>
+      <stop offset="1" stop-color="#1258c2"/>
+    </linearGradient>
+    <linearGradient id="pernaDir" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0f4db3"/>
+      <stop offset="1" stop-color="#2289df"/>
+    </linearGradient>
+    <linearGradient id="diagEsq" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#33dcf6"/>
+      <stop offset="1" stop-color="#1a8edb"/>
+    </linearGradient>
+    <linearGradient id="diagonal" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3ae0f7"/>
+      <stop offset="0.5" stop-color="#2ea3e2"/>
+      <stop offset="0.82" stop-color="#86d6f4"/>
+      <stop offset="1" stop-color="#d2f3fc"/>
+    </linearGradient>
+    <linearGradient id="tri" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2290dc"/>
+      <stop offset="0.6" stop-color="#46bbe9"/>
+      <stop offset="1" stop-color="#b3eafa"/>
+    </linearGradient>
+  </defs>
+  <!-- cantos levemente arredondados: contorno da mesma cor de cada peça -->
+  <g stroke-linejoin="round" stroke-width="10">
+    <!-- perna direita (atrás da diagonal) -->
+    <path fill="url(#pernaDir)" stroke="url(#pernaDir)" d="M486 71 V437 C436 428 412 400 412 362 V190 Z"/>
+    <!-- perna esquerda + diagonal descendente -->
+    <path fill="url(#perna)" stroke="url(#perna)" d="M26 71 H100 V362 C100 400 74 428 26 437 Z"/>
+    <path fill="url(#diagEsq)" stroke="url(#diagEsq)" d="M26 71 H102 L238 216 L204 262 L100 158 Z"/>
+    <!-- diagonal principal -->
+    <path fill="url(#diagonal)" stroke="url(#diagonal)" d="M400 71 H486 L216 409 H130 Z"/>
+    <!-- triângulo interno -->
+    <path fill="url(#tri)" stroke="url(#tri)" d="M376 258 V392 C376 404 368 413 354 413 H244 Z"/>
+  </g>
+</svg>

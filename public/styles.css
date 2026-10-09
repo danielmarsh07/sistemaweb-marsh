@@ -580,7 +580,7 @@
   --bg-elevated:    #ffffff;
   --bg-glass:       #fcfdff;
   --bg-hover:       #edf3fa;
-  --bg-sidebar:     #e9f0f8;
+  --bg-sidebar:     #bfdff5;
   --bg-subtle:      #f5f8fc;
 
   --primary:        #1d6fd8;
@@ -634,12 +634,13 @@
 }
 :root[data-theme="sereno"] body::before { display: none; }
 
-/* Sereno: sidebar gelo com texto marinho */
+/* Sereno: sidebar azul céu (degradê suave) com texto marinho */
 :root[data-theme="sereno"] .sidebar {
-  background: var(--bg-sidebar);
+  background: linear-gradient(180deg, #d3e9f9 0%, #b4d9f3 45%, #a9d3f2 60%, #c6e2f7 100%);
+  background-color: var(--bg-sidebar);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid #b3cde6;
   box-shadow: none;
 }
 :root[data-theme="sereno"] .sidebar-header { border-bottom-color: transparent; }
@@ -649,7 +650,7 @@
   -webkit-background-clip: initial;
   background-clip: initial;
 }
-:root[data-theme="sereno"] .sidebar-footer { color: var(--text-muted); border-top-color: var(--border); }
+:root[data-theme="sereno"] .sidebar-footer { color: var(--text-secondary); border-top-color: rgba(11, 42, 85, 0.12); }
 :root[data-theme="sereno"] .logo-box {
   background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
   box-shadow: none;
@@ -657,7 +658,7 @@
 :root[data-theme="sereno"] .nav-link { color: var(--text-secondary); border-radius: 8px; font-weight: 500; }
 :root[data-theme="sereno"] .nav-link::before { display: none; }
 :root[data-theme="sereno"] .nav-link:hover {
-  background: rgba(11, 42, 85, 0.05);
+  background: rgba(255, 255, 255, 0.45);
   color: var(--text-main);
   box-shadow: none;
 }
