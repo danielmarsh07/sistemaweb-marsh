@@ -28,24 +28,48 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 40px 48px;
+      align-items: center;
+      text-align: center;
+      padding: 56px 64px 64px;
       color: #ffffff;
       background:
         linear-gradient(180deg, rgba(11, 42, 85, 0.20) 0%, rgba(11, 42, 85, 0.55) 55%, rgba(8, 26, 54, 0.92) 100%),
         url('img/sereno-ia.webp') center / cover no-repeat,
         radial-gradient(120% 120% at 70% 30%, #5aa9ec 0%, #1d6fd8 40%, #0b2a55 85%);
     }
-    .marca-topo { display: flex; align-items: center; gap: 12px; }
-    .marca-simbolo { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 4px 14px rgba(19, 168, 224, 0.35)); }
-    .marca-nome strong { display: block; font-size: 18px; font-weight: 700; letter-spacing: 0.18em; }
-    .marca-nome span { display: block; font-size: 10.5px; letter-spacing: 0.42em; opacity: 0.85; }
-    .marca-texto { max-width: 46ch; }
-    .marca-texto h2 { font-size: 30px; line-height: 1.2; font-weight: 600; letter-spacing: -0.02em; }
-    .marca-texto p { margin-top: 12px; font-size: 15px; color: rgba(255, 255, 255, 0.82); }
-    .marca-pontos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    /* Logo grande e centralizado: símbolo em cima, MARSH / CONSULTORIA abaixo */
+    /* Zona do logo ocupa o espaço livre e fica centralizada nele; o texto fica ancorado embaixo */
+    .marca-topo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+    .marca-topo { position: relative; }
+    /* Halo ciano suave atrás do símbolo */
+    .marca-topo::before {
+      content: ""; position: absolute; left: 50%; top: 50%; width: 420px; height: 420px;
+      transform: translate(-50%, -62%); pointer-events: none; z-index: 0;
+      background: radial-gradient(circle, rgba(19, 168, 224, 0.22) 0%, rgba(29, 111, 216, 0.10) 38%, transparent 68%);
+    }
+    .marca-topo > * { position: relative; z-index: 1; }
+    .marca-simbolo { width: 160px; height: 160px; object-fit: contain; filter: drop-shadow(0 12px 32px rgba(19, 168, 224, 0.40)); }
+    .marca-nome strong { display: block; font-size: 44px; line-height: 1; font-weight: 700; letter-spacing: 0.2em; margin-right: -0.2em; }
+    .marca-nome span { display: block; margin-top: 10px; font-size: 14px; letter-spacing: 0.62em; margin-right: -0.62em; opacity: 0.85; }
+    .marca-texto {
+      width: 100%; max-width: 640px; display: flex; flex-direction: column; align-items: center;
+      padding-top: 36px; border-top: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    .marca-texto h2 { font-size: 34px; line-height: 1.25; font-weight: 600; letter-spacing: -0.02em; max-width: 20em; text-wrap: balance; }
+    .marca-texto p { margin-top: 14px; font-size: 18px; line-height: 1.55; color: rgba(255, 255, 255, 0.85); max-width: 44ch; text-wrap: balance; }
+    .marca-pontos { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 24px; }
     .marca-pontos span {
-      font-size: 12px; font-weight: 500; padding: 5px 11px; border-radius: 999px;
-      background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 13.5px; font-weight: 500; padding: 7px 14px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.24);
+    }
+    /* Telas de notebook mais baixas: reduz um pouco para caber sem rolagem */
+    @media (max-height: 760px) and (min-width: 769px) {
+      .login-marca { padding: 36px 48px 40px; }
+      .marca-texto { padding-top: 24px; }
+      .marca-simbolo { width: 120px; height: 120px; }
+      .marca-nome strong { font-size: 36px; }
+      .marca-texto h2 { font-size: 30px; }
+      .marca-texto p { font-size: 16px; }
     }
 
     /* ---------- Formulário ---------- */
@@ -88,8 +112,13 @@
     /* Celular: só o formulário, com uma faixa da marca no topo */
     @media (max-width: 768px) {
       body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-      .login-marca { padding: 20px 20px 18px; min-height: 0; }
+      .login-marca { padding: 20px 20px 18px; min-height: 0; align-items: flex-start; text-align: left; }
       .marca-texto, .marca-pontos { display: none; }
+      .marca-topo { flex-direction: row; gap: 12px; }
+      .marca-topo::before { display: none; }
+      .marca-simbolo { width: 44px; height: 44px; }
+      .marca-nome strong { font-size: 18px; letter-spacing: 0.18em; margin-right: 0; }
+      .marca-nome span { margin-top: 4px; font-size: 10.5px; letter-spacing: 0.42em; margin-right: 0; }
       .login-lado { align-items: flex-start; padding: 28px 20px; }
       .campo input, .btn-login { height: 48px; }
     }
