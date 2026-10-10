@@ -85,7 +85,10 @@ async function carregarStatusFinanceiro() {
   _finStatus = await res.json();
   const avisos = [];
   if (!_finStatus.asaas_configurado) avisos.push('Emissão de NFS-e desligada: falta configurar a chave do Asaas (ASAAS_API_KEY). As faturas funcionam normalmente; as notas ficam para emitir depois.');
-  else if (_finStatus.asaas_ambiente === 'sandbox') avisos.push('Asaas em modo de TESTE (sandbox): as notas emitidas não têm valor fiscal.');
+  else {
+    if (_finStatus.asaas_fiscal_configurado === false) avisos.push('Asaas conectado, mas a configuração fiscal da conta está pendente: no painel do Asaas, em Notas Fiscais, informe inscrição municipal, regime e o acesso ao portal da prefeitura. Até lá as notas não são emitidas.');
+    if (_finStatus.asaas_ambiente === 'sandbox') avisos.push('Asaas em modo de TESTE (sandbox): as notas emitidas não têm valor fiscal.');
+  }
   if (!_finStatus.email_configurado) avisos.push('Envio de e-mail desligado neste ambiente: as faturas não serão enviadas aos clientes.');
   document.getElementById('fin-avisos').innerHTML = avisos.map(a => `<div class="fin-aviso">${escapeHtml(a)}</div>`).join('');
   return _finStatus;
@@ -352,25 +355,36 @@ function estornarBaixa(id) {
   acaoFatura(id, '/estornar-baixa', `Desfazer o pagamento de ${nomeFatura(id)}? A fatura volta para "em aberto".`);
 }
 
-function abrirBaixa(id) {
-  const f = _faturasCache.find(x => x.id === id);
-  if (!f) return;
-  faturaBaixa = f;
+// O mesmo modal registra recebimento de fatura e pagamento de conta a pagar
+let contaBaixa = null;
+
+function prepararModalBaixa(titulo, labelValor, valor) {
   const form = document.getElementById('form-baixa');
   form.reset();
   form.data_pagamento.value = hojeIso();
-  form.valor_pago.value = f.valor_liquido ?? f.valor;
-  document.getElementById('modal-baixa-titulo').textContent = `Pagamento — ${f.cliente_nome}`;
+  form.valor_pago.value = valor;
+  document.getElementById('baixa-valor-label').textContent = labelValor;
+  document.getElementById('modal-baixa-titulo').textContent = titulo;
   showModal('#modal-baixa');
+}
+
+function abrirBaixa(id) {
+  const f = _faturasCache.find(x => x.id === id);
+  if (!f) return;
+  faturaBaixa = f; contaBaixa = null;
+  prepararModalBaixa(`Pagamento — ${f.cliente_nome}`, 'Valor recebido (R$) *', f.valor_liquido ?? f.valor);
 }
 
 async function salvarBaixa() {
   const form = document.getElementById('form-baixa');
-  const r = await acaoFatura(faturaBaixa.id, '/baixa', null, {
+  const corpo = {
     data_pagamento: form.data_pagamento.value,
     valor_pago: form.valor_pago.value,
     forma_pagamento: form.forma_pagamento.value
-  });
+  };
+  const r = contaBaixa
+    ? await acaoContaPagar(contaBaixa.id, '/baixa', null, corpo)
+    : await acaoFatura(faturaBaixa.id, '/baixa', null, corpo);
   if (r) closeModal(document.getElementById('modal-baixa'));
 }
 
@@ -393,6 +407,8 @@ async function abrirConfigFinanceiro() {
   const item = (ok, txt) => `<div class="${ok ? 'ok' : 'off'}">${ok ? '●' : '○'} ${escapeHtml(txt)}</div>`;
   document.getElementById('fin-config-status').innerHTML = st ? [
     item(st.asaas_configurado, st.asaas_configurado ? `Asaas conectado (${st.asaas_ambiente === 'producao' ? 'produção' : 'teste / sandbox'})` : 'Asaas não conectado — defina ASAAS_API_KEY no servidor'),
+    ...(st.asaas_configurado ? [item(st.asaas_fiscal_configurado === true, st.asaas_fiscal_configurado === true
+      ? 'Configuração fiscal do Asaas ok' : 'Configuração fiscal do Asaas pendente (painel do Asaas → Notas Fiscais)')] : []),
     item(st.webhook_configurado, st.webhook_configurado ? 'Webhook do Asaas ativo' : 'Webhook do Asaas sem token (as notas são consultadas a cada hora)'),
     item(st.email_configurado, st.email_configurado ? 'Envio de e-mail ativo' : 'Envio de e-mail desligado (RESEND_API_KEY)')
   ].join('') : '';
@@ -526,10 +542,412 @@ async function encerrarContrato(id) {
   loadContratos();
 }
 
+// ===== Contas a pagar =====
+let _contasCache = [];
+let contaEmEdicao = null;
+let _categoriasDespesa = [];
+let _gruposDre = [];
+let categoriaDespesaEmEdicao = null;
+
+function mesFiltro(id) {
+  const el = document.getElementById(id);
+  if (!el.value) el.value = hojeIso().slice(0, 7);
+  return el.value;
+}
+
+function situacaoConta(c) {
+  if (c.status === 'paga') return pill(`Paga em ${diaBr(c.data_pagamento)}`, '#2e7d4f');
+  if (c.status === 'cancelada') return pill('Cancelada', '#94a3b8');
+  if (c.vencida) return pill('Vencida', '#b42318');
+  return pill('Em aberto', '#1d6fd8');
+}
+
+async function loadContasPagar() {
+  const mes = mesFiltro('cp-mes');
+  const tbody = document.getElementById('contas-pagar-tbody');
+  tbody.innerHTML = skeletonRows(6);
+  const [rl, rr] = await Promise.all([
+    apiFetch(`${API_URL}/financeiro/contas-pagar?mes=${mes}`),
+    apiFetch(`${API_URL}/financeiro/contas-pagar/resumo?mes=${mes}`)
+  ]);
+  if (!rl || !rr) return;
+  if (!rl.ok) { const e = await rl.json(); tbody.innerHTML = `<tr><td colspan="6" class="text-center">${escapeHtml(e.erro)}</td></tr>`; return; }
+  _contasCache = await rl.json();
+  if (rr.ok) {
+    const r = await rr.json();
+    const set = (id, v) => { document.getElementById(id).textContent = v; };
+    set('cp-total-mes', formatMoeda(r.total_mes)); set('cp-total-mes-qtd', `${r.qtd_mes} conta(s)`);
+    set('cp-pago-mes', formatMoeda(r.pago_mes)); set('cp-pago-mes-qtd', `${r.qtd_pago} conta(s)`);
+    set('cp-proximos', formatMoeda(r.proximos_7)); set('cp-proximos-qtd', `${r.qtd_proximos_7} conta(s) a partir de hoje`);
+    set('cp-vencido', formatMoeda(r.vencido)); set('cp-vencido-qtd', `${r.qtd_vencido} conta(s) (todos os meses)`);
+  }
+  renderContasPagar();
+}
+
+function renderContasPagar() {
+  const tbody = document.getElementById('contas-pagar-tbody');
+  const filtro = document.getElementById('cp-filtro-status').value;
+  const busca = document.getElementById('cp-busca').value.trim().toLowerCase();
+  const lista = _contasCache.filter(c => {
+    if (filtro === 'vencida' && !c.vencida) return false;
+    if (filtro && filtro !== 'vencida' && c.status !== filtro) return false;
+    if (busca && !`${c.descricao} ${c.fornecedor_nome || ''} ${c.categoria_nome || ''}`.toLowerCase().includes(busca)) return false;
+    return true;
+  });
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">${_contasCache.length
+      ? 'Nenhuma conta com esse filtro.' : 'Nenhuma conta neste mês. Use "+ Nova conta".'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = lista.map(c => {
+    const acoes = [botao('eye', 'Visualizar', `visualizarRegistro(editarConta, ${c.id}, '#modal-conta-pagar')`)];
+    if (c.status === 'aberta') {
+      acoes.push(botao('dinheiro', 'Registrar pagamento', `abrirBaixaConta(${c.id})`, 'btn-edit'));
+      acoes.push(botao('edit', 'Editar', `editarConta(${c.id})`));
+      acoes.push(botao('trash', 'Excluir', `excluirConta(${c.id})`, 'btn-danger'));
+    } else if (c.status === 'paga') {
+      acoes.push(botao('edit', 'Editar', `editarConta(${c.id})`));
+      acoes.push(botao('desfazer', 'Desfazer pagamento', `estornarConta(${c.id})`));
+    }
+    const sub = [c.fornecedor_nome, c.parcela ? `${c.parcela}/${c.total_parcelas}` : null, c.documento].filter(Boolean).join(' · ');
+    return `
+    <tr>
+      <td data-label="Descrição"><strong>${escapeHtml(c.descricao)}</strong>${sub ? `<span class="fin-sub">${escapeHtml(sub)}</span>` : ''}</td>
+      <td data-label="Categoria">${escapeHtml(c.categoria_nome || '—')}</td>
+      <td data-label="Valor" class="fin-num">${formatMoeda(c.valor)}${c.status === 'paga' && c.valor_pago !== c.valor
+        ? `<span class="fin-sub">pago ${formatMoeda(c.valor_pago)}</span>` : ''}</td>
+      <td data-label="Vencimento">${diaBr(c.data_vencimento)}</td>
+      <td data-label="Situação">${situacaoConta(c)}</td>
+      <td data-label="Ações" class="td-acoes">${acoes.join('')}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function carregarCategoriasDespesa() {
+  const [rc, rg] = await Promise.all([
+    apiFetch(`${API_URL}/financeiro/categorias-despesa`),
+    _gruposDre.length ? null : apiFetch(`${API_URL}/financeiro/grupos-dre`)
+  ]);
+  if (rc && rc.ok) _categoriasDespesa = await rc.json();
+  if (rg && rg.ok) _gruposDre = await rg.json();
+}
+
+async function preencherSelectsConta(form, conta) {
+  const [, rf] = await Promise.all([carregarCategoriasDespesa(), apiFetch(`${API_URL}/fornecedores`)]);
+  const ativas = _categoriasDespesa.filter(c => c.ativo || (conta && c.id === conta.categoria_id));
+  form.categoria_id.innerHTML = '<option value="">Selecione...</option>' + _gruposDre.map(g => {
+    const cats = ativas.filter(c => c.grupo_dre === g.id);
+    return cats.length ? `<optgroup label="${escapeHtml(g.nome)}">${cats.map(c =>
+      `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('')}</optgroup>` : '';
+  }).join('');
+  const fornecedores = rf && rf.ok ? (await rf.json()).filter(f => f.ativo !== false || (conta && f.id === conta.fornecedor_id)) : [];
+  form.fornecedor_id.innerHTML = '<option value="">—</option>' + fornecedores.map(f =>
+    `<option value="${f.id}">${escapeHtml(f.nome || f.razao_social)}</option>`).join('');
+  if (conta) { form.categoria_id.value = conta.categoria_id || ''; form.fornecedor_id.value = conta.fornecedor_id || ''; }
+}
+
+async function abrirNovaConta() {
+  contaEmEdicao = null;
+  const form = document.getElementById('form-conta-pagar');
+  form.reset();
+  form.data_vencimento.value = hojeIso();
+  form.competencia.value = mesFiltro('cp-mes');
+  form.data_pagamento.value = hojeIso();
+  document.getElementById('conta-nova-campos').hidden = false;
+  document.getElementById('conta-paga-campos').hidden = true;
+  document.getElementById('conta-seguintes-linha').hidden = true;
+  await preencherSelectsConta(form);
+  document.getElementById('modal-conta-pagar-titulo').textContent = 'Nova conta a pagar';
+  showModal('#modal-conta-pagar');
+}
+
+async function editarConta(id) {
+  const c = _contasCache.find(x => x.id === id);
+  if (!c) return;
+  contaEmEdicao = c;
+  const form = document.getElementById('form-conta-pagar');
+  form.reset();
+  await preencherSelectsConta(form, c);
+  form.descricao.value = c.descricao;
+  form.valor.value = c.valor;
+  form.data_vencimento.value = c.data_vencimento;
+  form.competencia.value = c.competencia.slice(0, 7);
+  form.documento.value = c.documento || '';
+  form.observacoes.value = c.observacoes || '';
+  document.getElementById('conta-nova-campos').hidden = true;
+  document.getElementById('conta-seguintes-linha').hidden = !c.grupo_id || c.parcela >= c.total_parcelas;
+  document.getElementById('modal-conta-pagar-titulo').textContent =
+    `Editar conta${c.parcela ? ` (${c.parcela}/${c.total_parcelas})` : ''}`;
+  showModal('#modal-conta-pagar');
+}
+
+async function salvarConta() {
+  const form = document.getElementById('form-conta-pagar');
+  const dados = {
+    descricao: form.descricao.value,
+    categoria_id: form.categoria_id.value,
+    fornecedor_id: form.fornecedor_id.value,
+    valor: form.valor.value,
+    data_vencimento: form.data_vencimento.value,
+    competencia: form.competencia.value,
+    documento: form.documento.value,
+    observacoes: form.observacoes.value
+  };
+  if (contaEmEdicao) {
+    dados.aplicar_seguintes = form.aplicar_seguintes.checked;
+  } else {
+    dados.repetir_meses = Number(form.repetir_meses.value);
+    dados.ja_paga = form.ja_paga.value === '1';
+    dados.data_pagamento = form.data_pagamento.value;
+    dados.forma_pagamento = form.forma_pagamento.value;
+  }
+  const url = contaEmEdicao ? `${API_URL}/financeiro/contas-pagar/${contaEmEdicao.id}` : `${API_URL}/financeiro/contas-pagar`;
+  const res = await apiFetch(url, { method: contaEmEdicao ? 'PUT' : 'POST', body: JSON.stringify(dados) });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  closeModal(document.getElementById('modal-conta-pagar'));
+  if (!contaEmEdicao && dados.data_vencimento.slice(0, 7) !== mesFiltro('cp-mes')) {
+    document.getElementById('cp-mes').value = dados.data_vencimento.slice(0, 7);
+  }
+  loadContasPagar();
+}
+
+async function acaoContaPagar(id, caminho, confirmacao, corpo, query = '') {
+  if (confirmacao && !confirm(confirmacao)) return null;
+  const res = await apiFetch(`${API_URL}/financeiro/contas-pagar/${id}${caminho}${query}`, {
+    method: caminho ? 'POST' : 'DELETE', body: corpo ? JSON.stringify(corpo) : undefined
+  });
+  if (!res) return null;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return null; }
+  loadContasPagar();
+  return r;
+}
+
+function abrirBaixaConta(id) {
+  const c = _contasCache.find(x => x.id === id);
+  if (!c) return;
+  contaBaixa = c; faturaBaixa = null;
+  prepararModalBaixa(`Pagamento — ${c.descricao}`, 'Valor pago (R$) *', c.valor);
+}
+
+async function excluirConta(id) {
+  const c = _contasCache.find(x => x.id === id);
+  if (!c) return;
+  let query = '';
+  if (c.grupo_id && c.parcela < c.total_parcelas) {
+    const todas = confirm(`"${c.descricao}" faz parte de uma série (${c.parcela}/${c.total_parcelas}).\n\nOK = excluir esta e as próximas em aberto\nCancelar = escolher excluir só esta`);
+    if (todas) query = '?seguintes=1';
+    else if (!confirm(`Excluir só a parcela ${c.parcela}/${c.total_parcelas} de "${c.descricao}"?`)) return;
+  } else if (!confirm(`Excluir "${c.descricao}" (${formatMoeda(c.valor)})?`)) return;
+  const r = await acaoContaPagar(id, '', null, null, query);
+  if (r && query) alert(r.mensagem);
+}
+
+function estornarConta(id) {
+  const c = _contasCache.find(x => x.id === id);
+  acaoContaPagar(id, '/estornar-baixa', `Desfazer o pagamento de "${c ? c.descricao : ''}"? A conta volta para em aberto.`);
+}
+
+// ===== Categorias de despesa =====
+async function abrirCategoriasDespesa() {
+  await carregarCategoriasDespesa();
+  const form = document.getElementById('form-categoria-despesa');
+  form.grupo_dre.innerHTML = _gruposDre.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join('');
+  limparFormCategoriaDespesa();
+  renderCategoriasDespesa();
+  showModal('#modal-categorias-despesa');
+}
+
+function renderCategoriasDespesa() {
+  const nomeGrupo = id => (_gruposDre.find(g => g.id === id) || {}).nome || id;
+  document.getElementById('cat-desp-lista').innerHTML = _categoriasDespesa.map(c => `
+    <div class="fin-cat-item ${c.ativo ? '' : 'inativa'}">
+      <div>
+        <strong>${escapeHtml(c.nome)}</strong>${c.ativo ? '' : ' <span class="fin-muted">(inativa)</span>'}
+        <span class="fin-sub">${escapeHtml(nomeGrupo(c.grupo_dre))} · ${c.total_uso} conta(s)</span>
+      </div>
+      <div class="fin-cat-acoes">
+        ${botao('edit', 'Editar', `editarCategoriaDespesa(${c.id})`)}
+        ${botao(c.ativo ? 'ban' : 'refresh', c.ativo ? 'Desativar' : 'Reativar', `alternarCategoriaDespesa(${c.id})`)}
+      </div>
+    </div>`).join('') || '<p class="fin-muted">Nenhuma categoria.</p>';
+}
+
+function limparFormCategoriaDespesa() {
+  categoriaDespesaEmEdicao = null;
+  const form = document.getElementById('form-categoria-despesa');
+  form.reset();
+  document.getElementById('cat-desp-form-titulo').textContent = 'Nova categoria';
+  document.getElementById('cat-desp-cancelar').hidden = true;
+}
+
+function editarCategoriaDespesa(id) {
+  const c = _categoriasDespesa.find(x => x.id === id);
+  if (!c) return;
+  categoriaDespesaEmEdicao = c;
+  const form = document.getElementById('form-categoria-despesa');
+  form.nome.value = c.nome;
+  form.grupo_dre.value = c.grupo_dre;
+  document.getElementById('cat-desp-form-titulo').textContent = `Editando "${c.nome}"`;
+  document.getElementById('cat-desp-cancelar').hidden = false;
+  form.nome.focus();
+}
+
+async function gravarCategoriaDespesa(id, dados) {
+  const res = await apiFetch(`${API_URL}/financeiro/categorias-despesa${id ? `/${id}` : ''}`, {
+    method: id ? 'PUT' : 'POST', body: JSON.stringify(dados)
+  });
+  if (!res) return false;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return false; }
+  await carregarCategoriasDespesa();
+  renderCategoriasDespesa();
+  return true;
+}
+
+async function salvarCategoriaDespesa() {
+  const form = document.getElementById('form-categoria-despesa');
+  const c = categoriaDespesaEmEdicao;
+  const ok = await gravarCategoriaDespesa(c && c.id, { nome: form.nome.value, grupo_dre: form.grupo_dre.value, ativo: c ? c.ativo : true });
+  if (ok) limparFormCategoriaDespesa();
+}
+
+function alternarCategoriaDespesa(id) {
+  const c = _categoriasDespesa.find(x => x.id === id);
+  if (c) gravarCategoriaDespesa(c.id, { nome: c.nome, grupo_dre: c.grupo_dre, ativo: !c.ativo });
+}
+
+// ===== Fluxo de caixa =====
+const corValor = v => (v < 0 ? ' fin-negativo' : '');
+
+async function loadFluxoCaixa() {
+  const inicio = document.getElementById('fc-inicio');
+  if (!inicio.value) {
+    const d = new Date(); d.setMonth(d.getMonth() - 2);
+    inicio.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+  const meses = document.getElementById('fc-meses').value;
+  const box = document.getElementById('fc-tabela');
+  box.innerHTML = '<p class="fin-muted">Carregando...</p>';
+  const res = await apiFetch(`${API_URL}/financeiro/fluxo-caixa?inicio=${inicio.value}&meses=${meses}`);
+  if (!res) return;
+  const d = await res.json();
+  if (!res.ok) { box.innerHTML = `<p class="fin-muted">${escapeHtml(d.erro)}</p>`; return; }
+
+  document.getElementById('fc-aviso').innerHTML = d.saldo_inicial_data ? '' :
+    '<div class="fin-aviso">Saldo inicial não informado: o saldo considera apenas os pagamentos registrados no sistema. Use "Saldo inicial" para partir do saldo real do banco.</div>';
+
+  const linhas = [
+    ['Saldo no início do mês', 'saldo_abertura', 'saldo'],
+    ['(+) Recebido', 'entradas_realizadas', 'entrada'],
+    ['(+) Faturas a receber', 'entradas_previstas', 'entrada'],
+    ['(+) Contratos a faturar (estimado)', 'contratos_estimados', 'entrada'],
+    ['(−) Pago', 'saidas_realizadas', 'saida'],
+    ['(−) Contas a pagar', 'saidas_previstas', 'saida'],
+    ['Saldo no fim do mês', 'saldo_final', 'total']
+  ];
+  const th = d.meses.map(m => `<th class="${m.mes === d.mes_atual ? 'fin-col-atual' : ''}">${mesAnoBr(m.mes)}</th>`).join('');
+  const corpo = linhas.map(([rotulo, k, tipo]) => `
+    <tr class="fin-linha-${tipo}">
+      <th scope="row">${rotulo}</th>
+      ${d.meses.map(m => {
+        const v = m[k];
+        const txt = v === 0 && tipo !== 'saldo' && tipo !== 'total' ? '<span class="fin-muted">—</span>' : formatMoeda(tipo === 'saida' ? -v : v);
+        return `<td class="fin-num${m.mes === d.mes_atual ? ' fin-col-atual' : ''}${corValor(tipo === 'saida' ? -v : v)}">${txt}</td>`;
+      }).join('')}
+    </tr>`).join('');
+  box.innerHTML = `<table><thead><tr><th></th>${th}</tr></thead><tbody>${corpo}</tbody></table>`;
+
+  const tbody = document.getElementById('fc-proximos-tbody');
+  tbody.innerHTML = d.proximos.length ? d.proximos.map(p => `
+    <tr>
+      <td data-label="Vencimento">${diaBr(p.data_vencimento)}${p.vencida ? ` ${pill('Atrasada', '#b42318')}` : ''}</td>
+      <td data-label="Tipo">${p.tipo === 'receber' ? pill('A receber', '#2e7d4f') : pill('A pagar', '#b7791f')}</td>
+      <td data-label="Descrição">${escapeHtml(p.descricao)}</td>
+      <td data-label="Valor" class="fin-num${p.tipo === 'pagar' ? ' fin-negativo' : ''}">${formatMoeda(p.tipo === 'pagar' ? -p.valor : p.valor)}</td>
+    </tr>`).join('') : '<tr><td colspan="4" class="text-center">Nada vencendo nos próximos 30 dias.</td></tr>';
+}
+
+async function abrirSaldoInicial() {
+  const res = await apiFetch(`${API_URL}/financeiro/config`);
+  if (!res) return;
+  const c = await res.json();
+  const form = document.getElementById('form-saldo-inicial');
+  form.saldo_inicial.value = c.saldo_inicial ?? 0;
+  form.saldo_inicial_data.value = c.saldo_inicial_data ? String(c.saldo_inicial_data).slice(0, 10) : hojeIso().slice(0, 8) + '01';
+  showModal('#modal-saldo-inicial');
+}
+
+async function salvarSaldoInicial() {
+  const form = document.getElementById('form-saldo-inicial');
+  const res = await apiFetch(`${API_URL}/financeiro/saldo-inicial`, {
+    method: 'PUT',
+    body: JSON.stringify({ saldo_inicial: form.saldo_inicial.value, saldo_inicial_data: form.saldo_inicial_data.value })
+  });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  closeModal(document.getElementById('modal-saldo-inicial'));
+  loadFluxoCaixa();
+}
+
+// ===== DRE =====
+let _dre = null;
+
+async function loadDre() {
+  const sel = document.getElementById('dre-ano');
+  if (!sel.options.length) {
+    const atual = new Date().getFullYear();
+    for (let a = atual + 1; a >= 2024; a--) sel.add(new Option(String(a), String(a), false, a === atual));
+  }
+  const box = document.getElementById('dre-tabela');
+  box.innerHTML = '<p class="fin-muted">Carregando...</p>';
+  const res = await apiFetch(`${API_URL}/financeiro/dre?ano=${sel.value}`);
+  if (!res) return;
+  const d = await res.json();
+  if (!res.ok) { box.innerHTML = `<p class="fin-muted">${escapeHtml(d.erro)}</p>`; return; }
+  _dre = d;
+  renderDre();
+}
+
+function renderDre() {
+  if (!_dre) return;
+  const detalhar = document.getElementById('dre-detalhar').checked;
+  const celula = v => `<td class="fin-num${corValor(v)}">${v === 0 ? '<span class="fin-muted">—</span>' : formatMoeda(v)}</td>`;
+  const linhas = _dre.linhas.filter(l => detalhar || l.tipo !== 'categoria');
+  // Grupos de despesa sem nenhum valor no ano ficam escondidos (a menos que abra por categoria)
+  const visiveis = linhas.filter(l => detalhar || l.tipo !== 'grupo' || l.chave === 'receita_bruta' || l.total !== 0);
+  const receita = _dre.linhas.find(l => l.chave === 'receita_bruta');
+  const liquido = _dre.linhas.find(l => l.chave === 'resultado_liquido');
+  const margem = (r, l) => (r ? `${((l / r) * 100).toFixed(1).replace('.', ',')}%` : '—');
+
+  const th = MESES_CURTOS.map(m => `<th>${m}</th>`).join('') + '<th>Total</th>';
+  const corpo = visiveis.map(l => `
+    <tr class="fin-dre-${l.tipo}">
+      <th scope="row">${escapeHtml(l.rotulo)}</th>
+      ${l.valores.map(celula).join('')}${celula(l.total)}
+    </tr>`).join('') + `
+    <tr class="fin-dre-margem">
+      <th scope="row">Margem líquida</th>
+      ${liquido.valores.map((v, i) => `<td class="fin-num">${margem(receita.valores[i], v)}</td>`).join('')}
+      <td class="fin-num">${margem(receita.total, liquido.total)}</td>
+    </tr>`;
+  document.getElementById('dre-tabela').innerHTML =
+    `<table><thead><tr><th></th>${th}</tr></thead><tbody>${corpo}</tbody></table>`;
+  document.getElementById('dre-fora').textContent = _dre.fora_resultado.total
+    ? `Fora da DRE (distribuição de lucros, empréstimos, investimentos): ${formatMoeda(_dre.fora_resultado.total)} no ano. Esses valores aparecem no fluxo de caixa.`
+    : '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const sub = (id, fn) => document.getElementById(id).addEventListener('submit', e => { e.preventDefault(); fn(); });
   sub('form-contrato', salvarContrato);
   sub('form-fatura', salvarFatura);
   sub('form-baixa', salvarBaixa);
   sub('form-fin-config', salvarConfigFinanceiro);
+  sub('form-conta-pagar', salvarConta);
+  sub('form-categoria-despesa', salvarCategoriaDespesa);
+  sub('form-saldo-inicial', salvarSaldoInicial);
 });

@@ -73,9 +73,33 @@ async function garantirCliente(cliente) {
   return id;
 }
 
+// Prefeituras com lista própria de serviços (Bragança Paulista é uma) exigem o id do item da lista.
+// Acha o item pelo código ("01.06" → "1.06 - ..."); sem lista ou sem item, segue com o código.
+const _servicos = new Map();
+async function resolverServico(codigo) {
+  if (!codigo) return null;
+  if (_servicos.has(codigo)) return _servicos.get(codigo);
+  const curto = String(codigo).trim().replace(/^0+(?=\d)/, ''); // "01.06" → "1.06"
+  let achado = null;
+  try {
+    const r = await chamar('GET', `/fiscalInfo/services?limit=100&description=${encodeURIComponent(curto)}`);
+    achado = (r.data || []).find(s => {
+      const d = String(s.description || '').trim();
+      return d.startsWith(curto + ' ') || d.startsWith(curto + ' -') || d.startsWith(String(codigo) + ' ');
+    }) || null;
+  } catch (err) {
+    // Portal Nacional não publica a lista: segue com o código
+    console.error('[Asaas] lista de serviços indisponível:', err.message);
+  }
+  const res = achado ? { id: achado.id, nome: achado.description } : null;
+  _servicos.set(codigo, res);
+  return res;
+}
+
 // Agenda a NFS-e avulsa (sem cobrança vinculada) para hoje e pede a emissão imediata
 async function emitirNotaFatura(fatura, cliente) {
   const customer = await garantirCliente(cliente);
+  const servico = await resolverServico(fatura.codigo_servico);
   const hoje = new Date().toISOString().slice(0, 10);
   const aliquota = Number(fatura.aliquota_iss || 0);
 
@@ -87,8 +111,9 @@ async function emitirNotaFatura(fatura, cliente) {
     value: Number(fatura.valor),
     deductions: 0,
     effectiveDate: hoje,
-    municipalServiceCode: fatura.codigo_servico,
-    municipalServiceName: fatura.nome_servico,
+    municipalServiceId: servico ? servico.id : undefined,
+    municipalServiceCode: servico ? undefined : fatura.codigo_servico,
+    municipalServiceName: fatura.nome_servico || (servico && servico.nome) || undefined,
     // Alíquotas (%) das retenções federais feitas pelo tomador
     taxes: {
       retainIss: !!fatura.reter_iss,
@@ -109,6 +134,18 @@ async function emitirNotaFatura(fatura, cliente) {
     console.error('[Asaas] authorize falhou, segue agendada:', err.message);
   }
   return final;
+}
+
+// A conta tem a configuração fiscal salva? (sem ela o Asaas não emite). Cache de 5 min.
+let _fiscal = { em: 0, ok: null };
+async function fiscalConfigurado() {
+  if (!configurado()) return false;
+  if (Date.now() - _fiscal.em < 5 * 60 * 1000) return _fiscal.ok;
+  let ok = null;
+  try { await chamar('GET', '/fiscalInfo'); ok = true; }
+  catch (err) { ok = err.status === 404 ? false : null; } // outro erro = não sabemos
+  _fiscal = { em: Date.now(), ok };
+  return ok;
 }
 
 async function consultarNota(id) {
@@ -149,6 +186,6 @@ async function aplicarNotaNaFatura(faturaId, nota) {
 }
 
 module.exports = {
-  ambiente, configurado, garantirCliente, emitirNotaFatura,
+  ambiente, configurado, fiscalConfigurado, garantirCliente, emitirNotaFatura,
   consultarNota, cancelarNota, aplicarNotaNaFatura, STATUS_NFSE
 };

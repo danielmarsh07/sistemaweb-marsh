@@ -642,6 +642,44 @@ async function iniciar() {
       }
     }
 
+    // 23. Fase 2 do financeiro: contas a pagar, fluxo de caixa e DRE
+    //     Categorias de despesa reaproveitam categorias_transacao (tipo 'saída') + a linha da DRE onde entram
+    await pool.query(`ALTER TABLE categorias_transacao ADD COLUMN IF NOT EXISTS grupo_dre VARCHAR(30);`);
+    //     Saldo bancário de partida do fluxo de caixa (saldo no início do dia saldo_inicial_data)
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS saldo_inicial NUMERIC(12,2) DEFAULT 0;`);
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS saldo_inicial_data DATE;`);
+
+    //     status: aberta → paga | cancelada ("vencida" = aberta com vencimento < hoje)
+    //     competencia = mês da despesa na DRE; data_pagamento = mês no fluxo de caixa
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contas_pagar (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        fornecedor_id INTEGER REFERENCES fornecedores(id),
+        categoria_id INTEGER REFERENCES categorias_transacao(id),
+        descricao VARCHAR(255) NOT NULL,
+        documento VARCHAR(80),
+        valor NUMERIC(12,2) NOT NULL CHECK (valor > 0),
+        competencia DATE NOT NULL,
+        data_vencimento DATE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'aberta',
+        data_pagamento DATE,
+        valor_pago NUMERIC(12,2),
+        forma_pagamento VARCHAR(30),
+        grupo_id UUID,
+        parcela INTEGER,
+        total_parcelas INTEGER,
+        observacoes TEXT,
+        criado_por_usuario_id INTEGER,
+        atualizado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_emp_venc ON contas_pagar(empresa_id, data_vencimento);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_emp_comp ON contas_pagar(empresa_id, competencia);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_grupo ON contas_pagar(grupo_id);`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);
@@ -651,6 +689,7 @@ async function iniciar() {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
     console.log(`📊 Dashboard: http://localhost:${PORT}`);
+    financeiroJobs.iniciar(); // NFS-e pendentes + lembretes de faturas vencidas, a cada hora
   });
 }
 

@@ -73,9 +73,10 @@ router.use((req, res, next) => {
 });
 
 // GET /status — integrações disponíveis
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
   res.json({
     asaas_configurado: asaas.configurado(),
+    asaas_fiscal_configurado: await asaas.fiscalConfigurado(),
     asaas_ambiente: asaas.ambiente(),
     webhook_configurado: !!process.env.ASAAS_WEBHOOK_TOKEN,
     email_configurado: email.emailConfigurado()
@@ -495,5 +496,8 @@ router.get('/resumo', async (req, res) => {
     res.json({ ...r.rows[0], ...mrr.rows[0] });
   } catch (err) { erro500(res, 'Erro ao montar resumo', err); }
 });
+
+// Fase 2: contas a pagar, fluxo de caixa e DRE (herda a trava de administrador acima)
+router.use(require('./financeiro-gestao'));
 
 module.exports = router;

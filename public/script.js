@@ -347,7 +347,10 @@ function showPage(page) {
     licencas: 'Licenças',
     treinamentos: 'Treinamentos',
     faturamento: 'Faturamento',
-    contratos: 'Contratos'
+    contratos: 'Contratos',
+    'contas-pagar': 'Contas a pagar',
+    'fluxo-caixa': 'Fluxo de caixa',
+    dre: 'DRE gerencial'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -365,6 +368,9 @@ function showPage(page) {
   if (page === 'treinamentos') loadCursos();
   if (page === 'faturamento') loadFaturamento();
   if (page === 'contratos') loadContratos();
+  if (page === 'contas-pagar') loadContasPagar();
+  if (page === 'fluxo-caixa') loadFluxoCaixa();
+  if (page === 'dre') loadDre();
 }
 
 // ===== CONFIGURAÇÕES / THEME PICKER =====

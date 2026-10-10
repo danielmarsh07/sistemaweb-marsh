@@ -104,6 +104,15 @@
           <a href="#" data-page="contratos" class="nav-link">
             <svg class="icon"><use href="#i-doc"/></svg> Contratos
           </a>
+          <a href="#" data-page="contas-pagar" class="nav-link">
+            <svg class="icon"><use href="#i-trend-down"/></svg> Contas a pagar
+          </a>
+          <a href="#" data-page="fluxo-caixa" class="nav-link">
+            <svg class="icon"><use href="#i-trend-up"/></svg> Fluxo de caixa
+          </a>
+          <a href="#" data-page="dre" class="nav-link">
+            <svg class="icon"><use href="#i-scale"/></svg> DRE
+          </a>
           <a href="#" data-page="fornecedores" class="nav-link">
             <svg class="icon"><use href="#i-building"/></svg> Fornecedores
           </a>
@@ -682,6 +691,132 @@
             </tbody>
           </table>
         </div>
+      </section>
+
+      <!-- ========== CONTAS A PAGAR (financeiro.js) ========== -->
+      <section id="contas-pagar-page" class="page">
+        <div class="page-header">
+          <h2>Contas a pagar</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirCategoriasDespesa()">Categorias</button>
+            <button type="button" class="btn btn-primary" onclick="abrirNovaConta()">+ Nova conta</button>
+          </div>
+        </div>
+
+        <div class="filtros-bar">
+          <label class="filtros-label">Vencimento em
+            <input type="month" id="cp-mes" class="filtro-select" onchange="loadContasPagar()">
+          </label>
+          <select id="cp-filtro-status" class="filtro-select" onchange="renderContasPagar()">
+            <option value="">Todas</option>
+            <option value="aberta">Em aberto</option>
+            <option value="vencida">Vencidas</option>
+            <option value="paga">Pagas</option>
+          </select>
+          <input type="text" id="cp-busca" class="filtro-select" placeholder="Buscar descrição, fornecedor ou categoria..." style="min-width:200px; flex:1" oninput="renderContasPagar()">
+        </div>
+
+        <div class="totais-finance">
+          <div class="totais-card totais-caixa">
+            <span class="totais-label">Vence no mês</span>
+            <span class="totais-valor" id="cp-total-mes">R$ 0,00</span>
+            <span class="totais-qtd" id="cp-total-mes-qtd">0 conta(s)</span>
+          </div>
+          <div class="totais-card totais-entrada">
+            <span class="totais-label">Pago no mês</span>
+            <span class="totais-valor" id="cp-pago-mes">R$ 0,00</span>
+            <span class="totais-qtd" id="cp-pago-mes-qtd">0 conta(s)</span>
+          </div>
+          <div class="totais-card totais-saldo">
+            <span class="totais-label">Próximos 7 dias</span>
+            <span class="totais-valor" id="cp-proximos">R$ 0,00</span>
+            <span class="totais-qtd" id="cp-proximos-qtd">0 conta(s)</span>
+          </div>
+          <div class="totais-card totais-saida">
+            <span class="totais-label">Vencido</span>
+            <span class="totais-valor" id="cp-vencido">R$ 0,00</span>
+            <span class="totais-qtd" id="cp-vencido-qtd">0 conta(s)</span>
+          </div>
+        </div>
+        <p class="pagina-descricao">Mostra as contas que vencem no mês escolhido e as em aberto de meses anteriores.</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th>Valor</th>
+                <th>Vencimento</th>
+                <th>Situação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="contas-pagar-tbody">
+              <tr><td colspan="6" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== FLUXO DE CAIXA (financeiro.js) ========== -->
+      <section id="fluxo-caixa-page" class="page">
+        <div class="page-header">
+          <h2>Fluxo de caixa</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirSaldoInicial()">Saldo inicial</button>
+          </div>
+        </div>
+        <div class="filtros-bar">
+          <label class="filtros-label">A partir de
+            <input type="month" id="fc-inicio" class="filtro-select" onchange="loadFluxoCaixa()">
+          </label>
+          <select id="fc-meses" class="filtro-select" onchange="loadFluxoCaixa()">
+            <option value="6">6 meses</option>
+            <option value="12" selected>12 meses</option>
+            <option value="24">24 meses</option>
+          </select>
+        </div>
+        <div id="fc-aviso"></div>
+        <p class="pagina-descricao">
+          Meses passados mostram o que entrou e saiu de fato. Do mês atual em diante entram também as faturas e contas em aberto (as atrasadas caem no mês atual) e uma estimativa dos contratos ativos que ainda não viraram fatura.
+        </p>
+        <div class="fin-matriz" id="fc-tabela"></div>
+
+        <h3 class="fin-subtitulo">Próximos 30 dias</h3>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Vencimento</th>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody id="fc-proximos-tbody">
+              <tr><td colspan="4" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== DRE (financeiro.js) ========== -->
+      <section id="dre-page" class="page">
+        <div class="page-header">
+          <h2>DRE gerencial</h2>
+        </div>
+        <div class="filtros-bar">
+          <label class="filtros-label">Ano
+            <select id="dre-ano" class="filtro-select" onchange="loadDre()"></select>
+          </label>
+          <label class="check-linha fin-check-filtro"><input type="checkbox" id="dre-detalhar" onchange="renderDre()"> Abrir por categoria</label>
+        </div>
+        <p class="pagina-descricao">
+          Regime de competência: receita pelas faturas aprovadas do mês e despesas pelo mês de competência das contas a pagar. Retenções feitas pelo cliente na nota entram como imposto. É um demonstrativo gerencial; o oficial é o do contador.
+        </p>
+        <div class="fin-matriz" id="dre-tabela"></div>
+        <p class="pagina-descricao" id="dre-fora"></p>
       </section>
 
       <section id="transacoes-page" class="page">
@@ -1461,7 +1596,7 @@
             <input type="date" name="data_pagamento" required>
           </div>
           <div class="form-group">
-            <label>Valor recebido (R$) *</label>
+            <label id="baixa-valor-label">Valor recebido (R$) *</label>
             <input type="number" name="valor_pago" min="0.01" step="0.01" required>
           </div>
         </div>
@@ -1548,6 +1683,159 @@
         <div class="form-group">
           <label>Cópia dos e-mails para</label>
           <input type="email" name="email_copia" placeholder="seu e-mail (opcional)">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-conta-pagar" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-conta-pagar-titulo">Nova conta a pagar</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-conta-pagar" class="form">
+        <div class="form-group">
+          <label>Descrição *</label>
+          <input type="text" name="descricao" required maxlength="255" placeholder="Ex.: Honorários contábeis">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Categoria *</label>
+            <select name="categoria_id" required></select>
+            <small class="form-hint">Define a linha da DRE. <a href="#" onclick="abrirCategoriasDespesa(); return false;">Gerenciar categorias</a></small>
+          </div>
+          <div class="form-group">
+            <label>Fornecedor</label>
+            <select name="fornecedor_id"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor (R$) *</label>
+            <input type="number" name="valor" min="0.01" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label>Vencimento *</label>
+            <input type="date" name="data_vencimento" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Competência *</label>
+            <input type="month" name="competencia" required>
+            <small class="form-hint">Mês a que a despesa se refere (usado na DRE).</small>
+          </div>
+          <div class="form-group">
+            <label>Documento</label>
+            <input type="text" name="documento" maxlength="80" placeholder="Nº da NF, boleto, guia...">
+          </div>
+        </div>
+
+        <div id="conta-nova-campos">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Repetir</label>
+              <select name="repetir_meses">
+                <option value="1">Não repetir</option>
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
+                <option value="24">24 meses</option>
+              </select>
+              <small class="form-hint">Cria uma conta por mês, no mesmo dia de vencimento.</small>
+            </div>
+            <div class="form-group">
+              <label>Já foi paga?</label>
+              <select name="ja_paga" onchange="document.getElementById('conta-paga-campos').hidden = this.value !== '1'">
+                <option value="">Não</option>
+                <option value="1">Sim, registrar pagamento</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row" id="conta-paga-campos" hidden>
+            <div class="form-group">
+              <label>Data do pagamento</label>
+              <input type="date" name="data_pagamento">
+            </div>
+            <div class="form-group">
+              <label>Forma</label>
+              <select name="forma_pagamento">
+                <option value="transferencia">Transferência / TED</option>
+                <option value="pix">PIX</option>
+                <option value="boleto">Boleto</option>
+                <option value="debito">Débito automático</option>
+                <option value="cartao">Cartão</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <label class="check-linha" id="conta-seguintes-linha" hidden>
+          <input type="checkbox" name="aplicar_seguintes"> Aplicar descrição, valor, categoria e fornecedor às próximas parcelas em aberto
+        </label>
+
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea name="observacoes" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-categorias-despesa" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Categorias de despesa</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-categoria-despesa" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label id="cat-desp-form-titulo">Nova categoria</label>
+            <input type="text" name="nome" required maxlength="120" placeholder="Nome">
+          </div>
+          <div class="form-group">
+            <label>Linha da DRE</label>
+            <select name="grupo_dre" required></select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cat-desp-cancelar" hidden onclick="limparFormCategoriaDespesa()">Cancelar edição</button>
+          <button type="submit" class="btn btn-primary">Salvar categoria</button>
+        </div>
+      </form>
+      <div class="fin-cat-lista" id="cat-desp-lista"></div>
+    </div>
+  </div>
+
+  <div id="modal-saldo-inicial" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Saldo inicial do caixa</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-saldo-inicial" class="form">
+        <p class="pagina-descricao">
+          Informe quanto havia na conta bancária no início de um dia. O fluxo de caixa parte desse valor e soma os recebimentos e pagamentos registrados a partir dessa data.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Data *</label>
+            <input type="date" name="saldo_inicial_data" required>
+          </div>
+          <div class="form-group">
+            <label>Saldo (R$) *</label>
+            <input type="number" name="saldo_inicial" step="0.01" required>
+          </div>
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
@@ -2231,6 +2519,10 @@
     <button class="bottom-nav-item" data-page="contratos">
       <span class="bn-icon"><svg class="icon"><use href="#i-doc"/></svg></span>
       <span>Contratos</span>
+    </button>
+    <button class="bottom-nav-item" data-page="contas-pagar">
+      <span class="bn-icon"><svg class="icon"><use href="#i-trend-down"/></svg></span>
+      <span>A pagar</span>
     </button>
     <button class="bottom-nav-item" data-page="usuarios">
       <span class="bn-icon"><svg class="icon"><use href="#i-key"/></svg></span>

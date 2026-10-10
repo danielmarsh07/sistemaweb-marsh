@@ -3505,7 +3505,46 @@ svg.icon {
 :root[data-theme="sereno-escuro"] .fin-aviso,
 :root[data-theme="dark"] .fin-aviso { background: rgba(245, 158, 11, 0.12); color: #f5c46b; border-color: rgba(245, 158, 11, 0.3); }
 
+/* Fase 2: fluxo de caixa e DRE em matriz (meses nas colunas). Não usa .table-container de propósito:
+   no celular continua tabela, com rolagem lateral e a 1ª coluna fixa. */
+.fin-matriz {
+  overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card-solid, var(--bg-card, #fff));
+}
+.fin-matriz table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.fin-matriz th, .fin-matriz td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.fin-matriz thead th { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); text-align: right; }
+.fin-matriz tbody th { text-align: left; font-weight: 500; color: var(--text-main); }
+.fin-matriz tr > :first-child {
+  position: sticky; left: 0; z-index: 1; min-width: 210px;
+  background: var(--bg-card-solid, var(--bg-card, #fff)); box-shadow: 1px 0 0 var(--border);
+}
+.fin-matriz td { text-align: right; }
+.fin-matriz tbody tr:last-child > * { border-bottom: 0; }
+.fin-col-atual { background: color-mix(in srgb, var(--primary) 7%, transparent); }
+.fin-negativo { color: #b42318; }
+.fin-linha-saldo th, .fin-linha-saldo td { color: var(--text-muted); }
+.fin-linha-total > *, .fin-dre-subtotal > *, .fin-dre-resultado > * { font-weight: 700; }
+.fin-linha-total > *, .fin-dre-resultado > * { border-top: 2px solid var(--border); }
+.fin-dre-subtotal > * { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+.fin-dre-categoria th { padding-left: 26px; font-weight: 400; color: var(--text-secondary); }
+.fin-dre-categoria td { color: var(--text-secondary); }
+.fin-dre-margem > * { color: var(--text-muted); font-size: 0.8rem; }
+.fin-subtitulo { margin: 8px 0 12px; font-size: 1rem; }
+.fin-check-filtro { margin: 0; }
+.fin-cat-lista { display: grid; gap: 6px; margin-top: 16px; max-height: 50vh; overflow-y: auto; }
+.fin-cat-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+}
+.fin-cat-item.inativa { opacity: 0.6; }
+.fin-cat-acoes { display: flex; gap: 6px; flex-shrink: 0; }
+:root[data-theme="sereno-escuro"] .fin-negativo,
+:root[data-theme="dark"] .fin-negativo { color: #fca5a5; }
+
 @media (max-width: 768px) {
+  .fin-matriz tr > :first-child { min-width: 150px; max-width: 170px; white-space: normal; }
+  .fin-cat-acoes .btn-icon { min-width: 44px; min-height: 44px; }
   .page-header-acoes { width: 100%; }
   .page-header-acoes .btn { flex: 1 1 auto; }
   .fin-barra-aprovar { top: 8px; }
