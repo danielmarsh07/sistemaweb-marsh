@@ -132,6 +132,10 @@ router.post('/', async (req, res) => {
         req.usuario.id
       ]
     );
+    if (req.body.email_financeiro !== undefined) {
+      await pool.query('UPDATE clientes SET email_financeiro = $1 WHERE id = $2',
+        [String(req.body.email_financeiro || '').trim() || null, result.rows[0].id]);
+    }
     res.status(201).json({ mensagem: 'Cliente criado com sucesso!', cliente: result.rows[0] });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao criar cliente', detalhe: err.message });
@@ -231,6 +235,13 @@ router.put('/:id', async (req, res) => {
         empresa_id
       ]
     );
+    // E-mail de cobrança; se o CPF/CNPJ mudou, o cliente é recriado no Asaas na próxima nota
+    await pool.query(
+      `UPDATE clientes SET
+         email_financeiro = CASE WHEN $1::boolean THEN $2 ELSE email_financeiro END,
+         asaas_customer_id = CASE WHEN cpf_cnpj IS DISTINCT FROM $3 THEN NULL ELSE asaas_customer_id END
+       WHERE id = $4`,
+      [req.body.email_financeiro !== undefined, String(req.body.email_financeiro || '').trim() || null, c.cpf_cnpj, req.params.id]);
     res.json({ mensagem: 'Cliente atualizado com sucesso!', cliente: result.rows[0] });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao atualizar cliente', detalhe: err.message });

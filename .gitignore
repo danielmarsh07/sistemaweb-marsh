@@ -30,3 +30,8 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# Notas fiscais reais (dados de clientes) — nunca versionar
+docs/NF_*
+docs/**/*.xml
+docs/**/*.pdf

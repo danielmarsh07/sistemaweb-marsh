@@ -1804,6 +1804,13 @@
     .licenca-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
     .licenca-card .linha { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; padding: 4px 0; color: var(--text-secondary); }
     .licenca-card .linha strong { color: var(--text-main); font-weight: 600; }
+    .fatura-card.vencida { border-color: rgba(180, 35, 24, 0.45); }
+    .fatura-card .docs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .fatura-card .docs a { font-size: 0.82rem; font-weight: 600; color: var(--primary); text-decoration: none; padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: 8px; }
+    .fatura-card .docs a:hover { border-color: var(--primary); }
+    .pagamento-box { margin-bottom: 14px; padding: 14px 16px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); font-size: 0.88rem; color: var(--text-secondary); }
+    .pagamento-box strong { color: var(--text-main); }
+    .pagamento-box p { margin-top: 4px; white-space: pre-line; }
     .licenca-card h4 { font-size: 1rem; margin-bottom: 8px; color: var(--text-main); display: flex; justify-content: space-between; align-items: center; }
 
     .modal-curso-box { width: 96vw; max-width: 1120px; }
@@ -1911,6 +1918,13 @@
     <section id="secao-treinamentos" class="portal-secao" hidden>
       <div class="section-header"><h3>Treinamentos</h3></div>
       <div id="lista-cursos" class="cursos-grid"></div>
+    </section>
+
+    <!-- Financeiro: faturas e notas fiscais (some se a empresa não tiver faturas) -->
+    <section id="secao-financeiro" class="portal-secao" hidden>
+      <div class="section-header"><h3>Financeiro</h3></div>
+      <div id="financeiro-pagamento"></div>
+      <div id="lista-faturas" class="licencas-portal"></div>
     </section>
 
     <!-- Licença do conector SAP (some se a empresa não tiver) -->

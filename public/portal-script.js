@@ -114,7 +114,8 @@ async function carregarPortal() {
     carregarChamados(),
     carregarTecnologias(),
     carregarTreinamentos(),
-    carregarLicencasPortal()
+    carregarLicencasPortal(),
+    carregarFinanceiroPortal()
   ]);
 }
 
@@ -861,6 +862,47 @@ async function carregarLicencasPortal() {
         <div class="linha"><span>Sistemas</span><strong>${escapeHtml(String(l.sids).replace(/,/g, ', '))}</strong></div>
         <div class="linha"><span>Usuários ativos (30 dias)</span><strong>${l.usuarios_ativos}${l.max_usuarios ? ' de ' + l.max_usuarios : ''}</strong></div>
         <div class="linha"><span>Uso do conector (30 dias)</span><strong>${Number(l.chamadas_30d).toLocaleString('pt-BR')} operações</strong></div>
+      </div>`;
+  }).join('');
+}
+
+// ===== FINANCEIRO: faturas e NFS-e do cliente (só leitura) =====
+async function carregarFinanceiroPortal() {
+  const res = await apiFetch(`${API}/financeiro/minhas-faturas`);
+  if (!res || !res.ok) return;
+  const { faturas, pagamento } = await res.json();
+  document.getElementById('secao-financeiro').hidden = !faturas.length;
+  if (!faturas.length) return;
+
+  const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const mesAno = d => { const [a, m] = String(d).slice(0, 7).split('-'); return `${meses[Number(m) - 1]}/${a}`; };
+  const br = d => String(d).slice(0, 10).split('-').reverse().join('/');
+  const moeda = v => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const temAberta = faturas.some(f => f.status === 'aberta');
+  document.getElementById('financeiro-pagamento').innerHTML = temAberta && (pagamento.pix_chave || pagamento.instrucoes) ? `
+    <div class="pagamento-box">
+      <strong>Como pagar</strong>
+      ${pagamento.pix_chave ? `<p>PIX: <strong>${escapeHtml(pagamento.pix_chave)}</strong></p>` : ''}
+      ${pagamento.instrucoes ? `<p>${escapeHtml(pagamento.instrucoes)}</p>` : ''}
+    </div>` : '';
+
+  document.getElementById('lista-faturas').innerHTML = faturas.map(f => {
+    const st = f.status === 'paga' ? [`Paga em ${br(f.data_pagamento)}`, '#10b981']
+      : f.vencida ? ['Vencida', '#ef4444'] : ['Em aberto', '#1d6fd8'];
+    const docs = [
+      f.nfse_pdf_url && `<a href="${escapeHtml(f.nfse_pdf_url)}" target="_blank" rel="noopener">Nota fiscal (PDF)</a>`,
+      f.nfse_xml_url && `<a href="${escapeHtml(f.nfse_xml_url)}" target="_blank" rel="noopener">XML</a>`
+    ].filter(Boolean).join('');
+    return `
+      <div class="licenca-card fatura-card${f.vencida ? ' vencida' : ''}">
+        <h4>${mesAno(f.competencia)}
+          <span style="background:${st[1]}20; color:${st[1]}; padding:2px 8px; border-radius:20px; font-size:0.75rem; font-weight:600">${st[0]}</span></h4>
+        <div class="linha"><span>Valor da nota</span><strong>${moeda(f.valor)}</strong></div>
+        ${f.valor_liquido < f.valor ? `<div class="linha"><span>Valor a pagar (com retenções)</span><strong>${moeda(f.valor_liquido)}</strong></div>` : ''}
+        <div class="linha"><span>Vencimento</span><strong>${br(f.data_vencimento)}</strong></div>
+        <div class="linha"><span>NFS-e</span><strong>${f.nfse_status === 'emitida' ? 'Nº ' + escapeHtml(f.nfse_numero || '-') : f.nfse_status === 'processando' ? 'Em emissão' : '—'}</strong></div>
+        ${docs ? `<div class="docs">${docs}</div>` : ''}
       </div>`;
   }).join('');
 }

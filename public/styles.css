@@ -3209,14 +3209,45 @@ svg.icon {
 }
 .sidebar-nav { overflow-y: auto; gap: 2px; }
 
-/* Títulos dos grupos do menu */
+/* Grupos do menu: título clicável que recolhe/expande os itens (estado salvo no navegador) */
 .nav-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-subtle);
-  padding: 14px 12px 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.nav-group-title:hover { color: var(--text-secondary); background: rgba(127, 127, 127, 0.08); }
+.nav-group-title:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.nav-group-seta {
+  width: 14px; height: 14px; flex-shrink: 0;
+  fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+.nav-group-title[aria-expanded="false"] .nav-group-seta { transform: rotate(-90deg); }
+.nav-group-itens {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.22s ease;
+}
+.nav-group-title[aria-expanded="false"] + .nav-group-itens { grid-template-rows: 0fr; }
+.nav-group-inner { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: hidden; }
+/* Grupo fechado com a página atual dentro: o título fica marcado */
+.nav-group.tem-ativo .nav-group-title[aria-expanded="false"] { color: var(--primary); }
+@media (prefers-reduced-motion: reduce) {
+  .nav-group-itens, .nav-group-seta { transition: none; }
 }
 :root[data-theme="light"] .nav-group-title { color: rgba(245, 245, 247, 0.45); }
 
@@ -3428,4 +3459,57 @@ svg.icon {
   .licenca-uso-resumo { grid-template-columns: 1fr 1fr; }
   .licenca-chave-box { flex-direction: column; align-items: stretch; }
   .licenca-chave-box code { font-size: 16px; text-align: center; }
+}
+
+/* =====================================================================
+   FINANCEIRO — faturamento mensal (financeiro.js)
+   ===================================================================== */
+.page-header-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.fin-pill {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+  color: var(--pill); background: color-mix(in srgb, var(--pill) 13%, transparent);
+}
+.fin-sub { display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+.fin-muted { color: var(--text-muted); font-size: 0.85rem; }
+.fin-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fin-links { margin-top: 4px; font-size: 0.8rem; }
+.fin-links a { color: var(--primary); text-decoration: none; font-weight: 500; }
+.fin-links a:hover { text-decoration: underline; }
+.fin-erro { margin-top: 4px; max-width: 260px; font-size: 0.75rem; line-height: 1.35; color: #b42318; }
+.fin-linha-cancelada td { opacity: 0.55; }
+.col-check { width: 36px; }
+.col-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
+.fin-aviso {
+  margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; font-size: 0.875rem;
+  background: #fff7e6; color: #8a5a00; border: 1px solid #f3dca6;
+}
+.fin-barra-aprovar {
+  position: sticky; top: 72px; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 10px 14px; border-radius: 10px;
+  background: var(--primary-soft, #e3effc); border: 1px solid var(--border);
+  font-weight: 500; color: var(--text-main);
+}
+.fin-barra-aprovar[hidden] { display: none; }
+.check-linha { display: flex; align-items: center; gap: 8px; margin: 4px 0 14px; font-size: 0.9rem; color: var(--text-secondary); cursor: pointer; }
+.check-linha input { width: auto; accent-color: var(--primary); }
+.fin-retencoes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.fin-retencoes .form-group { margin-bottom: 4px; }
+.form-section-sub { margin: 6px 0 6px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+@media (max-width: 600px) { .fin-retencoes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.fin-integracoes { display: grid; gap: 4px; margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: var(--bg-subtle, rgba(127,127,127,.06)); font-size: 0.85rem; }
+.fin-integracoes .ok { color: #2e7d4f; }
+.fin-integracoes .off { color: var(--text-muted); }
+.fin-integracoes:empty { display: none; }
+:root[data-theme="sereno-escuro"] .fin-aviso,
+:root[data-theme="dark"] .fin-aviso { background: rgba(245, 158, 11, 0.12); color: #f5c46b; border-color: rgba(245, 158, 11, 0.3); }
+
+@media (max-width: 768px) {
+  .page-header-acoes { width: 100%; }
+  .page-header-acoes .btn { flex: 1 1 auto; }
+  .fin-barra-aprovar { top: 8px; }
+  .fin-barra-aprovar .btn { width: 100%; }
+  .table-container td.col-check:empty { display: none; }
+  .fin-erro { max-width: none; }
 }

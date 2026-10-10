@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "dev:local": "node -r dotenv/config server.js dotenv_config_path=.env.local",
+    "seed:local": "node scripts/seed-local.js",
     "optimize:images": "node scripts/optimize-images.js"
   },
   "repository": {

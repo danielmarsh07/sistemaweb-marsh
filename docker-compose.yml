@@ -1,0 +1,23 @@
+# Banco local de desenvolvimento (não é usado em produção — lá o banco é o Postgres do Render)
+# Subir:  docker compose up -d      Rodar o app contra ele:  npm run dev:local
+services:
+  marsh-db:
+    image: postgres:16-alpine
+    container_name: marsh-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: marsh_local
+      POSTGRES_USER: marsh
+      POSTGRES_PASSWORD: marsh_local
+    ports:
+      - "5545:5432"
+    volumes:
+      - marsh-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marsh -d marsh_local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  marsh-db-data:

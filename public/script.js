@@ -93,6 +93,7 @@ let _categoriasTransCache = [];
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
+  iniciarMenuGrupos();
   loadDashboard();
 });
 
@@ -285,10 +286,47 @@ function setupEventListeners() {
   });
 }
 
+// ===== MENU LATERAL: grupos recolhíveis =====
+const MENU_GRUPOS_KEY = 'menuGruposFechados';
+
+function lerGruposFechados() {
+  try { return JSON.parse(localStorage.getItem(MENU_GRUPOS_KEY) || '[]'); } catch { return []; }
+}
+
+function abrirFecharGrupo(grupo, aberto, salvar = true) {
+  const btn = grupo.querySelector('.nav-group-title');
+  btn.setAttribute('aria-expanded', String(aberto));
+  // Itens escondidos não recebem foco pelo Tab
+  grupo.querySelectorAll('.nav-link').forEach(a => { a.tabIndex = aberto ? 0 : -1; });
+  if (!salvar) return;
+  const fechados = new Set(lerGruposFechados());
+  if (aberto) fechados.delete(grupo.dataset.grupo); else fechados.add(grupo.dataset.grupo);
+  try { localStorage.setItem(MENU_GRUPOS_KEY, JSON.stringify([...fechados])); } catch {}
+}
+
+function iniciarMenuGrupos() {
+  const fechados = lerGruposFechados();
+  document.querySelectorAll('.nav-group').forEach(grupo => {
+    abrirFecharGrupo(grupo, !fechados.includes(grupo.dataset.grupo), false);
+    grupo.querySelector('.nav-group-title').addEventListener('click', () => {
+      const aberto = grupo.querySelector('.nav-group-title').getAttribute('aria-expanded') === 'true';
+      abrirFecharGrupo(grupo, !aberto);
+    });
+  });
+}
+
+// Marca o grupo da página atual (fica destacado quando recolhido)
+function marcarGrupoAtivo(page) {
+  document.querySelectorAll('.nav-group').forEach(grupo => {
+    grupo.classList.toggle('tem-ativo', !!grupo.querySelector(`.nav-link[data-page="${page}"]`));
+  });
+}
+
 // ===== NAVIGATION =====
 function showPage(page) {
   document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(link => link.classList.remove('active'));
   document.querySelectorAll(`[data-page="${page}"]`).forEach(el => el.classList.add('active'));
+  marcarGrupoAtivo(page);
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const pageEl = document.getElementById(`${page}-page`);
@@ -305,7 +343,9 @@ function showPage(page) {
     usuarios: 'Usuários do Sistema',
     configuracoes: 'Configurações',
     licencas: 'Licenças',
-    treinamentos: 'Treinamentos'
+    treinamentos: 'Treinamentos',
+    faturamento: 'Faturamento',
+    contratos: 'Contratos'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -321,6 +361,8 @@ function showPage(page) {
   if (page === 'configuracoes') renderThemePicker();
   if (page === 'licencas') loadLicencas();
   if (page === 'treinamentos') loadCursos();
+  if (page === 'faturamento') loadFaturamento();
+  if (page === 'contratos') loadContratos();
 }
 
 // ===== CONFIGURAÇÕES / THEME PICKER =====
@@ -555,6 +597,7 @@ async function salvarCliente() {
     site: form.site.value,
     responsavel_nome: form.responsavel_nome.value,
     responsavel_email: form.responsavel_email.value,
+    email_financeiro: form.email_financeiro.value,
     responsavel_telefone: form.responsavel_telefone.value,
     cep: form.cep.value,
     logradouro: form.logradouro.value,
@@ -620,7 +663,7 @@ async function editarCliente(id) {
 
   const fields = ['razao_social','nome_fantasia','cpf_cnpj','inscricao_estadual',
     'inscricao_municipal','email','telefone','celular','site','responsavel_nome',
-    'responsavel_email','responsavel_telefone','cep','logradouro','numero',
+    'responsavel_email','email_financeiro','responsavel_telefone','cep','logradouro','numero',
     'complemento','bairro','cidade','uf','observacoes',
     'segmento','porte','tier_sla'];
 

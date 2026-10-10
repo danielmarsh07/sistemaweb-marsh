@@ -35,6 +35,7 @@
     <symbol id="i-trend-down" viewBox="0 0 24 24"><path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
     <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
     <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M7 7l-4 8a4 4 0 0 0 8 0zM17 7l-4 8a4 4 0 0 0 8 0z"/></symbol>
   </svg>
 
@@ -53,43 +54,79 @@
         <svg class="icon"><use href="#i-dash"/></svg> Visão geral
       </a>
 
-      <div class="nav-group-title">Atendimento</div>
-      <a href="#" data-page="chamados" class="nav-link">
-        <svg class="icon"><use href="#i-ticket"/></svg> Chamados
-      </a>
-      <a href="#" data-page="clientes" class="nav-link">
-        <svg class="icon"><use href="#i-users"/></svg> Clientes
-      </a>
+      <div class="nav-group" data-grupo="atendimento">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-atendimento">
+          <span>Atendimento</span>
+          <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-group-itens" id="nav-grupo-atendimento">
+          <div class="nav-group-inner">
+          <a href="#" data-page="chamados" class="nav-link">
+            <svg class="icon"><use href="#i-ticket"/></svg> Chamados
+          </a>
+          <a href="#" data-page="clientes" class="nav-link">
+            <svg class="icon"><use href="#i-users"/></svg> Clientes
+          </a>
+          </div>
+        </div>
+      </div>
 
-      <div class="nav-group-title">Produtos SAP</div>
-      <a href="#" data-page="licencas" class="nav-link">
-        <svg class="icon"><use href="#i-shield"/></svg> Licenças
-      </a>
-      <a href="#" data-page="treinamentos" class="nav-link">
-        <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
-      </a>
-      <a href="#" data-page="tecnologias" class="nav-link">
-        <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
-      </a>
+      <div class="nav-group" data-grupo="produtos">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-produtos">
+          <span>Produtos SAP</span>
+          <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-group-itens" id="nav-grupo-produtos">
+          <div class="nav-group-inner">
+          <a href="#" data-page="licencas" class="nav-link">
+            <svg class="icon"><use href="#i-shield"/></svg> Licenças
+          </a>
+          <a href="#" data-page="treinamentos" class="nav-link">
+            <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
+          </a>
+          <a href="#" data-page="tecnologias" class="nav-link">
+            <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
+          </a>
+          </div>
+        </div>
+      </div>
 
-      <div class="nav-group-title">Financeiro</div>
-      <a href="#" data-page="transacoes" class="nav-link">
-        <svg class="icon"><use href="#i-wallet"/></svg> Transações
-      </a>
-      <a href="#" data-page="categorias-transacao" class="nav-link">
-        <svg class="icon"><use href="#i-tag"/></svg> Categorias
-      </a>
-      <a href="#" data-page="fornecedores" class="nav-link">
-        <svg class="icon"><use href="#i-building"/></svg> Fornecedores
-      </a>
+      <div class="nav-group" data-grupo="financeiro">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-financeiro">
+          <span>Financeiro</span>
+          <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-group-itens" id="nav-grupo-financeiro">
+          <div class="nav-group-inner">
+          <a href="#" data-page="faturamento" class="nav-link">
+            <svg class="icon"><use href="#i-wallet"/></svg> Faturamento
+          </a>
+          <a href="#" data-page="contratos" class="nav-link">
+            <svg class="icon"><use href="#i-doc"/></svg> Contratos
+          </a>
+          <a href="#" data-page="fornecedores" class="nav-link">
+            <svg class="icon"><use href="#i-building"/></svg> Fornecedores
+          </a>
+          </div>
+        </div>
+      </div>
 
-      <div class="nav-group-title">Sistema</div>
-      <a href="#" data-page="usuarios" class="nav-link">
-        <svg class="icon"><use href="#i-key"/></svg> Usuários
-      </a>
-      <a href="#" data-page="configuracoes" class="nav-link">
-        <svg class="icon"><use href="#i-sliders"/></svg> Configurações
-      </a>
+      <div class="nav-group" data-grupo="sistema">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-sistema">
+          <span>Sistema</span>
+          <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-group-itens" id="nav-grupo-sistema">
+          <div class="nav-group-inner">
+          <a href="#" data-page="usuarios" class="nav-link">
+            <svg class="icon"><use href="#i-key"/></svg> Usuários
+          </a>
+          <a href="#" data-page="configuracoes" class="nav-link">
+            <svg class="icon"><use href="#i-sliders"/></svg> Configurações
+          </a>
+          </div>
+        </div>
+      </div>
     </nav>
 
     <div class="sidebar-footer sidebar-usuario">
@@ -528,6 +565,111 @@
       </section>
 
       <!-- ========== TRANSAÇÕES PAGE ========== -->
+      <!-- ========== FATURAMENTO (financeiro.js) ========== -->
+      <section id="faturamento-page" class="page">
+        <div class="page-header">
+          <h2>Faturamento</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirConfigFinanceiro()">Configurar</button>
+            <button type="button" class="btn btn-secondary" onclick="abrirFaturaAvulsa()">+ Fatura avulsa</button>
+            <button type="button" class="btn btn-primary" id="btn-gerar-mes" onclick="gerarFaturasMes()">Gerar faturas do mês</button>
+          </div>
+        </div>
+        <div id="fin-avisos"></div>
+
+        <div class="filtros-bar">
+          <label class="filtros-label">Competência
+            <input type="month" id="fin-competencia" class="filtro-select" onchange="loadFaturamento()">
+          </label>
+          <select id="fin-filtro-status" class="filtro-select" onchange="renderFaturas()">
+            <option value="">Todas</option>
+            <option value="rascunho">Rascunhos</option>
+            <option value="aberta">Em aberto</option>
+            <option value="vencida">Vencidas</option>
+            <option value="paga">Pagas</option>
+            <option value="cancelada">Canceladas</option>
+          </select>
+          <input type="text" id="fin-busca" class="filtro-select" placeholder="Buscar cliente..." style="min-width:200px; flex:1" oninput="renderFaturas()">
+        </div>
+
+        <div class="totais-finance">
+          <div class="totais-card totais-caixa">
+            <span class="totais-label">Faturado no mês</span>
+            <span class="totais-valor" id="fin-faturado">R$ 0,00</span>
+            <span class="totais-qtd" id="fin-faturado-qtd">0 fatura(s)</span>
+          </div>
+          <div class="totais-card totais-entrada">
+            <span class="totais-label">Recebido no mês</span>
+            <span class="totais-valor" id="fin-recebido">R$ 0,00</span>
+            <span class="totais-qtd" id="fin-recebido-qtd">0 fatura(s)</span>
+          </div>
+          <div class="totais-card totais-saldo">
+            <span class="totais-label">A receber</span>
+            <span class="totais-valor" id="fin-areceber">R$ 0,00</span>
+            <span class="totais-qtd" id="fin-areceber-qtd">no prazo, todos os meses</span>
+          </div>
+          <div class="totais-card totais-saida">
+            <span class="totais-label">Vencido</span>
+            <span class="totais-valor" id="fin-vencido">R$ 0,00</span>
+            <span class="totais-qtd" id="fin-vencido-qtd">0 fatura(s)</span>
+          </div>
+        </div>
+        <p class="pagina-descricao" id="fin-mrr"></p>
+
+        <div class="fin-barra-aprovar" id="fin-barra-aprovar" hidden>
+          <span id="fin-sel-qtd">0 selecionada(s)</span>
+          <button type="button" class="btn btn-primary" onclick="aprovarSelecionadas()">Aprovar, emitir NFS-e e enviar</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" id="fin-sel-todas" aria-label="Selecionar todos os rascunhos" onchange="selecionarTodasFaturas(this.checked)"></th>
+                <th>Cliente</th>
+                <th>Valor</th>
+                <th>Vencimento</th>
+                <th>Situação</th>
+                <th>NFS-e</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="faturas-tbody">
+              <tr><td colspan="7" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== CONTRATOS (financeiro.js) ========== -->
+      <section id="contratos-page" class="page">
+        <div class="page-header">
+          <h2>Contratos recorrentes</h2>
+          <button type="button" class="btn btn-primary" onclick="abrirNovoContrato()">+ Novo contrato</button>
+        </div>
+        <p class="pagina-descricao">
+          Cada contrato ativo gera uma fatura por mês no fechamento. Mudanças aqui valem para as próximas faturas.
+        </p>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Contrato</th>
+                <th>Mensalidade</th>
+                <th>Vencimento</th>
+                <th>Vigência</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="contratos-tbody">
+              <tr><td colspan="7" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="transacoes-page" class="page">
         <div class="page-header">
           <h2>Transações Financeiras</h2>
@@ -749,6 +891,15 @@
           <div class="form-group">
             <label>Site</label>
             <input type="text" name="site" placeholder="https://">
+          </div>
+        </div>
+
+        <div class="form-section-title">Cobrança</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>E-mail do financeiro</label>
+            <input type="text" name="email_financeiro" placeholder="financeiro@cliente.com.br">
+            <small class="form-hint">Recebe faturas, notas fiscais e lembretes. Vários: separe por vírgula. Vazio = usa o e-mail principal.</small>
           </div>
         </div>
 
@@ -1093,6 +1244,305 @@
   </div>
 
   <!-- MODAL: LICENÇA (cadastro / edição) -->
+  <!-- ===== MODAIS DO FINANCEIRO (financeiro.js) ===== -->
+  <div id="modal-contrato" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-contrato-titulo">Novo contrato</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-contrato" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cliente *</label>
+            <select name="cliente_id" required></select>
+          </div>
+          <div class="form-group">
+            <label>Nome do contrato *</label>
+            <input type="text" name="descricao" required placeholder="Ex.: AMS SAP — sustentação">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Descrição do serviço na nota fiscal *</label>
+          <textarea name="descricao_servico" rows="3" required placeholder="Ex.: Serviços de suporte e sustentação SAP (AMS) prestados no período."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor mensal (R$) *</label>
+            <input type="number" name="valor" min="0.01" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label>Dia do vencimento *</label>
+            <input type="number" name="dia_vencimento" min="1" max="28" value="10" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Início *</label>
+            <input type="date" name="data_inicio" required>
+          </div>
+          <div class="form-group">
+            <label>Fim</label>
+            <input type="date" name="data_fim">
+            <small class="form-hint">Vazio = sem prazo.</small>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Reajuste</label>
+            <select name="indice_reajuste">
+              <option value="nenhum">Sem reajuste</option>
+              <option value="IPCA">IPCA</option>
+              <option value="IGPM">IGP-M</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mês do reajuste</label>
+            <select name="mes_reajuste">
+              <option value="">—</option>
+              <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+              <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+              <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+              <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section-title">Nota fiscal</div>
+        <label class="check-linha"><input type="checkbox" name="emitir_nfse" checked> Emitir NFS-e para este contrato</label>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Código do serviço</label>
+            <input type="text" name="codigo_servico" placeholder="Vazio = padrão da configuração">
+          </div>
+          <div class="form-group">
+            <label>Alíquota ISS (%)</label>
+            <input type="number" name="aliquota_iss" min="0" max="5" step="0.01" placeholder="Padrão">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Nome do serviço</label>
+          <input type="text" name="nome_servico" placeholder="Vazio = padrão da configuração">
+        </div>
+        <label class="check-linha"><input type="checkbox" name="reter_iss"> ISS retido pelo tomador (cliente)</label>
+
+          <div class="form-section-sub">Retenções do tomador (%)</div>
+          <div class="fin-retencoes">
+            <div class="form-group"><label>IRRF</label><input type="number" name="ret_ir" min="0" max="20" step="0.01" placeholder="Padrão"></div>
+            <div class="form-group"><label>CSLL</label><input type="number" name="ret_csll" min="0" max="20" step="0.01" placeholder="Padrão"></div>
+            <div class="form-group"><label>PIS</label><input type="number" name="ret_pis" min="0" max="20" step="0.01" placeholder="Padrão"></div>
+            <div class="form-group"><label>COFINS</label><input type="number" name="ret_cofins" min="0" max="20" step="0.01" placeholder="Padrão"></div>
+            <div class="form-group"><label>INSS</label><input type="number" name="ret_inss" min="0" max="20" step="0.01" placeholder="Padrão"></div>
+          </div>
+          <small class="form-hint">Vazio = usa o padrão da configuração. O cliente paga o valor da nota menos as retenções.</small>
+
+
+        <div class="form-row" id="contrato-status-row">
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status">
+              <option value="ativo">Ativo</option>
+              <option value="suspenso">Suspenso (não fatura)</option>
+              <option value="encerrado">Encerrado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observações internas</label>
+          <textarea name="observacoes" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar contrato</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-fatura" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-fatura-titulo">Fatura</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-fatura" class="form">
+        <div class="form-row" id="fatura-avulsa-row">
+          <div class="form-group">
+            <label>Cliente *</label>
+            <select name="cliente_id"></select>
+          </div>
+          <div class="form-group">
+            <label>Competência *</label>
+            <input type="month" name="competencia">
+          </div>
+        </div>
+        <p class="pagina-descricao" id="fatura-aviso-aberta" hidden>
+          A fatura já foi aprovada: só dá para mudar o vencimento e as observações. Para corrigir valor ou descrição, cancele e crie outra.
+        </p>
+        <div class="form-group">
+          <label>Descrição do serviço na nota fiscal *</label>
+          <textarea name="descricao" rows="3" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor (R$) *</label>
+            <input type="number" name="valor" min="0.01" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label>Vencimento *</label>
+            <input type="date" name="data_vencimento" required>
+          </div>
+        </div>
+        <div id="fatura-nfse-campos">
+          <label class="check-linha"><input type="checkbox" name="emitir_nfse" checked> Emitir NFS-e</label>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Código do serviço</label>
+              <input type="text" name="codigo_servico">
+            </div>
+            <div class="form-group">
+              <label>Alíquota ISS (%)</label>
+              <input type="number" name="aliquota_iss" min="0" max="5" step="0.01">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Nome do serviço</label>
+            <input type="text" name="nome_servico">
+          </div>
+          <label class="check-linha"><input type="checkbox" name="reter_iss"> ISS retido pelo tomador</label>
+
+          <div class="form-section-sub">Retenções do tomador (%)</div>
+          <div class="fin-retencoes">
+            <div class="form-group"><label>IRRF</label><input type="number" name="ret_ir" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>CSLL</label><input type="number" name="ret_csll" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>PIS</label><input type="number" name="ret_pis" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>COFINS</label><input type="number" name="ret_cofins" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>INSS</label><input type="number" name="ret_inss" min="0" max="20" step="0.01" placeholder="0"></div>
+          </div>
+          <small class="form-hint">O cliente paga o valor da nota menos as retenções.</small>
+
+        </div>
+        <div class="form-group">
+          <label>Observações (vão na nota)</label>
+          <textarea name="observacoes" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-baixa" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-baixa-titulo">Registrar pagamento</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-baixa" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Data do pagamento *</label>
+            <input type="date" name="data_pagamento" required>
+          </div>
+          <div class="form-group">
+            <label>Valor recebido (R$) *</label>
+            <input type="number" name="valor_pago" min="0.01" step="0.01" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Forma</label>
+          <select name="forma_pagamento">
+            <option value="transferencia">Transferência / TED</option>
+            <option value="pix">PIX</option>
+            <option value="boleto">Boleto</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Confirmar pagamento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-fin-config" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Configuração do faturamento</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-fin-config" class="form">
+        <div id="fin-config-status" class="fin-integracoes"></div>
+
+        <div class="form-section-title">Como o cliente paga</div>
+        <div class="form-group">
+          <label>Chave PIX</label>
+          <input type="text" name="pix_chave" placeholder="CNPJ, e-mail ou chave aleatória">
+        </div>
+        <div class="form-group">
+          <label>Dados bancários / instruções</label>
+          <textarea name="instrucoes_pagamento" rows="3" placeholder="Banco, agência, conta, favorecido, CNPJ..."></textarea>
+          <small class="form-hint">Aparece no e-mail da fatura e no portal do cliente.</small>
+        </div>
+
+        <div class="form-section-title">Nota fiscal (padrão dos contratos)</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Código do serviço</label>
+            <input type="text" name="codigo_servico" placeholder="Ex.: 01.07.01">
+            <small class="form-hint">Código da lista de serviços (LC 116) usado pela prefeitura. Suas notas: 01.06 (nacional 01.06.01.000).</small>
+          </div>
+          <div class="form-group">
+            <label>Alíquota ISS (%)</label>
+            <input type="number" name="aliquota_iss" min="0" max="5" step="0.01">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Nome do serviço</label>
+          <input type="text" name="nome_servico" placeholder="Ex.: Suporte técnico em informática">
+        </div>
+
+
+          <div class="form-section-sub">Retenções do tomador (%)</div>
+          <div class="fin-retencoes">
+            <div class="form-group"><label>IRRF</label><input type="number" name="ret_ir" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>CSLL</label><input type="number" name="ret_csll" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>PIS</label><input type="number" name="ret_pis" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>COFINS</label><input type="number" name="ret_cofins" min="0" max="20" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label>INSS</label><input type="number" name="ret_inss" min="0" max="20" step="0.01" placeholder="0"></div>
+          </div>
+          <small class="form-hint">Padrão para contratos novos. Ex.: Lucro Presumido com tomador PJ costuma reter IRRF 1,5% e CSLL 1%; PIS/COFINS conforme o cliente.</small>
+
+        <div class="form-section-title">Cobrança</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Vencimento</label>
+            <select name="vencimento_mes_seguinte">
+              <option value="true">No mês seguinte à competência</option>
+              <option value="false">No próprio mês da competência</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Lembrete de vencida a cada (dias)</label>
+            <input type="number" name="dias_lembrete" min="0" max="30">
+            <small class="form-hint">0 = não enviar lembretes.</small>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Cópia dos e-mails para</label>
+          <input type="email" name="email_copia" placeholder="seu e-mail (opcional)">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="modal-licenca" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -1760,13 +2210,13 @@
       <span class="bn-icon"><svg class="icon"><use href="#i-cpu"/></svg></span>
       <span>Tecno</span>
     </button>
-    <button class="bottom-nav-item" data-page="transacoes">
+    <button class="bottom-nav-item" data-page="faturamento">
       <span class="bn-icon"><svg class="icon"><use href="#i-wallet"/></svg></span>
-      <span>Finanças</span>
+      <span>Faturas</span>
     </button>
-    <button class="bottom-nav-item" data-page="categorias-transacao">
-      <span class="bn-icon"><svg class="icon"><use href="#i-tag"/></svg></span>
-      <span>Categ.</span>
+    <button class="bottom-nav-item" data-page="contratos">
+      <span class="bn-icon"><svg class="icon"><use href="#i-doc"/></svg></span>
+      <span>Contratos</span>
     </button>
     <button class="bottom-nav-item" data-page="usuarios">
       <span class="bn-icon"><svg class="icon"><use href="#i-key"/></svg></span>
@@ -1779,6 +2229,7 @@
   </nav>
 
   <script src="script.js"></script>
+  <script src="financeiro.js"></script>
   <script src="assistente-voz.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

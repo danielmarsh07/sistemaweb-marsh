@@ -33,11 +33,15 @@ const assistenteRoutes = require('./routes/assistente');
 const licencasRoutes = require('./routes/licencas');
 const licencasConectorRoutes = require('./routes/licencas-conector');
 const treinamentosRoutes = require('./routes/treinamentos');
+const financeiroRoutes = require('./routes/financeiro');
+const asaasWebhookRoutes = require('./routes/asaas-webhook');
+const financeiroJobs = require('./services/financeiro-jobs');
 const autenticar = require('./middleware/autenticar');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
 app.use('/api/licencas-conector', licencasConectorRoutes); // conector SAP: autentica pela chave da licença
+app.use('/api/asaas/webhook', asaasWebhookRoutes); // Asaas: autentica pelo header asaas-access-token
 
 // Rotas protegidas
 app.use('/api/empresas', autenticar, empresasRoutes);
@@ -53,6 +57,7 @@ app.use('/api/usuarios', autenticar, usuariosRoutes);
 app.use('/api/assistente', autenticar, assistenteRoutes);
 app.use('/api/licencas', autenticar, licencasRoutes);
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
+app.use('/api/financeiro', autenticar, financeiroRoutes);
 
 // Rota de teste
 app.get('/api/ping', (req, res) => {
@@ -531,6 +536,110 @@ async function iniciar() {
         }
       }
       console.log('Migração cursos_iniciais: cursos ABAP e Funcional criados como rascunho');
+    }
+
+    // 22. Faturamento mensal: contratos recorrentes → faturas → NFS-e (Asaas, padrão nacional)
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email_financeiro VARCHAR(255);`);
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS asaas_customer_id VARCHAR(50);`);
+
+    //     Configuração por empresa. A chave da API do Asaas NÃO fica aqui: vem de ASAAS_API_KEY (Render > Environment)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS financeiro_config (
+        empresa_id INTEGER PRIMARY KEY,
+        instrucoes_pagamento TEXT,
+        pix_chave VARCHAR(150),
+        codigo_servico VARCHAR(20),
+        nome_servico VARCHAR(255),
+        aliquota_iss NUMERIC(5,2) DEFAULT 0,
+        email_copia VARCHAR(255),
+        dias_lembrete INTEGER DEFAULT 3,
+        vencimento_mes_seguinte BOOLEAN DEFAULT TRUE,
+        data_atualizacao TIMESTAMP
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contratos (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        descricao VARCHAR(255) NOT NULL,
+        descricao_servico TEXT NOT NULL,
+        valor NUMERIC(12,2) NOT NULL CHECK (valor > 0),
+        dia_vencimento INTEGER NOT NULL DEFAULT 10 CHECK (dia_vencimento BETWEEN 1 AND 28),
+        data_inicio DATE NOT NULL,
+        data_fim DATE,
+        indice_reajuste VARCHAR(10) DEFAULT 'nenhum',
+        mes_reajuste INTEGER CHECK (mes_reajuste BETWEEN 1 AND 12),
+        emitir_nfse BOOLEAN NOT NULL DEFAULT TRUE,
+        codigo_servico VARCHAR(20),
+        nome_servico VARCHAR(255),
+        aliquota_iss NUMERIC(5,2),
+        reter_iss BOOLEAN NOT NULL DEFAULT FALSE,
+        status VARCHAR(20) NOT NULL DEFAULT 'ativo',
+        observacoes TEXT,
+        criado_por_usuario_id INTEGER,
+        atualizado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_emp ON contratos(empresa_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_cliente ON contratos(cliente_id);`);
+
+    //     status: rascunho (gerada, aguardando revisão) → aberta (aprovada/enviada) → paga | cancelada
+    //     "vencida" não é status gravado: é aberta com vencimento < hoje
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS faturas (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        contrato_id INTEGER REFERENCES contratos(id),
+        competencia DATE NOT NULL,
+        descricao TEXT NOT NULL,
+        valor NUMERIC(12,2) NOT NULL CHECK (valor > 0),
+        data_vencimento DATE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'rascunho',
+        data_aprovacao TIMESTAMP,
+        data_pagamento DATE,
+        valor_pago NUMERIC(12,2),
+        forma_pagamento VARCHAR(30),
+        observacoes TEXT,
+        emitir_nfse BOOLEAN NOT NULL DEFAULT TRUE,
+        codigo_servico VARCHAR(20),
+        nome_servico VARCHAR(255),
+        aliquota_iss NUMERIC(5,2),
+        reter_iss BOOLEAN NOT NULL DEFAULT FALSE,
+        nfse_status VARCHAR(20) NOT NULL DEFAULT 'nao_emitida',
+        nfse_asaas_id VARCHAR(50),
+        nfse_numero VARCHAR(50),
+        nfse_codigo_verificacao VARCHAR(100),
+        nfse_pdf_url TEXT,
+        nfse_xml_url TEXT,
+        nfse_erro TEXT,
+        email_enviado_em TIMESTAMP,
+        lembrete_enviado_em TIMESTAMP,
+        criado_por_usuario_id INTEGER,
+        atualizado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_faturas_emp_comp ON faturas(empresa_id, competencia);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_faturas_cliente ON faturas(cliente_id);`);
+    // Um contrato gera no máximo uma fatura (não cancelada) por competência
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_faturas_contrato_comp
+      ON faturas(contrato_id, competencia) WHERE contrato_id IS NOT NULL AND status <> 'cancelada';
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_faturas_nfse_asaas ON faturas(nfse_asaas_id);`);
+
+    //     Retenções federais feitas pelo tomador (% sobre o valor da nota). Valor a receber = valor - retenções.
+    //     Em contratos ficam NULL = usar o padrão da configuração.
+    for (const t of ['financeiro_config', 'contratos', 'faturas']) {
+      for (const r of ['ret_ir', 'ret_csll', 'ret_pis', 'ret_cofins', 'ret_inss']) {
+        await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS ${r} NUMERIC(5,2);`);
+      }
     }
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
