@@ -1,4 +1,5 @@
-// Integração com o Asaas — só emissão de NFS-e (o pagamento é por transferência, com baixa manual).
+// Integração com o Asaas — emissão de NFS-e e, opcionalmente, cobrança PIX das faturas
+// (sem PIX ligado, o pagamento é por transferência com baixa manual).
 // O Asaas emite pelo Portal Nacional da NFS-e quando a conta está configurada nele.
 // Variáveis: ASAAS_API_KEY (obrigatória p/ emitir), ASAAS_AMBIENTE = 'producao' | 'sandbox' (padrão sandbox),
 //            ASAAS_WEBHOOK_TOKEN (confere o header asaas-access-token do webhook).
@@ -185,7 +186,45 @@ async function aplicarNotaNaFatura(faturaId, nota) {
   return status;
 }
 
+// ===== Cobrança PIX =====
+// Cria a cobrança no valor que o cliente paga (líquido das retenções) e busca o QR code.
+// Vencimento no passado vira hoje (o Asaas não aceita dueDate retroativo).
+async function criarCobrancaPix({ fatura, cliente, valor, descricao }) {
+  const customer = await garantirCliente(cliente);
+  const hoje = new Date().toISOString().slice(0, 10);
+  const venc = String(fatura.data_vencimento).slice(0, 10);
+  const cobranca = await chamar('POST', '/payments', {
+    customer,
+    billingType: 'PIX',
+    value: Number(valor),
+    dueDate: venc < hoje ? hoje : venc,
+    description: String(descricao || '').slice(0, 500),
+    externalReference: `cobranca-fatura-${fatura.id}`
+  });
+  try {
+    const qr = await chamar('GET', `/payments/${cobranca.id}/pixQrCode`);
+    return { cobranca, qr };
+  } catch (err) {
+    // Sem QR code a cobrança não serve: apaga para não ficar órfã no Asaas
+    await chamar('DELETE', `/payments/${cobranca.id}`).catch(() => {});
+    throw err;
+  }
+}
+
+const consultarCobranca = id => chamar('GET', `/payments/${id}`);
+const cancelarCobranca = id => chamar('DELETE', `/payments/${id}`);
+const alterarVencimentoCobranca = (id, dueDate) => chamar('POST', `/payments/${id}`, { dueDate });
+
+// Status do Asaas → faturas.pix_status
+const STATUS_PIX = {
+  PENDING: 'pendente', OVERDUE: 'pendente', AWAITING_RISK_ANALYSIS: 'pendente',
+  RECEIVED: 'pago', CONFIRMED: 'pago', RECEIVED_IN_CASH: 'pago',
+  REFUNDED: 'estornado', REFUND_REQUESTED: 'estornado', REFUND_IN_PROGRESS: 'estornado',
+  DELETED: 'cancelado'
+};
+
 module.exports = {
   ambiente, configurado, fiscalConfigurado, garantirCliente, emitirNotaFatura,
-  consultarNota, cancelarNota, aplicarNotaNaFatura, STATUS_NFSE
+  consultarNota, cancelarNota, aplicarNotaNaFatura, STATUS_NFSE,
+  criarCobrancaPix, consultarCobranca, cancelarCobranca, alterarVencimentoCobranca, STATUS_PIX
 };

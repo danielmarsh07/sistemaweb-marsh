@@ -763,6 +763,15 @@ async function iniciar() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_propostas_oport ON propostas(oportunidade_id);`);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_propostas_numero ON propostas(empresa_id, numero, versao);`);
 
+    // 25. Fase 4: cobrança PIX pelo Asaas (opcional, liga em financeiro_config.cobranca_pix)
+    //     pix_status: pendente | pago | cancelado | estornado | erro. pix_qrcode = PNG em base64 (vai no portal)
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS cobranca_pix BOOLEAN NOT NULL DEFAULT FALSE;`);
+    for (const c of ['pix_asaas_id VARCHAR(50)', 'pix_status VARCHAR(20)', 'pix_payload TEXT', 'pix_qrcode TEXT',
+                     'pix_url TEXT', 'pix_erro TEXT', 'pix_taxa NUMERIC(12,2)']) {
+      await pool.query(`ALTER TABLE faturas ADD COLUMN IF NOT EXISTS ${c};`);
+    }
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_faturas_pix_asaas ON faturas(pix_asaas_id);`);
+
     //     Dados que aparecem no cabeçalho/rodapé da proposta (NULL = padrão do código)
     for (const c of ['prop_razao_social VARCHAR(255)', 'prop_cnpj VARCHAR(30)', 'prop_contato VARCHAR(255)',
                      'prop_apresentacao TEXT', 'prop_condicoes_padrao TEXT', 'prop_validade_dias INTEGER']) {

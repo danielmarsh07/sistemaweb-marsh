@@ -1,5 +1,5 @@
 /**
- * POST /api/asaas/webhook — eventos de NFS-e do Asaas (rota pública).
+ * POST /api/asaas/webhook — eventos de NFS-e (INVOICE_*) e de cobrança PIX (PAYMENT_*) do Asaas (rota pública).
  * Autenticação: header asaas-access-token igual a ASAAS_WEBHOOK_TOKEN (cadastrado no painel do Asaas).
  * Sempre responde 200 para eventos válidos: o Asaas pausa a fila do webhook quando recebe erro.
  */
@@ -21,7 +21,25 @@ function tokenOk(recebido) {
 router.post('/', async (req, res) => {
   if (!tokenOk(req.get('asaas-access-token'))) return res.status(401).json({ erro: 'Token inválido' });
 
-  const { event, invoice } = req.body || {};
+  const { event, invoice, payment } = req.body || {};
+
+  // Cobrança PIX: recebido → baixa automática; excluída/estornada → só atualiza o status do PIX
+  if (payment && String(event || '').startsWith('PAYMENT_')) {
+    try {
+      const ref = /^cobranca-fatura-(\d+)$/.exec(payment.externalReference || '');
+      const r = await pool.query(
+        'SELECT id, empresa_id FROM faturas WHERE pix_asaas_id = $1 OR id = $2 LIMIT 1',
+        [payment.id, ref ? Number(ref[1]) : 0]);
+      if (!r.rows.length) return res.json({ ok: true, ignorado: true });
+      await fat.aplicarCobrancaNaFatura(r.rows[0].id, r.rows[0].empresa_id,
+        event === 'PAYMENT_DELETED' ? { ...payment, deleted: true } : payment);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[Asaas webhook PIX]', err.message);
+      return res.json({ ok: false });
+    }
+  }
+
   if (!invoice || !String(event || '').startsWith('INVOICE_')) return res.json({ ok: true, ignorado: true });
 
   try {

@@ -128,6 +128,9 @@
           <a href="#" data-page="dre" class="nav-link">
             <svg class="icon"><use href="#i-scale"/></svg> DRE
           </a>
+          <a href="#" data-page="relatorios" class="nav-link">
+            <svg class="icon"><use href="#i-dash"/></svg> Relatórios
+          </a>
           <a href="#" data-page="fornecedores" class="nav-link">
             <svg class="icon"><use href="#i-building"/></svg> Fornecedores
           </a>
@@ -705,6 +708,71 @@
               <tr><td colspan="7" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- ========== RELATÓRIOS (relatorios.js) ========== -->
+      <section id="relatorios-page" class="page">
+        <div class="page-header">
+          <h2>Relatórios</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="exportarCsv('faturas')">Exportar faturas (CSV)</button>
+            <button type="button" class="btn btn-secondary" onclick="exportarCsv('contas-pagar')">Exportar contas a pagar (CSV)</button>
+          </div>
+        </div>
+        <div class="filtros-bar">
+          <label class="filtros-label">Período
+            <select id="rel-meses" class="filtro-select" onchange="loadRelatorios()">
+              <option value="6">Últimos 6 meses</option>
+              <option value="12" selected>Últimos 12 meses</option>
+              <option value="24">Últimos 24 meses</option>
+            </select>
+          </label>
+          <span class="filtros-contador" id="rel-periodo"></span>
+        </div>
+
+        <div class="rel-tiles" id="rel-tiles"></div>
+
+        <div class="rel-grid">
+          <figure class="rel-card viz">
+            <figcaption>
+              <strong>Receita recorrente (MRR)</strong>
+              <span>Soma dos contratos vigentes no fim de cada mês</span>
+            </figcaption>
+            <div class="rel-grafico" id="rel-graf-mrr" role="img" aria-label="Gráfico de colunas do MRR por mês; os valores estão na tabela abaixo"></div>
+          </figure>
+          <figure class="rel-card viz">
+            <figcaption>
+              <strong>Faturado × recebido</strong>
+              <span>Faturado pela competência; recebido pela data do pagamento</span>
+            </figcaption>
+            <div class="rel-legenda" aria-hidden="true">
+              <span><i style="background:var(--viz-1)"></i>Faturado</span>
+              <span><i style="background:var(--viz-2)"></i>Recebido</span>
+            </div>
+            <div class="rel-grafico" id="rel-graf-fat" role="img" aria-label="Gráfico de colunas de faturado e recebido por mês; os valores estão na tabela abaixo"></div>
+          </figure>
+        </div>
+        <div class="rel-tooltip" id="rel-tooltip" hidden></div>
+
+        <details class="rel-card rel-detalhe">
+          <summary>Tabela mês a mês</summary>
+          <div class="fin-matriz" id="rel-tabela-meses"></div>
+        </details>
+
+        <div class="rel-grid">
+          <section class="rel-card viz">
+            <h3>Receita por cliente</h3>
+            <p class="fin-muted">Faturado no período e participação no total</p>
+            <div id="rel-clientes"></div>
+          </section>
+          <section class="rel-card">
+            <h3>Contas a receber por atraso</h3>
+            <p class="fin-muted">Faturas em aberto hoje, pelo valor líquido</p>
+            <div id="rel-aging"></div>
+            <h3 class="rel-sub">Funil de vendas no período</h3>
+            <div id="rel-funil"></div>
+          </section>
         </div>
       </section>
 
@@ -1697,6 +1765,8 @@
           <textarea name="instrucoes_pagamento" rows="3" placeholder="Banco, agência, conta, favorecido, CNPJ..."></textarea>
           <small class="form-hint">Aparece no e-mail da fatura e no portal do cliente.</small>
         </div>
+        <label class="check-linha"><input type="checkbox" name="cobranca_pix"> Gerar cobrança PIX no Asaas ao aprovar cada fatura</label>
+        <small class="form-hint fin-hint-pix">O cliente recebe o QR code e o código copia e cola (no e-mail e no portal) no valor líquido, e a baixa é automática quando ele paga. O Asaas cobra uma tarifa por PIX recebido, que entra nas contas a pagar como tarifa bancária. Para isso funcionar, a conta do Asaas precisa ter uma chave PIX cadastrada e o webhook precisa enviar os eventos de cobrança.</small>
 
         <div class="form-section-title">Nota fiscal (padrão dos contratos)</div>
         <div class="form-row">
@@ -2836,6 +2906,7 @@
   <script src="script.js"></script>
   <script src="financeiro.js"></script>
   <script src="comercial.js"></script>
+  <script src="relatorios.js"></script>
   <script src="assistente-voz.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

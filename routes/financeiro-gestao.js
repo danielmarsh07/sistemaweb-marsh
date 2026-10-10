@@ -537,4 +537,156 @@ router.get('/dre', async (req, res) => {
   } catch (err) { erro500(res, 'Erro ao montar DRE', err); }
 });
 
+// ===== Relatórios (fase 4) =====
+// GET /relatorios?meses=12 — MRR, faturado × recebido, receita por cliente, atraso, prazo de recebimento e funil
+router.get('/relatorios', async (req, res) => {
+  const meses = Number(req.query.meses || 12);
+  if (![6, 12, 24].includes(meses)) return res.status(400).json({ erro: 'Período: 6, 12 ou 24 meses.' });
+  const empresa = emp(req);
+  try {
+    const base = (await pool.query(`SELECT to_char(date_trunc('month', CURRENT_DATE), 'YYYY-MM-DD') AS mes_atual`)).rows[0];
+    const ini = somarMeses(base.mes_atual, -(meses - 1)); // 1º dia do primeiro mês
+    const fim = somarMeses(base.mes_atual, 1);           // exclusivo
+
+    const [mrr, fatur, receb, clientes, aging, prazo, funil, motivos] = await Promise.all([
+      // MRR no fim de cada mês, novos e encerrados (pelo valor atual do contrato; suspensos ficam de fora)
+      pool.query(
+        `SELECT to_char(m, 'YYYY-MM') AS mes,
+                COALESCE(SUM(ct.valor) FILTER (WHERE ct.data_inicio <= fm AND (ct.data_fim IS NULL OR ct.data_fim >= fm)), 0)::float AS mrr,
+                COALESCE(SUM(ct.valor) FILTER (WHERE ct.data_inicio >= m AND ct.data_inicio <= fm), 0)::float AS novo,
+                COALESCE(SUM(ct.valor) FILTER (WHERE ct.data_fim >= m AND ct.data_fim <= fm), 0)::float AS encerrado,
+                COUNT(ct.id) FILTER (WHERE ct.data_inicio <= fm AND (ct.data_fim IS NULL OR ct.data_fim >= fm))::int AS contratos
+         FROM generate_series($2::date, $3::date - INTERVAL '1 month', INTERVAL '1 month') m
+         CROSS JOIN LATERAL (SELECT (m + INTERVAL '1 month - 1 day')::date AS fm) x
+         LEFT JOIN contratos ct ON ct.empresa_id = $1 AND ct.status <> 'suspenso'
+         GROUP BY m ORDER BY m`, [empresa, ini, fim]),
+      pool.query(
+        `SELECT to_char(competencia, 'YYYY-MM') AS mes, SUM(valor)::float AS total
+         FROM faturas WHERE empresa_id = $1 AND status IN ('aberta','paga') AND competencia >= $2 AND competencia < $3
+         GROUP BY 1`, [empresa, ini, fim]),
+      pool.query(
+        `SELECT to_char(data_pagamento, 'YYYY-MM') AS mes, SUM(valor_pago)::float AS total
+         FROM faturas WHERE empresa_id = $1 AND status = 'paga' AND data_pagamento >= $2 AND data_pagamento < $3
+         GROUP BY 1`, [empresa, ini, fim]),
+      pool.query(
+        `SELECT c.id, COALESCE(NULLIF(c.nome_fantasia, ''), c.razao_social, c.nome) AS cliente,
+                SUM(f.valor)::float AS faturado,
+                COALESCE(SUM(f.valor_pago) FILTER (WHERE f.status = 'paga'), 0)::float AS recebido,
+                COUNT(*)::int AS faturas
+         FROM faturas f JOIN clientes c ON c.id = f.cliente_id
+         WHERE f.empresa_id = $1 AND f.status IN ('aberta','paga') AND f.competencia >= $2 AND f.competencia < $3
+         GROUP BY c.id ORDER BY faturado DESC LIMIT 50`, [empresa, ini, fim]),
+      pool.query(
+        `SELECT CASE WHEN dias <= 0 THEN 'a_vencer' WHEN dias <= 30 THEN 'd1_30' WHEN dias <= 60 THEN 'd31_60'
+                     WHEN dias <= 90 THEN 'd61_90' ELSE 'd90' END AS faixa,
+                SUM(liquido)::float AS total, COUNT(*)::int AS qtd
+         FROM (SELECT CURRENT_DATE - f.data_vencimento AS dias, ${fat.sqlValorLiquido('f')} AS liquido
+               FROM faturas f WHERE f.empresa_id = $1 AND f.status = 'aberta') a
+         GROUP BY 1`, [empresa]),
+      pool.query(
+        `SELECT COUNT(*)::int AS pagas,
+                ROUND(AVG(data_pagamento - data_vencimento), 1)::float AS dias_medio,
+                COUNT(*) FILTER (WHERE data_pagamento <= data_vencimento)::int AS em_dia
+         FROM faturas WHERE empresa_id = $1 AND status = 'paga' AND data_pagamento >= $2 AND data_pagamento < $3`,
+        [empresa, ini, fim]),
+      pool.query(
+        `SELECT COUNT(*) FILTER (WHERE etapa = 'ganha')::int AS ganhas,
+                COUNT(*) FILTER (WHERE etapa = 'perdida')::int AS perdidas,
+                COALESCE(AVG(valor_mensal) FILTER (WHERE etapa = 'ganha' AND valor_mensal > 0), 0)::float AS ticket_mensal,
+                ROUND(AVG(data_fechamento - data_criacao::date) FILTER (WHERE etapa = 'ganha'))::int AS ciclo_dias,
+                (SELECT COUNT(*) FROM oportunidades o2 WHERE o2.empresa_id = $1 AND o2.data_criacao >= $2)::int AS criadas
+         FROM oportunidades WHERE empresa_id = $1 AND etapa IN ('ganha','perdida') AND data_fechamento >= $2`,
+        [empresa, ini]),
+      pool.query(
+        `SELECT COALESCE(NULLIF(TRIM(motivo_perda), ''), 'Sem motivo') AS motivo, COUNT(*)::int AS qtd
+         FROM oportunidades WHERE empresa_id = $1 AND etapa = 'perdida' AND data_fechamento >= $2
+         GROUP BY 1 ORDER BY qtd DESC LIMIT 5`, [empresa, ini])
+    ]);
+
+    const porMes = rows => Object.fromEntries(rows.map(r => [r.mes, r.total]));
+    const f = porMes(fatur.rows), rc = porMes(receb.rows);
+    const totalFat = clientes.rows.reduce((s, c) => s + c.faturado, 0);
+    const faixas = ['a_vencer', 'd1_30', 'd31_60', 'd61_90', 'd90'];
+    res.json({
+      inicio: mesDe(ini), mes_atual: mesDe(base.mes_atual),
+      meses: mrr.rows.map(m => ({
+        ...m, faturado: r2(f[m.mes] || 0), recebido: r2(rc[m.mes] || 0), liquido: r2(m.novo - m.encerrado)
+      })),
+      clientes: clientes.rows.map(c => ({ ...c, participacao: totalFat ? Math.round((c.faturado / totalFat) * 1000) / 10 : 0 })),
+      aging: faixas.map(k => aging.rows.find(a => a.faixa === k) || { faixa: k, total: 0, qtd: 0 }),
+      recebimento: prazo.rows[0],
+      funil: { ...funil.rows[0], motivos: motivos.rows }
+    });
+  } catch (err) { erro500(res, 'Erro ao montar relatórios', err); }
+});
+
+// ===== Exportação CSV para o contador (Excel pt-BR: ; e vírgula decimal, com BOM) =====
+const csvCampo = v => {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return String(v).replace('.', ',');
+  const s = String(v);
+  return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+function enviarCsv(res, nome, cabecalho, linhas) {
+  const corpo = [cabecalho, ...linhas].map(l => l.map(csvCampo).join(';')).join('\r\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+  res.send('﻿' + corpo);
+}
+
+function periodoCsv(req, res) {
+  const { inicio, fim } = req.query;
+  if (!competenciaValida(inicio) || !competenciaValida(fim) || fim < inicio) {
+    res.status(400).json({ erro: 'Período no formato AAAA-MM (início ≤ fim).' });
+    return null;
+  }
+  return [`${inicio}-01`, somarMeses(`${fim}-01`, 1)];
+}
+
+router.get('/exportar/faturas.csv', async (req, res) => {
+  const p = periodoCsv(req, res);
+  if (!p) return;
+  try {
+    const r = await pool.query(
+      `SELECT f.id, to_char(f.competencia, 'MM/YYYY') AS competencia,
+              COALESCE(NULLIF(c.razao_social, ''), c.nome) AS cliente, c.cpf_cnpj, f.descricao,
+              f.valor::float AS valor, ${fat.sqlValorLiquido('f')} AS liquido,
+              f.ret_ir::float AS ir, f.ret_csll::float AS csll, f.ret_pis::float AS pis, f.ret_cofins::float AS cofins,
+              f.ret_inss::float AS inss, f.aliquota_iss::float AS iss, f.reter_iss,
+              to_char(f.data_vencimento, 'DD/MM/YYYY') AS vencimento, f.status,
+              to_char(f.data_pagamento, 'DD/MM/YYYY') AS pagamento, f.valor_pago::float AS valor_pago, f.forma_pagamento,
+              f.nfse_numero, f.nfse_status
+       FROM faturas f JOIN clientes c ON c.id = f.cliente_id
+       WHERE f.empresa_id = $1 AND f.status <> 'rascunho' AND f.competencia >= $2 AND f.competencia < $3
+       ORDER BY f.competencia, cliente`, [emp(req), ...p]);
+    enviarCsv(res, `faturas_${req.query.inicio}_a_${req.query.fim}.csv`,
+      ['Fatura', 'Competência', 'Cliente', 'CPF/CNPJ', 'Descrição', 'Valor da nota', 'Valor líquido', 'IRRF %', 'CSLL %',
+       'PIS %', 'COFINS %', 'INSS %', 'ISS %', 'ISS retido', 'Vencimento', 'Situação', 'Pagamento', 'Valor pago', 'Forma',
+       'NFS-e nº', 'NFS-e situação'],
+      r.rows.map(x => [x.id, x.competencia, x.cliente, x.cpf_cnpj, x.descricao, x.valor, x.liquido, x.ir, x.csll, x.pis,
+        x.cofins, x.inss, x.iss, x.reter_iss ? 'sim' : 'não', x.vencimento, x.status, x.pagamento, x.valor_pago,
+        x.forma_pagamento, x.nfse_numero, x.nfse_status]));
+  } catch (err) { erro500(res, 'Erro ao exportar faturas', err); }
+});
+
+router.get('/exportar/contas-pagar.csv', async (req, res) => {
+  const p = periodoCsv(req, res);
+  if (!p) return;
+  try {
+    const r = await pool.query(
+      `SELECT cp.id, to_char(cp.competencia, 'MM/YYYY') AS competencia, cp.descricao, cp.documento,
+              COALESCE(NULLIF(fo.razao_social, ''), fo.nome) AS fornecedor, fo.cnpj, cat.nome AS categoria,
+              cp.valor::float AS valor, to_char(cp.data_vencimento, 'DD/MM/YYYY') AS vencimento, cp.status,
+              to_char(cp.data_pagamento, 'DD/MM/YYYY') AS pagamento, cp.valor_pago::float AS valor_pago, cp.forma_pagamento
+       ${FROM_CONTA}
+       WHERE cp.empresa_id = $1 AND cp.status <> 'cancelada' AND cp.competencia >= $2 AND cp.competencia < $3
+       ORDER BY cp.competencia, cp.data_vencimento`, [emp(req), ...p]);
+    enviarCsv(res, `contas_pagar_${req.query.inicio}_a_${req.query.fim}.csv`,
+      ['Conta', 'Competência', 'Descrição', 'Documento', 'Fornecedor', 'CNPJ', 'Categoria', 'Valor', 'Vencimento',
+       'Situação', 'Pagamento', 'Valor pago', 'Forma'],
+      r.rows.map(x => [x.id, x.competencia, x.descricao, x.documento, x.fornecedor, x.cnpj, x.categoria, x.valor,
+        x.vencimento, x.status, x.pagamento, x.valor_pago, x.forma_pagamento]));
+  } catch (err) { erro500(res, 'Erro ao exportar contas a pagar', err); }
+});
+
 module.exports = router;

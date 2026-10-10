@@ -6,7 +6,8 @@ Object.assign(_ICONS, {
   mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   nota: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',
-  desfazer: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>'
+  desfazer: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
+  pix: '<path d="m12 3 4.5 4.5a2 2 0 0 1 0 2.8L12 14.8l-4.5-4.5a2 2 0 0 1 0-2.8z"/><path d="m5.5 13.5 4 4a3.5 3.5 0 0 0 5 0l4-4"/>'
 });
 
 let _faturasCache = [];
@@ -34,9 +35,17 @@ function pill(txt, cor) {
 function situacaoFatura(f) {
   if (f.status === 'rascunho') return pill('Rascunho', '#64748b');
   if (f.status === 'cancelada') return pill('Cancelada', '#94a3b8');
-  if (f.status === 'paga') return pill(`Paga em ${diaBr(f.data_pagamento)}`, '#2e7d4f');
-  if (f.vencida) return pill('Vencida', '#b42318');
-  return pill('Em aberto', '#1d6fd8');
+  if (f.status === 'paga') return pill(`Paga em ${diaBr(f.data_pagamento)}${f.pix_status === 'pago' ? ' (PIX)' : ''}`, '#2e7d4f');
+  const pix = situacaoPix(f);
+  if (f.vencida) return pill('Vencida', '#b42318') + pix;
+  return pill('Em aberto', '#1d6fd8') + pix;
+}
+
+function situacaoPix(f) {
+  if (f.pix_status === 'pendente') return '<div class="fin-sub">PIX gerado, aguardando pagamento</div>';
+  if (f.pix_status === 'erro') return `<div class="fin-erro" title="${escapeHtml(f.pix_erro)}">PIX: ${escapeHtml((f.pix_erro || '').slice(0, 90))}</div>`;
+  if (f.pix_status === 'estornado') return '<div class="fin-erro">PIX estornado no Asaas</div>';
+  return '';
 }
 
 function nfseFatura(f) {
@@ -69,6 +78,8 @@ function acoesFatura(f) {
     b.push(botao('dinheiro', 'Registrar pagamento', `abrirBaixa(${f.id})`, 'btn-edit'));
     if (['nao_emitida', 'erro'].includes(f.nfse_status)) b.push(botao('nota', 'Emitir NFS-e', `emitirNfseFatura(${f.id})`));
     if (['processando', 'cancelando'].includes(f.nfse_status)) b.push(botao('refresh', 'Consultar NFS-e no Asaas', `sincronizarNfseFatura(${f.id})`));
+    if (f.pix_status === 'pendente') b.push(botao('pix', 'Consultar pagamento PIX no Asaas', `sincronizarPixFatura(${f.id})`));
+    else if (_finStatus && _finStatus.asaas_configurado) b.push(botao('pix', 'Gerar cobrança PIX', `gerarPixFatura(${f.id})`));
     b.push(botao('mail', 'Enviar por e-mail', `reenviarEmailFatura(${f.id})`));
     b.push(botao('edit', 'Alterar vencimento', `editarFatura(${f.id})`));
     b.push(botao('ban', 'Cancelar fatura', `cancelarFatura(${f.id})`, 'btn-danger'));
@@ -216,11 +227,15 @@ async function aprovarSelecionadas() {
     const erros = r.resultados.filter(x => x.erro || x.nfse_status === 'erro');
     const emitidas = r.resultados.filter(x => x.nfse_status === 'emitida').length;
     const processando = r.resultados.filter(x => x.nfse_status === 'processando').length;
+    const pixErro = r.resultados.filter(x => x.pix_status === 'erro').length;
     const emails = r.resultados.filter(x => x.email_enviado).length;
     alert(`${r.resultados.length - r.resultados.filter(x => x.erro).length} fatura(s) aprovada(s).\n` +
       `NFS-e: ${emitidas} emitida(s), ${processando} em processamento na prefeitura.\n` +
       `E-mails enviados: ${emails}.` +
-      (erros.length ? `\n\n${erros.length} com problema na nota — veja a coluna NFS-e e use "Emitir NFS-e" para tentar de novo.` : ''));
+      (erros.length ? `\n\n${erros.length} com problema na nota — veja a coluna NFS-e e use "Emitir NFS-e" para tentar de novo.` : '') +
+      (pixErro ? `
+
+${pixErro} sem cobrança PIX (erro no Asaas): veja a coluna Situação e use "Gerar cobrança PIX".` : ''));
   } finally {
     btn.disabled = false; btn.textContent = 'Aprovar, emitir NFS-e e enviar';
     loadFaturamento();
@@ -351,6 +366,17 @@ async function cancelarFatura(id) {
   if (r) alert(r.mensagem);
 }
 
+async function gerarPixFatura(id) {
+  const f = _faturasCache.find(x => x.id === id);
+  const r = await acaoFatura(id, '/pix', `Gerar cobrança PIX de ${formatMoeda(f ? (f.valor_liquido ?? f.valor) : 0)} no Asaas${_finStatus && _finStatus.asaas_ambiente === 'sandbox' ? ' (TESTE)' : ''}?`);
+  if (r) alert(r.mensagem);
+}
+
+async function sincronizarPixFatura(id) {
+  const r = await acaoFatura(id, '/pix/sincronizar');
+  if (r) alert(r.pix_status === 'pago' ? 'PIX recebido! A fatura foi baixada.' : `Situação do PIX: ${r.pix_status}.`);
+}
+
 function estornarBaixa(id) {
   acaoFatura(id, '/estornar-baixa', `Desfazer o pagamento de ${nomeFatura(id)}? A fatura volta para "em aberto".`);
 }
@@ -403,6 +429,7 @@ async function abrirConfigFinanceiro() {
   form.vencimento_mes_seguinte.value = c.vencimento_mes_seguinte === false ? 'false' : 'true';
   form.dias_lembrete.value = c.dias_lembrete ?? 3;
   form.email_copia.value = c.email_copia || '';
+  form.cobranca_pix.checked = !!c.cobranca_pix;
   RETENCOES.forEach(r => { form[r].value = c[r] ? c[r] : ''; });
   const item = (ok, txt) => `<div class="${ok ? 'ok' : 'off'}">${ok ? '●' : '○'} ${escapeHtml(txt)}</div>`;
   document.getElementById('fin-config-status').innerHTML = st ? [
@@ -428,6 +455,7 @@ async function salvarConfigFinanceiro() {
       vencimento_mes_seguinte: form.vencimento_mes_seguinte.value === 'true',
       dias_lembrete: Number(form.dias_lembrete.value || 0),
       email_copia: form.email_copia.value,
+      cobranca_pix: form.cobranca_pix.checked,
       ...Object.fromEntries(RETENCOES.map(r => [r, form[r].value || 0]))
     })
   });

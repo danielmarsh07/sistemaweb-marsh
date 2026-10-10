@@ -27,7 +27,8 @@ const COLUNAS_FATURA = `
   f.ret_ir::float AS ret_ir, f.ret_csll::float AS ret_csll, f.ret_pis::float AS ret_pis,
   f.ret_cofins::float AS ret_cofins, f.ret_inss::float AS ret_inss,
   ${sqlValorLiquido('f')} AS valor_liquido,
-  (f.status = 'aberta' AND f.data_vencimento < CURRENT_DATE) AS vencida`;
+  (f.status = 'aberta' AND f.data_vencimento < CURRENT_DATE) AS vencida,
+  f.pix_asaas_id, f.pix_status, f.pix_payload, f.pix_url, f.pix_erro, f.pix_taxa::float AS pix_taxa`;
 
 async function carregarConfig(empresa_id) {
   const r = await pool.query('SELECT * FROM financeiro_config WHERE empresa_id = $1', [empresa_id]);
@@ -100,22 +101,97 @@ async function sincronizarNfse(fatura) {
   return status;
 }
 
-// Aprova um rascunho: vira "aberta", emite a NFS-e e envia o e-mail
+// ===== Cobrança PIX (Asaas) =====
+// Gera a cobrança PIX da fatura aberta. Não lança: grava o erro em pix_erro e devolve o pix_status.
+async function gerarPix(fatura) {
+  if (!asaas.configurado()) return null;
+  try {
+    const cliente = await carregarCliente(fatura.cliente_id);
+    const { cobranca, qr } = await asaas.criarCobrancaPix({
+      fatura, cliente, valor: fatura.valor_liquido ?? fatura.valor,
+      descricao: `${fatura.descricao} — competência ${String(fatura.competencia).slice(0, 7)}`
+    });
+    await pool.query(
+      `UPDATE faturas SET pix_asaas_id = $1, pix_status = 'pendente', pix_payload = $2, pix_qrcode = $3,
+         pix_url = $4, pix_erro = NULL, data_atualizacao = NOW() WHERE id = $5`,
+      [cobranca.id, qr.payload || null, qr.encodedImage || null, cobranca.invoiceUrl || null, fatura.id]);
+    return 'pendente';
+  } catch (err) {
+    await pool.query(`UPDATE faturas SET pix_status = 'erro', pix_erro = $1 WHERE id = $2`, [err.message.slice(0, 1000), fatura.id]);
+    return 'erro';
+  }
+}
+
+// Cancela a cobrança PIX pendente (baixa manual, cancelamento da fatura). Best-effort: não lança.
+async function cancelarPix(fatura) {
+  if (!fatura.pix_asaas_id || fatura.pix_status !== 'pendente') return;
+  try { await asaas.cancelarCobranca(fatura.pix_asaas_id); }
+  catch (err) { console.error(`[PIX] cancelar cobrança da fatura ${fatura.id}:`, err.message); }
+  await pool.query(`UPDATE faturas SET pix_status = 'cancelado', data_atualizacao = NOW() WHERE id = $1`, [fatura.id]);
+}
+
+// Tarifa do Asaas vira despesa paga (categoria de despesa financeira), para a DRE e o fluxo ficarem certos
+async function lancarTarifaAsaas(fatura, taxa, dataPagamento) {
+  const cat = await pool.query(
+    `SELECT id FROM categorias_transacao WHERE empresa_id = $1 AND tipo = 'saída' AND ativo = TRUE
+       AND grupo_dre = 'despesa_financeira' ORDER BY (nome = 'Tarifas bancárias') DESC, id LIMIT 1`, [fatura.empresa_id]);
+  if (!cat.rows.length) return;
+  await pool.query(
+    `INSERT INTO contas_pagar (empresa_id, categoria_id, descricao, documento, valor, competencia, data_vencimento,
+       status, data_pagamento, valor_pago, forma_pagamento, observacoes)
+     VALUES ($1, $2, $3, $4, $5, date_trunc('month', $6::date), $6::date, 'paga', $6::date, $5, 'debito', $7)`,
+    [fatura.empresa_id, cat.rows[0].id, `Tarifa Asaas — PIX fatura #${fatura.id}`, `fatura-${fatura.id}`, taxa,
+     dataPagamento, 'Lançada automaticamente quando o PIX foi recebido.']);
+}
+
+// Aplica o retrato da cobrança do Asaas na fatura; recebido → baixa automática (uma vez só)
+async function aplicarCobrancaNaFatura(faturaId, empresa_id, cobranca) {
+  const f = await carregarFatura(faturaId, empresa_id);
+  if (!f) return null;
+  const status = cobranca.deleted ? 'cancelado' : (asaas.STATUS_PIX[cobranca.status] || f.pix_status);
+  if (status === 'pago' && f.status === 'aberta') {
+    const data = String(cobranca.paymentDate || cobranca.clientPaymentDate || cobranca.confirmedDate || new Date().toISOString()).slice(0, 10);
+    const valor = Number(cobranca.value || f.valor_liquido);
+    const taxa = cobranca.netValue != null ? Math.max(0, Math.round((valor - Number(cobranca.netValue)) * 100) / 100) : null;
+    const r = await pool.query(
+      `UPDATE faturas SET status = 'paga', data_pagamento = $1, valor_pago = $2, forma_pagamento = 'pix',
+         pix_status = 'pago', pix_taxa = $3, data_atualizacao = NOW()
+       WHERE id = $4 AND status = 'aberta' RETURNING id`, [data, valor, taxa, f.id]);
+    if (r.rows.length && taxa > 0) await lancarTarifaAsaas(f, taxa, data);
+    return 'pago';
+  }
+  if (status !== f.pix_status) {
+    await pool.query(`UPDATE faturas SET pix_status = $1, data_atualizacao = NOW() WHERE id = $2`, [status, f.id]);
+  }
+  return status;
+}
+
+// Consulta a cobrança no Asaas (fallback quando o webhook não chega)
+async function sincronizarPix(fatura) {
+  if (!fatura.pix_asaas_id) return fatura.pix_status;
+  const cobranca = await asaas.consultarCobranca(fatura.pix_asaas_id);
+  return aplicarCobrancaNaFatura(fatura.id, fatura.empresa_id, cobranca);
+}
+
+// Aprova um rascunho: vira "aberta", emite a NFS-e, gera o PIX (se ligado) e envia o e-mail
 // (com nota emitida na hora → e-mail já leva o PDF; se a prefeitura demorar, o e-mail sai quando a nota autorizar)
 async function aprovarFatura(fatura, usuario_id) {
   await pool.query(
     `UPDATE faturas SET status = 'aberta', data_aprovacao = NOW(), atualizado_por_usuario_id = $2, data_atualizacao = NOW()
      WHERE id = $1 AND status = 'rascunho'`, [fatura.id, usuario_id]);
+  const config = await carregarConfig(fatura.empresa_id);
+  const pix = config.cobranca_pix ? await gerarPix(fatura) : null;
   const nfse = await emitirNfse(fatura);
   let emailEnviado = false;
   if (nfse === 'emitida' || nfse === 'nao_emitida') {
     const atual = await carregarFatura(fatura.id, fatura.empresa_id);
     emailEnviado = await enviarEmailFatura(atual);
   }
-  return { id: fatura.id, nfse_status: nfse, email_enviado: emailEnviado };
+  return { id: fatura.id, nfse_status: nfse, pix_status: pix, email_enviado: emailEnviado };
 }
 
 module.exports = {
   RETENCOES, sqlValorLiquido, COLUNAS_FATURA, carregarConfig, carregarFatura, carregarCliente,
-  enviarEmailFatura, emitirNfse, sincronizarNfse, aposAtualizarNota, aprovarFatura
+  enviarEmailFatura, emitirNfse, sincronizarNfse, aposAtualizarNota, aprovarFatura,
+  gerarPix, cancelarPix, aplicarCobrancaNaFatura, sincronizarPix
 };

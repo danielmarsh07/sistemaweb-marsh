@@ -351,7 +351,8 @@ function showPage(page) {
     'contas-pagar': 'Contas a pagar',
     'fluxo-caixa': 'Fluxo de caixa',
     dre: 'DRE gerencial',
-    funil: 'Funil de vendas'
+    funil: 'Funil de vendas',
+    relatorios: 'Relatórios'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -373,6 +374,7 @@ function showPage(page) {
   if (page === 'fluxo-caixa') loadFluxoCaixa();
   if (page === 'dre') loadDre();
   if (page === 'funil') loadFunil();
+  if (page === 'relatorios') loadRelatorios();
 }
 
 // ===== CONFIGURAÇÕES / THEME PICKER =====

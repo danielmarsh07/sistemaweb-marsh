@@ -902,9 +902,34 @@ async function carregarFinanceiroPortal() {
         ${f.valor_liquido < f.valor ? `<div class="linha"><span>Valor a pagar (com retenções)</span><strong>${moeda(f.valor_liquido)}</strong></div>` : ''}
         <div class="linha"><span>Vencimento</span><strong>${br(f.data_vencimento)}</strong></div>
         <div class="linha"><span>NFS-e</span><strong>${f.nfse_status === 'emitida' ? 'Nº ' + escapeHtml(f.nfse_numero || '-') : f.nfse_status === 'processando' ? 'Em emissão' : '—'}</strong></div>
+        ${f.pix_payload ? blocoPixPortal(f) : ''}
         ${docs ? `<div class="docs">${docs}</div>` : ''}
       </div>`;
   }).join('');
+}
+
+// Cobrança PIX do Asaas: QR code + copia e cola (a baixa é automática quando o cliente paga)
+function blocoPixPortal(f) {
+  const qr = /^[A-Za-z0-9+/=]+$/.test(f.pix_qrcode || '') ? f.pix_qrcode : null;
+  return `
+    <div class="pix-box">
+      <strong>Pague com PIX</strong>
+      ${qr ? `<img src="data:image/png;base64,${qr}" alt="QR code PIX da fatura" width="180" height="180">` : ''}
+      <code class="pix-codigo">${escapeHtml(f.pix_payload)}</code>
+      <button type="button" class="pix-copiar" onclick="copiarPix(this)">Copiar código PIX</button>
+      <small>A confirmação do pagamento é automática.</small>
+    </div>`;
+}
+
+async function copiarPix(btn) {
+  const codigo = btn.parentElement.querySelector('.pix-codigo').textContent;
+  try {
+    await navigator.clipboard.writeText(codigo);
+    btn.textContent = 'Código copiado!';
+    setTimeout(() => { btn.textContent = 'Copiar código PIX'; }, 2500);
+  } catch {
+    prompt('Copie o código PIX:', codigo);
+  }
 }
 
 // ===== MODAL HELPERS =====

@@ -1,6 +1,7 @@
 // Rotina periódica do financeiro (roda dentro do próprio servidor, a cada hora):
 //  1. Consulta no Asaas as NFS-e ainda em processamento (caso o webhook não tenha chegado)
-//  2. Envia lembrete por e-mail de faturas vencidas e não pagas
+//  2. Consulta as cobranças PIX pendentes (baixa automática se o webhook de pagamento falhou)
+//  3. Envia lembrete por e-mail de faturas vencidas e não pagas
 const pool = require('../db');
 const asaas = require('./asaas');
 const email = require('./email');
@@ -22,6 +23,23 @@ async function sincronizarNotasPendentes() {
       await fat.sincronizarNfse(f);
     } catch (err) {
       console.error(`[financeiro-jobs] sincronizar NFS-e fatura ${id}:`, err.message);
+    }
+  }
+}
+
+// PIX pendente há mais de 10 min: consulta no Asaas (caso o webhook de pagamento não tenha chegado)
+async function sincronizarPixPendentes() {
+  if (!asaas.configurado()) return;
+  const r = await pool.query(
+    `SELECT id, empresa_id FROM faturas
+     WHERE status = 'aberta' AND pix_status = 'pendente' AND pix_asaas_id IS NOT NULL
+       AND COALESCE(data_atualizacao, data_criacao) < NOW() - INTERVAL '10 minutes'
+     LIMIT 50`);
+  for (const { id, empresa_id } of r.rows) {
+    try {
+      await fat.sincronizarPix(await fat.carregarFatura(id, empresa_id));
+    } catch (err) {
+      console.error(`[financeiro-jobs] sincronizar PIX fatura ${id}:`, err.message);
     }
   }
 }
@@ -58,6 +76,7 @@ async function ciclo() {
   rodando = true;
   try {
     await sincronizarNotasPendentes();
+    await sincronizarPixPendentes(); // antes dos lembretes: quem já pagou não recebe cobrança
     await enviarLembretes();
   } catch (err) {
     console.error('[financeiro-jobs]', err.message);

@@ -3629,6 +3629,97 @@ svg.icon {
   .op-proposta-acoes .btn-icon, .op-painel-acoes .btn-icon { min-width: 44px; min-height: 44px; }
 }
 
+/* =====================================================================
+   RELATÓRIOS (relatorios.js) — cores validadas (dataviz) nas superfícies dos temas
+   Escuro: tema base (sem data-theme) e sereno-escuro. Claro: sereno, light, enterprise.
+   ===================================================================== */
+.viz, .rel-tooltip {
+  --viz-1: #3987e5; --viz-2: #d95926;
+  --viz-grade: #2c2c2a; --viz-base: #4b5563; --viz-eixo: #94a3b8;
+}
+:root[data-theme="sereno"] .viz, :root[data-theme="light"] .viz, :root[data-theme="enterprise"] .viz,
+:root[data-theme="sereno"] .rel-tooltip, :root[data-theme="light"] .rel-tooltip, :root[data-theme="enterprise"] .rel-tooltip {
+  --viz-1: #2a78d6; --viz-2: #eb6834;
+  --viz-grade: #e1e0d9; --viz-base: #c3c2b7; --viz-eixo: #6b7280;
+}
+.rel-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 600px) {
+  .rel-tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .rel-tile { padding: 12px; }
+  .rel-tile-valor { font-size: 1.1rem; }
+}
+.rel-tile, .rel-card {
+  background: var(--bg-card-solid, var(--bg-card, #fff)); border: 1px solid var(--border); border-radius: 12px;
+}
+.rel-tile { display: grid; gap: 2px; padding: 14px 16px; }
+.rel-tile-rotulo { font-size: 0.8rem; color: var(--text-muted); }
+.rel-tile-valor { font-size: 1.45rem; font-weight: 600; color: var(--text-main); }
+.rel-tile-detalhe { font-size: 0.78rem; color: var(--text-secondary); }
+.rel-delta { font-size: 0.78rem; font-weight: 600; }
+.rel-delta.sobe { color: #2e7d4f; }
+.rel-delta.desce { color: #b42318; }
+:root:not([data-theme]) .rel-delta.sobe, :root[data-theme="sereno-escuro"] .rel-delta.sobe, :root[data-theme="dark"] .rel-delta.sobe { color: #4ade80; }
+:root:not([data-theme]) .rel-delta.desce, :root[data-theme="sereno-escuro"] .rel-delta.desce, :root[data-theme="dark"] .rel-delta.desce { color: #fca5a5; }
+.rel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; margin-bottom: 12px; }
+.rel-card { margin: 0; padding: 16px; min-width: 0; }
+.rel-card h3 { margin: 0 0 2px; font-size: 1rem; color: var(--text-main); }
+.rel-card figcaption { display: grid; gap: 2px; margin-bottom: 8px; }
+.rel-card figcaption strong { font-size: 1rem; color: var(--text-main); }
+.rel-card figcaption span { font-size: 0.8rem; color: var(--text-muted); }
+.rel-sub { margin-top: 20px !important; }
+.rel-legenda { display: flex; gap: 16px; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; }
+.rel-legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.rel-grafico { width: 100%; }
+.rel-grafico svg { display: block; overflow: visible; }
+.viz-grade { stroke: var(--viz-grade); stroke-width: 1; }
+.viz-base { stroke: var(--viz-base); stroke-width: 1; }
+.viz-eixo { fill: var(--viz-eixo); font-size: 11px; font-variant-numeric: tabular-nums; }
+.viz-rotulo { fill: var(--text-main); font-size: 12px; font-weight: 600; }
+.viz-alvo { fill: transparent; cursor: crosshair; }
+.viz-alvo.ativo { fill: var(--viz-eixo); fill-opacity: 0.08; }
+.rel-tooltip {
+  position: fixed; z-index: 1000; pointer-events: none; min-width: 170px; padding: 10px 12px; border-radius: 10px;
+  background: var(--bg-card-solid, #fff); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  font-size: 0.8rem; color: var(--text-main);
+}
+.rel-tooltip[hidden] { display: none; }
+.rel-tooltip strong { display: block; margin-bottom: 6px; }
+.rel-tooltip div { display: flex; align-items: center; gap: 8px; }
+.rel-tooltip i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.rel-tooltip i.vazio { background: transparent; }
+.rel-tooltip span { color: var(--text-secondary); flex: 1; }
+.rel-tooltip b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.rel-detalhe { margin-bottom: 12px; }
+.rel-detalhe summary { cursor: pointer; font-weight: 600; color: var(--text-main); min-height: 32px; display: flex; align-items: center; }
+.rel-detalhe .fin-matriz { margin: 12px 0 0; }
+.rel-clientes { display: grid; gap: 12px; margin-top: 12px; }
+.rel-cliente-topo, .rel-cliente-rodape { display: flex; justify-content: space-between; gap: 12px; font-size: 0.88rem; }
+.rel-cliente-topo span { color: var(--text-main); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-cliente-topo strong { color: var(--text-main); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rel-cliente-rodape { font-size: 0.75rem; color: var(--text-muted); }
+.rel-barra { height: 8px; margin: 6px 0 4px; border-radius: 4px; background: color-mix(in srgb, var(--viz-1, #2a78d6) 16%, transparent); overflow: hidden; }
+.rel-barra span { display: block; height: 100%; border-radius: 4px; background: var(--viz-1, #2a78d6); }
+.rel-aviso { margin-top: 12px; }
+.rel-aging { display: grid; gap: 6px; margin-top: 12px; }
+.rel-aging-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 0 12px; align-items: baseline;
+  padding: 8px 12px; border-radius: 8px; border-left: 4px solid var(--border);
+  background: var(--bg-subtle, rgba(127,127,127,.05));
+}
+.rel-aging-item span { font-size: 0.85rem; color: var(--text-secondary); }
+.rel-aging-item strong { font-variant-numeric: tabular-nums; color: var(--text-main); }
+.rel-aging-item small { grid-column: 1 / -1; font-size: 0.75rem; color: var(--text-muted); }
+.rel-ok { border-left-color: #0ca30c; }
+.rel-alerta { border-left-color: #fab219; }
+.rel-serio { border-left-color: #ec835a; }
+.rel-critico { border-left-color: #d03b3b; }
+.rel-funil { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 12px; }
+.rel-funil div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 8px; background: var(--bg-subtle, rgba(127,127,127,.05)); }
+.rel-funil span { font-size: 0.78rem; color: var(--text-muted); }
+.rel-funil strong { font-size: 1.05rem; color: var(--text-main); }
+.rel-motivos { margin-top: 10px; font-size: 0.82rem; }
+.fin-hint-pix { display: block; margin: -8px 0 14px; }
+
 /* Marca no topo do menu: símbolo maior, bloco centralizado (mesma composição do login) */
 .sidebar .sidebar-header { justify-content: center; gap: 12px; padding: 4px 16px 20px; }
 .sidebar .sidebar-header .logo-box.logo-img { width: 46px; height: 46px; flex-shrink: 0; }

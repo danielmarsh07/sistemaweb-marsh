@@ -308,7 +308,15 @@ function blocoFatura({ fatura, config }) {
          <td style="font-size:13px;color:#0f172a">NFS-e nº ${esc(fatura.nfse_numero || '-')} ·
            <a href="${esc(fatura.nfse_pdf_url)}" style="color:#1d6fd8">PDF</a>${fatura.nfse_xml_url ? ` · <a href="${esc(fatura.nfse_xml_url)}" style="color:#1d6fd8">XML</a>` : ''}</td></tr>`
     : '';
-  const pix = config && config.pix_chave
+  // Cobrança PIX do Asaas (valor exato + baixa automática) tem prioridade sobre a chave PIX fixa
+  const pixCobranca = fatura.status === 'aberta' && fatura.pix_status === 'pendente' && fatura.pix_payload
+    ? `<div style="border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px;padding:16px 20px;margin-bottom:20px">
+        <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#1d6fd8">Pague com PIX</p>
+        <p style="margin:0 0 6px;font-size:13px;color:#334155">Copie o código abaixo e use "PIX copia e cola" no app do seu banco. A baixa é automática.</p>
+        <p style="margin:0 0 12px;font-family:monospace;font-size:12px;color:#0f172a;word-break:break-all;background:#fff;border-radius:6px;padding:10px">${esc(fatura.pix_payload)}</p>
+        ${fatura.pix_url ? `<a href="${esc(fatura.pix_url)}" style="color:#1d6fd8;font-size:13px;font-weight:600">Ver QR code →</a>` : ''}
+      </div>` : '';
+  const pix = !pixCobranca && config && config.pix_chave
     ? `<p style="margin:0 0 6px;font-size:14px;color:#0f172a"><strong>PIX:</strong> ${esc(config.pix_chave)}</p>` : '';
   const instr = config && config.instrucoes_pagamento
     ? `<p style="margin:0;font-size:13px;color:#334155;white-space:pre-line">${esc(config.instrucoes_pagamento)}</p>` : '';
@@ -322,8 +330,9 @@ function blocoFatura({ fatura, config }) {
         ${nota}
       </table>
     </div>
+    ${pixCobranca}
     ${pix || instr ? `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:20px">
-      <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#64748b">Como pagar</p>
+      <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#64748b">${pixCobranca ? 'Ou por transferência' : 'Como pagar'}</p>
       ${pix}${instr}
     </div>` : ''}
     <a href="https://www.marshconsultoria.com.br/login.html"

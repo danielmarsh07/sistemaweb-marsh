@@ -50,6 +50,9 @@ router.get('/minhas-faturas', async (req, res) => {
               to_char(f.data_pagamento, 'YYYY-MM-DD') AS data_pagamento,
               f.nfse_status, f.nfse_numero, f.nfse_pdf_url, f.nfse_xml_url,
               ${fat.sqlValorLiquido('f')} AS valor_liquido,
+              CASE WHEN f.status = 'aberta' AND f.pix_status = 'pendente' THEN f.pix_payload END AS pix_payload,
+              CASE WHEN f.status = 'aberta' AND f.pix_status = 'pendente' THEN f.pix_qrcode END AS pix_qrcode,
+              CASE WHEN f.status = 'aberta' AND f.pix_status = 'pendente' THEN f.pix_url END AS pix_url,
               (f.status = 'aberta' AND f.data_vencimento < CURRENT_DATE) AS vencida
        FROM faturas f
        WHERE f.cliente_id = $1 AND f.status IN ('aberta', 'paga')
@@ -101,8 +104,8 @@ router.put('/config', async (req, res) => {
     await pool.query(
       `INSERT INTO financeiro_config (empresa_id, instrucoes_pagamento, pix_chave, codigo_servico, nome_servico,
          aliquota_iss, email_copia, dias_lembrete, vencimento_mes_seguinte,
-         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, data_atualizacao)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, cobranca_pix, data_atualizacao)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
        ON CONFLICT (empresa_id) DO UPDATE SET
          instrucoes_pagamento = EXCLUDED.instrucoes_pagamento, pix_chave = EXCLUDED.pix_chave,
          codigo_servico = EXCLUDED.codigo_servico, nome_servico = EXCLUDED.nome_servico,
@@ -110,10 +113,10 @@ router.put('/config', async (req, res) => {
          dias_lembrete = EXCLUDED.dias_lembrete, vencimento_mes_seguinte = EXCLUDED.vencimento_mes_seguinte,
          ret_ir = EXCLUDED.ret_ir, ret_csll = EXCLUDED.ret_csll, ret_pis = EXCLUDED.ret_pis,
          ret_cofins = EXCLUDED.ret_cofins, ret_inss = EXCLUDED.ret_inss,
-         data_atualizacao = NOW()`,
+         cobranca_pix = EXCLUDED.cobranca_pix, data_atualizacao = NOW()`,
       [emp(req), vazioNulo(b.instrucoes_pagamento), vazioNulo(b.pix_chave), vazioNulo(b.codigo_servico),
        vazioNulo(b.nome_servico), aliquota, vazioNulo(b.email_copia), dias, b.vencimento_mes_seguinte !== false,
-       ...RET.map(r => Number(b[r] || 0))]);
+       ...RET.map(r => Number(b[r] || 0)), !!b.cobranca_pix]);
     res.json({ mensagem: 'Configuração salva!' });
   } catch (err) { erro500(res, 'Erro ao salvar configuração', err); }
 });
@@ -346,6 +349,10 @@ router.put('/faturas/:id', async (req, res) => {
       await pool.query(
         `UPDATE faturas SET data_vencimento=$1, observacoes=$2, atualizado_por_usuario_id=$3, data_atualizacao=NOW() WHERE id=$4`,
         [b.data_vencimento, vazioNulo(b.observacoes), req.usuario.id, f.id]);
+      if (f.pix_status === 'pendente' && f.pix_asaas_id && b.data_vencimento !== f.data_vencimento) {
+        try { await asaas.alterarVencimentoCobranca(f.pix_asaas_id, b.data_vencimento); }
+        catch (err) { return res.json({ mensagem: `Fatura atualizada, mas o vencimento do PIX no Asaas não mudou: ${err.message}` }); }
+      }
     } else {
       return res.status(400).json({ erro: 'Fatura paga ou cancelada não pode ser editada.' });
     }
@@ -419,6 +426,30 @@ router.post('/faturas/:id/enviar-email', async (req, res) => {
   } catch (err) { erro500(res, 'Erro ao enviar e-mail', err); }
 });
 
+// POST /faturas/:id/pix — gera a cobrança PIX no Asaas (ou tenta de novo após erro/cancelamento)
+router.post('/faturas/:id/pix', async (req, res) => {
+  try {
+    const f = await fat.carregarFatura(req.params.id, emp(req));
+    if (!f) return res.status(404).json({ erro: 'Fatura não encontrada.' });
+    if (f.status !== 'aberta') return res.status(400).json({ erro: 'Só faturas em aberto recebem cobrança PIX.' });
+    if (f.pix_status === 'pendente') return res.status(400).json({ erro: 'Esta fatura já tem um PIX pendente.' });
+    if (!asaas.configurado()) return res.status(400).json({ erro: 'Asaas não configurado: defina ASAAS_API_KEY no servidor.' });
+    const status = await fat.gerarPix(f);
+    const atual = await fat.carregarFatura(f.id, emp(req));
+    if (status === 'erro') return res.status(400).json({ erro: `O PIX não foi gerado: ${atual.pix_erro}` });
+    res.json({ mensagem: 'Cobrança PIX gerada! Ela aparece no portal do cliente; use "Enviar por e-mail" para mandar o código.', pix_status: status });
+  } catch (err) { erro500(res, 'Erro ao gerar PIX', err); }
+});
+
+// POST /faturas/:id/pix/sincronizar — consulta a cobrança no Asaas (dá baixa se já foi paga)
+router.post('/faturas/:id/pix/sincronizar', async (req, res) => {
+  try {
+    const f = await fat.carregarFatura(req.params.id, emp(req));
+    if (!f || !f.pix_asaas_id) return res.status(404).json({ erro: 'Esta fatura não tem cobrança PIX.' });
+    res.json({ pix_status: await fat.sincronizarPix(f) });
+  } catch (err) { erro500(res, 'Erro ao consultar PIX', err); }
+});
+
 // POST /faturas/:id/baixa { data_pagamento, valor_pago, forma_pagamento }
 router.post('/faturas/:id/baixa', async (req, res) => {
   const b = req.body || {};
@@ -431,12 +462,19 @@ router.post('/faturas/:id/baixa', async (req, res) => {
        WHERE id = $5 AND empresa_id = $6 AND status = 'aberta' RETURNING id`,
       [b.data_pagamento, Number(b.valor_pago), vazioNulo(b.forma_pagamento) || 'transferencia', req.usuario.id, req.params.id, emp(req)]);
     if (!r.rows.length) return res.status(400).json({ erro: 'Só faturas em aberto recebem baixa.' });
+    // Pagou por fora (transferência): o PIX pendente no Asaas não pode mais ser pago
+    const f = await fat.carregarFatura(req.params.id, emp(req));
+    if (f.pix_status === 'pendente') await fat.cancelarPix(f);
     res.json({ mensagem: 'Pagamento registrado!' });
   } catch (err) { erro500(res, 'Erro ao registrar pagamento', err); }
 });
 
 router.post('/faturas/:id/estornar-baixa', async (req, res) => {
   try {
+    const f = await fat.carregarFatura(req.params.id, emp(req));
+    if (f && f.pix_status === 'pago') {
+      return res.status(400).json({ erro: 'Este pagamento entrou por PIX no Asaas. Para desfazer, faça o estorno no painel do Asaas (a fatura é atualizada sozinha).' });
+    }
     const r = await pool.query(
       `UPDATE faturas SET status = 'aberta', data_pagamento = NULL, valor_pago = NULL, forma_pagamento = NULL,
          atualizado_por_usuario_id = $1, data_atualizacao = NOW()
@@ -465,6 +503,7 @@ router.post('/faturas/:id/cancelar', async (req, res) => {
       }
       aviso = 'Cancelamento da NFS-e solicitado à prefeitura.';
     }
+    await fat.cancelarPix(f);
     await pool.query(
       `UPDATE faturas SET status = 'cancelada', atualizado_por_usuario_id = $1, data_atualizacao = NOW() WHERE id = $2`,
       [req.usuario.id, f.id]);
