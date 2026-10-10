@@ -3513,3 +3513,43 @@ svg.icon {
   .table-container td.col-check:empty { display: none; }
   .fin-erro { max-width: none; }
 }
+
+/* Marca no topo do menu: símbolo maior, bloco centralizado (mesma composição do login) */
+.sidebar .sidebar-header { justify-content: center; gap: 12px; padding: 4px 16px 20px; }
+.sidebar .sidebar-header .logo-box.logo-img { width: 46px; height: 46px; flex-shrink: 0; }
+.sidebar-marca .marca-palavra { font-size: 18px; letter-spacing: 0.2em; line-height: 1.1; }
+.sidebar-marca span#sidebar-empresa { font-size: 10.5px; letter-spacing: 0.38em; text-transform: uppercase; margin-top: 3px; }
+
+/* Cabeçalho dos cadastros (modais) no mesmo azul-céu do menu lateral — padrão em todas as telas */
+:root[data-theme="sereno"] .modal-header {
+  background: linear-gradient(180deg, #d3e9f9 0%, #b4d9f3 55%, #c6e2f7 100%);
+  border-bottom: 1px solid #b3cde6;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+:root[data-theme="sereno"] .modal-header h3 { color: #0f2a4d; font-weight: 600; }
+:root[data-theme="sereno"] .modal-header .btn-close { color: #34465e; }
+:root[data-theme="sereno-escuro"] .modal-header {
+  background: linear-gradient(180deg, #13284a 0%, #0f2240 100%);
+  border-bottom: 1px solid rgba(90, 169, 236, 0.22);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+@media (max-width: 768px) {
+  :root[data-theme="sereno"] .modal-header { background: linear-gradient(180deg, #d3e9f9 0%, #b4d9f3 55%, #c6e2f7 100%); }
+  :root[data-theme="sereno-escuro"] .modal-header { background: linear-gradient(180deg, #13284a 0%, #0f2240 100%); }
+}
+
+/* Modo visualização (ícone de olho): campos legíveis, sem cara de desabilitado, e sem o botão Salvar */
+.modal.modo-leitura .form-actions [type="submit"] { display: none; }
+.modal:not(.modo-leitura) .btn-sair-leitura { display: none; }
+.modal.modo-leitura .form input:disabled,
+.modal.modo-leitura .form select:disabled,
+.modal.modo-leitura .form textarea:disabled {
+  opacity: 1;
+  color: var(--text-main);
+  -webkit-text-fill-color: var(--text-main);
+  background: var(--bg-subtle, rgba(127, 127, 127, 0.05));
+  cursor: default;
+}
+.modal.modo-leitura .form :disabled::placeholder { color: transparent; -webkit-text-fill-color: transparent; }

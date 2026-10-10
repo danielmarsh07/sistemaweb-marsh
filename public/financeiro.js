@@ -61,6 +61,7 @@ function botao(icone, titulo, acao, extra = '') {
 
 function acoesFatura(f) {
   const b = [];
+  b.push(botao('eye', 'Visualizar', `visualizarRegistro(editarFatura, ${f.id}, '#modal-fatura')`));
   if (f.status === 'rascunho') {
     b.push(botao('edit', 'Editar', `editarFatura(${f.id})`, 'btn-edit'));
     b.push(botao('trash', 'Excluir rascunho', `excluirFatura(${f.id})`, 'btn-danger'));
@@ -445,6 +446,7 @@ async function loadContratos() {
       <td data-label="Vigência">${diaBr(c.data_inicio)} → ${c.data_fim ? diaBr(c.data_fim) : 'sem prazo'}</td>
       <td data-label="Status">${pill(txt, cor)}</td>
       <td data-label="Ações" class="td-acoes">
+        ${botao('eye', 'Visualizar', `visualizarRegistro(editarContrato, ${c.id}, '#modal-contrato')`)}
         ${botao('edit', 'Editar', `editarContrato(${c.id})`, 'btn-edit')}
         ${c.status !== 'encerrado' ? botao('trash', 'Encerrar / excluir', `encerrarContrato(${c.id})`, 'btn-danger') : ''}
       </td>

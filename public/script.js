@@ -13,8 +13,10 @@ if (usuario) {
   const el = document.getElementById('usuario-nome');
   if (el) el.textContent = usuario.nome;
 
+  // Abaixo de "MARSH" vai "Consultoria" (como no login); outra empresa aparece pelo próprio nome
   const emp = document.getElementById('sidebar-empresa');
-  if (emp) emp.textContent = usuario.empresa_nome || 'Marsh Consultoria';
+  const nomeEmp = (usuario.empresa_nome || '').trim();
+  if (emp) emp.textContent = !nomeEmp || /^marsh( consultoria)?$/i.test(nomeEmp) ? 'Consultoria' : nomeEmp;
 
   // Rodapé do menu: iniciais e perfil do usuário
   const partes = (usuario.nome || '').trim().split(/\s+/).filter(Boolean);
@@ -418,30 +420,19 @@ async function loadDashboard() {
     tbodyRecent.innerHTML = skeletonRows(6, 3);
   }
   try {
-    const [resumo, transacoes, chamadosResp] = await Promise.all([
+    const [resumo, chamadosResp] = await Promise.all([
       apiFetch(`${API_URL}/empresas/resumo`).then(r => r ? r.json() : {}),
-      apiFetch(`${API_URL}/transacoes`).then(r => r ? r.json() : {}),
       apiFetch(`${API_URL}/chamados?status=aberto&limit=10`).then(r => r ? r.json() : {})
     ]);
+    loadDashboardFinanceiro();
     const chamados = Array.isArray(chamadosResp) ? chamadosResp : (chamadosResp.chamados || []);
 
     if (resumo) {
       animateCounter(document.getElementById('total-clientes'), resumo.clientes || 0);
-      animateCounter(document.getElementById('total-fornecedores'), resumo.fornecedores || 0);
-      animateCounter(document.getElementById('total-tecnologias'), resumo.tecnologias || 0);
       if (resumo.chamados) {
         const abertos = parseInt(resumo.chamados.abertos || 0) + parseInt(resumo.chamados.em_andamento || 0);
         animateCounter(document.getElementById('total-chamados-abertos'), abertos);
       }
-    }
-
-    if (transacoes && transacoes.resumo) {
-      const { totalEntradas, totalSaidas, saldo } = transacoes.resumo;
-      animateCounter(document.getElementById('total-entradas'), totalEntradas, { formatter: formatMoeda });
-      animateCounter(document.getElementById('total-saidas'), totalSaidas, { formatter: formatMoeda });
-      animateCounter(document.getElementById('total-saldo'), saldo, { formatter: formatMoeda });
-      const elSaldo = document.getElementById('total-saldo');
-      if (elSaldo) elSaldo.style.color = saldo < 0 ? '#ef4444' : (saldo > 0 ? '#10b981' : '');
     }
 
     // Chamados recentes
@@ -449,6 +440,42 @@ async function loadDashboard() {
   } catch (err) {
     console.error('Erro ao carregar dashboard:', err);
   }
+}
+
+// Cards e lista financeira da visão geral (só administradores enxergam o financeiro)
+async function loadDashboardFinanceiro() {
+  const blocos = document.querySelectorAll('.dash-fin');
+  if (!usuario || !['admin_empresa', 'admin_sistema'].includes(usuario.tipo)) {
+    blocos.forEach(b => { b.hidden = true; });
+    return;
+  }
+  const hoje = new Date();
+  const comp = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  const [rr, rf] = await Promise.all([
+    apiFetch(`${API_URL}/financeiro/resumo?competencia=${comp}`),
+    apiFetch(`${API_URL}/financeiro/faturas?status=pendentes`)
+  ]);
+  if (!rr || !rf || !rr.ok || !rf.ok) { blocos.forEach(b => { b.hidden = true; }); return; }
+  const r = await rr.json();
+  animateCounter(document.getElementById('dash-contratos'), r.contratos || 0);
+  animateCounter(document.getElementById('dash-mrr'), r.mrr || 0, { formatter: formatMoeda });
+  animateCounter(document.getElementById('dash-areceber'), r.a_receber || 0, { formatter: formatMoeda });
+  animateCounter(document.getElementById('dash-vencido'), r.vencido || 0, { formatter: formatMoeda });
+  document.getElementById('dash-vencido').style.color = r.vencido > 0 ? '#b42318' : '';
+
+  const abertas = (await rf.json()).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento)).slice(0, 6);
+  const tbody = document.getElementById('dash-recebimentos-tbody');
+  tbody.innerHTML = abertas.length ? abertas.map(f => `
+    <tr style="cursor:pointer" onclick="document.getElementById('fin-competencia').value='${f.competencia.slice(0, 7)}';showPage('faturamento')">
+      <td data-label="Cliente"><strong>${escapeHtml(f.cliente_nome)}</strong></td>
+      <td data-label="Competência">${f.competencia.slice(5, 7)}/${f.competencia.slice(0, 4)}</td>
+      <td data-label="A receber" class="fin-num">${formatMoeda(f.valor_liquido ?? f.valor)}</td>
+      <td data-label="Vencimento">${diaBr(f.data_vencimento)}</td>
+      <td data-label="Situação">${f.vencida
+        ? '<span class="fin-pill" style="--pill:#b42318">Vencida</span>'
+        : '<span class="fin-pill" style="--pill:#1d6fd8">Em aberto</span>'}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="5" class="text-center">Nenhuma fatura em aberto.</td></tr>';
 }
 
 function renderDashboardChamados(chamados) {
@@ -540,6 +567,7 @@ function renderClientes() {
         }
       </td>
       <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon" title="Visualizar" aria-label="Visualizar" onclick="visualizarRegistro(editarCliente, ${c.id}, '#modal-cliente')">${iconSVG('eye')}</button>
         <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarCliente(${c.id})">${iconSVG('edit')}</button>
         <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarCliente(${c.id})">${iconSVG('trash')}</button>
       </td>
@@ -833,6 +861,7 @@ function renderFornecedores() {
       <td data-label="Contato">${escapeHtml(f.contato_nome || f.email || '-')}</td>
       <td data-label="Status">${badgeStatusGeral(f.status)}</td>
       <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon" title="Visualizar" aria-label="Visualizar" onclick="visualizarRegistro(editarFornecedor, ${f.id}, '#modal-fornecedor')">${iconSVG('eye')}</button>
         <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarFornecedor(${f.id})">${iconSVG('edit')}</button>
         <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarFornecedor(${f.id})">${iconSVG('trash')}</button>
       </td>
@@ -961,6 +990,7 @@ async function loadTecnologias() {
       <td data-label="Clientes">${t.total_clientes || 0} cliente(s)</td>
       <td data-label="Status">${badgeStatusTec(t.status)}</td>
       <td data-label="Ações" class="td-acoes">
+        <button class="btn btn-icon" title="Visualizar" aria-label="Visualizar" onclick="visualizarRegistro(editarTecnologia, ${t.id}, '#modal-tecnologia')">${iconSVG('eye')}</button>
         <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarTecnologia(${t.id})">${iconSVG('edit')}</button>
         <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarTecnologia(${t.id})">${iconSVG('trash')}</button>
       </td>
@@ -2719,13 +2749,49 @@ async function reativarUsuario(id) {
   loadUsuarios();
 }
 
+// ===== MODO VISUALIZAÇÃO (ícone de olho nas listagens) =====
+// Abre o próprio formulário de edição com tudo travado; "Editar" destrava sem fechar.
+async function visualizarRegistro(editar, id, modalSel) {
+  await editar(id);
+  const modal = document.querySelector(modalSel);
+  if (!modal || !modal.classList.contains('show')) return;
+  modal.classList.add('modo-leitura');
+  modal.querySelectorAll('form input, form select, form textarea').forEach(el => {
+    if (!el.disabled) { el.disabled = true; el.dataset.leitura = '1'; }
+  });
+  const titulo = modal.querySelector('.modal-header h3');
+  if (titulo) {
+    titulo.dataset.tituloEdicao = titulo.textContent;
+    titulo.textContent = titulo.textContent.replace(/^Editar\b/i, 'Visualizar');
+  }
+  const acoes = modal.querySelector('.form-actions');
+  if (acoes && !acoes.querySelector('.btn-sair-leitura')) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-primary btn-sair-leitura';
+    b.textContent = 'Editar';
+    b.addEventListener('click', () => sairModoLeitura(modal));
+    acoes.appendChild(b);
+  }
+}
+
+function sairModoLeitura(modal) {
+  if (!modal.classList.contains('modo-leitura')) return;
+  modal.classList.remove('modo-leitura');
+  modal.querySelectorAll('[data-leitura]').forEach(el => { el.disabled = false; delete el.dataset.leitura; });
+  const titulo = modal.querySelector('.modal-header h3');
+  if (titulo && titulo.dataset.tituloEdicao) { titulo.textContent = titulo.dataset.tituloEdicao; delete titulo.dataset.tituloEdicao; }
+}
+
 // ===== UTILITIES =====
 function showModal(selector) {
   document.querySelector(selector).classList.add('show');
 }
 
 function closeModal(modal) {
-  if (modal) modal.classList.remove('show');
+  if (!modal) return;
+  sairModoLeitura(modal);
+  modal.classList.remove('show');
 }
 
 function resetForm(selector) {

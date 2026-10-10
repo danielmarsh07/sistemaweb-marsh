@@ -179,20 +179,6 @@
               <p id="total-clientes" class="stat-number">0</p>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer" onclick="showPage('fornecedores')">
-            <div class="stat-icon"><svg class="icon"><use href="#i-building"/></svg></div>
-            <div class="stat-content">
-              <h3>Fornecedores</h3>
-              <p id="total-fornecedores" class="stat-number">0</p>
-            </div>
-          </div>
-          <div class="stat-card" style="cursor:pointer" onclick="showPage('tecnologias')">
-            <div class="stat-icon"><svg class="icon"><use href="#i-cpu"/></svg></div>
-            <div class="stat-content">
-              <h3>Tecnologias</h3>
-              <p id="total-tecnologias" class="stat-number">0</p>
-            </div>
-          </div>
           <div class="stat-card" style="cursor:pointer" onclick="showPage('chamados')">
             <div class="stat-icon"><svg class="icon"><use href="#i-ticket"/></svg></div>
             <div class="stat-content">
@@ -200,26 +186,54 @@
               <p id="total-chamados-abertos" class="stat-number">0</p>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card dash-fin" style="cursor:pointer" onclick="showPage('contratos')">
+            <div class="stat-icon"><svg class="icon"><use href="#i-doc"/></svg></div>
+            <div class="stat-content">
+              <h3>Contratos ativos</h3>
+              <p id="dash-contratos" class="stat-number">0</p>
+            </div>
+          </div>
+          <div class="stat-card dash-fin" style="cursor:pointer" onclick="showPage('contratos')">
             <div class="stat-icon"><svg class="icon"><use href="#i-trend-up"/></svg></div>
             <div class="stat-content">
-              <h3>Entradas</h3>
-              <p id="total-entradas" class="stat-number">R$ 0</p>
+              <h3>Receita recorrente / mês</h3>
+              <p id="dash-mrr" class="stat-number">R$ 0</p>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card dash-fin" style="cursor:pointer" onclick="showPage('faturamento')">
+            <div class="stat-icon"><svg class="icon"><use href="#i-wallet"/></svg></div>
+            <div class="stat-content">
+              <h3>A receber</h3>
+              <p id="dash-areceber" class="stat-number">R$ 0</p>
+            </div>
+          </div>
+          <div class="stat-card dash-fin" style="cursor:pointer" onclick="showPage('faturamento')">
             <div class="stat-icon"><svg class="icon"><use href="#i-trend-down"/></svg></div>
             <div class="stat-content">
-              <h3>Saídas</h3>
-              <p id="total-saidas" class="stat-number">R$ 0</p>
+              <h3>Vencido</h3>
+              <p id="dash-vencido" class="stat-number">R$ 0</p>
             </div>
           </div>
-          <div class="stat-card stat-card-full">
-            <div class="stat-icon"><svg class="icon"><use href="#i-scale"/></svg></div>
-            <div class="stat-content">
-              <h3>Saldo</h3>
-              <p id="total-saldo" class="stat-number stat-saldo">R$ 0</p>
-            </div>
+        </div>
+
+        <!-- Próximos recebimentos (faturas em aberto) -->
+        <div class="dash-fin" style="margin-top:2rem;">
+          <h3 class="secao-titulo">Próximos recebimentos</h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Competência</th>
+                  <th>A receber</th>
+                  <th>Vencimento</th>
+                  <th>Situação</th>
+                </tr>
+              </thead>
+              <tbody id="dash-recebimentos-tbody">
+                <tr><td colspan="5" class="text-center">Carregando...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
