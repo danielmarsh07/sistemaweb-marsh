@@ -35,6 +35,8 @@ const licencasConectorRoutes = require('./routes/licencas-conector');
 const treinamentosRoutes = require('./routes/treinamentos');
 const financeiroRoutes = require('./routes/financeiro');
 const asaasWebhookRoutes = require('./routes/asaas-webhook');
+const comercialRoutes = require('./routes/comercial');
+const publicoRoutes = require('./routes/publico');
 const financeiroJobs = require('./services/financeiro-jobs');
 const autenticar = require('./middleware/autenticar');
 
@@ -42,6 +44,7 @@ const autenticar = require('./middleware/autenticar');
 app.use('/api/auth', authRoutes);
 app.use('/api/licencas-conector', licencasConectorRoutes); // conector SAP: autentica pela chave da licença
 app.use('/api/asaas/webhook', asaasWebhookRoutes); // Asaas: autentica pelo header asaas-access-token
+app.use('/api/publico', publicoRoutes); // lead do site e proposta por link (token), com limite de requisições
 
 // Rotas protegidas
 app.use('/api/empresas', autenticar, empresasRoutes);
@@ -58,6 +61,7 @@ app.use('/api/assistente', autenticar, assistenteRoutes);
 app.use('/api/licencas', autenticar, licencasRoutes);
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/financeiro', autenticar, financeiroRoutes);
+app.use('/api/comercial', autenticar, comercialRoutes);
 
 // Rota de teste
 app.get('/api/ping', (req, res) => {
@@ -679,6 +683,91 @@ async function iniciar() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_emp_venc ON contas_pagar(empresa_id, data_vencimento);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_emp_comp ON contas_pagar(empresa_id, competencia);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_grupo ON contas_pagar(grupo_id);`);
+
+    // 24. Fase 3: funil de vendas (oportunidades) e propostas comerciais
+    //     etapa: lead → qualificacao → proposta → negociacao → ganha | perdida
+    //     Prospect sem cadastro: cliente_id NULL e os dados ficam em empresa_nome/contato_*
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS oportunidades (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        cliente_id INTEGER REFERENCES clientes(id),
+        titulo VARCHAR(255) NOT NULL,
+        empresa_nome VARCHAR(255),
+        contato_nome VARCHAR(255),
+        contato_email VARCHAR(255),
+        contato_telefone VARCHAR(50),
+        interesse VARCHAR(60),
+        origem VARCHAR(30) NOT NULL DEFAULT 'outro',
+        etapa VARCHAR(20) NOT NULL DEFAULT 'lead',
+        valor_mensal NUMERIC(12,2) NOT NULL DEFAULT 0,
+        valor_unico NUMERIC(12,2) NOT NULL DEFAULT 0,
+        probabilidade INTEGER CHECK (probabilidade BETWEEN 0 AND 100),
+        previsao_fechamento DATE,
+        data_fechamento DATE,
+        motivo_perda VARCHAR(255),
+        mensagem_origem TEXT,
+        observacoes TEXT,
+        contrato_id INTEGER REFERENCES contratos(id),
+        criado_por_usuario_id INTEGER,
+        atualizado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_oportunidades_emp_etapa ON oportunidades(empresa_id, etapa);`);
+
+    //     tipo: nota | etapa | proposta | sistema
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS oportunidades_historico (
+        id SERIAL PRIMARY KEY,
+        oportunidade_id INTEGER NOT NULL REFERENCES oportunidades(id) ON DELETE CASCADE,
+        tipo VARCHAR(20) NOT NULL DEFAULT 'nota',
+        texto TEXT NOT NULL,
+        usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_oport_hist ON oportunidades_historico(oportunidade_id);`);
+
+    //     status: rascunho → enviada → aceita | recusada. Itens em JSONB: [{descricao, tipo: mensal|unico, quantidade, valor_unitario}]
+    //     token: link público para o cliente ver e responder (sem login)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS propostas (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        oportunidade_id INTEGER NOT NULL REFERENCES oportunidades(id) ON DELETE CASCADE,
+        numero VARCHAR(20) NOT NULL,
+        versao INTEGER NOT NULL DEFAULT 1,
+        titulo VARCHAR(255) NOT NULL,
+        introducao TEXT,
+        escopo TEXT,
+        condicoes TEXT,
+        itens JSONB NOT NULL DEFAULT '[]',
+        total_mensal NUMERIC(12,2) NOT NULL DEFAULT 0,
+        total_unico NUMERIC(12,2) NOT NULL DEFAULT 0,
+        validade DATE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'rascunho',
+        token VARCHAR(64) UNIQUE,
+        data_envio TIMESTAMP,
+        data_visualizacao TIMESTAMP,
+        data_resposta TIMESTAMP,
+        resposta_nome VARCHAR(255),
+        resposta_comentario TEXT,
+        criado_por_usuario_id INTEGER,
+        atualizado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_propostas_oport ON propostas(oportunidade_id);`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_propostas_numero ON propostas(empresa_id, numero, versao);`);
+
+    //     Dados que aparecem no cabeçalho/rodapé da proposta (NULL = padrão do código)
+    for (const c of ['prop_razao_social VARCHAR(255)', 'prop_cnpj VARCHAR(30)', 'prop_contato VARCHAR(255)',
+                     'prop_apresentacao TEXT', 'prop_condicoes_padrao TEXT', 'prop_validade_dias INTEGER']) {
+      await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS ${c};`);
+    }
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

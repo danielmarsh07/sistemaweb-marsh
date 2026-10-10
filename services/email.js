@@ -373,11 +373,57 @@ async function enviarLembreteFatura({ fatura, cliente, config }) {
   });
 }
 
+// ===== Comercial (funil e propostas) =====
+
+/** Proposta enviada ao contato da oportunidade, com o link público para ver e responder */
+async function enviarProposta({ proposta, para, nomeContato, link, copia }) {
+  const linhas = [
+    Number(proposta.total_mensal) > 0 && `<tr><td style="padding:4px 16px 4px 0;font-size:13px;color:#64748b">Mensal</td><td style="font-size:16px;font-weight:700;color:#0f172a">${moeda(proposta.total_mensal)}/mês</td></tr>`,
+    Number(proposta.total_unico) > 0 && `<tr><td style="padding:4px 16px 4px 0;font-size:13px;color:#64748b">Valor único</td><td style="font-size:16px;font-weight:700;color:#0f172a">${moeda(proposta.total_unico)}</td></tr>`
+  ].filter(Boolean).join('');
+  const html = templateBase({
+    titulo: `Proposta ${proposta.numero}`,
+    preheader: `${proposta.titulo} — válida até ${diaBr(proposta.validade)}`,
+    corpo: `
+      <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">${esc(proposta.titulo)}</h2>
+      <p style="margin:0 0 24px;color:#64748b;font-size:14px">Olá${nomeContato ? `, ${esc(nomeContato)}` : ''}. Segue a nossa proposta comercial nº ${esc(proposta.numero)}.</p>
+      <div style="background:#f8fafc;border-radius:10px;padding:20px;margin-bottom:20px;border-left:4px solid #1d6fd8">
+        <table>${linhas}
+          <tr><td style="padding:4px 16px 4px 0;font-size:13px;color:#64748b">Válida até</td><td style="font-size:13px;font-weight:600;color:#0f172a">${diaBr(proposta.validade)}</td></tr>
+        </table>
+      </div>
+      <a href="${esc(link)}" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">
+        Ver proposta completa →
+      </a>
+      <p style="margin:20px 0 0;color:#64748b;font-size:13px">Na própria página dá para aceitar a proposta ou nos dizer o que ajustar.</p>`
+  });
+  return enviar({ to: [para], cc: copia ? [copia] : undefined, subject: `[Marsh] Proposta ${proposta.numero} — ${proposta.titulo}`, html });
+}
+
+/** Aviso interno para os administradores da empresa (lead novo, proposta aceita/recusada) */
+async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, link }) {
+  const admins = await emailsAdmins(empresa_id);
+  if (!admins.length) return false;
+  const html = templateBase({
+    titulo, preheader: assunto,
+    corpo: `
+      <h2 style="margin:0 0 16px;color:#0f172a;font-size:20px">${esc(titulo)}</h2>
+      <div style="background:#f8fafc;border-radius:10px;padding:20px;margin-bottom:20px;border-left:4px solid #1d6fd8">
+        <table>${linhas.filter(([, v]) => v).map(([k, v]) =>
+          `<tr><td style="padding:4px 16px 4px 0;font-size:13px;color:#64748b;vertical-align:top">${esc(k)}</td><td style="font-size:13px;color:#0f172a;white-space:pre-line">${esc(v)}</td></tr>`).join('')}</table>
+      </div>
+      ${link ? `<a href="${esc(link)}" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Abrir no sistema →</a>` : ''}`
+  });
+  return enviar({ to: admins, subject: `[Marsh] ${assunto}`, html });
+}
+
 module.exports = {
   notificarNovoChamado,
   notificarAtualizacaoStatus,
   notificarNovoAtendimento,
   enviarFatura,
   enviarLembreteFatura,
+  enviarProposta,
+  notificarAdminsComercial,
   emailConfigurado: () => !!process.env.RESEND_API_KEY
 };

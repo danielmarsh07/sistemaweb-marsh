@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Proposta Comercial — Marsh Consultoria</title>
+  <link rel="icon" type="image/png" href="/img/logo-simbolo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Documento comercial: paleta clara fixa (é o que vai para o papel / PDF) */
+    :root {
+      --azul: #1d6fd8; --azul-escuro: #0f2a4a; --texto: #1e293b; --suave: #64748b;
+      --borda: #e2e8f0; --fundo: #eef2f7; --papel: #fff; --verde: #2e7d4f; --vermelho: #b42318;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--fundo); color: var(--texto); font-family: Inter, Arial, sans-serif; font-size: 15px; line-height: 1.55; }
+    .barra {
+      position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+      padding: 10px 16px; background: rgba(255,255,255,.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--borda);
+    }
+    [hidden] { display: none !important; }
+    .btn { border: 0; border-radius: 8px; padding: 10px 18px; font: 600 14px Inter, Arial, sans-serif; cursor: pointer; min-height: 44px; }
+    .btn-primario { background: var(--azul); color: #fff; }
+    .btn-verde { background: var(--verde); color: #fff; }
+    .btn-claro { background: #fff; color: var(--texto); border: 1px solid var(--borda); }
+    .folha { max-width: 860px; margin: 24px auto; background: var(--papel); border-radius: 14px; box-shadow: 0 10px 40px rgba(15,42,74,.08); overflow: hidden; }
+    .cabecalho { display: flex; align-items: center; gap: 16px; padding: 28px 40px; background: var(--azul-escuro); color: #fff; }
+    .cabecalho img { width: 52px; height: 52px; }
+    .cabecalho .empresa { flex: 1; min-width: 0; }
+    .cabecalho strong { display: block; font-size: 17px; }
+    .cabecalho span { display: block; font-size: 12px; color: #b9c6d8; overflow-wrap: anywhere; }
+    .conteudo { padding: 36px 40px 28px; }
+    .rotulo { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--azul); margin: 0 0 4px; }
+    h1 { font-size: 28px; line-height: 1.2; margin: 0 0 18px; color: var(--azul-escuro); }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; padding: 16px 18px; border: 1px solid var(--borda); border-radius: 10px; margin-bottom: 28px; }
+    .meta div span { display: block; font-size: 12px; color: var(--suave); }
+    .meta div strong { font-size: 14px; }
+    h2 { font-size: 16px; margin: 30px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--azul); color: var(--azul-escuro); }
+    .texto { white-space: pre-line; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); padding: 8px 10px; border-bottom: 1px solid var(--borda); }
+    td { padding: 10px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+    .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .tipo { font-size: 12px; color: var(--suave); }
+    .totais { margin-top: 14px; display: grid; gap: 8px; justify-content: end; }
+    .total { display: flex; justify-content: space-between; gap: 32px; padding: 12px 18px; border-radius: 10px; background: #f1f6fd; font-size: 15px; }
+    .total strong { font-size: 18px; color: var(--azul-escuro); }
+    .rodape { padding: 18px 40px; background: #f8fafc; border-top: 1px solid var(--borda); font-size: 12px; color: var(--suave); text-align: center; }
+    .aviso { max-width: 860px; margin: 16px auto 0; padding: 12px 16px; border-radius: 10px; font-size: 14px; }
+    .aviso.ok { background: #e7f5ec; color: #1f5e3a; }
+    .aviso.alerta { background: #fff7e6; color: #8a5a00; }
+    .aviso.erro { background: #fdecea; color: var(--vermelho); }
+    .resposta { max-width: 860px; margin: 0 auto 32px; background: var(--papel); border-radius: 14px; padding: 24px 28px; box-shadow: 0 10px 40px rgba(15,42,74,.08); }
+    .resposta h3 { margin: 0 0 6px; }
+    .resposta p { margin: 0 0 16px; color: var(--suave); font-size: 14px; }
+    .campo { display: grid; gap: 4px; margin-bottom: 12px; }
+    .campo label { font-size: 13px; font-weight: 600; }
+    .campo input, .campo textarea { font: 15px Inter, Arial, sans-serif; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 8px; width: 100%; }
+    .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .carregando { text-align: center; padding: 80px 16px; color: var(--suave); }
+    @media (max-width: 640px) {
+      .folha { margin: 0; border-radius: 0; }
+      .cabecalho, .conteudo, .rodape { padding-left: 16px; padding-right: 16px; }
+      h1 { font-size: 22px; }
+      .itens thead { display: none; }
+      .itens tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--borda); }
+      .itens td { border: 0; padding: 0; }
+      .itens td.qtd { display: none; }
+      .totais { justify-content: stretch; }
+      .resposta { border-radius: 0; padding: 20px 16px; }
+      .acoes .btn { flex: 1 1 auto; }
+      .aviso { margin: 12px 16px 0; }
+    }
+    @media print {
+      body { background: #fff; font-size: 12.5px; }
+      .barra, .resposta, .aviso { display: none !important; }
+      .folha { margin: 0; max-width: none; box-shadow: none; border-radius: 0; }
+      .cabecalho { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .total { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      h2 { break-after: avoid; }
+      tr { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="barra" id="barra" hidden>
+    <button class="btn btn-claro" onclick="window.print()">Imprimir / salvar PDF</button>
+    <button class="btn btn-primario" id="btn-ir-responder" hidden onclick="document.getElementById('resposta').scrollIntoView({behavior:'smooth'})">Responder proposta</button>
+  </div>
+  <div id="avisos"></div>
+  <div id="app"><p class="carregando">Carregando proposta...</p></div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const TOKEN_PUBLICO = params.get('t');
+    const ID_INTERNO = params.get('id');
+
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const moeda = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const dia = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '—';
+    const qtd = n => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+
+    function aviso(texto, tipo) {
+      document.getElementById('avisos').innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : '';
+    }
+
+    async function carregar() {
+      let res;
+      try {
+        if (TOKEN_PUBLICO) {
+          res = await fetch(`/api/publico/proposta/${encodeURIComponent(TOKEN_PUBLICO)}`);
+        } else if (ID_INTERNO) {
+          const token = localStorage.getItem('token');
+          if (!token) { location.href = '/login.html'; return; }
+          res = await fetch(`/api/comercial/propostas/${encodeURIComponent(ID_INTERNO)}`, { headers: { Authorization: `Bearer ${token}` } });
+        } else {
+          throw new Error('Link incompleto.');
+        }
+        const p = await res.json();
+        if (!res.ok) throw new Error(p.erro || 'Proposta não encontrada.');
+        render(p);
+      } catch (err) {
+        document.getElementById('app').innerHTML = `<p class="carregando">${esc(err.message)}</p>`;
+      }
+    }
+
+    function render(p) {
+      const c = p.config || {};
+      document.title = `Proposta ${p.numero} — ${p.titulo}`;
+      const itens = (p.itens || []).map(it => `
+        <tr>
+          <td>${esc(it.descricao)}<div class="tipo">${it.tipo === 'mensal' ? 'Mensal' : 'Valor único'}</div></td>
+          <td class="num qtd">${qtd(it.quantidade)} × ${moeda(it.valor_unitario)}</td>
+          <td class="num"><strong>${moeda(it.total)}</strong>${it.tipo === 'mensal' ? '<div class="tipo">/mês</div>' : ''}</td>
+        </tr>`).join('');
+      const totais = [
+        p.total_mensal > 0 && `<div class="total"><span>Total mensal</span><strong>${moeda(p.total_mensal)}/mês</strong></div>`,
+        p.total_unico > 0 && `<div class="total"><span>Total valor único</span><strong>${moeda(p.total_unico)}</strong></div>`
+      ].filter(Boolean).join('');
+      const secao = (titulo, txt) => txt ? `<h2>${titulo}</h2><div class="texto">${esc(txt)}</div>` : '';
+
+      document.getElementById('app').innerHTML = `
+        <article class="folha">
+          <header class="cabecalho">
+            <img src="/img/logo-simbolo.svg" alt="Marsh">
+            <div class="empresa">
+              <strong>${esc(c.prop_razao_social)}</strong>
+              <span>${c.prop_cnpj ? `CNPJ ${esc(c.prop_cnpj)}` : ''}</span>
+              <span>${esc(c.prop_contato)}</span>
+            </div>
+          </header>
+          <div class="conteudo">
+            <p class="rotulo">Proposta comercial nº ${esc(p.numero)}${p.versao > 1 ? ` · versão ${p.versao}` : ''}</p>
+            <h1>${esc(p.titulo)}</h1>
+            <div class="meta">
+              <div><span>Para</span><strong>${esc(p.destinatario || '—')}</strong></div>
+              ${p.contato_nome ? `<div><span>A/C</span><strong>${esc(p.contato_nome)}</strong></div>` : ''}
+              <div><span>Data</span><strong>${dia(p.data_envio || new Date().toISOString())}</strong></div>
+              <div><span>Válida até</span><strong>${dia(p.validade)}</strong></div>
+            </div>
+            ${secao('Apresentação', p.introducao)}
+            ${secao('Escopo', p.escopo)}
+            <h2>Investimento</h2>
+            <table class="itens">
+              <thead><tr><th>Item</th><th class="num qtd">Qtd × valor</th><th class="num">Total</th></tr></thead>
+              <tbody>${itens}</tbody>
+            </table>
+            <div class="totais">${totais}</div>
+            ${secao('Condições', p.condicoes)}
+          </div>
+          <footer class="rodape">${esc(c.prop_razao_social)}${c.prop_cnpj ? ` · CNPJ ${esc(c.prop_cnpj)}` : ''} · ${esc(c.prop_contato)}</footer>
+        </article>
+        ${TOKEN_PUBLICO && p.pode_responder ? `
+        <section class="resposta" id="resposta">
+          <h3>O que achou da proposta?</h3>
+          <p>Ao aceitar, a Marsh entra em contato para formalizar o contrato e combinar o início. Se quiser ajustes, conte o que mudar.</p>
+          <div class="campo"><label for="r-nome">Seu nome *</label><input id="r-nome" autocomplete="name"></div>
+          <div class="campo"><label for="r-coment">Comentário</label><textarea id="r-coment" rows="3" placeholder="Opcional"></textarea></div>
+          <div class="acoes">
+            <button class="btn btn-verde" onclick="responder('aceitar')">Aceitar proposta</button>
+            <button class="btn btn-claro" onclick="responder('recusar')">Recusar / pedir ajustes</button>
+          </div>
+        </section>` : ''}`;
+
+      document.getElementById('barra').hidden = false;
+      document.getElementById('btn-ir-responder').hidden = !(TOKEN_PUBLICO && p.pode_responder);
+
+      const status = {
+        aceita: [`Proposta aceita${p.resposta_nome ? ` por ${p.resposta_nome}` : ''} em ${dia(p.data_resposta)}. Obrigado!`, 'ok'],
+        recusada: [`Proposta recusada em ${dia(p.data_resposta)}.`, 'alerta'],
+        substituida: ['Esta versão foi substituída por uma proposta mais recente.', 'alerta'],
+        rascunho: ['Rascunho: o cliente ainda não tem acesso a esta proposta.', 'alerta']
+      }[p.status];
+      if (status) aviso(...status);
+      else if (p.expirada) aviso('Esta proposta passou da validade. Fale com a Marsh para receber uma versão atualizada.', 'alerta');
+      else aviso('', '');
+    }
+
+    async function responder(acao) {
+      const nome = document.getElementById('r-nome').value.trim();
+      const comentario = document.getElementById('r-coment').value.trim();
+      if (!nome) { alert('Informe seu nome.'); document.getElementById('r-nome').focus(); return; }
+      if (acao === 'aceitar' && !confirm('Confirmar o aceite desta proposta?')) return;
+      if (acao === 'recusar' && !comentario && !confirm('Recusar sem comentário? Se quiser ajustes, conte no campo de comentário.')) return;
+      document.querySelectorAll('.resposta .btn').forEach(b => { b.disabled = true; });
+      try {
+        const res = await fetch(`/api/publico/proposta/${encodeURIComponent(TOKEN_PUBLICO)}/responder`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao, nome, comentario })
+        });
+        const r = await res.json();
+        if (!res.ok) throw new Error(r.erro);
+        await carregar();
+        aviso(r.mensagem, acao === 'aceitar' ? 'ok' : 'alerta');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        aviso(err.message || 'Não foi possível enviar a resposta.', 'erro');
+        document.querySelectorAll('.resposta .btn').forEach(b => { b.disabled = false; });
+      }
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

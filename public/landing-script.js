@@ -62,13 +62,23 @@ form.addEventListener('submit', async (e) => {
 
   try {
     const data = new FormData(form);
-    const response = await fetch(form.action, {
+    // Vai para o Formspree (e-mail) e para o funil do sistema (lead); basta um dos dois dar certo
+    const lead = fetch('/api/publico/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: data.get('name'), email: data.get('email'), telefone: data.get('phone'),
+        interesse: data.get('subject'), mensagem: data.get('message'), website: data.get('website')
+      })
+    }).then(r => r.ok).catch(() => false);
+    const formspree = fetch(form.action, {
       method: 'POST',
       body: data,
       headers: { Accept: 'application/json' }
-    });
+    }).then(r => r.ok).catch(() => false);
+    const [okLead, okFormspree] = await Promise.all([lead, formspree]);
 
-    if (response.ok) {
+    if (okLead || okFormspree) {
       form.reset();
       formSuccess.style.display = 'block';
       formSuccess.textContent = 'Mensagem enviada com sucesso! Em breve entraremos em contato.';

@@ -37,6 +37,7 @@
     <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
     <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
     <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M7 7l-4 8a4 4 0 0 0 8 0zM17 7l-4 8a4 4 0 0 0 8 0z"/></symbol>
+    <symbol id="i-funil" viewBox="0 0 24 24"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></symbol>
   </svg>
 
   <!-- SIDEBAR -->
@@ -86,6 +87,20 @@
           </a>
           <a href="#" data-page="tecnologias" class="nav-link">
             <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
+          </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-group" data-grupo="comercial">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-comercial">
+          <span>Comercial</span>
+          <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-group-itens" id="nav-grupo-comercial">
+          <div class="nav-group-inner">
+          <a href="#" data-page="funil" class="nav-link">
+            <svg class="icon"><use href="#i-funil"/></svg> Funil de vendas
           </a>
           </div>
         </div>
@@ -691,6 +706,52 @@
             </tbody>
           </table>
         </div>
+      </section>
+
+      <!-- ========== FUNIL DE VENDAS (comercial.js) ========== -->
+      <section id="funil-page" class="page">
+        <div class="page-header">
+          <h2>Funil de vendas</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirConfigPropostas()">Modelo da proposta</button>
+            <button type="button" class="btn btn-primary" onclick="abrirNovaOportunidade()">+ Nova oportunidade</button>
+          </div>
+        </div>
+
+        <div class="totais-finance">
+          <div class="totais-card totais-caixa">
+            <span class="totais-label">Pipeline mensal</span>
+            <span class="totais-valor" id="funil-pipeline">R$ 0,00</span>
+            <span class="totais-qtd" id="funil-pipeline-qtd">0 oportunidade(s) abertas</span>
+          </div>
+          <div class="totais-card totais-saldo">
+            <span class="totais-label">Ponderado pela chance</span>
+            <span class="totais-valor" id="funil-ponderado">R$ 0,00</span>
+            <span class="totais-qtd" id="funil-unico">+ R$ 0,00 em valores únicos</span>
+          </div>
+          <div class="totais-card totais-entrada">
+            <span class="totais-label">Ganho em 90 dias</span>
+            <span class="totais-valor" id="funil-ganho">R$ 0,00</span>
+            <span class="totais-qtd" id="funil-ganho-qtd">0 ganha(s) · 0 perdida(s)</span>
+          </div>
+          <div class="totais-card totais-saida">
+            <span class="totais-label">Leads do site</span>
+            <span class="totais-valor" id="funil-leads">0</span>
+            <span class="totais-qtd">nos últimos 7 dias</span>
+          </div>
+        </div>
+
+        <div class="filtros-bar">
+          <input type="text" id="funil-busca" class="filtro-select" placeholder="Buscar empresa, contato ou título..." style="min-width:200px; flex:1" oninput="renderFunil()">
+          <select id="funil-fechadas" class="filtro-select" onchange="loadFunil()">
+            <option value="30">Fechadas: últimos 30 dias</option>
+            <option value="90" selected>Fechadas: últimos 90 dias</option>
+            <option value="365">Fechadas: último ano</option>
+            <option value="0">Só as abertas</option>
+          </select>
+        </div>
+        <p class="pagina-descricao">Arraste os cartões entre as colunas (no computador) ou abra o cartão para mudar a etapa.</p>
+        <div class="funil-board" id="funil-board"></div>
       </section>
 
       <!-- ========== CONTAS A PAGAR (financeiro.js) ========== -->
@@ -1845,6 +1906,240 @@
     </div>
   </div>
 
+  <!-- ===== MODAIS DO COMERCIAL (comercial.js) ===== -->
+  <div id="modal-oportunidade" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-oportunidade-titulo">Nova oportunidade</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+
+      <div id="op-painel" class="op-painel" hidden>
+        <div class="op-etapa">
+          <label for="op-etapa-select">Etapa</label>
+          <select id="op-etapa-select"></select>
+          <button type="button" class="btn btn-secondary" onclick="moverEtapaModal()">Mover</button>
+        </div>
+        <div class="op-painel-acoes" id="op-painel-acoes"></div>
+      </div>
+
+      <form id="form-oportunidade" class="form">
+        <div class="form-group">
+          <label>Título *</label>
+          <input type="text" name="titulo" required maxlength="255" placeholder="Ex.: AMS SAP — Empresa X">
+        </div>
+        <div class="form-group">
+          <label>Cliente</label>
+          <select name="cliente_id" onchange="alternarProspect()"></select>
+          <small class="form-hint">Vazio = prospect (ainda não é cliente): preencha empresa e contato abaixo.</small>
+        </div>
+        <div class="form-row" id="op-prospect-row">
+          <div class="form-group">
+            <label>Empresa (prospect)</label>
+            <input type="text" name="empresa_nome" maxlength="255">
+          </div>
+          <div class="form-group">
+            <label>Contato</label>
+            <input type="text" name="contato_nome" maxlength="255">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>E-mail do contato</label>
+            <input type="email" name="contato_email" maxlength="255">
+            <small class="form-hint">Para onde vai a proposta.</small>
+          </div>
+          <div class="form-group">
+            <label>Telefone</label>
+            <input type="text" name="contato_telefone" maxlength="50">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Origem</label>
+            <select name="origem"></select>
+          </div>
+          <div class="form-group">
+            <label>Interesse</label>
+            <input type="text" name="interesse" maxlength="60" placeholder="Ex.: SAP, CPI, IA, Software">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor mensal estimado (R$)</label>
+            <input type="number" name="valor_mensal" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Valor único estimado (R$)</label>
+            <input type="number" name="valor_unico" min="0" step="0.01">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Chance de fechar (%)</label>
+            <input type="number" name="probabilidade" min="0" max="100" step="1" placeholder="Padrão da etapa">
+          </div>
+          <div class="form-group">
+            <label>Previsão de fechamento</label>
+            <input type="date" name="previsao_fechamento">
+          </div>
+        </div>
+        <div class="form-group" id="op-mensagem-row" hidden>
+          <label>Mensagem recebida pelo site</label>
+          <div class="op-mensagem" id="op-mensagem"></div>
+        </div>
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea name="observacoes" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Fechar</button>
+          <button type="submit" class="btn btn-primary">Salvar dados</button>
+        </div>
+      </form>
+
+      <div id="op-extras" hidden>
+        <div class="form-section-title op-secao">
+          <span>Propostas</span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="novaProposta()">+ Nova proposta</button>
+        </div>
+        <div id="op-propostas" class="op-lista"></div>
+
+        <div class="form-section-title op-secao"><span>Histórico</span></div>
+        <form id="form-op-nota" class="op-nota">
+          <textarea name="texto" rows="2" placeholder="Registrar ligação, reunião, próximo passo..." required></textarea>
+          <button type="submit" class="btn btn-secondary">Adicionar nota</button>
+        </form>
+        <div id="op-historico" class="op-historico"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-proposta" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-proposta-titulo">Proposta</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-proposta" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Título *</label>
+            <input type="text" name="titulo" required maxlength="255">
+          </div>
+          <div class="form-group">
+            <label>Válida até *</label>
+            <input type="date" name="validade" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Apresentação</label>
+          <textarea name="introducao" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Escopo</label>
+          <textarea name="escopo" rows="6" placeholder="O que está incluído, entregas, prazos, o que não está incluído..."></textarea>
+        </div>
+
+        <div class="form-section-title">Itens</div>
+        <div class="prop-itens" id="prop-itens"></div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="adicionarItemProposta()">+ Item</button>
+        <div class="prop-totais" id="prop-totais"></div>
+
+        <div class="form-group">
+          <label>Condições</label>
+          <textarea name="condicoes" rows="4"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar rascunho</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-gerar-contrato" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Gerar contrato recorrente</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-gerar-contrato" class="form">
+        <p class="pagina-descricao" id="gc-aviso"></p>
+        <div class="form-group">
+          <label>Nome do contrato *</label>
+          <input type="text" name="descricao" required maxlength="255">
+        </div>
+        <div class="form-group">
+          <label>Descrição do serviço na nota fiscal *</label>
+          <textarea name="descricao_servico" rows="3" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor mensal (R$) *</label>
+            <input type="number" name="valor" min="0.01" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label>Dia do vencimento *</label>
+            <input type="number" name="dia_vencimento" min="1" max="28" value="10" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Início *</label>
+          <input type="date" name="data_inicio" required>
+        </div>
+        <small class="form-hint">Nota fiscal e retenções seguem o padrão do faturamento; ajuste depois em Financeiro → Contratos se precisar.</small>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Gerar contrato</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-config-propostas" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Modelo da proposta</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-config-propostas" class="form">
+        <div class="form-section-title">Cabeçalho</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Razão social</label>
+            <input type="text" name="prop_razao_social" maxlength="255">
+          </div>
+          <div class="form-group">
+            <label>CNPJ</label>
+            <input type="text" name="prop_cnpj" maxlength="30">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Contato (e-mail · telefone · cidade)</label>
+          <input type="text" name="prop_contato" maxlength="255">
+        </div>
+        <div class="form-section-title">Textos padrão de propostas novas</div>
+        <div class="form-group">
+          <label>Apresentação</label>
+          <textarea name="prop_apresentacao" rows="4"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Condições</label>
+          <textarea name="prop_condicoes_padrao" rows="5"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Validade (dias)</label>
+          <input type="number" name="prop_validade_dias" min="1" max="180">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="modal-licenca" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -2512,6 +2807,10 @@
       <span class="bn-icon"><svg class="icon"><use href="#i-cpu"/></svg></span>
       <span>Tecno</span>
     </button>
+    <button class="bottom-nav-item" data-page="funil">
+      <span class="bn-icon"><svg class="icon"><use href="#i-funil"/></svg></span>
+      <span>Funil</span>
+    </button>
     <button class="bottom-nav-item" data-page="faturamento">
       <span class="bn-icon"><svg class="icon"><use href="#i-wallet"/></svg></span>
       <span>Faturas</span>
@@ -2536,6 +2835,7 @@
 
   <script src="script.js"></script>
   <script src="financeiro.js"></script>
+  <script src="comercial.js"></script>
   <script src="assistente-voz.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

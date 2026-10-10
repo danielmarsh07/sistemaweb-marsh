@@ -3553,6 +3553,82 @@ svg.icon {
   .fin-erro { max-width: none; }
 }
 
+/* =====================================================================
+   COMERCIAL — funil (kanban), oportunidade e proposta (comercial.js)
+   ===================================================================== */
+.funil-board {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px;
+  overflow-x: auto; padding-bottom: 12px; align-items: start;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+}
+.funil-coluna {
+  scroll-snap-align: start; border-radius: 12px; border: 1px solid var(--border);
+  border-top: 3px solid var(--etapa); background: var(--bg-subtle, rgba(127,127,127,.05));
+  min-height: 160px; transition: background .15s, box-shadow .15s;
+}
+.funil-coluna.alvo { background: color-mix(in srgb, var(--etapa) 10%, transparent); box-shadow: inset 0 0 0 2px var(--etapa); }
+.funil-coluna-topo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; }
+.funil-coluna-topo strong { font-size: 0.9rem; color: var(--text-main); }
+.funil-qtd { font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; color: var(--etapa); background: color-mix(in srgb, var(--etapa) 13%, transparent); }
+.funil-total { margin-left: auto; font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.funil-cartoes { display: grid; gap: 8px; padding: 0 10px 10px; }
+.funil-cartao {
+  display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  background: var(--bg-card-solid, var(--bg-card, #fff)); border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .05); transition: border-color .15s, transform .15s;
+}
+.funil-cartao:hover, .funil-cartao:focus-visible { border-color: var(--etapa); outline: none; }
+.funil-cartao:active { transform: scale(.99); }
+.funil-cartao-nome { font-size: 0.9rem; color: var(--text-main); }
+.funil-cartao-titulo { font-size: 0.8rem; color: var(--text-secondary); }
+.funil-cartao-valor { font-size: 0.85rem; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums; }
+.funil-cartao-rodape { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 0.75rem; }
+.funil-vazio { margin: 0; padding: 8px 4px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+
+.op-painel {
+  display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: var(--bg-subtle, rgba(127,127,127,.06));
+}
+.op-painel[hidden], #op-extras[hidden], #op-mensagem-row[hidden] { display: none; }
+.op-etapa { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.op-etapa label { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
+.op-etapa select { min-height: 40px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-solid, #fff); color: var(--text-main); }
+.op-painel-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.op-mensagem { white-space: pre-line; padding: 10px 12px; border-radius: 8px; border: 1px dashed var(--border); font-size: 0.9rem; color: var(--text-secondary); }
+.op-secao { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 20px; }
+.btn.btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+.op-lista { display: grid; gap: 8px; }
+.op-proposta {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+}
+.op-proposta-info { min-width: 0; flex: 1 1 260px; }
+.op-proposta-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+.op-nota { display: grid; gap: 8px; margin-bottom: 12px; }
+.op-nota textarea { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-solid, #fff); color: var(--text-main); font: inherit; }
+.op-nota .btn { justify-self: end; }
+.op-historico { display: grid; gap: 2px; max-height: 320px; overflow-y: auto; }
+.op-hist-item { padding: 8px 0 8px 14px; border-left: 2px solid var(--border); }
+.op-hist-etapa, .op-hist-proposta { border-left-color: var(--primary); }
+.op-hist-data { font-size: 0.75rem; color: var(--text-muted); }
+.op-hist-texto { font-size: 0.9rem; color: var(--text-main); white-space: pre-line; }
+
+.prop-itens { display: grid; gap: 8px; margin-bottom: 8px; }
+.prop-item { display: grid; grid-template-columns: minmax(0, 1fr) 100px 80px 120px 44px; gap: 6px; align-items: center; }
+.prop-item input, .prop-item select {
+  width: 100%; min-height: 40px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card-solid, #fff); color: var(--text-main); font: inherit;
+}
+.prop-totais { display: flex; gap: 20px; justify-content: flex-end; flex-wrap: wrap; margin: 10px 0 16px; font-size: 0.9rem; color: var(--text-secondary); }
+.prop-totais strong { color: var(--text-main); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 768px) {
+  .funil-board { grid-auto-columns: 82vw; margin: 0 -16px; padding: 0 16px 12px; scroll-padding: 0 16px; }
+  .prop-item { grid-template-columns: 1fr 64px 1fr 44px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .prop-item input[type="text"] { grid-column: 1 / -1; }
+  .op-proposta-acoes .btn-icon, .op-painel-acoes .btn-icon { min-width: 44px; min-height: 44px; }
+}
+
 /* Marca no topo do menu: símbolo maior, bloco centralizado (mesma composição do login) */
 .sidebar .sidebar-header { justify-content: center; gap: 12px; padding: 4px 16px 20px; }
 .sidebar .sidebar-header .logo-box.logo-img { width: 46px; height: 46px; flex-shrink: 0; }
