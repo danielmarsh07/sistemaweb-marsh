@@ -32,7 +32,7 @@ async function emailsCliente(cliente_id) {
 // --- Envio genérico com tratamento de erro silencioso ---
 
 // Retorna true só quando o Resend aceitou o envio
-async function enviar({ to, subject, html, cc }) {
+async function enviar({ to, subject, html, cc, semAlerta }) {
   const resend = getResend();
   if (!resend) return false; // chave não configurada
   try {
@@ -43,6 +43,13 @@ async function enviar({ to, subject, html, cc }) {
     return true;
   } catch (err) {
     console.error('[Email] Erro ao enviar:', err.message);
+    // O próprio e-mail de alerta não gera alerta (evita laço quando o envio está fora do ar)
+    if (!semAlerta) {
+      require('./alertas').registrarAlerta({
+        chave: 'email:falha', titulo: 'Falha ao enviar e-mail',
+        detalhe: `"${subject}" para ${(Array.isArray(to) ? to.map(u => u.email || u) : [to]).join(', ')}: ${err.message}`
+      });
+    }
     return false;
   }
 }
@@ -382,6 +389,38 @@ async function enviarLembreteFatura({ fatura, cliente, config }) {
   });
 }
 
+// ===== Sistema: alertas e acesso =====
+
+/** Falha importante no sistema (enviado pelo services/alertas.js). Não gera alerta se o próprio envio falhar. */
+async function enviarAlertaSistema({ para, titulo, detalhe, ocorrencias }) {
+  const html = templateBase({
+    titulo: 'Alerta do sistema', preheader: titulo,
+    corpo: `
+      <h2 style="margin:0 0 8px;color:#b42318;font-size:20px">⚠ ${esc(titulo)}</h2>
+      <p style="margin:0 0 16px;color:#64748b;font-size:14px">${ocorrencias > 1 ? `Ocorreu ${ocorrencias} vezes até agora.` : 'Primeira ocorrência.'} Você recebe no máximo um aviso a cada 6 horas para o mesmo problema.</p>
+      <pre style="white-space:pre-wrap;background:#f8fafc;border-radius:8px;padding:14px;font-size:12px;color:#0f172a;border-left:4px solid #b42318">${esc(detalhe || 'sem detalhe')}</pre>
+      <a href="${esc(process.env.APP_URL || 'https://marshconsultoria.com.br')}/dashboard.html" style="display:inline-block;margin-top:16px;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Ver em Sistema → Alertas</a>`
+  });
+  return enviar({ to: para, subject: `[Marsh] Alerta: ${titulo}`, html, semAlerta: true });
+}
+
+/** Convite (criar a senha) ou redefinição de senha — o link vale uma vez e expira */
+async function enviarLinkSenha({ nome, email, link, tipo, horas }) {
+  const convite = tipo === 'convite';
+  const html = templateBase({
+    titulo: convite ? 'Seu acesso ao Sistema Marsh' : 'Redefinir senha',
+    preheader: convite ? 'Crie sua senha para acessar' : 'Link para criar uma nova senha',
+    corpo: `
+      <h2 style="margin:0 0 8px;color:#0f172a;font-size:20px">${convite ? 'Bem-vindo ao Sistema Marsh' : 'Redefinição de senha'}</h2>
+      <p style="margin:0 0 20px;color:#334155;font-size:14px">Olá, ${esc(nome)}. ${convite
+        ? 'Seu acesso foi criado. Clique no botão abaixo para criar a sua senha.'
+        : 'Recebemos um pedido para redefinir a sua senha. Se não foi você, ignore este e-mail: a senha atual continua valendo.'}</p>
+      <a href="${esc(link)}" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">${convite ? 'Criar minha senha' : 'Criar nova senha'} →</a>
+      <p style="margin:20px 0 0;color:#64748b;font-size:13px">O link vale por ${horas} horas e só pode ser usado uma vez. Seu login é <strong>${esc(email)}</strong>.</p>`
+  });
+  return enviar({ to: [email], subject: convite ? '[Marsh] Seu acesso ao Sistema Marsh' : '[Marsh] Redefinição de senha', html });
+}
+
 // ===== Comercial (funil e propostas) =====
 
 /** Proposta enviada ao contato da oportunidade, com o link público para ver e responder */
@@ -433,6 +472,8 @@ module.exports = {
   enviarFatura,
   enviarLembreteFatura,
   enviarProposta,
+  enviarAlertaSistema,
+  enviarLinkSenha,
   notificarAdminsComercial,
   emailConfigurado: () => !!process.env.RESEND_API_KEY
 };

@@ -9,6 +9,7 @@ const router = express.Router();
 const pool = require('../db');
 const asaas = require('../services/asaas');
 const fat = require('../services/faturamento');
+const { registrarAlerta } = require('../services/alertas');
 
 function tokenOk(recebido) {
   const esperado = process.env.ASAAS_WEBHOOK_TOKEN;
@@ -19,7 +20,11 @@ function tokenOk(recebido) {
 }
 
 router.post('/', async (req, res) => {
-  if (!tokenOk(req.get('asaas-access-token'))) return res.status(401).json({ erro: 'Token inválido' });
+  if (!tokenOk(req.get('asaas-access-token'))) {
+    registrarAlerta({ chave: 'webhook:token', nivel: 'aviso', titulo: 'Webhook do Asaas recusado: token não confere',
+      detalhe: 'Confira se o token configurado no painel do Asaas é igual ao ASAAS_WEBHOOK_TOKEN do Render.' });
+    return res.status(401).json({ erro: 'Token inválido' });
+  }
 
   const { event, invoice, payment } = req.body || {};
 
@@ -35,7 +40,7 @@ router.post('/', async (req, res) => {
         event === 'PAYMENT_DELETED' ? { ...payment, deleted: true } : payment);
       return res.json({ ok: true });
     } catch (err) {
-      console.error('[Asaas webhook PIX]', err.message);
+      registrarAlerta({ chave: 'webhook:pix', titulo: 'Webhook do Asaas: falha ao processar pagamento PIX', detalhe: `${event} ${payment.id}: ${err.message}` });
       return res.json({ ok: false });
     }
   }
@@ -54,7 +59,7 @@ router.post('/', async (req, res) => {
     await fat.aposAtualizarNota(id, empresa_id);
     res.json({ ok: true });
   } catch (err) {
-    console.error('[Asaas webhook]', err.message);
+    registrarAlerta({ chave: 'webhook:nfse', titulo: 'Webhook do Asaas: falha ao processar nota fiscal', detalhe: `${event} ${invoice.id}: ${err.message}` });
     res.json({ ok: false }); // não trava a fila; a rotina periódica re-sincroniza
   }
 });

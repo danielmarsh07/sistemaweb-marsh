@@ -115,6 +115,13 @@
     .mensagem.erro { display: block; background: #fbeae8; color: #b42318; border: 1px solid #f4cdc8; }
     .mensagem.sucesso { display: block; background: #e6f2ea; color: #2e7d4f; border: 1px solid #c7e3d1; }
 
+    [hidden] { display: none !important; }
+    .link-esqueci { display: inline-block; margin-top: 14px; font-size: 13.5px; color: var(--primary); text-decoration: none; font-weight: 500; }
+    .link-esqueci:hover { text-decoration: underline; }
+    .ds-regras { list-style: none; margin: 0 0 8px; padding: 0; font-size: 13px; color: var(--text-muted); display: grid; gap: 4px; }
+    .ds-regras li::before { content: '\25CB  '; }
+    .ds-regras li.ok { color: #2e7d4f; }
+    .ds-regras li.ok::before { content: '\2713  '; }
     .login-footer { margin-top: 24px; font-size: 12.5px; color: var(--text-muted); }
     .login-footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
 
@@ -150,22 +157,23 @@
 
   <main class="login-lado">
     <div class="login-card">
-      <h1>Entrar</h1>
-      <p class="sub">Acesse o Sistema Marsh ou o Portal do Cliente.</p>
+      <h1 id="login-titulo">Entrar</h1>
+      <p class="sub" id="login-sub">Acesse o Sistema Marsh ou o Portal do Cliente.</p>
 
       <div class="campo">
         <label for="login-email">E-mail</label>
         <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email" />
       </div>
-      <div class="campo">
+      <div class="campo" id="campo-senha">
         <label for="login-senha">Senha</label>
         <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" />
       </div>
-      <button class="btn-login" id="btn-entrar" onclick="fazerLogin()">Entrar</button>
+      <button class="btn-login" id="btn-entrar" onclick="acaoPrincipal()">Entrar</button>
       <div class="mensagem" id="login-msg" role="alert"></div>
+      <a href="#" class="link-esqueci" id="link-esqueci" onclick="alternarRecuperar(); return false;">Esqueci minha senha</a>
 
       <div class="login-footer">
-        Acesso restrito — solicite suas credenciais ao administrador.<br>
+        Acesso restrito — o administrador envia o convite para o seu e-mail.<br>
         <a href="/index.html">Conheça a Marsh Consultoria</a>
       </div>
     </div>
@@ -188,6 +196,43 @@
       el.textContent = texto;
       el.className = `mensagem ${tipo}`;
     }
+
+    // Modo "esqueci minha senha": mesmo cartão, sem o campo de senha, envia o link por e-mail
+    let modoRecuperar = false;
+    function alternarRecuperar() {
+      modoRecuperar = !modoRecuperar;
+      document.getElementById('campo-senha').hidden = modoRecuperar;
+      document.getElementById('login-titulo').textContent = modoRecuperar ? 'Recuperar senha' : 'Entrar';
+      document.getElementById('login-sub').textContent = modoRecuperar
+        ? 'Informe seu e-mail: enviamos um link para você criar uma nova senha.'
+        : 'Acesse o Sistema Marsh ou o Portal do Cliente.';
+      document.getElementById('btn-entrar').textContent = modoRecuperar ? 'Enviar link' : 'Entrar';
+      document.getElementById('link-esqueci').textContent = modoRecuperar ? 'Voltar para o login' : 'Esqueci minha senha';
+      document.getElementById('login-msg').className = 'mensagem';
+      document.getElementById('login-email').focus();
+    }
+
+    function acaoPrincipal() { return modoRecuperar ? pedirLink() : fazerLogin(); }
+
+    async function pedirLink() {
+      const email = document.getElementById('login-email').value.trim();
+      const btn = document.getElementById('btn-entrar');
+      if (!email) return mostrarMensagem('Informe o seu e-mail.', 'erro');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      try {
+        const res = await fetch('/api/auth/esqueci', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+        const data = await res.json();
+        mostrarMensagem(data.mensagem || data.erro, res.ok ? 'sucesso' : 'erro');
+      } catch {
+        mostrarMensagem('Erro de conexão. Tente novamente.', 'erro');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Enviar link';
+      }
+    }
+
+    // Vindo da página de criar senha: já preenche o e-mail
+    const emailUrl = new URLSearchParams(location.search).get('email');
+    if (emailUrl) document.getElementById('login-email').value = emailUrl;
 
     async function fazerLogin() {
       const email = document.getElementById('login-email').value.trim();
@@ -233,7 +278,7 @@
     }
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Enter') fazerLogin();
+      if (e.key === 'Enter') acaoPrincipal();
     });
   </script>
   <script>

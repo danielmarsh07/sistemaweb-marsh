@@ -173,3 +173,59 @@ function renderPaginaCategoriasDespesa() {
       </td>
     </tr>`).join('') : '<tr><td colspan="5" class="text-center">Nenhuma categoria.</td></tr>';
 }
+
+// ----- Alertas do sistema -----
+let _alertas = [];
+
+async function loadAlertas() {
+  const box = document.getElementById('alertas-lista');
+  box.innerHTML = '<p class="fin-muted">Carregando...</p>';
+  const todos = document.getElementById('alertas-todos').checked ? '?todos=1' : '';
+  const res = await apiFetch(`${API_URL}/alertas${todos}`);
+  if (!res) return;
+  const d = await res.json();
+  if (!res.ok) { box.innerHTML = `<p class="fin-muted">${escapeHtml(d.erro)}</p>`; return; }
+  _alertas = d.alertas;
+  atualizarBadgeAlertas(d.nao_lidos);
+  const dataHora = v => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  box.innerHTML = _alertas.length ? _alertas.map(a => `
+    <article class="alerta-item alerta-${escapeHtml(a.nivel)}${a.lido ? ' alerta-lido' : ''}">
+      <div class="alerta-topo">
+        <strong>${escapeHtml(a.titulo)}</strong>
+        ${a.lido ? pill('Resolvido', '#64748b') : botao('check', 'Marcar como resolvido', `resolverAlerta(${a.id})`, 'btn-edit')}
+      </div>
+      <div class="alerta-meta">
+        ${a.ocorrencias > 1 ? `${a.ocorrencias} ocorrências · primeira ${dataHora(a.primeira_em)} · ` : ''}última ${dataHora(a.ultima_em)}
+        ${a.email_enviado_em ? ` · e-mail enviado ${dataHora(a.email_enviado_em)}` : ''}
+      </div>
+      ${a.detalhe ? `<details><summary>Detalhe técnico</summary><pre>${escapeHtml(a.detalhe)}</pre></details>` : ''}
+    </article>`).join('') : '<p class="alertas-vazio">✓ Nenhum alerta em aberto. Tudo funcionando.</p>';
+}
+
+function atualizarBadgeAlertas(n) {
+  const b = document.getElementById('badge-alertas');
+  if (!b) return;
+  b.textContent = n > 99 ? '99+' : String(n);
+  b.hidden = !n;
+}
+
+// Contador no menu ao abrir o dashboard (só administradores enxergam a rota)
+async function carregarContadorAlertas() {
+  const u = JSON.parse(localStorage.getItem('usuario') || 'null');
+  if (!u || !['admin_empresa', 'admin_sistema'].includes(u.tipo)) return;
+  const res = await apiFetch(`${API_URL}/alertas`);
+  if (res && res.ok) atualizarBadgeAlertas((await res.json()).nao_lidos);
+}
+
+async function resolverAlerta(id) {
+  const res = await apiFetch(`${API_URL}/alertas/${id}/lido`, { method: 'POST' });
+  if (res && res.ok) loadAlertas();
+}
+
+async function resolverTodosAlertas() {
+  if (!confirm('Marcar todos os alertas em aberto como resolvidos?')) return;
+  const res = await apiFetch(`${API_URL}/alertas/ler-todos`, { method: 'POST' });
+  if (res && res.ok) loadAlertas();
+}
+
+document.addEventListener('DOMContentLoaded', () => { setTimeout(carregarContadorAlertas, 1500); });

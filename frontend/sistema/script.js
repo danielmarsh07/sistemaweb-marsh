@@ -130,8 +130,9 @@ function setupEventListeners() {
     usuarioEmEdicao = null;
     resetForm('#form-usuario');
     document.getElementById('modal-usuario-titulo').textContent = 'Novo Usuário';
-    document.getElementById('campo-senha-usuario').style.display = 'block';
-    document.querySelector('#form-usuario [name="senha"]').required = true;
+    document.getElementById('campo-convite-usuario').style.display = '';
+    document.querySelector('#form-usuario [name="enviar_convite"]').checked = true;
+    alternarConviteUsuario();
     toggleClienteSelect();
     await preencherSelectClientesUsuario();
     showModal('#modal-usuario');
@@ -282,6 +283,11 @@ function setupEventListeners() {
     salvarResetSenha();
   });
 
+  document.getElementById('form-minha-senha').addEventListener('submit', (e) => {
+    e.preventDefault();
+    alterarMinhaSenha();
+  });
+
   document.getElementById('form-transacao').addEventListener('submit', (e) => {
     e.preventDefault();
     salvarTransacao();
@@ -356,7 +362,8 @@ function showPage(page) {
     roteiro: 'Roteiro de uso',
     'visao-mensal': 'Visão mensal',
     'contas-financeiras': 'Contas e cartões',
-    'categorias-despesa': 'Categorias de despesa'
+    'categorias-despesa': 'Categorias de despesa',
+    alertas: 'Alertas do sistema'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -382,6 +389,7 @@ function showPage(page) {
   if (page === 'visao-mensal') loadVisaoMensal();
   if (page === 'contas-financeiras') loadPaginaContasFinanceiras();
   if (page === 'categorias-despesa') loadPaginaCategoriasDespesa();
+  if (page === 'alertas') loadAlertas();
 }
 
 // ===== CONFIGURAÇÕES / THEME PICKER =====
@@ -2639,6 +2647,7 @@ function renderUsuarios() {
             ? `<button class="btn btn-icon btn-danger" title="${ehVoce ? 'Não pode desativar a si mesmo' : 'Desativar'}" aria-label="Desativar" onclick="desativarUsuario(${u.id})"${ehVoce ? ' disabled' : ''}>${iconSVG('ban')}</button>`
             : `<button class="btn btn-icon btn-edit" title="Reativar" aria-label="Reativar" onclick="reativarUsuario(${u.id})">${iconSVG('check')}</button>`
           }
+          ${ehVoce || u.ativo === false ? '' : `<button class="btn btn-icon btn-edit" title="Enviar link para criar senha (convite)" aria-label="Enviar link para criar senha" onclick="enviarLinkSenhaUsuario(${u.id})">${iconSVG('mail')}</button>`}
           ${ehVoce ? '' : `<button class="btn btn-icon btn-danger" title="Excluir definitivamente" aria-label="Excluir definitivamente" onclick="excluirUsuario(${u.id})">${iconSVG('trash')}</button>`}
         </td>
       </tr>
@@ -2661,8 +2670,9 @@ async function abrirEditarUsuario(id, nome, email, tipo, cliente_id) {
   resetForm('#form-usuario');
   document.getElementById('modal-usuario-titulo').textContent = 'Editar Usuário';
 
-  // Senha não obrigatória na edição
+  // Senha não obrigatória na edição (troca de senha: botão de chave ou "enviar link" na lista)
   document.getElementById('campo-senha-usuario').style.display = 'none';
+  document.getElementById('campo-convite-usuario').style.display = 'none';
   document.querySelector('#form-usuario [name="senha"]').required = false;
 
   await preencherSelectClientesUsuario();
@@ -2702,7 +2712,8 @@ async function salvarUsuario() {
     } else {
       // Criação — POST
       dados.email = emailField.value;
-      dados.senha = form.senha.value;
+      dados.enviar_convite = form.enviar_convite.checked;
+      if (!dados.enviar_convite) dados.senha = form.senha.value;
       res = await apiFetch(`${API_URL}/usuarios`, {
         method: 'POST',
         body: JSON.stringify(dados)
@@ -2717,7 +2728,8 @@ async function salvarUsuario() {
       return;
     }
 
-    alert(usuarioEmEdicao ? 'Usuário atualizado!' : 'Usuário criado com sucesso! Compartilhe o email e senha com o usuário.');
+    const r = await res.json();
+    alert(usuarioEmEdicao ? 'Usuário atualizado!' : (r.mensagem || 'Usuário criado!'));
     emailField.disabled = false;
     closeModal(document.getElementById('modal-usuario'));
     loadUsuarios();
@@ -2754,6 +2766,34 @@ async function desativarUsuario(id) {
   if (!res) return;
   if (!res.ok) { const e = await res.json(); alert(e.erro); return; }
   loadUsuarios();
+}
+
+// Novo usuário: com convite, a senha some (o usuário cria pelo link); sem convite, a senha é obrigatória
+function alternarConviteUsuario() {
+  const convite = document.querySelector('#form-usuario [name="enviar_convite"]').checked;
+  document.getElementById('campo-senha-usuario').style.display = convite ? 'none' : 'block';
+  document.querySelector('#form-usuario [name="senha"]').required = !convite;
+}
+
+async function enviarLinkSenhaUsuario(id) {
+  const u = _usuariosCache.find(x => x.id === id);
+  if (!confirm(`Enviar para ${u ? u.email : 'o usuário'} um link para criar uma nova senha?\n\nO link vale 72 horas. A senha atual continua valendo até ele criar a nova.`)) return;
+  const res = await apiFetch(`${API_URL}/usuarios/${id}/convite`, { method: 'POST' });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+}
+
+async function alterarMinhaSenha() {
+  const form = document.getElementById('form-minha-senha');
+  if (form.nova_senha.value !== form.confirma.value) { alert('As duas senhas novas não conferem.'); return; }
+  const res = await apiFetch(`${API_URL}/usuarios/me/senha`, {
+    method: 'PUT', body: JSON.stringify({ senha_atual: form.senha_atual.value, nova_senha: form.nova_senha.value })
+  });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) form.reset();
 }
 
 async function excluirUsuario(id) {

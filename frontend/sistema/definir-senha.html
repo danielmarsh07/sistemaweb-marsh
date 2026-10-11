@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="sereno">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Criar senha — Marsh Consultoria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#1d6fd8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Marsh" />
+  <link rel="icon" type="image/png" href="/img/logo-simbolo.png" />
+  <link rel="apple-touch-icon" href="/img/logo-simbolo-512.png" />
+  <style>
+    /* Login sempre no visual da marca (Sereno): o tema do usuário só é conhecido depois de entrar */
+    body {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(380px, 1fr);
+    }
+
+    /* ---------- Painel da marca (imagem img/sereno-ia.webp) ---------- */
+    .login-marca {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 56px 64px 72px;
+      color: #ffffff;
+      background:
+        linear-gradient(180deg, rgba(11, 42, 85, 0.20) 0%, rgba(11, 42, 85, 0.55) 55%, rgba(8, 26, 54, 0.92) 100%),
+        url('img/sereno-ia.webp') center / cover no-repeat,
+        radial-gradient(120% 120% at 70% 30%, #5aa9ec 0%, #1d6fd8 40%, #0b2a55 85%);
+    }
+    /* Logo e texto formam um único bloco centralizado no painel (sem vão entre eles) */
+    .marca-topo { position: relative; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    /* Halo ciano suave atrás do símbolo */
+    .marca-topo::before {
+      content: ""; position: absolute; left: 50%; top: 80px; width: 380px; height: 380px;
+      transform: translate(-50%, -50%); pointer-events: none; z-index: 0;
+      background: radial-gradient(circle, rgba(19, 168, 224, 0.22) 0%, rgba(29, 111, 216, 0.10) 38%, transparent 68%);
+    }
+    .marca-topo > * { position: relative; z-index: 1; }
+    .marca-simbolo { width: 160px; height: 160px; object-fit: contain; filter: drop-shadow(0 12px 32px rgba(19, 168, 224, 0.40)); }
+    .marca-nome strong { display: block; font-size: 44px; line-height: 1; font-weight: 700; letter-spacing: 0.2em; margin-right: -0.2em; }
+    .marca-nome span { display: block; margin-top: 10px; font-size: 14px; letter-spacing: 0.62em; margin-right: -0.62em; opacity: 0.85; }
+    .marca-texto {
+      width: 100%; max-width: 560px; display: flex; flex-direction: column; align-items: center;
+      margin-top: 44px;
+    }
+    /* Filete curto separando o nome da frase */
+    .marca-texto::before {
+      content: ""; width: 56px; height: 2px; border-radius: 2px; margin-bottom: 28px;
+      background: linear-gradient(90deg, #13a8e0, #5aa9ec);
+    }
+    .marca-rodape {
+      position: absolute; left: 0; right: 0; bottom: 28px;
+      font-size: 12.5px; color: rgba(255, 255, 255, 0.6); letter-spacing: 0.02em;
+    }
+    .marca-texto h2 { font-size: 32px; line-height: 1.25; font-weight: 600; letter-spacing: -0.02em; max-width: 20em; text-wrap: balance; }
+    .marca-texto p { margin-top: 14px; font-size: 18px; line-height: 1.55; color: rgba(255, 255, 255, 0.85); max-width: 44ch; text-wrap: balance; }
+    .marca-pontos { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 24px; }
+    .marca-pontos span {
+      font-size: 13.5px; font-weight: 500; padding: 7px 14px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.24);
+    }
+    /* Telas de notebook mais baixas: reduz um pouco para caber sem rolagem */
+    @media (max-height: 760px) and (min-width: 769px) {
+      .login-marca { padding: 32px 48px 56px; }
+      .marca-texto { margin-top: 28px; }
+      .marca-texto::before { margin-bottom: 20px; }
+      .marca-topo::before { top: 60px; }
+      .marca-simbolo { width: 120px; height: 120px; }
+      .marca-nome strong { font-size: 36px; }
+      .marca-texto h2 { font-size: 30px; }
+      .marca-texto p { font-size: 16px; }
+    }
+
+    /* ---------- Formulário ---------- */
+    .login-lado {
+      display: flex; align-items: center; justify-content: center;
+      padding: 32px 24px; background: var(--bg-main);
+    }
+    .login-card { width: 100%; max-width: 380px; animation: loginFadeIn 0.4s ease-out; }
+    @keyframes loginFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .login-card h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-main); }
+    .login-card .sub { color: var(--text-muted); margin-top: 4px; margin-bottom: 28px; }
+
+    .campo { margin-bottom: 16px; }
+    .campo label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+    .campo input {
+      width: 100%; height: 44px; padding: 0 14px; font: inherit; font-size: 15px;
+      color: var(--text-main); background: #ffffff;
+      border: 1px solid var(--border-strong); border-radius: 10px; outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .campo input::placeholder { color: var(--text-subtle); }
+    .campo input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
+
+    .btn-login {
+      width: 100%; height: 46px; margin-top: 8px; border: 0; border-radius: 10px;
+      background: var(--primary); color: #fff; font: inherit; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-login:hover:not(:disabled) { background: var(--primary-hover); box-shadow: 0 4px 14px rgba(29, 111, 216, 0.28); }
+    .btn-login:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .mensagem { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 14px; display: none; }
+    .mensagem.erro { display: block; background: #fbeae8; color: #b42318; border: 1px solid #f4cdc8; }
+    .mensagem.sucesso { display: block; background: #e6f2ea; color: #2e7d4f; border: 1px solid #c7e3d1; }
+
+    [hidden] { display: none !important; }
+    .link-esqueci { display: inline-block; margin-top: 14px; font-size: 13.5px; color: var(--primary); text-decoration: none; font-weight: 500; }
+    .link-esqueci:hover { text-decoration: underline; }
+    .ds-regras { list-style: none; margin: 0 0 8px; padding: 0; font-size: 13px; color: var(--text-muted); display: grid; gap: 4px; }
+    .ds-regras li::before { content: '\25CB  '; }
+    .ds-regras li.ok { color: #2e7d4f; }
+    .ds-regras li.ok::before { content: '\2713  '; }
+    .login-footer { margin-top: 24px; font-size: 12.5px; color: var(--text-muted); }
+    .login-footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
+
+    /* Celular: só o formulário, com uma faixa da marca no topo */
+    @media (max-width: 768px) {
+      body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .login-marca { padding: 20px 20px 18px; min-height: 0; align-items: flex-start; text-align: left; }
+      .marca-texto, .marca-pontos, .marca-rodape { display: none; }
+      .marca-topo { flex-direction: row; gap: 12px; }
+      .marca-topo::before { display: none; }
+      .marca-simbolo { width: 44px; height: 44px; }
+      .marca-nome strong { font-size: 18px; letter-spacing: 0.18em; margin-right: 0; }
+      .marca-nome span { margin-top: 4px; font-size: 10.5px; letter-spacing: 0.42em; margin-right: 0; }
+      .login-lado { align-items: flex-start; padding: 28px 20px; }
+      .campo input, .btn-login { height: 48px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .login-card { animation: none; } }
+  </style>
+</head>
+<body>
+  <aside class="login-marca">
+    <div class="marca-topo">
+      <img class="marca-simbolo" src="img/logo-simbolo.svg" alt="" aria-hidden="true">
+      <div class="marca-nome"><strong>MARSH</strong><span>CONSULTORIA</span></div>
+    </div>
+    <div class="marca-texto">
+      <h2>Seu time e a IA trabalhando juntos no SAP.</h2>
+      <p>Chamados, licenças e treinamentos em um só lugar — com segurança e governança.</p>
+      <div class="marca-pontos"><span>SAP + IA</span><span>Fiscal BR</span><span>Suporte com SLA</span></div>
+    </div>
+    <div class="marca-rodape">© Marsh Consultoria</div>
+  </aside>
+
+  <main class="login-lado">
+    <div class="login-card">
+      <h1 id="ds-titulo">Criar senha</h1>
+      <p class="sub" id="ds-sub">Conferindo o link...</p>
+
+      <div id="ds-form" hidden>
+        <div class="campo">
+          <label for="ds-senha">Nova senha</label>
+          <input type="password" id="ds-senha" autocomplete="new-password" placeholder="mínimo 8, com letras e números" />
+        </div>
+        <div class="campo">
+          <label for="ds-confirma">Repita a senha</label>
+          <input type="password" id="ds-confirma" autocomplete="new-password" />
+        </div>
+        <ul class="ds-regras" id="ds-regras">
+          <li data-r="tam">Pelo menos 8 caracteres</li>
+          <li data-r="mix">Letras e números</li>
+          <li data-r="igual">As duas senhas iguais</li>
+        </ul>
+        <button class="btn-login" id="ds-btn" onclick="definirSenha()">Salvar senha</button>
+      </div>
+      <div class="mensagem" id="login-msg" role="alert"></div>
+
+      <div class="login-footer">
+        <a href="/login.html">Ir para o login</a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function mostrarMensagem(texto, tipo) {
+      const el = document.getElementById('login-msg');
+      el.textContent = texto;
+      el.className = `mensagem ${tipo}`;
+    }
+    const token = new URLSearchParams(location.search).get('t') || '';
+    let emailDoLink = '';
+
+    async function conferirLink() {
+      try {
+        const res = await fetch(`/api/auth/link/${encodeURIComponent(token)}`);
+        const d = await res.json();
+        if (!res.ok) {
+          document.getElementById('ds-titulo').textContent = 'Link inválido';
+          document.getElementById('ds-sub').textContent = `${d.erro} Na tela de login, use "Esqueci minha senha" para receber outro.`;
+          return;
+        }
+        emailDoLink = d.email;
+        document.getElementById('ds-titulo').textContent = d.tipo === 'convite' ? 'Bem-vindo! Crie sua senha' : 'Criar nova senha';
+        document.getElementById('ds-sub').textContent = `${d.nome} · login ${d.email}`;
+        document.getElementById('ds-form').hidden = false;
+        document.getElementById('ds-senha').focus();
+      } catch {
+        mostrarMensagem('Erro de conexão. Tente novamente.', 'erro');
+      }
+    }
+
+    // Mostra as regras sendo cumpridas enquanto digita
+    function conferirRegras() {
+      const s = document.getElementById('ds-senha').value;
+      const c = document.getElementById('ds-confirma').value;
+      const ok = { tam: s.length >= 8, mix: /[A-Za-zÀ-ÿ]/.test(s) && /\d/.test(s), igual: !!s && s === c };
+      document.querySelectorAll('#ds-regras li').forEach(li => li.classList.toggle('ok', ok[li.dataset.r]));
+      return ok.tam && ok.mix && ok.igual;
+    }
+    document.getElementById('ds-senha').addEventListener('input', conferirRegras);
+    document.getElementById('ds-confirma').addEventListener('input', conferirRegras);
+
+    async function definirSenha() {
+      if (!conferirRegras()) return mostrarMensagem('A senha ainda não cumpre as regras acima.', 'erro');
+      const btn = document.getElementById('ds-btn');
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      try {
+        const res = await fetch('/api/auth/definir-senha', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, senha: document.getElementById('ds-senha').value })
+        });
+        const d = await res.json();
+        if (!res.ok) { btn.disabled = false; btn.textContent = 'Salvar senha'; return mostrarMensagem(d.erro, 'erro'); }
+        document.getElementById('ds-form').hidden = true;
+        mostrarMensagem(d.mensagem, 'sucesso');
+        setTimeout(() => { location.href = `/login.html?email=${encodeURIComponent(d.email || emailDoLink)}`; }, 2500);
+      } catch {
+        btn.disabled = false; btn.textContent = 'Salvar senha';
+        mostrarMensagem('Erro de conexão. Tente novamente.', 'erro');
+      }
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !document.getElementById('ds-form').hidden) definirSenha();
+    });
+    conferirLink();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
+</body>
+</html>

@@ -993,3 +993,17 @@ function badgePrioridade(p) {
   const s = map[p] || { label: p, color: '#64748b' };
   return `<span class="badge" style="background:${s.color}20;color:${s.color}">${s.label}</span>`;
 }
+
+// ===== MINHA CONTA: alterar a própria senha =====
+async function alterarMinhaSenhaPortal(e) {
+  e.preventDefault();
+  const form = document.getElementById('form-minha-senha-portal');
+  if (form.nova_senha.value !== form.confirma.value) { alert('As duas senhas novas não conferem.'); return; }
+  const res = await apiFetch(`${API}/usuarios/me/senha`, {
+    method: 'PUT', body: JSON.stringify({ senha_atual: form.senha_atual.value, nova_senha: form.nova_senha.value })
+  });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) form.reset();
+}

@@ -14,6 +14,10 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
+// Toda resposta 5xx vira alerta (Sistema → Alertas + e-mail aos administradores, agrupado)
+const { registrarAlerta, alertarErros500 } = require('./backend/services/alertas');
+app.use(alertarErros500);
+
 // Arquivos estáticos: três pastas servidas na raiz, então os endereços não dependem da pasta
 //   frontend/site    → página institucional (/, /style.css, /landing-script.js)
 //   frontend/sistema → dashboard, portal, login e proposta (/dashboard.html, /script.js...)
@@ -46,6 +50,7 @@ const publicoRoutes = require('./backend/routes/publico');
 const financeiroJobs = require('./backend/services/financeiro-jobs');
 const autenticar = require('./backend/middleware/autenticar');
 const apenasEquipe = require('./backend/middleware/apenas-equipe');
+const alertasRoutes = require('./backend/routes/alertas');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
@@ -69,6 +74,17 @@ app.use('/api/licencas', autenticar, licencasRoutes);
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/financeiro', autenticar, financeiroRoutes);
 app.use('/api/comercial', autenticar, comercialRoutes);
+app.use('/api/alertas', autenticar, alertasRoutes);
+
+// Saúde: para monitor externo (UptimeRobot etc.). 200 = servidor e banco respondendo; 503 = banco fora.
+app.get('/api/saude', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ ok: true, banco: 'ok', em: new Date().toISOString() });
+  } catch (err) {
+    res.status(503).json({ ok: false, banco: 'erro' });
+  }
+});
 
 // Rota de teste
 app.get('/api/ping', (req, res) => {
@@ -802,6 +818,37 @@ async function iniciar() {
     await pool.query(`ALTER TABLE contas_pagar ADD COLUMN IF NOT EXISTS recorrente BOOLEAN NOT NULL DEFAULT FALSE;`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_recorrente ON contas_pagar(grupo_id) WHERE recorrente;`);
 
+    // 27. Alertas do sistema (falhas avisadas por e-mail e listadas em Sistema → Alertas)
+    //     chave agrupa repetições do mesmo problema; e-mail no máximo a cada 6 h por chave
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS alertas_sistema (
+        id SERIAL PRIMARY KEY,
+        chave VARCHAR(200) NOT NULL,
+        nivel VARCHAR(10) NOT NULL DEFAULT 'erro',
+        titulo VARCHAR(255) NOT NULL,
+        detalhe TEXT,
+        ocorrencias INTEGER NOT NULL DEFAULT 1,
+        primeira_em TIMESTAMP NOT NULL DEFAULT NOW(),
+        ultima_em TIMESTAMP NOT NULL DEFAULT NOW(),
+        email_enviado_em TIMESTAMP,
+        lido BOOLEAN NOT NULL DEFAULT FALSE
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_alertas_chave_aberto ON alertas_sistema(chave) WHERE NOT lido;`);
+
+    // 28. Convite e redefinição de senha: guarda só o hash do token; vale uma vez e expira
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuarios_tokens (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        tipo VARCHAR(12) NOT NULL,
+        token_hash VARCHAR(64) NOT NULL UNIQUE,
+        expira_em TIMESTAMP NOT NULL,
+        usado_em TIMESTAMP,
+        criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+
     //     Dados que aparecem no cabeçalho/rodapé da proposta (NULL = padrão do código)
     for (const c of ['prop_razao_social VARCHAR(255)', 'prop_cnpj VARCHAR(30)', 'prop_contato VARCHAR(255)',
                      'prop_apresentacao TEXT', 'prop_condicoes_padrao TEXT', 'prop_validade_dias INTEGER']) {
@@ -811,6 +858,8 @@ async function iniciar() {
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);
+    // O servidor sobe mesmo assim; o alerta avisa que alguma tabela/coluna pode não ter sido criada
+    registrarAlerta({ chave: 'migracao', titulo: 'Falha ao atualizar o banco no deploy', detalhe: err.stack || err.message });
   }
 
   const PORT = process.env.PORT || 3000;
@@ -820,5 +869,15 @@ async function iniciar() {
     financeiroJobs.iniciar(); // NFS-e pendentes + lembretes de faturas vencidas, a cada hora
   });
 }
+
+// Erros que escaparam de todo tratamento: registra; o "uncaught" ainda encerra o processo (o Render reinicia)
+process.on('unhandledRejection', err => {
+  registrarAlerta({ chave: 'processo:promessa', titulo: 'Erro não tratado (promessa)', detalhe: (err && err.stack) || String(err) });
+});
+process.on('uncaughtException', err => {
+  console.error('Erro fatal:', err);
+  registrarAlerta({ chave: 'processo:fatal', titulo: 'Erro fatal: o servidor reiniciou', detalhe: err.stack || String(err) })
+    .finally(() => setTimeout(() => process.exit(1), 3000));
+});
 
 iniciar();

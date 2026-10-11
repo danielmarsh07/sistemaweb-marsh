@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const pool = require('../db');
+const senhas = require('../services/senhas');
 
 // Middleware: apenas admin_empresa e admin_sistema podem gerenciar usuários
 // Se tipo não veio no JWT (token antigo), assume admin_empresa
@@ -43,6 +44,21 @@ router.put('/me/tema', async (req, res) => {
   }
 });
 
+// PUT /api/usuarios/me/senha { senha_atual, nova_senha } — qualquer usuário logado troca a própria senha
+router.put('/me/senha', async (req, res) => {
+  const { senha_atual, nova_senha } = req.body || {};
+  const erro = senhas.validarSenha(nova_senha);
+  if (erro) return res.status(400).json({ erro });
+  try {
+    const u = (await pool.query('SELECT senha FROM usuarios WHERE id = $1 AND ativo = TRUE', [req.usuario.id])).rows[0];
+    if (!u || !(await bcrypt.compare(String(senha_atual || ''), u.senha))) return res.status(400).json({ erro: 'Senha atual incorreta.' });
+    await pool.query('UPDATE usuarios SET senha = $1 WHERE id = $2', [await bcrypt.hash(nova_senha, 10), req.usuario.id]);
+    res.json({ mensagem: 'Senha alterada!' });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao alterar senha', detalhe: err.message });
+  }
+});
+
 // GET - Listar usuários da empresa
 router.get('/', apenasAdmin, async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
@@ -66,10 +82,12 @@ router.get('/', apenasAdmin, async (req, res) => {
 // POST - Criar novo usuário (admin cria para cliente ou técnico)
 router.post('/', apenasAdmin, async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
-  const { nome, email, senha, tipo, cliente_id } = req.body;
+  const { nome, senha, tipo, cliente_id } = req.body;
+  const email = String(req.body.email || '').trim();
+  const convite = !!req.body.enviar_convite; // convite: o próprio usuário cria a senha pelo link do e-mail
 
-  if (!nome || !email || !senha) {
-    return res.status(400).json({ erro: 'Nome, email e senha são obrigatórios' });
+  if (!nome || !email || (!convite && !senha)) {
+    return res.status(400).json({ erro: convite ? 'Nome e e-mail são obrigatórios' : 'Nome, email e senha são obrigatórios' });
   }
 
   if (!tipo) {
@@ -85,12 +103,13 @@ router.post('/', apenasAdmin, async (req, res) => {
     return res.status(400).json({ erro: 'Usuário do tipo cliente deve estar vinculado a um cliente' });
   }
 
-  if (senha.length < 6) {
-    return res.status(400).json({ erro: 'Senha deve ter no mínimo 6 caracteres' });
+  if (!convite) {
+    const erroSenha = senhas.validarSenha(senha);
+    if (erroSenha) return res.status(400).json({ erro: erroSenha });
   }
 
   try {
-    const existe = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
+    const existe = await pool.query('SELECT id FROM usuarios WHERE LOWER(email) = LOWER($1)', [email]);
     if (existe.rows.length > 0) {
       return res.status(400).json({ erro: 'Email já cadastrado' });
     }
@@ -106,7 +125,7 @@ router.post('/', apenasAdmin, async (req, res) => {
       }
     }
 
-    const hash = await bcrypt.hash(senha, 10);
+    const hash = convite ? await senhas.senhaProvisoria() : await bcrypt.hash(senha, 10);
     const result = await pool.query(
       `INSERT INTO usuarios (nome, email, senha, empresa_id, tipo, cliente_id, ativo)
        VALUES ($1, $2, $3, $4, $5, $6, TRUE)
@@ -114,6 +133,14 @@ router.post('/', apenasAdmin, async (req, res) => {
       [nome, email, hash, empresa_id, tipo, tipo === 'cliente' ? cliente_id : null]
     );
 
+    if (convite) {
+      const { enviado } = await senhas.enviarLink(result.rows[0], 'convite');
+      return res.status(201).json({
+        mensagem: enviado ? `Usuário criado! Convite enviado para ${email} (o link vale ${senhas.PRAZO_H.convite} horas).`
+          : 'Usuário criado, mas o convite não pôde ser enviado (e-mail desligado?). Use "Reenviar convite" ou defina uma senha.',
+        usuario: result.rows[0], convite_enviado: enviado
+      });
+    }
     res.status(201).json({ mensagem: 'Usuário criado com sucesso!', usuario: result.rows[0] });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao criar usuário', detalhe: err.message });
@@ -166,9 +193,8 @@ router.put('/:id/senha', apenasAdmin, async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   const { nova_senha } = req.body;
 
-  if (!nova_senha || nova_senha.length < 6) {
-    return res.status(400).json({ erro: 'Senha deve ter no mínimo 6 caracteres' });
-  }
+  const erroSenha = senhas.validarSenha(nova_senha);
+  if (erroSenha) return res.status(400).json({ erro: erroSenha });
 
   try {
     const check = await pool.query(
@@ -189,6 +215,21 @@ router.put('/:id/senha', apenasAdmin, async (req, res) => {
 });
 
 // DELETE - Desativar usuário (soft delete)
+// POST /:id/convite — (re)envia o link para o usuário criar/redefinir a própria senha
+router.post('/:id/convite', apenasAdmin, async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  try {
+    const u = (await pool.query('SELECT id, nome, email, ativo FROM usuarios WHERE id = $1 AND empresa_id = $2', [req.params.id, empresa_id])).rows[0];
+    if (!u) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+    if (!u.ativo) return res.status(400).json({ erro: 'Reative o usuário antes de enviar o convite.' });
+    const { enviado } = await senhas.enviarLink(u, 'convite');
+    if (!enviado) return res.status(400).json({ erro: 'Não foi possível enviar: envio de e-mail desligado ou falhou (veja Sistema → Alertas).' });
+    res.json({ mensagem: `Link enviado para ${u.email} (vale ${senhas.PRAZO_H.convite} horas).` });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao enviar convite', detalhe: err.message });
+  }
+});
+
 // Não deixa a empresa sem nenhum administrador ativo
 async function ehUltimoAdmin(id, empresa_id) {
   const r = await pool.query(

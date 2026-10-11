@@ -171,6 +171,9 @@
           <a href="#" data-page="configuracoes" class="nav-link">
             <svg class="icon"><use href="#i-sliders"/></svg> Configurações
           </a>
+          <a href="#" data-page="alertas" class="nav-link">
+            <svg class="icon"><use href="#i-shield"/></svg> Alertas <span class="nav-badge" id="badge-alertas" hidden>0</span>
+          </a>
           <a href="#" data-page="roteiro" class="nav-link">
             <svg class="icon"><use href="#i-doc"/></svg> Roteiro de uso
           </a>
@@ -965,6 +968,22 @@
         <div class="funil-board" id="funil-board"></div>
       </section>
 
+      <!-- ========== ALERTAS DO SISTEMA (cadastros.js) ========== -->
+      <section id="alertas-page" class="page">
+        <div class="page-header">
+          <h2>Alertas do sistema</h2>
+          <div class="page-header-acoes">
+            <label class="check-linha fin-check-filtro"><input type="checkbox" id="alertas-todos" onchange="loadAlertas()"> Mostrar também os resolvidos</label>
+            <button type="button" class="btn btn-secondary" onclick="resolverTodosAlertas()">Marcar todos como resolvidos</button>
+          </div>
+        </div>
+        <p class="pagina-descricao">
+          Falhas que o sistema detectou sozinho: erros internos, rotinas automáticas, webhook do Asaas, e-mails que não saíram e atualização do banco.
+          Os administradores recebem um e-mail no máximo a cada 6 horas para o mesmo problema. Resolveu? Marque como resolvido: se voltar a acontecer, um alerta novo é aberto.
+        </p>
+        <div id="alertas-lista" class="alertas-lista"></div>
+      </section>
+
       <!-- ========== CADASTROS: contas e cartões / categorias de despesa (cadastros.js) ========== -->
       <section id="contas-financeiras-page" class="page">
         <div class="page-header">
@@ -1312,6 +1331,30 @@
       <section id="configuracoes-page" class="page">
         <div class="page-header">
           <h2>Configurações</h2>
+        </div>
+
+        <div class="config-secao">
+          <div class="config-secao-header">
+            <h3>Alterar minha senha</h3>
+            <p>Mínimo de 8 caracteres, com letras e números.</p>
+          </div>
+          <form id="form-minha-senha" class="form form-minha-senha">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Senha atual</label>
+                <input type="password" name="senha_atual" required autocomplete="current-password">
+              </div>
+              <div class="form-group">
+                <label>Nova senha</label>
+                <input type="password" name="nova_senha" required minlength="8" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label>Repita a nova senha</label>
+                <input type="password" name="confirma" required minlength="8" autocomplete="new-password">
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Alterar senha</button></div>
+          </form>
         </div>
 
         <div class="config-secao">
@@ -2923,10 +2966,14 @@
             </select>
           </div>
         </div>
+        <label class="check-linha" id="campo-convite-usuario">
+          <input type="checkbox" name="enviar_convite" checked onchange="alternarConviteUsuario()">
+          Enviar convite por e-mail (o próprio usuário cria a senha pelo link)
+        </label>
         <div class="form-group" id="campo-senha-usuario">
-          <label>Senha <span class="obrig" title="Obrigatório">*</span></label>
-          <input type="password" name="senha" placeholder="Mínimo 6 caracteres">
-          <small style="color:#94a3b8; font-size:0.78rem">O usuário pode alterar a senha após o primeiro acesso.</small>
+          <label>Senha</label>
+          <input type="password" name="senha" placeholder="Mínimo 8, com letras e números" autocomplete="new-password">
+          <small class="form-hint">Só se não for enviar o convite. O usuário pode trocar depois em Configurações / "Esqueci minha senha".</small>
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
@@ -2947,7 +2994,7 @@
         <input type="hidden" id="reset-usuario-id">
         <div class="form-group">
           <label>Nova senha para <strong id="reset-usuario-nome"></strong></label>
-          <input type="password" name="nova_senha" required placeholder="Mínimo 6 caracteres">
+          <input type="password" name="nova_senha" required minlength="8" placeholder="Mínimo 8, com letras e números" autocomplete="new-password">
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>

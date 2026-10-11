@@ -7,6 +7,7 @@ const pool = require('../db');
 const asaas = require('./asaas');
 const email = require('./email');
 const fat = require('./faturamento');
+const { registrarAlerta } = require('./alertas');
 
 const UMA_HORA = 60 * 60 * 1000;
 let rodando = false;
@@ -23,7 +24,7 @@ async function sincronizarNotasPendentes() {
       const f = await fat.carregarFatura(id, empresa_id);
       await fat.sincronizarNfse(f);
     } catch (err) {
-      console.error(`[financeiro-jobs] sincronizar NFS-e fatura ${id}:`, err.message);
+      registrarAlerta({ chave: 'job:nfse', titulo: 'Rotina: falha ao consultar NFS-e no Asaas', detalhe: `fatura ${id}: ${err.message}` });
     }
   }
 }
@@ -40,7 +41,7 @@ async function sincronizarPixPendentes() {
     try {
       await fat.sincronizarPix(await fat.carregarFatura(id, empresa_id));
     } catch (err) {
-      console.error(`[financeiro-jobs] sincronizar PIX fatura ${id}:`, err.message);
+      registrarAlerta({ chave: 'job:pix', titulo: 'Rotina: falha ao consultar PIX no Asaas', detalhe: `fatura ${id}: ${err.message}` });
     }
   }
 }
@@ -69,7 +70,7 @@ async function estenderRecorrentes() {
          WHERE (p.data_vencimento + make_interval(months => n - 1)) < CURRENT_DATE + INTERVAL '12 months'`,
         [s.grupo_id, s.ultima]);
     } catch (err) {
-      console.error(`[financeiro-jobs] renovar assinatura ${s.grupo_id}:`, err.message);
+      registrarAlerta({ chave: 'job:assinaturas', titulo: 'Rotina: falha ao renovar assinatura de contas a pagar', detalhe: `série ${s.grupo_id}: ${err.message}` });
     }
   }
 }
@@ -96,7 +97,7 @@ async function enviarLembretes() {
         await pool.query('UPDATE faturas SET lembrete_enviado_em = NOW() WHERE id = $1', [id]);
       }
     } catch (err) {
-      console.error(`[financeiro-jobs] lembrete fatura ${id}:`, err.message);
+      registrarAlerta({ chave: 'job:lembrete', titulo: 'Rotina: falha ao enviar lembrete de fatura vencida', detalhe: `fatura ${id}: ${err.message}` });
     }
   }
 }
@@ -110,7 +111,7 @@ async function ciclo() {
     await enviarLembretes();
     await estenderRecorrentes();
   } catch (err) {
-    console.error('[financeiro-jobs]', err.message);
+    registrarAlerta({ chave: 'job:ciclo', titulo: 'Rotina horária do financeiro falhou', detalhe: err.stack || err.message });
   } finally {
     rodando = false;
   }

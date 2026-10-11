@@ -29,7 +29,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       `SELECT u.*, e.razao_social as empresa_nome, e.nome_fantasia as empresa_fantasia
        FROM usuarios u
        LEFT JOIN empresas e ON e.id = u.empresa_id
-       WHERE u.email = $1`,
+       WHERE LOWER(u.email) = LOWER($1)`,
       [email]
     );
 
@@ -76,6 +76,51 @@ router.post('/login', loginLimiter, async (req, res) => {
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao fazer login', detalhe: err.message });
   }
+});
+
+// ===== Esqueci minha senha / convite (sem login) =====
+const senhas = require('../services/senhas');
+// Limites separados: pedir link é mais restrito (gera e-mail); usar o link permite errar a senha algumas vezes
+const limiteEsqueci = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false,
+  message: { erro: 'Muitos pedidos de link. Tente de novo em 15 minutos.' }
+});
+const limiteSenha = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+  message: { erro: 'Muitas tentativas. Tente de novo em 15 minutos.' }
+});
+
+// POST /api/auth/esqueci { email } — responde sempre igual (não revela se o e-mail existe)
+router.post('/esqueci', limiteEsqueci, async (req, res) => {
+  const mail = String((req.body || {}).email || '').trim().toLowerCase();
+  const resposta = { mensagem: 'Se o e-mail estiver cadastrado, enviamos um link para criar uma nova senha. Confira a caixa de entrada e o spam.' };
+  if (!mail) return res.status(400).json({ erro: 'Informe o e-mail.' });
+  try {
+    const u = (await pool.query(`SELECT id, nome, email FROM usuarios WHERE LOWER(email) = $1 AND ativo = TRUE`, [mail])).rows[0];
+    if (u) await senhas.enviarLink(u, 'redefinir');
+    res.json(resposta);
+  } catch (err) {
+    res.status(500).json({ erro: 'Não foi possível enviar o link agora.', detalhe: err.message });
+  }
+});
+
+// GET /api/auth/link/:token — a página de definir senha confere o link antes de mostrar o formulário
+router.get('/link/:token', limiteSenha, async (req, res) => {
+  try {
+    const t = await senhas.lerToken(req.params.token);
+    if (!t) return res.status(404).json({ erro: 'Link inválido ou expirado. Peça um novo.' });
+    res.json({ tipo: t.tipo, nome: t.nome, email: t.email });
+  } catch (err) { res.status(500).json({ erro: 'Erro ao validar o link.', detalhe: err.message }); }
+});
+
+// POST /api/auth/definir-senha { token, senha }
+router.post('/definir-senha', limiteSenha, async (req, res) => {
+  const { token, senha } = req.body || {};
+  try {
+    const r = await senhas.definirSenhaPorToken(token, senha);
+    if (r.erro) return res.status(400).json({ erro: r.erro });
+    res.json({ mensagem: 'Senha criada! Faça login com seu e-mail e a nova senha.', email: r.email });
+  } catch (err) { res.status(500).json({ erro: 'Erro ao definir a senha.', detalhe: err.message }); }
 });
 
 // GET /api/auth/tema?email=...

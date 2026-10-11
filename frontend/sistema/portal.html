@@ -1812,6 +1812,10 @@
     .pagamento-box { margin-bottom: 14px; padding: 14px 16px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); font-size: 0.88rem; color: var(--text-secondary); }
     .pagamento-box strong { color: var(--text-main); }
     .pagamento-box p { margin-top: 4px; white-space: pre-line; }
+    .minha-senha-titulo { margin: 1.4rem 0 0.6rem; font-size: 0.95rem; color: var(--text-main); }
+    .minha-senha { display: grid; gap: 8px; }
+    .minha-senha input { height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border-strong, var(--border)); background: var(--bg-card); color: var(--text-main); font: inherit; }
+    .minha-senha-btn { height: 44px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
     .pix-box { display: grid; gap: 8px; justify-items: center; margin-top: 12px; padding: 14px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
     .pix-box strong { color: var(--text-main); }
     .pix-box img { width: 180px; height: 180px; border-radius: 8px; background: #fff; padding: 6px; }
@@ -1864,7 +1868,7 @@
       </div>
     </div>
     <div class="portal-user">
-      <button id="btn-aparencia" class="btn-aparencia" type="button" title="Aparência" aria-label="Trocar tema">
+      <button id="btn-aparencia" class="btn-aparencia" type="button" title="Minha conta (tema e senha)" aria-label="Minha conta: tema e senha">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9 1.65 1.65 0 0 0 4.27 7.18l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
       <span id="header-usuario">...</span>
@@ -1876,7 +1880,7 @@
   <div class="modal-overlay" id="modal-aparencia">
     <div class="modal-box" style="max-width:560px;">
       <div class="modal-top">
-        <h3>Aparência</h3>
+        <h3>Minha conta</h3>
         <button class="btn-fechar" type="button" onclick="fecharAparencia()">×</button>
       </div>
       <div class="modal-body">
@@ -1886,6 +1890,14 @@
         <div class="theme-picker" id="theme-picker-portal">
           <!-- Renderizado por JS -->
         </div>
+
+        <h4 class="minha-senha-titulo">Alterar minha senha</h4>
+        <form id="form-minha-senha-portal" class="minha-senha" onsubmit="alterarMinhaSenhaPortal(event)">
+          <input type="password" name="senha_atual" placeholder="Senha atual" required autocomplete="current-password">
+          <input type="password" name="nova_senha" placeholder="Nova senha (8+, letras e números)" required minlength="8" autocomplete="new-password">
+          <input type="password" name="confirma" placeholder="Repita a nova senha" required minlength="8" autocomplete="new-password">
+          <button type="submit" class="minha-senha-btn">Alterar senha</button>
+        </form>
       </div>
     </div>
   </div>
