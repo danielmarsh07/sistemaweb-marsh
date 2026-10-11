@@ -1341,7 +1341,7 @@
         <div class="form-section-title">Dados da Empresa</div>
         <div class="form-row">
           <div class="form-group">
-            <label>Razão Social *</label>
+            <label>Razão Social <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="razao_social" required>
           </div>
           <div class="form-group">
@@ -1554,7 +1554,7 @@
         <div class="form-section-title">Dados da Empresa</div>
         <div class="form-row">
           <div class="form-group">
-            <label>Razão Social *</label>
+            <label>Razão Social <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="razao_social" required>
           </div>
           <div class="form-group">
@@ -1695,7 +1695,7 @@
       <form id="form-tecnologia" class="form">
         <div class="form-row">
           <div class="form-group">
-            <label>Nome *</label>
+            <label>Nome <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="nome" required>
           </div>
           <div class="form-group">
@@ -1756,31 +1756,31 @@
       <form id="form-contrato" class="form">
         <div class="form-row">
           <div class="form-group">
-            <label>Cliente *</label>
+            <label>Cliente <span class="obrig" title="Obrigatório">*</span></label>
             <select name="cliente_id" required></select>
           </div>
           <div class="form-group">
-            <label>Nome do contrato *</label>
+            <label>Nome do contrato <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="descricao" required placeholder="Ex.: AMS SAP — sustentação">
           </div>
         </div>
         <div class="form-group">
-          <label>Descrição do serviço na nota fiscal *</label>
+          <label>Descrição do serviço na nota fiscal <span class="obrig" title="Obrigatório">*</span></label>
           <textarea name="descricao_servico" rows="3" required placeholder="Ex.: Serviços de suporte e sustentação SAP (AMS) prestados no período."></textarea>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Valor mensal (R$) *</label>
+            <label>Valor mensal (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor" min="0.01" step="0.01" required>
           </div>
           <div class="form-group">
-            <label>Dia do vencimento *</label>
+            <label>Dia do vencimento <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="dia_vencimento" min="1" max="28" value="10" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Início *</label>
+            <label>Início <span class="obrig" title="Obrigatório">*</span></label>
             <input type="date" name="data_inicio" required>
           </div>
           <div class="form-group">
@@ -1870,11 +1870,11 @@
       <form id="form-fatura" class="form">
         <div class="form-row" id="fatura-avulsa-row">
           <div class="form-group">
-            <label>Cliente *</label>
+            <label>Cliente <span class="obrig" title="Obrigatório">*</span></label>
             <select name="cliente_id"></select>
           </div>
           <div class="form-group">
-            <label>Competência *</label>
+            <label>Competência <span class="obrig" title="Obrigatório">*</span></label>
             <input type="month" name="competencia">
           </div>
         </div>
@@ -1882,16 +1882,16 @@
           A fatura já foi aprovada: só dá para mudar o vencimento e as observações. Para corrigir valor ou descrição, cancele e crie outra.
         </p>
         <div class="form-group">
-          <label>Descrição do serviço na nota fiscal *</label>
+          <label>Descrição do serviço na nota fiscal <span class="obrig" title="Obrigatório">*</span></label>
           <textarea name="descricao" rows="3" required></textarea>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Valor (R$) *</label>
+            <label>Valor (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor" min="0.01" step="0.01" required>
           </div>
           <div class="form-group">
-            <label>Vencimento *</label>
+            <label>Vencimento <span class="obrig" title="Obrigatório">*</span></label>
             <input type="date" name="data_vencimento" required>
           </div>
         </div>
@@ -1945,11 +1945,11 @@
       <form id="form-baixa" class="form">
         <div class="form-row">
           <div class="form-group">
-            <label>Data do pagamento *</label>
+            <label>Data do pagamento <span class="obrig" title="Obrigatório">*</span></label>
             <input type="date" name="data_pagamento" required>
           </div>
           <div class="form-group">
-            <label id="baixa-valor-label">Valor recebido (R$) *</label>
+            <label id="baixa-valor-label">Valor recebido (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor_pago" min="0.01" step="0.01" required>
           </div>
         </div>
@@ -2055,12 +2055,12 @@
       </div>
       <form id="form-conta-pagar" class="form">
         <div class="form-group">
-          <label>Descrição *</label>
+          <label>Descrição <span class="obrig" title="Obrigatório">*</span></label>
           <input type="text" name="descricao" required maxlength="255" placeholder="Ex.: Honorários contábeis">
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Natureza *</label>
+            <label>Natureza <span class="obrig" title="Obrigatório">*</span></label>
             <select name="natureza">
               <option value="empresa">Empresa (despesa da Marsh)</option>
               <option value="pessoal">Pessoal (retirada do sócio)</option>
@@ -2075,7 +2075,7 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Categoria *</label>
+            <label>Categoria <span class="obrig" title="Obrigatório">*</span></label>
             <select name="categoria_id" required></select>
             <small class="form-hint">Define a linha da DRE. <a href="#" onclick="abrirCategoriasDespesa(); return false;">Gerenciar categorias</a></small>
           </div>
@@ -2086,22 +2086,22 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Valor (R$) *</label>
+            <label>Valor (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor" min="0.01" step="0.01" required>
           </div>
           <div class="form-group" id="conta-venc-data">
-            <label>Vencimento *</label>
+            <label>Vencimento <span class="obrig" title="Obrigatório">*</span></label>
             <input type="date" name="data_vencimento">
           </div>
           <div class="form-group" id="conta-venc-fatura" hidden>
-            <label>Fatura de *</label>
+            <label>Fatura de <span class="obrig" title="Obrigatório">*</span></label>
             <input type="month" name="mes_fatura">
             <small class="form-hint" id="conta-venc-fatura-dica"></small>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Competência *</label>
+            <label>Competência <span class="obrig" title="Obrigatório">*</span></label>
             <input type="month" name="competencia" required>
             <small class="form-hint">Mês a que a despesa se refere (usado na DRE).</small>
           </div>
@@ -2238,7 +2238,7 @@
         </div>
         <div class="form-row" id="cf-campos-cartao" hidden>
           <div class="form-group">
-            <label>Vencimento da fatura (dia) *</label>
+            <label>Vencimento da fatura (dia) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="dia_vencimento" min="1" max="31">
           </div>
           <div class="form-group">
@@ -2265,7 +2265,7 @@
       <form id="form-pagar-fatura" class="form">
         <p class="pagina-descricao" id="pagar-fatura-resumo"></p>
         <div class="form-group">
-          <label>Data do pagamento *</label>
+          <label>Data do pagamento <span class="obrig" title="Obrigatório">*</span></label>
           <input type="date" name="data_pagamento" required>
         </div>
         <div class="form-actions">
@@ -2288,11 +2288,11 @@
         </p>
         <div class="form-row">
           <div class="form-group">
-            <label>Data *</label>
+            <label>Data <span class="obrig" title="Obrigatório">*</span></label>
             <input type="date" name="saldo_inicial_data" required>
           </div>
           <div class="form-group">
-            <label>Saldo (R$) *</label>
+            <label>Saldo (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="saldo_inicial" step="0.01" required>
           </div>
         </div>
@@ -2323,7 +2323,7 @@
 
       <form id="form-oportunidade" class="form">
         <div class="form-group">
-          <label>Título *</label>
+          <label>Título <span class="obrig" title="Obrigatório">*</span></label>
           <input type="text" name="titulo" required maxlength="255" placeholder="Ex.: AMS SAP — Empresa X">
         </div>
         <div class="form-group">
@@ -2422,11 +2422,11 @@
       <form id="form-proposta" class="form">
         <div class="form-row">
           <div class="form-group">
-            <label>Título *</label>
+            <label>Título <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="titulo" required maxlength="255">
           </div>
           <div class="form-group">
-            <label>Válida até *</label>
+            <label>Válida até <span class="obrig" title="Obrigatório">*</span></label>
             <input type="date" name="validade" required>
           </div>
         </div>
@@ -2465,25 +2465,25 @@
       <form id="form-gerar-contrato" class="form">
         <p class="pagina-descricao" id="gc-aviso"></p>
         <div class="form-group">
-          <label>Nome do contrato *</label>
+          <label>Nome do contrato <span class="obrig" title="Obrigatório">*</span></label>
           <input type="text" name="descricao" required maxlength="255">
         </div>
         <div class="form-group">
-          <label>Descrição do serviço na nota fiscal *</label>
+          <label>Descrição do serviço na nota fiscal <span class="obrig" title="Obrigatório">*</span></label>
           <textarea name="descricao_servico" rows="3" required></textarea>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Valor mensal (R$) *</label>
+            <label>Valor mensal (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor" min="0.01" step="0.01" required>
           </div>
           <div class="form-group">
-            <label>Dia do vencimento *</label>
+            <label>Dia do vencimento <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="dia_vencimento" min="1" max="28" value="10" required>
           </div>
         </div>
         <div class="form-group">
-          <label>Início *</label>
+          <label>Início <span class="obrig" title="Obrigatório">*</span></label>
           <input type="date" name="data_inicio" required>
         </div>
         <small class="form-hint">Nota fiscal e retenções seguem o padrão do faturamento; ajuste depois em Financeiro → Contratos se precisar.</small>
@@ -2547,11 +2547,11 @@
       <form id="form-licenca" class="form">
         <div class="form-row">
           <div class="form-group">
-            <label>Cliente *</label>
+            <label>Cliente <span class="obrig" title="Obrigatório">*</span></label>
             <select name="cliente_id" required></select>
           </div>
           <div class="form-group">
-            <label>Plano *</label>
+            <label>Plano <span class="obrig" title="Obrigatório">*</span></label>
             <select name="plano" required>
               <option value="leitura">Leitura (funcionais)</option>
               <option value="desenvolvimento">Desenvolvimento (leitura + escrita)</option>
@@ -2561,7 +2561,7 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Sistemas SAP (SIDs) *</label>
+            <label>Sistemas SAP (SIDs) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="sids" placeholder="DEV, QAS" required>
             <small class="form-hint">Somente DEV/QAS. Separe por vírgula.</small>
           </div>
@@ -2576,7 +2576,7 @@
             <input type="date" name="data_inicio">
           </div>
           <div class="form-group">
-            <label>Fim do contrato *</label>
+            <label>Fim do contrato <span class="obrig" title="Obrigatório">*</span></label>
             <input type="date" name="data_fim" required>
           </div>
         </div>
@@ -2631,7 +2631,7 @@
       </div>
       <form id="form-curso" class="form">
         <div class="form-group">
-          <label>Título *</label>
+          <label>Título <span class="obrig" title="Obrigatório">*</span></label>
           <input type="text" name="titulo" required maxlength="200">
         </div>
         <div class="form-group">
@@ -2685,7 +2685,7 @@
             <input type="text" name="modulo" placeholder="Ex.: Módulo 7">
           </div>
           <div class="form-group">
-            <label>Título *</label>
+            <label>Título <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="titulo" required maxlength="200">
           </div>
         </div>
@@ -2768,12 +2768,12 @@
       </div>
       <form id="form-chamado" class="form">
         <div class="form-group">
-          <label>Título *</label>
+          <label>Título <span class="obrig" title="Obrigatório">*</span></label>
           <input type="text" name="titulo" required placeholder="Descreva brevemente o problema...">
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Cliente *</label>
+            <label>Cliente <span class="obrig" title="Obrigatório">*</span></label>
             <select name="cliente_id" required id="select-cliente-chamado">
               <option value="">Selecione o cliente...</option>
             </select>
@@ -2877,7 +2877,7 @@
               </div>
             </div>
             <div class="form-group">
-              <label>Descrição *</label>
+              <label>Descrição <span class="obrig" title="Obrigatório">*</span></label>
               <textarea name="descricao" rows="3" required placeholder="Descreva o atendimento realizado..."></textarea>
             </div>
             <div class="form-actions">
@@ -2899,17 +2899,17 @@
       <form id="form-usuario" class="form">
         <div class="form-row">
           <div class="form-group">
-            <label>Nome *</label>
+            <label>Nome <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="nome" required>
           </div>
           <div class="form-group">
-            <label>E-mail *</label>
+            <label>E-mail <span class="obrig" title="Obrigatório">*</span></label>
             <input type="email" name="email" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Perfil *</label>
+            <label>Perfil <span class="obrig" title="Obrigatório">*</span></label>
             <select name="tipo" id="select-tipo-usuario" onchange="toggleClienteSelect()">
               <option value="tecnico">Técnico (acesso interno)</option>
               <option value="cliente">Cliente (acesso ao portal)</option>
@@ -2917,14 +2917,14 @@
             </select>
           </div>
           <div class="form-group" id="campo-cliente-usuario">
-            <label>Cliente vinculado *</label>
+            <label>Cliente vinculado <span class="obrig" title="Obrigatório">*</span></label>
             <select name="cliente_id" id="select-cliente-usuario">
               <option value="">Selecione o cliente...</option>
             </select>
           </div>
         </div>
         <div class="form-group" id="campo-senha-usuario">
-          <label>Senha *</label>
+          <label>Senha <span class="obrig" title="Obrigatório">*</span></label>
           <input type="password" name="senha" placeholder="Mínimo 6 caracteres">
           <small style="color:#94a3b8; font-size:0.78rem">O usuário pode alterar a senha após o primeiro acesso.</small>
         </div>
@@ -2968,7 +2968,7 @@
         <input type="hidden" name="id" id="transacao-id">
         <div class="form-row">
           <div class="form-group">
-            <label>Tipo *</label>
+            <label>Tipo <span class="obrig" title="Obrigatório">*</span></label>
             <select name="tipo" required>
               <option value="">Selecione...</option>
               <option value="entrada">Entrada</option>
@@ -2976,7 +2976,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Valor *</label>
+            <label>Valor <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor" step="0.01" required>
           </div>
           <div class="form-group">
@@ -2985,7 +2985,7 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Categoria *</label>
+          <label>Categoria <span class="obrig" title="Obrigatório">*</span></label>
           <select name="categoria" id="select-categoria-transacao" required>
             <option value="">Selecione o tipo primeiro...</option>
           </select>
@@ -3004,14 +3004,14 @@
           <div id="repetir-transacao-opcoes" style="display:none; margin-top:10px;">
             <div class="form-row">
               <div class="form-group">
-                <label>Periodicidade *</label>
+                <label>Periodicidade <span class="obrig" title="Obrigatório">*</span></label>
                 <select id="repetir-periodicidade">
                   <option value="mensal">Mensal</option>
                   <option value="diaria">Diária</option>
                 </select>
               </div>
               <div class="form-group">
-                <label>Data final *</label>
+                <label>Data final <span class="obrig" title="Obrigatório">*</span></label>
                 <input type="date" id="repetir-data-final">
               </div>
             </div>
@@ -3037,11 +3037,11 @@
         <input type="hidden" name="id" id="categoria-transacao-id">
         <div class="form-row">
           <div class="form-group">
-            <label>Nome *</label>
+            <label>Nome <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="nome" required maxlength="120" placeholder="Ex: Supermercado, Mensalidade Cliente...">
           </div>
           <div class="form-group">
-            <label>Tipo *</label>
+            <label>Tipo <span class="obrig" title="Obrigatório">*</span></label>
             <select name="tipo" required>
               <option value="">Selecione...</option>
               <option value="entrada">Entrada</option>

@@ -45,6 +45,7 @@ const comercialRoutes = require('./backend/routes/comercial');
 const publicoRoutes = require('./backend/routes/publico');
 const financeiroJobs = require('./backend/services/financeiro-jobs');
 const autenticar = require('./backend/middleware/autenticar');
+const apenasEquipe = require('./backend/middleware/apenas-equipe');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
@@ -53,11 +54,11 @@ app.use('/api/asaas/webhook', asaasWebhookRoutes); // Asaas: autentica pelo head
 app.use('/api/publico', publicoRoutes); // lead do site e proposta por link (token), com limite de requisições
 
 // Rotas protegidas
-app.use('/api/empresas', autenticar, empresasRoutes);
-app.use('/api/clientes', autenticar, clientesRoutes);
-app.use('/api/fornecedores', autenticar, fornecedoresRoutes);
-app.use('/api/transacoes', autenticar, transacoesRoutes);
-app.use('/api/categorias-transacao', autenticar, categoriasTransacaoRoutes);
+app.use('/api/empresas', autenticar, apenasEquipe, empresasRoutes); // portal do cliente não acessa
+app.use('/api/clientes', autenticar, apenasEquipe, clientesRoutes); // portal do cliente não acessa
+app.use('/api/fornecedores', autenticar, apenasEquipe, fornecedoresRoutes); // portal do cliente não acessa
+app.use('/api/transacoes', autenticar, apenasEquipe, transacoesRoutes); // portal do cliente não acessa
+app.use('/api/categorias-transacao', autenticar, apenasEquipe, categoriasTransacaoRoutes); // portal do cliente não acessa
 app.use('/api/tecnologias', autenticar, tecnologiasRoutes);
 app.use('/api/chamados', autenticar, chamadosRoutes);
 app.use('/api/chamados', autenticar, anexosRoutes); // anexos sob /api/chamados/:id/anexos
@@ -203,6 +204,7 @@ async function iniciar() {
     // 8. Adicionar colunas novas em fornecedores (migração segura)
     await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS empresa_id INTEGER DEFAULT 1;`);
     await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS razao_social VARCHAR(255);`);
+    await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS nome_fantasia VARCHAR(255);`); // usado pela tela; faltava e travava o cadastro
     await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS cnpj VARCHAR(50);`);
     await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS email VARCHAR(255);`);
     await pool.query(`ALTER TABLE fornecedores ADD COLUMN IF NOT EXISTS telefone VARCHAR(50);`);

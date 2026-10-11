@@ -2,9 +2,29 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// GET - Listar tecnologias da empresa
+// Usuário do portal: só lê (e só as tecnologias vinculadas ao cliente dele, abaixo)
+router.use((req, res, next) => {
+  if (req.usuario.tipo === 'cliente' && !(req.method === 'GET' && req.path === '/')) {
+    return res.status(403).json({ erro: 'Acesso restrito à equipe Marsh.' });
+  }
+  next();
+});
+
+// GET - Listar tecnologias da empresa (cliente do portal: só as vinculadas a ele, para abrir chamado)
 router.get('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
+  if (req.usuario.tipo === 'cliente') {
+    try {
+      const r = await pool.query(
+        `SELECT t.id, t.nome, t.categoria FROM tecnologias t
+         JOIN cliente_tecnologias ct ON ct.tecnologia_id = t.id AND ct.status = 'ativo'
+         WHERE ct.cliente_id = $1 AND t.empresa_id = $2 AND t.ativo = TRUE
+         ORDER BY t.categoria ASC, t.nome ASC`, [req.usuario.cliente_id || 0, empresa_id]);
+      return res.json(r.rows);
+    } catch (err) {
+      return res.status(500).json({ erro: 'Erro ao buscar tecnologias', detalhe: err.message });
+    }
+  }
   try {
     const result = await pool.query(
       `SELECT t.*,

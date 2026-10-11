@@ -389,7 +389,7 @@ function prepararModalBaixa(titulo, labelValor, valor) {
   form.reset();
   form.data_pagamento.value = hojeIso();
   form.valor_pago.value = valor;
-  document.getElementById('baixa-valor-label').textContent = labelValor;
+  document.getElementById('baixa-valor-label').textContent = labelValor.replace(/\s*\*$/, ''); // o * vermelho vem do CSS (campo required)
   document.getElementById('modal-baixa-titulo').textContent = titulo;
   showModal('#modal-baixa');
 }

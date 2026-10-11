@@ -3733,6 +3733,21 @@ svg.icon {
 .rel-motivos { margin-top: 10px; font-size: 0.82rem; }
 .fin-hint-pix { display: block; margin: -8px 0 14px; }
 
+/* CAMPOS OBRIGATÓRIOS — asterisco vermelho no rótulo, aviso no topo do formulário e borda ao tentar salvar vazio.
+   .obrig = asterisco escrito no HTML; o ::after cobre qualquer campo [required] sem ele (inclusive os que o JS torna
+   obrigatórios na hora, como "Fatura de" no cartão). */
+:root { --obrigatorio: #c0392b; }
+:root[data-theme="sereno-escuro"], :root[data-theme="dark"], :root:not([data-theme]) { --obrigatorio: #f87171; }
+.obrig { color: var(--obrigatorio); font-weight: 700; margin-left: 1px; }
+.form-group:has(> input[required], > select[required], > textarea[required]) > label:not(:has(.obrig))::after {
+  content: ' *'; color: var(--obrigatorio); font-weight: 700;
+}
+.form:has(.obrig, [required])::before {
+  content: 'Campos com * são obrigatórios'; display: block; margin: 0 0 12px;
+  font-size: 0.78rem; color: var(--text-muted);
+}
+.form :is(input, select, textarea):user-invalid { border-color: var(--obrigatorio) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--obrigatorio) 18%, transparent); }
+
 /* FICHA DO CLIENTE (cadastros.js) — visão 360° ao clicar no olho */
 .modal-content.modal-ficha { max-width: 1120px !important; width: 96vw; max-height: 92vh; overflow-y: auto; }
 .modal-ficha .modal-header { position: sticky; top: 0; z-index: 2; background: var(--bg-card-solid, #fff); align-items: flex-start; gap: 12px; }
