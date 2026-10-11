@@ -65,9 +65,6 @@
           <a href="#" data-page="chamados" class="nav-link">
             <svg class="icon"><use href="#i-ticket"/></svg> Chamados
           </a>
-          <a href="#" data-page="clientes" class="nav-link">
-            <svg class="icon"><use href="#i-users"/></svg> Clientes
-          </a>
           </div>
         </div>
       </div>
@@ -84,9 +81,6 @@
           </a>
           <a href="#" data-page="treinamentos" class="nav-link">
             <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
-          </a>
-          <a href="#" data-page="tecnologias" class="nav-link">
-            <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
           </a>
           </div>
         </div>
@@ -134,8 +128,31 @@
           <a href="#" data-page="relatorios" class="nav-link">
             <svg class="icon"><use href="#i-dash"/></svg> Relatórios
           </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-group" data-grupo="cadastros">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-cadastros">
+          <span>Cadastros</span>
+          <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-group-itens" id="nav-grupo-cadastros">
+          <div class="nav-group-inner">
+          <a href="#" data-page="clientes" class="nav-link">
+            <svg class="icon"><use href="#i-users"/></svg> Clientes
+          </a>
           <a href="#" data-page="fornecedores" class="nav-link">
             <svg class="icon"><use href="#i-building"/></svg> Fornecedores
+          </a>
+          <a href="#" data-page="tecnologias" class="nav-link">
+            <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
+          </a>
+          <a href="#" data-page="contas-financeiras" class="nav-link">
+            <svg class="icon"><use href="#i-wallet"/></svg> Contas e cartões
+          </a>
+          <a href="#" data-page="categorias-despesa" class="nav-link">
+            <svg class="icon"><use href="#i-tag"/></svg> Categorias
           </a>
           </div>
         </div>
@@ -946,6 +963,35 @@
         </div>
         <p class="pagina-descricao">Arraste os cartões entre as colunas (no computador) ou abra o cartão para mudar a etapa.</p>
         <div class="funil-board" id="funil-board"></div>
+      </section>
+
+      <!-- ========== CADASTROS: contas e cartões / categorias de despesa (cadastros.js) ========== -->
+      <section id="contas-financeiras-page" class="page">
+        <div class="page-header">
+          <h2>Contas e cartões</h2>
+          <button type="button" class="btn btn-primary" onclick="abrirContasFinanceiras()">+ Nova conta ou cartão</button>
+        </div>
+        <p class="pagina-descricao">De onde sai cada pagamento. No cartão, o lançamento vence no dia da fatura do mês escolhido.</p>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Nome</th><th>Tipo</th><th>Fatura</th><th>Lançamentos</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="contas-financeiras-tbody"><tr><td colspan="6" class="text-center">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="categorias-despesa-page" class="page">
+        <div class="page-header">
+          <h2>Categorias de despesa</h2>
+          <button type="button" class="btn btn-primary" onclick="abrirCategoriasDespesa()">+ Nova categoria</button>
+        </div>
+        <p class="pagina-descricao">Cada categoria diz em que linha da DRE a despesa entra. Lançamentos pessoais ficam fora da DRE, qualquer que seja a categoria.</p>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Categoria</th><th>Linha da DRE</th><th>Lançamentos</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="categorias-despesa-tbody"><tr><td colspan="5" class="text-center">Carregando...</td></tr></tbody>
+          </table>
+        </div>
       </section>
 
       <!-- ========== VISÃO MENSAL (visao-mensal.js) — substitui a planilha de custos ========== -->
@@ -2154,6 +2200,22 @@
     </div>
   </div>
 
+  <div id="modal-ficha-cliente" class="modal">
+    <div class="modal-content modal-ficha">
+      <div class="modal-header">
+        <div class="ficha-titulo">
+          <h3 id="ficha-nome">Cliente</h3>
+          <span class="fin-sub" id="ficha-sub"></span>
+        </div>
+        <div class="ficha-acoes">
+          <button type="button" class="btn btn-secondary" id="ficha-btn-editar">Editar cadastro</button>
+          <button class="btn-close">&times;</button>
+        </div>
+      </div>
+      <div id="ficha-corpo" class="ficha-corpo"><p class="fin-muted">Carregando...</p></div>
+    </div>
+  </div>
+
   <div id="modal-contas-financeiras" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -3174,6 +3236,7 @@
   <script src="comercial.js"></script>
   <script src="relatorios.js"></script>
   <script src="visao-mensal.js"></script>
+  <script src="cadastros.js"></script>
   <script src="assistente-voz.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

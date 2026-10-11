@@ -62,6 +62,86 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET /:id/ficha — visão 360° do cliente: dados + contratos, faturas, usuários do portal, licenças, cursos,
+// tecnologias, chamados e oportunidades. Contratos, faturas e oportunidades só para administradores.
+router.get('/:id/ficha', async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  const tipo = req.usuario.tipo;
+  if (tipo === 'cliente') return res.status(403).json({ erro: 'Acesso negado.' });
+  const admin = !tipo || tipo === 'admin_empresa' || tipo === 'admin_sistema';
+  const id = req.params.id;
+  try {
+    const c = (await pool.query(
+      `SELECT c.*, uc.nome AS criado_por_nome, ua.nome AS atualizado_por_nome
+       FROM clientes c
+       LEFT JOIN usuarios uc ON uc.id = c.criado_por_usuario_id
+       LEFT JOIN usuarios ua ON ua.id = c.atualizado_por_usuario_id
+       WHERE c.id = $1 AND c.empresa_id = $2 AND c.ativo = TRUE`, [id, empresa_id])).rows[0];
+    if (!c) return res.status(404).json({ erro: 'Cliente não encontrado' });
+
+    const vazio = { rows: [] };
+    const [usuarios, licencas, cursos, tecnologias, chamados, contratos, faturas, oportunidades] = await Promise.all([
+      pool.query(`SELECT id, nome, email, ativo FROM usuarios WHERE cliente_id = $1 AND tipo = 'cliente' ORDER BY ativo DESC, nome`, [id]),
+      pool.query(
+        `SELECT id, plano, sids, max_usuarios, status, to_char(data_fim, 'YYYY-MM-DD') AS data_fim, ultima_validacao,
+                (data_fim < CURRENT_DATE) AS vencida
+         FROM licencas WHERE cliente_id = $1 AND ativo = TRUE AND status <> 'cancelada' ORDER BY data_fim DESC`, [id]),
+      pool.query(
+        `SELECT cu.id, cu.titulo, cu.status, to_char(lb.data_fim, 'YYYY-MM-DD') AS acesso_ate,
+                (SELECT COUNT(*) FROM cursos_aulas a WHERE a.curso_id = cu.id AND a.ativo)::int AS aulas,
+                (SELECT COUNT(DISTINCT p.usuario_id) FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
+                   JOIN usuarios u ON u.id = p.usuario_id WHERE a.curso_id = cu.id AND u.cliente_id = $1)::int AS alunos
+         FROM cursos_liberacoes lb JOIN cursos cu ON cu.id = lb.curso_id
+         WHERE lb.cliente_id = $1 AND cu.ativo ORDER BY cu.titulo`, [id]),
+      pool.query(
+        `SELECT t.id, t.nome, t.categoria, to_char(ct.data_ativacao, 'YYYY-MM-DD') AS desde
+         FROM cliente_tecnologias ct JOIN tecnologias t ON t.id = ct.tecnologia_id
+         WHERE ct.cliente_id = $1 AND ct.status = 'ativo' ORDER BY t.nome`, [id]),
+      pool.query(
+        `SELECT id, titulo, status, prioridade, to_char(data_abertura, 'YYYY-MM-DD') AS data_abertura,
+                COUNT(*) OVER () AS total,
+                COUNT(*) FILTER (WHERE status NOT IN ('resolvido','fechado')) OVER () AS abertos
+         FROM chamados WHERE cliente_id = $1 AND ativo = TRUE
+         ORDER BY (status NOT IN ('resolvido','fechado')) DESC, data_abertura DESC LIMIT 8`, [id]),
+      admin ? pool.query(
+        `SELECT id, descricao, valor::float AS valor, dia_vencimento, status,
+                to_char(data_inicio, 'YYYY-MM-DD') AS data_inicio, to_char(data_fim, 'YYYY-MM-DD') AS data_fim
+         FROM contratos WHERE cliente_id = $1 ORDER BY status = 'ativo' DESC, data_inicio DESC`, [id]) : vazio,
+      admin ? pool.query(
+        `SELECT id, to_char(competencia, 'YYYY-MM-DD') AS competencia, valor::float AS valor, status,
+                to_char(data_vencimento, 'YYYY-MM-DD') AS data_vencimento, to_char(data_pagamento, 'YYYY-MM-DD') AS data_pagamento,
+                nfse_status, nfse_numero, nfse_pdf_url, (status = 'aberta' AND data_vencimento < CURRENT_DATE) AS vencida
+         FROM faturas WHERE cliente_id = $1 AND status <> 'cancelada'
+         ORDER BY competencia DESC, id DESC LIMIT 12`, [id]) : vazio,
+      admin ? pool.query(
+        `SELECT id, titulo, etapa, valor_mensal::float AS valor_mensal, valor_unico::float AS valor_unico,
+                to_char(data_fechamento, 'YYYY-MM-DD') AS data_fechamento
+         FROM oportunidades WHERE cliente_id = $1 ORDER BY (etapa IN ('ganha','perdida')), data_atualizacao DESC LIMIT 8`, [id]) : vazio
+    ]);
+
+    // Resumo financeiro do cliente (só admin)
+    let financeiro = null;
+    if (admin) {
+      const f = (await pool.query(
+        `SELECT COALESCE(SUM(valor) FILTER (WHERE status = 'ativo'), 0)::float AS mensal_contratado,
+                (SELECT COALESCE(SUM(valor), 0) FROM faturas WHERE cliente_id = $1 AND status = 'aberta' AND data_vencimento < CURRENT_DATE)::float AS vencido,
+                (SELECT COALESCE(SUM(valor_pago), 0) FROM faturas WHERE cliente_id = $1 AND status = 'paga'
+                   AND data_pagamento >= CURRENT_DATE - INTERVAL '12 months')::float AS recebido_12m
+         FROM contratos WHERE cliente_id = $1`, [id])).rows[0];
+      financeiro = f;
+    }
+
+    res.json({
+      cliente: c, admin, financeiro,
+      usuarios: usuarios.rows, licencas: licencas.rows, cursos: cursos.rows, tecnologias: tecnologias.rows,
+      chamados: { lista: chamados.rows, total: Number(chamados.rows[0]?.total || 0), abertos: Number(chamados.rows[0]?.abertos || 0) },
+      contratos: contratos.rows, faturas: faturas.rows, oportunidades: oportunidades.rows
+    });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao montar a ficha do cliente', detalhe: err.message });
+  }
+});
+
 // POST - Criar novo cliente
 router.post('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;

@@ -3733,6 +3733,52 @@ svg.icon {
 .rel-motivos { margin-top: 10px; font-size: 0.82rem; }
 .fin-hint-pix { display: block; margin: -8px 0 14px; }
 
+/* FICHA DO CLIENTE (cadastros.js) — visão 360° ao clicar no olho */
+.modal-content.modal-ficha { max-width: 1120px !important; width: 96vw; max-height: 92vh; overflow-y: auto; }
+.modal-ficha .modal-header { position: sticky; top: 0; z-index: 2; background: var(--bg-card-solid, #fff); align-items: flex-start; gap: 12px; }
+.ficha-titulo { min-width: 0; }
+.ficha-titulo h3 { margin: 0; }
+.ficha-acoes { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ficha-corpo { padding: 16px 20px 20px; }
+.ficha-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 12px; }
+.ficha-caixa { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--bg-card-solid, #fff); min-width: 0; }
+.ficha-caixa-larga { grid-column: 1 / -1; }
+.ficha-caixa header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.ficha-caixa h4 { margin: 0; font-size: 0.95rem; color: var(--text-main); }
+.ficha-caixa header a { font-size: 0.8rem; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; }
+.ficha-caixa header a:hover { text-decoration: underline; }
+.ficha-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px 20px; }
+.ficha-campo span { display: block; font-size: 0.75rem; color: var(--text-muted); }
+.ficha-campo strong { display: block; font-size: 0.88rem; font-weight: 500; color: var(--text-main); overflow-wrap: anywhere; }
+.ficha-aviso { margin: 12px 0 0; }
+.ficha-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ficha-kpis div { padding: 10px; border-radius: 10px; background: var(--bg-subtle, rgba(127,127,127,.05)); }
+.ficha-kpis span { display: block; font-size: 0.72rem; color: var(--text-muted); }
+.ficha-kpis strong { display: block; font-size: 1rem; color: var(--text-main); white-space: nowrap; }
+.ficha-kpi-alerta strong { color: #b42318; }
+.ficha-lista { list-style: none; margin: 0; padding: 0; display: grid; }
+.ficha-lista li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.ficha-lista li:first-child { border-top: 0; padding-top: 0; }
+.ficha-lista li > div:first-child { min-width: 0; }
+.ficha-lista strong { display: block; font-size: 0.86rem; font-weight: 500; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ficha-lista span { display: block; font-size: 0.75rem; color: var(--text-muted); }
+.ficha-lista a { color: var(--primary); }
+.ficha-dir { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 0.82rem; font-variant-numeric: tabular-nums; color: var(--text-main); white-space: nowrap; }
+.ficha-resumo { margin: 0 0 8px; font-size: 0.82rem; color: var(--text-secondary); }
+.ficha-vazio { margin: 0; font-size: 0.84rem; color: var(--text-muted); }
+.ficha-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.ficha-tags span { padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.ficha-rodape { margin: 12px 0 0; font-size: 0.75rem; color: var(--text-muted); }
+.link-ficha { color: inherit; text-decoration: none; }
+.link-ficha:hover strong { color: var(--primary); text-decoration: underline; }
+:root[data-theme="sereno-escuro"] .ficha-kpi-alerta strong, :root[data-theme="dark"] .ficha-kpi-alerta strong { color: #fca5a5; }
+@media (max-width: 768px) {
+  .modal-content.modal-ficha { width: 100%; max-height: 95vh; }
+  .ficha-kpis { grid-template-columns: 1fr; }
+  .ficha-lista li { flex-direction: column; align-items: flex-start; }
+  .ficha-acoes .btn { padding: 8px 10px; }
+}
+
 /* VISÃO MENSAL (visao-mensal.js) — matriz linha × mês no formato da planilha de custos */
 .form [hidden], .form-row[hidden], .form-group[hidden] { display: none !important; }
 .vm-legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 10px; font-size: 0.8rem; color: var(--text-secondary); }

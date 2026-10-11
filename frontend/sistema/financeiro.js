@@ -985,6 +985,7 @@ async function gravarContaFinanceira(id, dados) {
   if (!res.ok) { alert(r.erro); return false; }
   await carregarContasFinanceiras();
   renderContasFinanceiras();
+  if (typeof renderPaginaContasFinanceiras === 'function') renderPaginaContasFinanceiras();
   // Se o formulário de lançamento estiver aberto, atualiza a lista de "Pago com"
   const formConta = document.getElementById('form-conta-pagar');
   if (document.getElementById('modal-conta-pagar').classList.contains('show')) {
@@ -1064,6 +1065,7 @@ async function gravarCategoriaDespesa(id, dados) {
   if (!res.ok) { alert(r.erro); return false; }
   await carregarCategoriasDespesa();
   renderCategoriasDespesa();
+  if (typeof renderPaginaCategoriasDespesa === 'function') renderPaginaCategoriasDespesa();
   return true;
 }
 

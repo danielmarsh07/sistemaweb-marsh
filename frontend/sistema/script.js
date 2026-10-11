@@ -354,7 +354,9 @@ function showPage(page) {
     funil: 'Funil de vendas',
     relatorios: 'Relatórios',
     roteiro: 'Roteiro de uso',
-    'visao-mensal': 'Visão mensal'
+    'visao-mensal': 'Visão mensal',
+    'contas-financeiras': 'Contas e cartões',
+    'categorias-despesa': 'Categorias de despesa'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -378,6 +380,8 @@ function showPage(page) {
   if (page === 'funil') loadFunil();
   if (page === 'relatorios') loadRelatorios();
   if (page === 'visao-mensal') loadVisaoMensal();
+  if (page === 'contas-financeiras') loadPaginaContasFinanceiras();
+  if (page === 'categorias-despesa') loadPaginaCategoriasDespesa();
 }
 
 // ===== CONFIGURAÇÕES / THEME PICKER =====
@@ -565,7 +569,7 @@ function renderClientes() {
   tbody.innerHTML = lista.map(c => `
     <tr>
       <td data-label="Razão Social">
-        <strong>${escapeHtml(c.razao_social || c.nome)}</strong>
+        <a href="#" class="link-ficha" onclick="abrirFichaCliente(${c.id}); return false;"><strong>${escapeHtml(c.razao_social || c.nome)}</strong></a>
         ${c.nome_fantasia ? `<br><small style="color:#94a3b8">${escapeHtml(c.nome_fantasia)}</small>` : ''}
         ${auditMeta(c)}
       </td>
@@ -580,7 +584,7 @@ function renderClientes() {
         }
       </td>
       <td data-label="Ações" class="td-acoes">
-        <button class="btn btn-icon" title="Visualizar" aria-label="Visualizar" onclick="visualizarRegistro(editarCliente, ${c.id}, '#modal-cliente')">${iconSVG('eye')}</button>
+        <button class="btn btn-icon" title="Visualizar" aria-label="Visualizar" onclick="abrirFichaCliente(${c.id})">${iconSVG('eye')}</button>
         <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarCliente(${c.id})">${iconSVG('edit')}</button>
         <button class="btn btn-icon btn-danger" title="Remover" aria-label="Remover" onclick="deletarCliente(${c.id})">${iconSVG('trash')}</button>
       </td>

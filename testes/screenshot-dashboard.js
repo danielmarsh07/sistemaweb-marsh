@@ -1,12 +1,13 @@
 require('./_ambiente-local');
 // Screenshot do dashboard logado (Chrome headless + CDP).
-// Uso: node testes/screenshot-dashboard.js <pagina> <largura> <tema> <saida.png>   (ex.: relatorios 390 sereno rel.png)
+// Uso: node testes/screenshot-dashboard.js <pagina> <largura> <tema> <saida.png> [js-depois]
+//      ex.: relatorios 390 sereno rel.png        |  clientes 1366 sereno ficha.png "abrirFichaCliente(2)"
 const { spawn } = require('child_process');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
 
-const [pagina, largura, tema, saida] = process.argv.slice(2);
+const [pagina, largura, tema, saida, depois] = process.argv.slice(2);
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORTA = 9333;
 const espera = ms => new Promise(r => setTimeout(r, ms));
@@ -40,6 +41,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(2500);
   await avaliar(`showPage(${JSON.stringify(pagina)})`);
   await espera(2500);
+  if (depois) { await avaliar(depois); await espera(2500); }
   const altura = (await avaliar(`Math.min(document.documentElement.scrollHeight, 4000)`)).result.value;
   await cmd('Emulation.setDeviceMetricsOverride', { width: Number(largura), height: altura, deviceScaleFactor: 1, mobile: Number(largura) < 600 });
   await espera(800);
