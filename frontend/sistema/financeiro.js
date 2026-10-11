@@ -59,7 +59,7 @@ function nfseFatura(f) {
     case 'processando': return pill('Processando', '#b7791f');
     case 'cancelando': return pill('Cancelando', '#b7791f');
     case 'cancelada': return pill('Cancelada', '#94a3b8');
-    case 'erro': return `${pill('Erro', '#b42318')}<div class="fin-erro" title="${escapeHtml(f.nfse_erro)}">${escapeHtml((f.nfse_erro || '').slice(0, 90))}</div>`;
+    case 'erro': return `${pill('Erro', '#b42318')}<div class="fin-erro" title="${escapeHtml(f.nfse_erro)}">${escapeHtml((f.nfse_erro || '').slice(0, 200))}</div>`;
     default: return f.status === 'rascunho' ? '<span class="fin-muted">Ao aprovar</span>' : '<span class="fin-muted">Não emitida</span>';
   }
 }

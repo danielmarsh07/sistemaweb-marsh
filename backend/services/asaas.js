@@ -45,31 +45,50 @@ async function chamar(metodo, caminho, corpo) {
 
 const soDigitos = s => String(s || '').replace(/\D/g, '');
 
-// Garante o cliente no Asaas (procura pelo CPF/CNPJ antes de criar) e guarda o id em clientes.asaas_customer_id
-async function garantirCliente(cliente) {
-  if (cliente.asaas_customer_id) return cliente.asaas_customer_id;
-  const doc = soDigitos(cliente.cpf_cnpj);
-  if (!doc) throw new Error('Cliente sem CPF/CNPJ: obrigatório para emitir NFS-e.');
+function dadosCliente(cliente) {
+  return {
+    name: cliente.razao_social || cliente.nome,
+    cpfCnpj: soDigitos(cliente.cpf_cnpj),
+    email: cliente.email_financeiro || cliente.email || undefined,
+    postalCode: soDigitos(cliente.cep) || undefined,
+    address: cliente.logradouro || undefined,
+    addressNumber: cliente.numero || undefined,
+    complement: cliente.complemento || undefined,
+    province: cliente.bairro || undefined,
+    municipalInscription: cliente.inscricao_municipal || undefined,
+    stateInscription: cliente.inscricao_estadual || undefined,
+    notificationDisabled: true, // quem avisa o cliente é o Sistema Marsh
+    externalReference: `cliente-${cliente.id}`
+  };
+}
 
-  const busca = await chamar('GET', `/customers?cpfCnpj=${doc}`);
-  let id = busca && busca.data && busca.data[0] && busca.data[0].id;
-  if (!id) {
-    const novo = await chamar('POST', '/customers', {
-      name: cliente.razao_social || cliente.nome,
-      cpfCnpj: doc,
-      email: cliente.email_financeiro || cliente.email || undefined,
-      postalCode: soDigitos(cliente.cep) || undefined,
-      address: cliente.logradouro || undefined,
-      addressNumber: cliente.numero || undefined,
-      complement: cliente.complemento || undefined,
-      province: cliente.bairro || undefined,
-      municipalInscription: cliente.inscricao_municipal || undefined,
-      stateInscription: cliente.inscricao_estadual || undefined,
-      notificationDisabled: true, // quem avisa o cliente é o Sistema Marsh
-      externalReference: `cliente-${cliente.id}`
-    });
-    id = novo.id;
+// A NFS-e exige o endereço do tomador: avisa antes de mandar ao Asaas, com o que falta
+function validarClienteParaNota(cliente) {
+  const nome = cliente.nome_fantasia || cliente.razao_social || cliente.nome;
+  const faltando = [
+    !soDigitos(cliente.cpf_cnpj) && 'CPF/CNPJ',
+    soDigitos(cliente.cep).length !== 8 && 'CEP',
+    !String(cliente.logradouro || '').trim() && 'logradouro',
+    !String(cliente.numero || '').trim() && 'número',
+    !String(cliente.bairro || '').trim() && 'bairro'
+  ].filter(Boolean);
+  if (faltando.length) throw new Error(`Cadastro de "${nome}" incompleto para a nota fiscal: falta ${faltando.join(', ')}. Complete em Clientes e emita de novo.`);
+}
+
+// Garante o cliente no Asaas (procura pelo CPF/CNPJ antes de criar) e guarda o id em clientes.asaas_customer_id.
+// Se já existe, reenvia os dados: um endereço corrigido no sistema passa a valer na próxima nota.
+async function garantirCliente(cliente) {
+  const dados = dadosCliente(cliente);
+  if (!dados.cpfCnpj) throw new Error('Cliente sem CPF/CNPJ: obrigatório para emitir NFS-e.');
+  if (cliente.asaas_customer_id) {
+    try { await chamar('POST', `/customers/${cliente.asaas_customer_id}`, dados); }
+    catch (err) { console.error('[Asaas] atualizar cliente:', err.message); }
+    return cliente.asaas_customer_id;
   }
+  const busca = await chamar('GET', `/customers?cpfCnpj=${dados.cpfCnpj}`);
+  let id = busca && busca.data && busca.data[0] && busca.data[0].id;
+  if (id) await chamar('POST', `/customers/${id}`, dados).catch(err => console.error('[Asaas] atualizar cliente:', err.message));
+  else id = (await chamar('POST', '/customers', dados)).id;
   await pool.query('UPDATE clientes SET asaas_customer_id = $1 WHERE id = $2', [id, cliente.id]);
   return id;
 }
@@ -99,6 +118,7 @@ async function resolverServico(codigo) {
 
 // Agenda a NFS-e avulsa (sem cobrança vinculada) para hoje e pede a emissão imediata
 async function emitirNotaFatura(fatura, cliente) {
+  validarClienteParaNota(cliente);
   const customer = await garantirCliente(cliente);
   const servico = await resolverServico(fatura.codigo_servico);
   const hoje = new Date().toISOString().slice(0, 10);
@@ -131,7 +151,12 @@ async function emitirNotaFatura(fatura, cliente) {
   try {
     final = await chamar('POST', `/invoices/${nota.id}/authorize`);
   } catch (err) {
-    // Agendada para hoje: o Asaas emite sozinho mesmo se a antecipação falhar
+    // Recusa de validação (4xx): a nota agendada também falharia. Cancela no Asaas e mostra o motivo na fatura.
+    if (err.status >= 400 && err.status < 500) {
+      await chamar('POST', `/invoices/${nota.id}/cancel`, {}).catch(e => console.error('[Asaas] cancelar nota recusada:', e.message));
+      throw err;
+    }
+    // Instabilidade (5xx/rede): segue agendada para hoje; o Asaas emite sozinho e a rotina horária sincroniza
     console.error('[Asaas] authorize falhou, segue agendada:', err.message);
   }
   return final;

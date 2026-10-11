@@ -189,6 +189,61 @@ router.put('/:id/senha', apenasAdmin, async (req, res) => {
 });
 
 // DELETE - Desativar usuário (soft delete)
+// Não deixa a empresa sem nenhum administrador ativo
+async function ehUltimoAdmin(id, empresa_id) {
+  const r = await pool.query(
+    `SELECT tipo, (SELECT COUNT(*) FROM usuarios WHERE empresa_id = $2 AND ativo AND tipo IN ('admin_empresa','admin_sistema') AND id <> $1)::int AS outros
+     FROM usuarios WHERE id = $1 AND empresa_id = $2`, [id, empresa_id]);
+  const u = r.rows[0];
+  return !!u && ['admin_empresa', 'admin_sistema'].includes(u.tipo) && u.outros === 0;
+}
+
+// DELETE /:id/definitivo — apaga de verdade, só se o usuário não tem histórico (chamados, comentários, etc.).
+// Com histórico, fica desativado: apagar deixaria chamados e comentários sem autor.
+router.delete('/:id/definitivo', apenasAdmin, async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  const id = parseInt(req.params.id);
+  if (id === req.usuario.id) return res.status(400).json({ erro: 'Você não pode excluir a sua própria conta.' });
+  const client = await pool.connect();
+  try {
+    const alvo = (await client.query('SELECT id, nome, tipo FROM usuarios WHERE id = $1 AND empresa_id = $2', [id, empresa_id])).rows[0];
+    if (!alvo) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+    if (alvo.tipo === 'admin_sistema' && req.usuario.tipo !== 'admin_sistema') {
+      return res.status(403).json({ erro: 'Só um Admin Sistema pode excluir outro Admin Sistema.' });
+    }
+    if (await ehUltimoAdmin(id, empresa_id)) return res.status(400).json({ erro: 'Este é o último administrador ativo: cadastre outro antes de excluí-lo.' });
+
+    const hist = (await client.query(
+      `SELECT (SELECT COUNT(*) FROM chamados WHERE aberto_por_usuario_id = $1 OR atribuido_para_usuario_id = $1)::int AS chamados,
+              (SELECT COUNT(*) FROM atendimentos WHERE usuario_id = $1)::int AS comentarios,
+              (SELECT COUNT(*) FROM chamados_status_log WHERE usuario_id = $1)::int AS mudancas,
+              (SELECT COUNT(*) FROM chamados_anexos WHERE usuario_id = $1)::int AS anexos,
+              (SELECT COUNT(*) FROM chamados_avaliacao WHERE usuario_id = $1)::int AS avaliacoes,
+              (SELECT COUNT(*) FROM oportunidades_historico WHERE usuario_id = $1)::int AS notas`, [id])).rows[0];
+    const partes = [
+      hist.chamados && `${hist.chamados} chamado(s)`, hist.comentarios && `${hist.comentarios} comentário(s)`,
+      hist.mudancas && `${hist.mudancas} mudança(s) de status`, hist.anexos && `${hist.anexos} anexo(s)`,
+      hist.avaliacoes && `${hist.avaliacoes} avaliação(ões)`, hist.notas && `${hist.notas} registro(s) no funil`
+    ].filter(Boolean);
+    if (partes.length) {
+      await client.query('UPDATE usuarios SET ativo = FALSE WHERE id = $1', [id]);
+      return res.status(409).json({
+        erro: `${alvo.nome} tem histórico no sistema (${partes.join(', ')}) e não pode ser apagado sem quebrar esse histórico. Ele foi desativado: não acessa mais o sistema.`,
+        desativado: true
+      });
+    }
+    await client.query('BEGIN');
+    await client.query('DELETE FROM cursos_progresso WHERE usuario_id = $1', [id]);
+    await client.query('DELETE FROM atendimentos_lidos WHERE usuario_id = $1', [id]);
+    await client.query('DELETE FROM usuarios WHERE id = $1', [id]);
+    await client.query('COMMIT');
+    res.json({ mensagem: `Usuário ${alvo.nome} excluído.` });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ erro: 'Erro ao excluir usuário', detalhe: err.message });
+  } finally { client.release(); }
+});
+
 router.delete('/:id', apenasAdmin, async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
 
@@ -197,6 +252,9 @@ router.delete('/:id', apenasAdmin, async (req, res) => {
   }
 
   try {
+    if (await ehUltimoAdmin(parseInt(req.params.id), empresa_id)) {
+      return res.status(400).json({ erro: 'Este é o último administrador ativo: cadastre outro antes de desativá-lo.' });
+    }
     const result = await pool.query(
       'UPDATE usuarios SET ativo = FALSE WHERE id = $1 AND empresa_id = $2 RETURNING id, nome',
       [req.params.id, empresa_id]

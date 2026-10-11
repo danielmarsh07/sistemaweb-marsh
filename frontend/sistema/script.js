@@ -2635,6 +2635,7 @@ function renderUsuarios() {
             ? `<button class="btn btn-icon btn-danger" title="${ehVoce ? 'Não pode desativar a si mesmo' : 'Desativar'}" aria-label="Desativar" onclick="desativarUsuario(${u.id})"${ehVoce ? ' disabled' : ''}>${iconSVG('ban')}</button>`
             : `<button class="btn btn-icon btn-edit" title="Reativar" aria-label="Reativar" onclick="reativarUsuario(${u.id})">${iconSVG('check')}</button>`
           }
+          ${ehVoce ? '' : `<button class="btn btn-icon btn-danger" title="Excluir definitivamente" aria-label="Excluir definitivamente" onclick="excluirUsuario(${u.id})">${iconSVG('trash')}</button>`}
         </td>
       </tr>
     `;
@@ -2748,6 +2749,16 @@ async function desativarUsuario(id) {
   const res = await apiFetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE' });
   if (!res) return;
   if (!res.ok) { const e = await res.json(); alert(e.erro); return; }
+  loadUsuarios();
+}
+
+async function excluirUsuario(id) {
+  const u = _usuariosCache.find(x => x.id === id);
+  if (!confirm(`Excluir definitivamente "${u ? u.nome : ''}"?\n\nSe o usuário tiver histórico (chamados, comentários), ele não é apagado: fica desativado para preservar o histórico.`)) return;
+  const res = await apiFetch(`${API_URL}/usuarios/${id}/definitivo`, { method: 'DELETE' });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
   loadUsuarios();
 }
 
