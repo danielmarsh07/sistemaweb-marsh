@@ -352,7 +352,8 @@ function showPage(page) {
     'fluxo-caixa': 'Fluxo de caixa',
     dre: 'DRE gerencial',
     funil: 'Funil de vendas',
-    relatorios: 'Relatórios'
+    relatorios: 'Relatórios',
+    roteiro: 'Roteiro de uso'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 

@@ -151,6 +151,9 @@
           <a href="#" data-page="configuracoes" class="nav-link">
             <svg class="icon"><use href="#i-sliders"/></svg> Configurações
           </a>
+          <a href="#" data-page="roteiro" class="nav-link">
+            <svg class="icon"><use href="#i-doc"/></svg> Roteiro de uso
+          </a>
           </div>
         </div>
       </div>
@@ -709,6 +712,124 @@
             </tbody>
           </table>
         </div>
+      </section>
+
+      <!-- ========== ROTEIRO DE USO (estático; os links "→" abrem a tela citada) ========== -->
+      <section id="roteiro-page" class="page">
+        <div class="page-header">
+          <h2>Roteiro de uso</h2>
+        </div>
+        <p class="pagina-descricao">
+          Os módulos se ligam pelo cliente, mas só <strong>contrato → fatura</strong> é automático: acesso ao portal, licença e cursos são liberados à mão, nesta ordem.
+        </p>
+
+        <ol class="roteiro-trilha" aria-label="Jornada do cliente">
+          <li><span>1</span>Venda<small>opcional</small></li>
+          <li><span>2</span>Cliente</li>
+          <li><span>3</span>Acesso ao portal</li>
+          <li><span>4</span>Contrato</li>
+          <li><span>5</span>Licença e cursos<small>se vendidos</small></li>
+          <li><span>6</span>Faturamento mensal</li>
+        </ol>
+
+        <div class="roteiro-grid">
+          <section class="rel-card roteiro-card">
+            <h3>Cliente novo, passo a passo</h3>
+            <ol>
+              <li><strong>Venda (opcional)</strong>: lead → proposta → cliente aceita pelo link → <em>Gerar contrato</em>. Isso já cadastra o cliente e cria o contrato; depois complete CNPJ e endereço.
+                <a href="#" class="roteiro-ir" onclick="showPage('funil'); return false;">Funil de vendas →</a></li>
+              <li><strong>Cadastro do cliente</strong>: razão social, <strong>CNPJ</strong> (obrigatório para nota e PIX), endereço e <strong>e-mail financeiro</strong>. Na mesma ficha, vincule as tecnologias que ele usa.
+                <a href="#" class="roteiro-ir" onclick="showPage('clientes'); return false;">Clientes →</a></li>
+              <li><strong>Acesso ao portal</strong>: novo usuário do tipo <em>Cliente</em>, ligado à empresa. Não há convite por e-mail: você define a senha e repassa. Um usuário por pessoa.
+                <a href="#" class="roteiro-ir" onclick="showPage('usuarios'); return false;">Usuários →</a></li>
+              <li><strong>Contrato</strong> (se não veio do funil): valor mensal, dia de vencimento, início, dados da nota e retenções.
+                <a href="#" class="roteiro-ir" onclick="showPage('contratos'); return false;">Contratos →</a></li>
+              <li><strong>Liberações</strong> do que foi vendido: licença do conector e/ou cursos (cartões ao lado).</li>
+              <li><strong>Avise o cliente</strong>: login do portal, chave da licença (se houver) e que as faturas chegam por e-mail.</li>
+            </ol>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Rotina mensal do faturamento</h3>
+            <ol>
+              <li>Escolha a competência e clique <strong>Gerar faturas do mês</strong>: cada contrato ativo vira um rascunho (nada vai ao cliente ainda).</li>
+              <li>Revise os rascunhos. Cobrança fora de contrato: <strong>+ Fatura avulsa</strong>.</li>
+              <li><strong>Aprovar</strong>: emite a NFS-e, gera o PIX (se ligado) e envia o e-mail ao financeiro do cliente.</li>
+              <li>Recebimento: PIX dá baixa sozinho (a tarifa do Asaas entra em Contas a pagar); transferência = <strong>Registrar pagamento</strong>.</li>
+              <li>Vencidas recebem lembrete automático por e-mail.</li>
+            </ol>
+            <p class="fin-muted">Para corrigir uma fatura aprovada: Cancelar (cancela a nota e o PIX) e criar outra.</p>
+            <a href="#" class="roteiro-ir" onclick="showPage('faturamento'); return false;">Faturamento →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Cursos</h3>
+            <p class="fin-muted">Aparece no portal só quando está <strong>publicado</strong> e <strong>liberado para a empresa</strong> do aluno. Não depende de contrato.</p>
+            <ol>
+              <li><strong>Criar</strong> o curso (nasce rascunho; já há rascunhos de ABAP e Funcional).</li>
+              <li><strong>Aulas</strong>: módulo, título, vídeo (YouTube, Vimeo, Panda ou Bunny) e material opcional.</li>
+              <li><strong>Publicar</strong> (status publicado).</li>
+              <li><strong>Liberar</strong> para os clientes: todos os usuários da empresa passam a ver; não há liberação por pessoa nem prazo de fim.</li>
+              <li><strong>Acompanhar</strong> o progresso por usuário. Com 100%, o aluno gera o certificado (página para imprimir/PDF, sem registro no sistema).</li>
+            </ol>
+            <p class="fin-muted">Curso vendido: cobre por fatura avulsa ou contrato e libere à parte.</p>
+            <a href="#" class="roteiro-ir" onclick="showPage('treinamentos'); return false;">Treinamentos →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Licença do conector SAP</h3>
+            <p class="fin-muted">A chave aparece <strong>uma única vez</strong>, na criação: copie e envie na hora.</p>
+            <ol>
+              <li>Nova licença: cliente, plano (leitura, desenvolvimento ou empresa), SIDs (ex.: DEV, QAS, PRD), limite de usuários e data de fim.</li>
+              <li>Envie a chave <code>MRSH-XXXX-XXXX-XXXX</code> ao cliente. Perdeu? <strong>Nova chave</strong> (a antiga deixa de valer).</li>
+              <li>Renovação: altere a data de fim. A licença <strong>não acompanha o contrato</strong>: vence na data dela.</li>
+              <li>Suspender ou cancelar bloqueia o conector em até 7 dias.</li>
+            </ol>
+            <a href="#" class="roteiro-ir" onclick="showPage('licencas'); return false;">Licenças →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Chamados</h3>
+            <p class="fin-muted">O cliente abre pelo portal; o prazo vem só da prioridade.</p>
+            <div class="fin-matriz roteiro-tabela">
+              <table>
+                <thead><tr><th>Prioridade</th><th>Prazo (horas corridas)</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">Crítica</th><td>2 h</td></tr>
+                  <tr><th scope="row">Alta</th><td>8 h</td></tr>
+                  <tr><th scope="row">Média (padrão)</th><td>24 h</td></tr>
+                  <tr><th scope="row">Baixa</th><td>72 h</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="fin-muted">E-mails: chamado novo → admins e técnicos; mudança de status → usuários do cliente; comentário → o outro lado.</p>
+            <a href="#" class="roteiro-ir" onclick="showPage('chamados'); return false;">Chamados →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Fechamento do mês</h3>
+            <ol>
+              <li>Lançar as contas do mês (use “Repetir” para as fixas). <a href="#" class="roteiro-ir-inline" onclick="showPage('contas-pagar'); return false;">Contas a pagar →</a></li>
+              <li>Dar baixa nas transferências recebidas.</li>
+              <li>Conferir o fluxo de caixa contra o extrato. <a href="#" class="roteiro-ir-inline" onclick="showPage('fluxo-caixa'); return false;">Fluxo de caixa →</a></li>
+              <li>Ver a DRE e os relatórios. <a href="#" class="roteiro-ir-inline" onclick="showPage('dre'); return false;">DRE →</a></li>
+              <li>Exportar os CSVs para o contador. <a href="#" class="roteiro-ir-inline" onclick="showPage('relatorios'); return false;">Relatórios →</a></li>
+            </ol>
+          </section>
+        </div>
+
+        <section class="rel-card roteiro-card roteiro-cuidados">
+          <h3>Cuidados: o que ainda não está ligado</h3>
+          <p class="fin-muted">Estes campos parecem controlar algo, mas hoje são só informativos. Confira à mão.</p>
+          <ul>
+            <li><strong>Status “suspenso/inativo” do cliente</strong>: não bloqueia portal, licença nem cursos.</li>
+            <li><strong>Tier SLA</strong>: não muda o prazo dos chamados.</li>
+            <li><strong>Datas de contrato no cadastro do cliente</strong>: não são usadas; valem as de Financeiro → Contratos.</li>
+            <li><strong>Fim do contrato</strong>: não encerra licença nem cursos liberados.</li>
+            <li><strong>Reajuste (IPCA/IGP-M)</strong>: não é aplicado sozinho; altere o valor do contrato no mês do reajuste.</li>
+            <li><strong>Portal</strong>: o formulário de chamado lista todas as tecnologias, não só as do cliente.</li>
+          </ul>
+        </section>
       </section>
 
       <!-- ========== RELATÓRIOS (relatorios.js) ========== -->

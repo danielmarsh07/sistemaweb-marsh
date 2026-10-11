@@ -3720,6 +3720,41 @@ svg.icon {
 .rel-motivos { margin-top: 10px; font-size: 0.82rem; }
 .fin-hint-pix { display: block; margin: -8px 0 14px; }
 
+/* ROTEIRO DE USO — página estática de ajuda */
+.roteiro-trilha {
+  display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0 0 16px; padding: 0; counter-reset: none;
+}
+.roteiro-trilha li {
+  position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px;
+  border-radius: 999px; background: var(--bg-card-solid, #fff); border: 1px solid var(--border);
+  font-size: 0.88rem; font-weight: 600; color: var(--text-main);
+}
+.roteiro-trilha li span {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--primary); color: #fff; font-size: 0.78rem;
+}
+.roteiro-trilha li small { font-weight: 400; color: var(--text-muted); }
+.roteiro-trilha li:not(:last-child)::after { content: '→'; margin-left: 4px; color: var(--text-muted); font-weight: 400; }
+.roteiro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 12px; margin-bottom: 12px; }
+.roteiro-card h3 { margin-bottom: 8px; }
+.roteiro-card ol, .roteiro-card ul { margin: 8px 0; padding-left: 20px; display: grid; gap: 8px; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; }
+.roteiro-card strong { color: var(--text-main); }
+.roteiro-card p { margin: 6px 0; }
+.roteiro-card code { font-size: 0.82rem; padding: 1px 6px; border-radius: 6px; background: var(--bg-subtle, rgba(127,127,127,.08)); }
+.roteiro-ir { display: inline-block; margin-top: 6px; font-weight: 600; font-size: 0.85rem; color: var(--primary); text-decoration: none; }
+.roteiro-card li .roteiro-ir { display: block; margin-top: 2px; }
+.roteiro-ir-inline { font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; }
+.roteiro-ir:hover, .roteiro-ir-inline:hover { text-decoration: underline; }
+.roteiro-tabela { margin: 8px 0; }
+.roteiro-tabela tr > :first-child { min-width: 0; }
+.roteiro-tabela tbody th { text-transform: none; letter-spacing: normal; font-size: 0.88rem; font-weight: 500; color: var(--text-main); }
+.roteiro-cuidados { margin-bottom: 24px; border-left: 4px solid #fab219; }
+@media (max-width: 768px) {
+  .roteiro-trilha { display: grid; grid-template-columns: 1fr 1fr; }
+  .roteiro-trilha li:not(:last-child)::after { content: none; }
+  .roteiro-ir, .roteiro-ir-inline { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
 /* Marca no topo do menu: símbolo maior, bloco centralizado (mesma composição do login) */
 .sidebar .sidebar-header { justify-content: center; gap: 12px; padding: 4px 16px 20px; }
 .sidebar .sidebar-header .logo-box.logo-img { width: 46px; height: 46px; flex-shrink: 0; }
