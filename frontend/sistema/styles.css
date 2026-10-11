@@ -628,7 +628,11 @@
 }
 
 :root[data-theme="sereno"] body {
-  background-image: none;
+  /* Fundo com a "fita" de linhas (bg-sereno.svg, gerado por backend/scripts/gerar-fundo-sereno.js).
+     Véu de 30% na cor da página para não competir com os cards; fixo ao rolar (parallax). */
+  background:
+    linear-gradient(rgba(242, 246, 251, 0.30), rgba(242, 246, 251, 0.30)),
+    url('bg-sereno.svg') center / cover no-repeat fixed;
   background-color: var(--bg-main);
   color-scheme: light;
 }
@@ -905,9 +909,15 @@
 }
 
 :root[data-theme="sereno-escuro"] body {
-  background-image: none;
+  background:
+    linear-gradient(rgba(11, 20, 36, 0.25), rgba(11, 20, 36, 0.25)),
+    url('bg-sereno-escuro.svg') center / cover no-repeat fixed;
   background-color: var(--bg-main);
   color-scheme: dark;
+}
+/* Celular: "fixed" é ignorado ou pesa no iOS; o fundo rola junto com a página */
+@media (max-width: 768px) {
+  :root[data-theme="sereno"] body, :root[data-theme="sereno-escuro"] body { background-attachment: scroll; }
 }
 :root[data-theme="sereno-escuro"] body::before { display: none; }
 
@@ -2140,6 +2150,9 @@ tbody tr:last-child td {
   .stat-number {
     font-size: 18px;
   }
+  /* Valores em R$ nos cards do financeiro: nunca quebrar no meio do número; encolhe um pouco */
+  .dash-fin .stat-number { white-space: nowrap; font-size: 15px; letter-spacing: -0.03em; }
+  .dash-fin .stat-content { min-width: 0; }
 
   .stat-content h3 {
     font-size: 10.5px;
