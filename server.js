@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const path = require('path');
-const pool = require('./db');
+const pool = require('./backend/db');
 
 const app = express();
 
@@ -14,31 +14,37 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
-// Servir arquivos estáticos do dashboard
-app.use(express.static(path.join(__dirname, 'public')));
+// Arquivos estáticos: três pastas servidas na raiz, então os endereços não dependem da pasta
+//   frontend/site    → página institucional (/, /style.css, /landing-script.js)
+//   frontend/sistema → dashboard, portal, login e proposta (/dashboard.html, /script.js...)
+//   frontend/comum   → logo, tema, manifest e service worker (/img/..., /theme.js, /sw.js)
+const FRONTEND = path.join(__dirname, 'frontend');
+for (const pasta of ['comum', 'site', 'sistema']) {
+  app.use(express.static(path.join(FRONTEND, pasta)));
+}
 
 // Importar rotas
-const authRoutes = require('./routes/auth');
-const empresasRoutes = require('./routes/empresas');
-const clientesRoutes = require('./routes/clientes');
-const fornecedoresRoutes = require('./routes/fornecedores');
-const transacoesRoutes = require('./routes/transacoes');
-const categoriasTransacaoRoutes = require('./routes/categorias-transacao');
-const tecnologiasRoutes = require('./routes/tecnologias');
-const chamadosRoutes = require('./routes/chamados');
-const atendimentosRoutes = require('./routes/atendimentos');
-const usuariosRoutes = require('./routes/usuarios');
-const anexosRoutes = require('./routes/anexos');
-const assistenteRoutes = require('./routes/assistente');
-const licencasRoutes = require('./routes/licencas');
-const licencasConectorRoutes = require('./routes/licencas-conector');
-const treinamentosRoutes = require('./routes/treinamentos');
-const financeiroRoutes = require('./routes/financeiro');
-const asaasWebhookRoutes = require('./routes/asaas-webhook');
-const comercialRoutes = require('./routes/comercial');
-const publicoRoutes = require('./routes/publico');
-const financeiroJobs = require('./services/financeiro-jobs');
-const autenticar = require('./middleware/autenticar');
+const authRoutes = require('./backend/routes/auth');
+const empresasRoutes = require('./backend/routes/empresas');
+const clientesRoutes = require('./backend/routes/clientes');
+const fornecedoresRoutes = require('./backend/routes/fornecedores');
+const transacoesRoutes = require('./backend/routes/transacoes');
+const categoriasTransacaoRoutes = require('./backend/routes/categorias-transacao');
+const tecnologiasRoutes = require('./backend/routes/tecnologias');
+const chamadosRoutes = require('./backend/routes/chamados');
+const atendimentosRoutes = require('./backend/routes/atendimentos');
+const usuariosRoutes = require('./backend/routes/usuarios');
+const anexosRoutes = require('./backend/routes/anexos');
+const assistenteRoutes = require('./backend/routes/assistente');
+const licencasRoutes = require('./backend/routes/licencas');
+const licencasConectorRoutes = require('./backend/routes/licencas-conector');
+const treinamentosRoutes = require('./backend/routes/treinamentos');
+const financeiroRoutes = require('./backend/routes/financeiro');
+const asaasWebhookRoutes = require('./backend/routes/asaas-webhook');
+const comercialRoutes = require('./backend/routes/comercial');
+const publicoRoutes = require('./backend/routes/publico');
+const financeiroJobs = require('./backend/services/financeiro-jobs');
+const autenticar = require('./backend/middleware/autenticar');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
@@ -70,7 +76,7 @@ app.get('/api/ping', (req, res) => {
 
 // Rota raiz redireciona para landing
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(FRONTEND, 'site', 'index.html'));
 });
 
 // Erro 404

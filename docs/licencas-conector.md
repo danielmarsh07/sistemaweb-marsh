@@ -23,7 +23,7 @@ Conector            --(só contadores por ferramenta)---> /api/licencas-conector
 
 1. Gerar o par de chaves, localmente:
    ```
-   node scripts/gerar-chaves-licenca.js
+   node backend/scripts/gerar-chaves-licenca.js
    ```
 2. Render → serviço → **Environment** → `LICENCA_CHAVE_PRIVADA` = a linha da chave privada.
    Nunca no git. Sem ela, `/validar` responde 503.

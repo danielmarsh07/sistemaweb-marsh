@@ -1,6 +1,6 @@
 /**
  * Gera o par de chaves Ed25519 das licenças (rodar UMA vez, localmente):
- *   node scripts/gerar-chaves-licenca.js
+ *   node backend/scripts/gerar-chaves-licenca.js
  *
  * - Privada  -> variável de ambiente LICENCA_CHAVE_PRIVADA no Render (nunca no git)
  * - Pública  -> arquivo chave_publica_licenca.pem do conector (Integration ECC)

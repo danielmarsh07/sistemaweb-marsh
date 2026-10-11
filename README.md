@@ -12,6 +12,28 @@ Sistema de gestão interno desenvolvido para a Marsh Consultoria, com painel adm
 
 ---
 
+## Estrutura de pastas
+
+```
+sistemaweb-marsh/
+├── server.js, package.json      ← raiz: o Render roda "node server.js" daqui
+├── backend/                     ← API (Node/Express)
+│   ├── routes/                  ← endpoints /api/...
+│   ├── services/                ← regras: faturamento, Asaas, e-mail, comercial...
+│   ├── middleware/  db/
+│   └── scripts/                 ← seed local, chaves de licença, imagens
+├── frontend/                    ← servido na raiz do site (os endereços não mostram a pasta)
+│   ├── site/                    ← página institucional: index.html, style.css, landing-script.js
+│   ├── sistema/                 ← dashboard, portal do cliente, login, proposta e seus scripts
+│   └── comum/                   ← logo (img/), tema, manifest e service worker
+├── docs/                        ← PRD, licenças do conector, marca, notas fiscais (fora do git)
+└── testes/                      ← testes da API e screenshots (só no banco local; veja testes/README.md)
+```
+
+Local: `docker compose up -d` e `npm run dev:local` (usa `.env.local`, banco Docker). O `.env` é o de produção.
+
+---
+
 ## Funcionalidades
 
 ### Painel Administrativo (`/dashboard.html`)

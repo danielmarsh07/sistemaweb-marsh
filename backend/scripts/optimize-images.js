@@ -1,24 +1,25 @@
 #!/usr/bin/env node
 /**
- * Otimiza imagens em public/ gerando .webp + .png redimensionado.
- * Uso:   node scripts/optimize-images.js [arquivo...]
- * Sem argumentos: processa public/background 1.png e public/background 2.png
+ * Otimiza imagens em frontend/sistema/ gerando .webp + .png redimensionado.
+ * Uso:   npm run optimize:images -- "nome original.png" [...]
+ *        (o arquivo de entrada fica em frontend/sistema/; os originais antigos
+ *         "background 1.png"/"background 2.png" saíram do projeto e estão no histórico do git)
  *
- * Saída:
+ * Saída, para "background 1.png":
  *   - background-1.webp (qualidade 78)
  *   - background-1.png  (PNG re-comprimido, fallback)
- * Os arquivos com espaço no nome são mantidos como input apenas.
  */
 
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 
-const PUB = path.join(__dirname, '..', 'public');
+const PUB = path.join(__dirname, '..', '..', 'frontend', 'sistema');
 
 const INPUTS = process.argv.slice(2);
 if (INPUTS.length === 0) {
-  INPUTS.push('background 1.png', 'background 2.png');
+  console.log('Informe o(s) arquivo(s) de entrada em frontend/sistema/. Ex.: npm run optimize:images -- "fundo novo.png"');
+  process.exit(0);
 }
 
 const MAX_W = 2000;
