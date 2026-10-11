@@ -21,7 +21,7 @@ const BASE = 'http://localhost:3000/api/financeiro';
   const mes = new Date().toISOString().slice(0, 7);
   const r1 = await api('POST', '/contas-pagar', { descricao: 'TESTE Contador', categoria_id: cat('Contabilidade'), valor: 500,
     competencia: mes, data_vencimento: `${mes}-15`, repetir_meses: 3 });
-  ok(/3 contas/.test(r1.mensagem), r1.mensagem);
+  ok(/3 (contas|parcela)/.test(r1.mensagem), r1.mensagem);
   await api('POST', '/contas-pagar', { descricao: 'TESTE ISS', categoria_id: cat('ISS'), valor: 300, competencia: mes,
     data_vencimento: `${mes}-05`, ja_paga: true, data_pagamento: `${mes}-05` });
   await api('POST', '/contas-pagar', { descricao: 'TESTE Lucros', categoria_id: cat('Distribuição de lucros'), valor: 1000, competencia: mes,

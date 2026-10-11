@@ -113,6 +113,9 @@
         </button>
         <div class="nav-group-itens" id="nav-grupo-financeiro">
           <div class="nav-group-inner">
+          <a href="#" data-page="visao-mensal" class="nav-link">
+            <svg class="icon"><use href="#i-dash"/></svg> Visão mensal
+          </a>
           <a href="#" data-page="faturamento" class="nav-link">
             <svg class="icon"><use href="#i-wallet"/></svg> Faturamento
           </a>
@@ -809,7 +812,9 @@
           <section class="rel-card roteiro-card">
             <h3>Fechamento do mês</h3>
             <ol>
-              <li>Lançar as contas do mês (use “Repetir” para as fixas). <a href="#" class="roteiro-ir-inline" onclick="showPage('contas-pagar'); return false;">Contas a pagar →</a></li>
+              <li>Conferir a <strong>Visão mensal</strong>: o que entra, o que sai e a sobra de cada mês, por conta e cartão. <a href="#" class="roteiro-ir-inline" onclick="showPage('visao-mensal'); return false;">Visão mensal →</a></li>
+              <li>Lançar as contas novas: fixas como <em>Assinatura</em>, dívidas em andamento como <em>Parcelada</em> (a partir da parcela atual), compras no cartão pelo mês da fatura. <a href="#" class="roteiro-ir-inline" onclick="showPage('contas-pagar'); return false;">Contas a pagar →</a></li>
+              <li>Pagar a fatura de cada cartão de uma vez (botão na Visão mensal ou em Contas a pagar, filtrando o cartão).</li>
               <li>Dar baixa nas transferências recebidas.</li>
               <li>Conferir o fluxo de caixa contra o extrato. <a href="#" class="roteiro-ir-inline" onclick="showPage('fluxo-caixa'); return false;">Fluxo de caixa →</a></li>
               <li>Ver a DRE e os relatórios. <a href="#" class="roteiro-ir-inline" onclick="showPage('dre'); return false;">DRE →</a></li>
@@ -943,11 +948,54 @@
         <div class="funil-board" id="funil-board"></div>
       </section>
 
+      <!-- ========== VISÃO MENSAL (visao-mensal.js) — substitui a planilha de custos ========== -->
+      <section id="visao-mensal-page" class="page">
+        <div class="page-header">
+          <h2>Visão mensal</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirContasFinanceiras()">Contas e cartões</button>
+            <button type="button" class="btn btn-secondary" onclick="exportarVisaoMensal()">Exportar (CSV)</button>
+            <button type="button" class="btn btn-primary" onclick="abrirNovaConta()">+ Lançamento</button>
+          </div>
+        </div>
+        <div class="filtros-bar">
+          <label class="filtros-label">A partir de
+            <input type="month" id="vm-inicio" class="filtro-select" onchange="loadVisaoMensal()">
+          </label>
+          <select id="vm-meses" class="filtro-select" onchange="loadVisaoMensal()" aria-label="Quantidade de meses">
+            <option value="3">3 meses</option>
+            <option value="6" selected>6 meses</option>
+            <option value="12">12 meses</option>
+          </select>
+          <select id="vm-agrupar" class="filtro-select" onchange="loadVisaoMensal()" aria-label="Agrupar por">
+            <option value="meio">Agrupar por conta / cartão</option>
+            <option value="categoria">Agrupar por categoria</option>
+          </select>
+          <select id="vm-natureza" class="filtro-select" onchange="renderVisaoMensal()" aria-label="Natureza">
+            <option value="">Empresa e pessoal</option>
+            <option value="empresa">Só empresa</option>
+            <option value="pessoal">Só pessoal</option>
+          </select>
+        </div>
+        <p class="pagina-descricao">
+          Cada linha é um lançamento (parcelado ou assinatura = uma linha só), cada coluna é o mês do vencimento.
+          Clique num valor para editar ou dar baixa, ou numa célula vazia para lançar naquele mês. No cartão, clique no total da seção para pagar a fatura.
+        </p>
+        <div class="vm-legenda" aria-hidden="true">
+          <span><i class="vm-st-aberta"></i>em aberto</span>
+          <span><i class="vm-st-paga"></i>pago</span>
+          <span><i class="vm-st-vencida"></i>vencido</span>
+          <span><i class="vm-st-estimado"></i>estimado (contrato ainda sem fatura)</span>
+        </div>
+        <div class="fin-matriz vm-matriz" id="vm-tabela"></div>
+      </section>
+
       <!-- ========== CONTAS A PAGAR (financeiro.js) ========== -->
       <section id="contas-pagar-page" class="page">
         <div class="page-header">
           <h2>Contas a pagar</h2>
           <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirContasFinanceiras()">Contas e cartões</button>
             <button type="button" class="btn btn-secondary" onclick="abrirCategoriasDespesa()">Categorias</button>
             <button type="button" class="btn btn-primary" onclick="abrirNovaConta()">+ Nova conta</button>
           </div>
@@ -962,6 +1010,14 @@
             <option value="aberta">Em aberto</option>
             <option value="vencida">Vencidas</option>
             <option value="paga">Pagas</option>
+          </select>
+          <select id="cp-filtro-meio" class="filtro-select" onchange="renderContasPagar()" aria-label="Pago com">
+            <option value="">Todas as contas e cartões</option>
+          </select>
+          <select id="cp-filtro-natureza" class="filtro-select" onchange="renderContasPagar()" aria-label="Natureza">
+            <option value="">Empresa e pessoal</option>
+            <option value="empresa">Só empresa</option>
+            <option value="pessoal">Só pessoal</option>
           </select>
           <input type="text" id="cp-busca" class="filtro-select" placeholder="Buscar descrição, fornecedor ou categoria..." style="min-width:200px; flex:1" oninput="renderContasPagar()">
         </div>
@@ -989,6 +1045,7 @@
           </div>
         </div>
         <p class="pagina-descricao">Mostra as contas que vencem no mês escolhido e as em aberto de meses anteriores.</p>
+        <div class="fin-barra-aprovar" id="cp-barra-fatura" hidden></div>
 
         <div class="table-container">
           <table>
@@ -1957,6 +2014,21 @@
         </div>
         <div class="form-row">
           <div class="form-group">
+            <label>Natureza *</label>
+            <select name="natureza">
+              <option value="empresa">Empresa (despesa da Marsh)</option>
+              <option value="pessoal">Pessoal (retirada do sócio)</option>
+            </select>
+            <small class="form-hint">Pessoal entra no caixa, mas fica fora da DRE.</small>
+          </div>
+          <div class="form-group">
+            <label>Pago com</label>
+            <select name="conta_financeira_id" onchange="ajustarCampoVencimento()"></select>
+            <small class="form-hint"><a href="#" onclick="abrirContasFinanceiras(); return false;">Gerenciar contas e cartões</a></small>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
             <label>Categoria *</label>
             <select name="categoria_id" required></select>
             <small class="form-hint">Define a linha da DRE. <a href="#" onclick="abrirCategoriasDespesa(); return false;">Gerenciar categorias</a></small>
@@ -1971,9 +2043,14 @@
             <label>Valor (R$) *</label>
             <input type="number" name="valor" min="0.01" step="0.01" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="conta-venc-data">
             <label>Vencimento *</label>
-            <input type="date" name="data_vencimento" required>
+            <input type="date" name="data_vencimento">
+          </div>
+          <div class="form-group" id="conta-venc-fatura" hidden>
+            <label>Fatura de *</label>
+            <input type="month" name="mes_fatura">
+            <small class="form-hint" id="conta-venc-fatura-dica"></small>
           </div>
         </div>
         <div class="form-row">
@@ -1991,15 +2068,13 @@
         <div id="conta-nova-campos">
           <div class="form-row">
             <div class="form-group">
-              <label>Repetir</label>
-              <select name="repetir_meses">
-                <option value="1">Não repetir</option>
-                <option value="3">3 meses</option>
-                <option value="6">6 meses</option>
-                <option value="12">12 meses</option>
-                <option value="24">24 meses</option>
+              <label>Tipo de lançamento</label>
+              <select name="tipo" onchange="ajustarTipoLancamento()">
+                <option value="unica">Única</option>
+                <option value="parcelada">Parcelada</option>
+                <option value="recorrente">Assinatura / todo mês (sem fim)</option>
               </select>
-              <small class="form-hint">Cria uma conta por mês, no mesmo dia de vencimento.</small>
+              <small class="form-hint" id="conta-tipo-dica"></small>
             </div>
             <div class="form-group">
               <label>Já foi paga?</label>
@@ -2007,6 +2082,16 @@
                 <option value="">Não</option>
                 <option value="1">Sim, registrar pagamento</option>
               </select>
+            </div>
+          </div>
+          <div class="form-row" id="conta-parcelas-campos" hidden>
+            <div class="form-group">
+              <label>Parcela deste mês</label>
+              <input type="number" name="parcela_inicial" min="1" max="120" value="1">
+            </div>
+            <div class="form-group">
+              <label>Total de parcelas</label>
+              <input type="number" name="total_parcelas" min="2" max="120">
             </div>
           </div>
           <div class="form-row" id="conta-paga-campos" hidden>
@@ -2028,7 +2113,7 @@
           </div>
         </div>
         <label class="check-linha" id="conta-seguintes-linha" hidden>
-          <input type="checkbox" name="aplicar_seguintes"> Aplicar descrição, valor, categoria e fornecedor às próximas parcelas em aberto
+          <input type="checkbox" name="aplicar_seguintes"> Aplicar descrição, valor, categoria, natureza e conta às próximas parcelas em aberto
         </label>
 
         <div class="form-group">
@@ -2066,6 +2151,66 @@
         </div>
       </form>
       <div class="fin-cat-lista" id="cat-desp-lista"></div>
+    </div>
+  </div>
+
+  <div id="modal-contas-financeiras" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Contas e cartões</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-conta-financeira" class="form">
+        <div class="form-row">
+          <div class="form-group">
+            <label id="cf-form-titulo">Nova conta ou cartão</label>
+            <input type="text" name="nome" required maxlength="80" placeholder="Ex.: Cartão Porto, Conta Bradesco">
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select name="tipo" onchange="document.getElementById('cf-campos-cartao').hidden = this.value !== 'cartao'">
+              <option value="conta">Conta bancária</option>
+              <option value="cartao">Cartão de crédito</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" id="cf-campos-cartao" hidden>
+          <div class="form-group">
+            <label>Vencimento da fatura (dia) *</label>
+            <input type="number" name="dia_vencimento" min="1" max="31">
+          </div>
+          <div class="form-group">
+            <label>Fechamento (dia)</label>
+            <input type="number" name="dia_fechamento" min="1" max="31">
+            <small class="form-hint">Informativo: ajuda a saber em qual fatura cai a compra.</small>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cf-cancelar" hidden onclick="limparFormContaFinanceira()">Cancelar edição</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+      <div class="fin-cat-lista" id="cf-lista"></div>
+    </div>
+  </div>
+
+  <div id="modal-pagar-fatura" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-pagar-fatura-titulo">Pagar fatura</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-pagar-fatura" class="form">
+        <p class="pagina-descricao" id="pagar-fatura-resumo"></p>
+        <div class="form-group">
+          <label>Data do pagamento *</label>
+          <input type="date" name="data_pagamento" required>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Dar baixa em todos</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -3028,6 +3173,7 @@
   <script src="financeiro.js"></script>
   <script src="comercial.js"></script>
   <script src="relatorios.js"></script>
+  <script src="visao-mensal.js"></script>
   <script src="assistente-voz.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

@@ -2,6 +2,7 @@
 //  1. Consulta no Asaas as NFS-e ainda em processamento (caso o webhook não tenha chegado)
 //  2. Consulta as cobranças PIX pendentes (baixa automática se o webhook de pagamento falhou)
 //  3. Envia lembrete por e-mail de faturas vencidas e não pagas
+//  4. Renova as assinaturas recorrentes de contas a pagar (sempre 12 meses à frente)
 const pool = require('../db');
 const asaas = require('./asaas');
 const email = require('./email');
@@ -44,6 +45,35 @@ async function sincronizarPixPendentes() {
   }
 }
 
+// Assinaturas recorrentes: mantém sempre 12 meses lançados à frente.
+// O vencimento N é calculado a partir da 1ª parcela (+N-1 meses) para não "escorregar" no fim do mês (31 → 28 → 28...).
+async function estenderRecorrentes() {
+  const series = await pool.query(
+    `SELECT grupo_id, MAX(parcela) AS ultima, MAX(data_vencimento) AS ultimo_venc
+     FROM contas_pagar WHERE recorrente AND grupo_id IS NOT NULL
+     GROUP BY grupo_id
+     HAVING MAX(data_vencimento) < CURRENT_DATE + INTERVAL '11 months'
+     LIMIT 200`);
+  for (const s of series.rows) {
+    try {
+      await pool.query(
+        `INSERT INTO contas_pagar (empresa_id, fornecedor_id, categoria_id, descricao, documento, valor, competencia,
+           data_vencimento, status, grupo_id, parcela, total_parcelas, observacoes, natureza, conta_financeira_id, recorrente)
+         SELECT u.empresa_id, u.fornecedor_id, u.categoria_id, u.descricao, u.documento, u.valor,
+                (p.competencia + make_interval(months => n - 1))::date,
+                (p.data_vencimento + make_interval(months => n - 1))::date,
+                'aberta', u.grupo_id, n, NULL, u.observacoes, u.natureza, u.conta_financeira_id, TRUE
+         FROM (SELECT * FROM contas_pagar WHERE grupo_id = $1 ORDER BY parcela DESC LIMIT 1) u
+         CROSS JOIN (SELECT * FROM contas_pagar WHERE grupo_id = $1 ORDER BY parcela LIMIT 1) p
+         CROSS JOIN generate_series($2::int + 1, $2::int + 12) n
+         WHERE (p.data_vencimento + make_interval(months => n - 1)) < CURRENT_DATE + INTERVAL '12 months'`,
+        [s.grupo_id, s.ultima]);
+    } catch (err) {
+      console.error(`[financeiro-jobs] renovar assinatura ${s.grupo_id}:`, err.message);
+    }
+  }
+}
+
 async function enviarLembretes() {
   if (!email.emailConfigurado()) return;
   // Vencidas há até 60 dias, sem lembrete ou com o último há mais de N dias (N = dias_lembrete; 0 desliga)
@@ -78,6 +108,7 @@ async function ciclo() {
     await sincronizarNotasPendentes();
     await sincronizarPixPendentes(); // antes dos lembretes: quem já pagou não recebe cobrança
     await enviarLembretes();
+    await estenderRecorrentes();
   } catch (err) {
     console.error('[financeiro-jobs]', err.message);
   } finally {
@@ -90,4 +121,4 @@ function iniciar() {
   setInterval(ciclo, UMA_HORA);
 }
 
-module.exports = { iniciar, ciclo };
+module.exports = { iniciar, ciclo, estenderRecorrentes };

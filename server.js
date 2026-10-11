@@ -778,6 +778,28 @@ async function iniciar() {
     }
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_faturas_pix_asaas ON faturas(pix_asaas_id);`);
 
+    // 26. Controle mensal (substitui a planilha de custos): contas/cartões, natureza e recorrência
+    //     tipo: conta | cartao. No cartão, o vencimento de cada lançamento = dia_vencimento da fatura do mês.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contas_financeiras (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        nome VARCHAR(80) NOT NULL,
+        tipo VARCHAR(10) NOT NULL DEFAULT 'conta',
+        dia_fechamento INTEGER CHECK (dia_fechamento BETWEEN 1 AND 31),
+        dia_vencimento INTEGER CHECK (dia_vencimento BETWEEN 1 AND 31),
+        ativo BOOLEAN NOT NULL DEFAULT TRUE,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        UNIQUE (empresa_id, nome)
+      );
+    `);
+    //     natureza: empresa | pessoal (pessoal = retirada do sócio: entra no caixa, fica fora da DRE)
+    //     recorrente: assinatura sem fim — a rotina horária mantém 12 meses à frente
+    await pool.query(`ALTER TABLE contas_pagar ADD COLUMN IF NOT EXISTS natureza VARCHAR(10) NOT NULL DEFAULT 'empresa';`);
+    await pool.query(`ALTER TABLE contas_pagar ADD COLUMN IF NOT EXISTS conta_financeira_id INTEGER REFERENCES contas_financeiras(id);`);
+    await pool.query(`ALTER TABLE contas_pagar ADD COLUMN IF NOT EXISTS recorrente BOOLEAN NOT NULL DEFAULT FALSE;`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contas_pagar_recorrente ON contas_pagar(grupo_id) WHERE recorrente;`);
+
     //     Dados que aparecem no cabeçalho/rodapé da proposta (NULL = padrão do código)
     for (const c of ['prop_razao_social VARCHAR(255)', 'prop_cnpj VARCHAR(30)', 'prop_contato VARCHAR(255)',
                      'prop_apresentacao TEXT', 'prop_condicoes_padrao TEXT', 'prop_validade_dias INTEGER']) {

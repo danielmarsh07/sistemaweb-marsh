@@ -353,7 +353,8 @@ function showPage(page) {
     dre: 'DRE gerencial',
     funil: 'Funil de vendas',
     relatorios: 'Relatórios',
-    roteiro: 'Roteiro de uso'
+    roteiro: 'Roteiro de uso',
+    'visao-mensal': 'Visão mensal'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -376,6 +377,7 @@ function showPage(page) {
   if (page === 'dre') loadDre();
   if (page === 'funil') loadFunil();
   if (page === 'relatorios') loadRelatorios();
+  if (page === 'visao-mensal') loadVisaoMensal();
 }
 
 // ===== CONFIGURAÇÕES / THEME PICKER =====

@@ -576,6 +576,9 @@ let contaEmEdicao = null;
 let _categoriasDespesa = [];
 let _gruposDre = [];
 let categoriaDespesaEmEdicao = null;
+let _contasFinanceiras = [];
+let contaFinanceiraEmEdicao = null;
+let _faturaAPagar = null;
 
 function mesFiltro(id) {
   const el = document.getElementById(id);
@@ -590,13 +593,38 @@ function situacaoConta(c) {
   return pill('Em aberto', '#1d6fd8');
 }
 
+// Depois de criar/editar/baixar uma conta, atualiza a tela que estiver aberta
+function aposMudarConta() {
+  if (typeof currentPage !== 'undefined' && currentPage === 'visao-mensal' && typeof loadVisaoMensal === 'function') loadVisaoMensal();
+  else loadContasPagar();
+}
+
+async function carregarContasFinanceiras() {
+  const res = await apiFetch(`${API_URL}/financeiro/contas-financeiras`);
+  if (res && res.ok) _contasFinanceiras = await res.json();
+  return _contasFinanceiras;
+}
+
+const cartaoPorId = id => _contasFinanceiras.find(c => c.id === Number(id) && c.tipo === 'cartao') || null;
+
+function opcoesContasFinanceiras(selecionado) {
+  const ativas = _contasFinanceiras.filter(c => c.ativo || c.id === Number(selecionado));
+  const grupo = (tipo, rotulo) => {
+    const itens = ativas.filter(c => c.tipo === tipo);
+    return itens.length ? `<optgroup label="${rotulo}">${itens.map(c =>
+      `<option value="${c.id}">${escapeHtml(c.nome)}${c.tipo === 'cartao' ? ` (vence dia ${c.dia_vencimento})` : ''}</option>`).join('')}</optgroup>` : '';
+  };
+  return '<option value="">— Conta / sem cartão —</option>' + grupo('conta', 'Contas') + grupo('cartao', 'Cartões de crédito');
+}
+
 async function loadContasPagar() {
   const mes = mesFiltro('cp-mes');
   const tbody = document.getElementById('contas-pagar-tbody');
   tbody.innerHTML = skeletonRows(6);
   const [rl, rr] = await Promise.all([
     apiFetch(`${API_URL}/financeiro/contas-pagar?mes=${mes}`),
-    apiFetch(`${API_URL}/financeiro/contas-pagar/resumo?mes=${mes}`)
+    apiFetch(`${API_URL}/financeiro/contas-pagar/resumo?mes=${mes}`),
+    carregarContasFinanceiras()
   ]);
   if (!rl || !rr) return;
   if (!rl.ok) { const e = await rl.json(); tbody.innerHTML = `<tr><td colspan="6" class="text-center">${escapeHtml(e.erro)}</td></tr>`; return; }
@@ -609,19 +637,29 @@ async function loadContasPagar() {
     set('cp-proximos', formatMoeda(r.proximos_7)); set('cp-proximos-qtd', `${r.qtd_proximos_7} conta(s) a partir de hoje`);
     set('cp-vencido', formatMoeda(r.vencido)); set('cp-vencido-qtd', `${r.qtd_vencido} conta(s) (todos os meses)`);
   }
+  const selMeio = document.getElementById('cp-filtro-meio');
+  const atual = selMeio.value;
+  selMeio.innerHTML = '<option value="">Todas as contas e cartões</option><option value="0">Conta / sem cartão</option>' +
+    _contasFinanceiras.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  selMeio.value = [...selMeio.options].some(o => o.value === atual) ? atual : '';
   renderContasPagar();
 }
 
 function renderContasPagar() {
   const tbody = document.getElementById('contas-pagar-tbody');
   const filtro = document.getElementById('cp-filtro-status').value;
+  const meio = document.getElementById('cp-filtro-meio').value;
+  const natureza = document.getElementById('cp-filtro-natureza').value;
   const busca = document.getElementById('cp-busca').value.trim().toLowerCase();
   const lista = _contasCache.filter(c => {
     if (filtro === 'vencida' && !c.vencida) return false;
     if (filtro && filtro !== 'vencida' && c.status !== filtro) return false;
+    if (meio !== '' && String(c.conta_financeira_id || 0) !== meio) return false;
+    if (natureza && c.natureza !== natureza) return false;
     if (busca && !`${c.descricao} ${c.fornecedor_nome || ''} ${c.categoria_nome || ''}`.toLowerCase().includes(busca)) return false;
     return true;
   });
+  renderBarraFatura(meio);
   if (!lista.length) {
     tbody.innerHTML = `<tr><td colspan="6" class="text-center">${_contasCache.length
       ? 'Nenhuma conta com esse filtro.' : 'Nenhuma conta neste mês. Use "+ Nova conta".'}</td></tr>`;
@@ -637,10 +675,11 @@ function renderContasPagar() {
       acoes.push(botao('edit', 'Editar', `editarConta(${c.id})`));
       acoes.push(botao('desfazer', 'Desfazer pagamento', `estornarConta(${c.id})`));
     }
-    const sub = [c.fornecedor_nome, c.parcela ? `${c.parcela}/${c.total_parcelas}` : null, c.documento].filter(Boolean).join(' · ');
+    const serie = c.recorrente ? 'assinatura' : c.parcela ? `${c.parcela}/${c.total_parcelas}` : null;
+    const sub = [c.conta_financeira_nome, c.fornecedor_nome, serie, c.documento].filter(Boolean).join(' · ');
     return `
     <tr>
-      <td data-label="Descrição"><strong>${escapeHtml(c.descricao)}</strong>${sub ? `<span class="fin-sub">${escapeHtml(sub)}</span>` : ''}</td>
+      <td data-label="Descrição"><strong>${escapeHtml(c.descricao)}</strong>${c.natureza === 'pessoal' ? ` ${pill('Pessoal', '#7c3aed')}` : ''}${sub ? `<span class="fin-sub">${escapeHtml(sub)}</span>` : ''}</td>
       <td data-label="Categoria">${escapeHtml(c.categoria_nome || '—')}</td>
       <td data-label="Valor" class="fin-num">${formatMoeda(c.valor)}${c.status === 'paga' && c.valor_pago !== c.valor
         ? `<span class="fin-sub">pago ${formatMoeda(c.valor_pago)}</span>` : ''}</td>
@@ -649,6 +688,53 @@ function renderContasPagar() {
       <td data-label="Ações" class="td-acoes">${acoes.join('')}</td>
     </tr>`;
   }).join('');
+}
+
+// Filtrando um cartão: mostra o total da fatura do mês e o botão de pagar tudo de uma vez
+function renderBarraFatura(meio) {
+  const barra = document.getElementById('cp-barra-fatura');
+  const cartao = cartaoPorId(meio);
+  const mes = mesFiltro('cp-mes');
+  if (!cartao) { barra.hidden = true; return; }
+  const itens = _contasCache.filter(c => c.conta_financeira_id === cartao.id && c.data_vencimento.slice(0, 7) === mes);
+  const abertos = itens.filter(c => c.status === 'aberta');
+  const total = itens.reduce((s, c) => s + c.valor, 0);
+  barra.hidden = !itens.length;
+  barra.innerHTML = `<span>Fatura ${escapeHtml(cartao.nome)} de ${mesAnoBr(mes + '-01')}: <strong>${formatMoeda(total)}</strong>
+      (${itens.length} lançamento(s)${abertos.length ? `, ${abertos.length} em aberto` : ', paga'})</span>
+    ${abertos.length ? `<button type="button" class="btn btn-primary" onclick="abrirPagarFatura(${cartao.id}, '${mes}')">Pagar fatura</button>` : ''}`;
+}
+
+async function abrirPagarFatura(cartaoId, mes, total, qtd) {
+  if (!_contasFinanceiras.length) await carregarContasFinanceiras();
+  const cartao = cartaoPorId(cartaoId);
+  if (!cartao) return;
+  if (total === undefined) {
+    const itens = _contasCache.filter(c => c.conta_financeira_id === cartao.id && c.status === 'aberta' && c.data_vencimento.slice(0, 7) === mes);
+    total = itens.reduce((s, c) => s + c.valor, 0);
+    qtd = itens.length;
+  }
+  _faturaAPagar = { cartaoId, mes };
+  const form = document.getElementById('form-pagar-fatura');
+  form.reset();
+  form.data_pagamento.value = hojeIso();
+  document.getElementById('modal-pagar-fatura-titulo').textContent = `Pagar fatura — ${cartao.nome}`;
+  document.getElementById('pagar-fatura-resumo').textContent =
+    `Fatura de ${mesAnoBr(mes + '-01')}, vencimento dia ${cartao.dia_vencimento}: ${qtd} lançamento(s) em aberto, total ${formatMoeda(total)}. Todos serão baixados com a data abaixo.`;
+  showModal('#modal-pagar-fatura');
+}
+
+async function salvarPagarFatura() {
+  const form = document.getElementById('form-pagar-fatura');
+  const res = await apiFetch(`${API_URL}/financeiro/contas-financeiras/${_faturaAPagar.cartaoId}/pagar-fatura`, {
+    method: 'POST', body: JSON.stringify({ mes: _faturaAPagar.mes, data_pagamento: form.data_pagamento.value })
+  });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  closeModal(document.getElementById('modal-pagar-fatura'));
+  alert(r.mensagem);
+  aposMudarConta();
 }
 
 async function carregarCategoriasDespesa() {
@@ -661,7 +747,7 @@ async function carregarCategoriasDespesa() {
 }
 
 async function preencherSelectsConta(form, conta) {
-  const [, rf] = await Promise.all([carregarCategoriasDespesa(), apiFetch(`${API_URL}/fornecedores`)]);
+  const [, rf] = await Promise.all([carregarCategoriasDespesa(), apiFetch(`${API_URL}/fornecedores`), carregarContasFinanceiras()]);
   const ativas = _categoriasDespesa.filter(c => c.ativo || (conta && c.id === conta.categoria_id));
   form.categoria_id.innerHTML = '<option value="">Selecione...</option>' + _gruposDre.map(g => {
     const cats = ativas.filter(c => c.grupo_dre === g.id);
@@ -671,26 +757,81 @@ async function preencherSelectsConta(form, conta) {
   const fornecedores = rf && rf.ok ? (await rf.json()).filter(f => f.ativo !== false || (conta && f.id === conta.fornecedor_id)) : [];
   form.fornecedor_id.innerHTML = '<option value="">—</option>' + fornecedores.map(f =>
     `<option value="${f.id}">${escapeHtml(f.nome || f.razao_social)}</option>`).join('');
-  if (conta) { form.categoria_id.value = conta.categoria_id || ''; form.fornecedor_id.value = conta.fornecedor_id || ''; }
+  form.conta_financeira_id.innerHTML = opcoesContasFinanceiras(conta && conta.conta_financeira_id);
+  if (conta) {
+    form.categoria_id.value = conta.categoria_id || '';
+    form.fornecedor_id.value = conta.fornecedor_id || '';
+    form.conta_financeira_id.value = conta.conta_financeira_id || '';
+  }
 }
 
-async function abrirNovaConta() {
+// Cartão escolhido → pede o mês da fatura (o vencimento é o dia da fatura); senão, a data de vencimento
+function ajustarCampoVencimento() {
+  const form = document.getElementById('form-conta-pagar');
+  const cartao = cartaoPorId(form.conta_financeira_id.value);
+  document.getElementById('conta-venc-data').hidden = !!cartao;
+  document.getElementById('conta-venc-fatura').hidden = !cartao;
+  form.data_vencimento.required = !cartao;
+  form.mes_fatura.required = !!cartao;
+  if (cartao) {
+    if (!form.mes_fatura.value) form.mes_fatura.value = (form.data_vencimento.value || hojeIso()).slice(0, 7);
+    document.getElementById('conta-venc-fatura-dica').textContent = `Vence no dia ${cartao.dia_vencimento} da fatura escolhida.`;
+  } else if (!form.data_vencimento.value && form.mes_fatura.value) {
+    form.data_vencimento.value = `${form.mes_fatura.value}-10`;
+  }
+}
+
+function ajustarTipoLancamento() {
+  const form = document.getElementById('form-conta-pagar');
+  const tipo = form.tipo.value;
+  document.getElementById('conta-parcelas-campos').hidden = tipo !== 'parcelada';
+  document.getElementById('conta-tipo-dica').textContent = {
+    unica: '',
+    parcelada: 'Dívida já em andamento? Informe a parcela deste mês: o sistema cria só as que faltam.',
+    recorrente: 'Lança 12 meses e renova sozinho. Para encerrar, exclua "esta e as próximas".'
+  }[tipo];
+}
+
+// modelo (opcional): pré-preenche a partir de uma linha da Visão mensal { descricao, categoria_id, natureza, conta_financeira_id, fornecedor_id, valor, mes }
+async function abrirNovaConta(modelo) {
   contaEmEdicao = null;
   const form = document.getElementById('form-conta-pagar');
   form.reset();
-  form.data_vencimento.value = hojeIso();
-  form.competencia.value = mesFiltro('cp-mes');
+  const mes = (modelo && modelo.mes) || (document.getElementById('cp-mes').value || hojeIso().slice(0, 7));
+  form.data_vencimento.value = modelo && modelo.mes ? `${modelo.mes}-10` : hojeIso();
+  form.mes_fatura.value = mes;
+  form.competencia.value = mes;
   form.data_pagamento.value = hojeIso();
   document.getElementById('conta-nova-campos').hidden = false;
   document.getElementById('conta-paga-campos').hidden = true;
   document.getElementById('conta-seguintes-linha').hidden = true;
-  await preencherSelectsConta(form);
-  document.getElementById('modal-conta-pagar-titulo').textContent = 'Nova conta a pagar';
+  await preencherSelectsConta(form, modelo && modelo.categoria_id ? modelo : null);
+  if (modelo && modelo.descricao) {
+    form.descricao.value = modelo.descricao;
+    form.valor.value = modelo.valor || '';
+    form.natureza.value = modelo.natureza || 'empresa';
+  }
+  ajustarCampoVencimento();
+  ajustarTipoLancamento();
+  document.getElementById('modal-conta-pagar-titulo').textContent = modelo && modelo.descricao
+    ? `Lançar "${modelo.descricao}" em ${mesAnoBr(mes + '-01')}` : 'Nova conta a pagar';
   showModal('#modal-conta-pagar');
 }
 
+// Busca a conta no cache da tela de contas a pagar; se não estiver (veio da Visão mensal), pede à API
+async function obterConta(id) {
+  let c = _contasCache.find(x => x.id === id);
+  if (!c) {
+    const res = await apiFetch(`${API_URL}/financeiro/contas-pagar/${id}`);
+    if (!res || !res.ok) return null;
+    c = await res.json();
+    _contasCache.push(c);
+  }
+  return c;
+}
+
 async function editarConta(id) {
-  const c = _contasCache.find(x => x.id === id);
+  const c = await obterConta(id);
   if (!c) return;
   contaEmEdicao = c;
   const form = document.getElementById('form-conta-pagar');
@@ -698,25 +839,32 @@ async function editarConta(id) {
   await preencherSelectsConta(form, c);
   form.descricao.value = c.descricao;
   form.valor.value = c.valor;
+  form.natureza.value = c.natureza || 'empresa';
   form.data_vencimento.value = c.data_vencimento;
+  form.mes_fatura.value = c.data_vencimento.slice(0, 7);
   form.competencia.value = c.competencia.slice(0, 7);
   form.documento.value = c.documento || '';
   form.observacoes.value = c.observacoes || '';
+  ajustarCampoVencimento();
   document.getElementById('conta-nova-campos').hidden = true;
-  document.getElementById('conta-seguintes-linha').hidden = !c.grupo_id || c.parcela >= c.total_parcelas;
-  document.getElementById('modal-conta-pagar-titulo').textContent =
-    `Editar conta${c.parcela ? ` (${c.parcela}/${c.total_parcelas})` : ''}`;
+  document.getElementById('conta-seguintes-linha').hidden = !c.grupo_id || (!c.recorrente && c.parcela >= c.total_parcelas);
+  const serie = c.recorrente ? ' (assinatura)' : c.parcela ? ` (${c.parcela}/${c.total_parcelas})` : '';
+  document.getElementById('modal-conta-pagar-titulo').textContent = `Editar conta${serie}`;
   showModal('#modal-conta-pagar');
 }
 
 async function salvarConta() {
   const form = document.getElementById('form-conta-pagar');
+  const cartao = cartaoPorId(form.conta_financeira_id.value);
   const dados = {
     descricao: form.descricao.value,
     categoria_id: form.categoria_id.value,
     fornecedor_id: form.fornecedor_id.value,
+    natureza: form.natureza.value,
+    conta_financeira_id: form.conta_financeira_id.value,
     valor: form.valor.value,
     data_vencimento: form.data_vencimento.value,
+    mes_fatura: cartao ? form.mes_fatura.value : undefined,
     competencia: form.competencia.value,
     documento: form.documento.value,
     observacoes: form.observacoes.value
@@ -724,7 +872,9 @@ async function salvarConta() {
   if (contaEmEdicao) {
     dados.aplicar_seguintes = form.aplicar_seguintes.checked;
   } else {
-    dados.repetir_meses = Number(form.repetir_meses.value);
+    dados.tipo = form.tipo.value;
+    dados.parcela_inicial = form.parcela_inicial.value;
+    dados.total_parcelas = form.total_parcelas.value;
     dados.ja_paga = form.ja_paga.value === '1';
     dados.data_pagamento = form.data_pagamento.value;
     dados.forma_pagamento = form.forma_pagamento.value;
@@ -735,10 +885,10 @@ async function salvarConta() {
   const r = await res.json();
   if (!res.ok) { alert(r.erro); return; }
   closeModal(document.getElementById('modal-conta-pagar'));
-  if (!contaEmEdicao && dados.data_vencimento.slice(0, 7) !== mesFiltro('cp-mes')) {
-    document.getElementById('cp-mes').value = dados.data_vencimento.slice(0, 7);
-  }
-  loadContasPagar();
+  if (!contaEmEdicao && dados.tipo !== 'unica') alert(r.mensagem);
+  const mesVenc = cartao ? dados.mes_fatura : dados.data_vencimento.slice(0, 7);
+  if (!contaEmEdicao && mesVenc && mesVenc !== mesFiltro('cp-mes')) document.getElementById('cp-mes').value = mesVenc;
+  aposMudarConta();
 }
 
 async function acaoContaPagar(id, caminho, confirmacao, corpo, query = '') {
@@ -749,33 +899,115 @@ async function acaoContaPagar(id, caminho, confirmacao, corpo, query = '') {
   if (!res) return null;
   const r = await res.json();
   if (!res.ok) { alert(r.erro); return null; }
-  loadContasPagar();
+  aposMudarConta();
   return r;
 }
 
-function abrirBaixaConta(id) {
-  const c = _contasCache.find(x => x.id === id);
+async function abrirBaixaConta(id) {
+  const c = await obterConta(id);
   if (!c) return;
   contaBaixa = c; faturaBaixa = null;
   prepararModalBaixa(`Pagamento — ${c.descricao}`, 'Valor pago (R$) *', c.valor);
 }
 
 async function excluirConta(id) {
-  const c = _contasCache.find(x => x.id === id);
+  const c = await obterConta(id);
   if (!c) return;
   let query = '';
-  if (c.grupo_id && c.parcela < c.total_parcelas) {
-    const todas = confirm(`"${c.descricao}" faz parte de uma série (${c.parcela}/${c.total_parcelas}).\n\nOK = excluir esta e as próximas em aberto\nCancelar = escolher excluir só esta`);
+  const temProximas = c.grupo_id && (c.recorrente || c.parcela < c.total_parcelas);
+  if (temProximas) {
+    const serie = c.recorrente ? 'uma assinatura' : `uma série (${c.parcela}/${c.total_parcelas})`;
+    const todas = confirm(`"${c.descricao}" faz parte de ${serie}.\n\nOK = excluir esta e as próximas em aberto${c.recorrente ? ' (encerra a assinatura)' : ''}\nCancelar = escolher excluir só esta`);
     if (todas) query = '?seguintes=1';
-    else if (!confirm(`Excluir só a parcela ${c.parcela}/${c.total_parcelas} de "${c.descricao}"?`)) return;
+    else if (!confirm(`Excluir só o lançamento de ${diaBr(c.data_vencimento)} de "${c.descricao}"?`)) return;
   } else if (!confirm(`Excluir "${c.descricao}" (${formatMoeda(c.valor)})?`)) return;
   const r = await acaoContaPagar(id, '', null, null, query);
   if (r && query) alert(r.mensagem);
 }
 
-function estornarConta(id) {
-  const c = _contasCache.find(x => x.id === id);
+async function estornarConta(id) {
+  const c = await obterConta(id);
   acaoContaPagar(id, '/estornar-baixa', `Desfazer o pagamento de "${c ? c.descricao : ''}"? A conta volta para em aberto.`);
+}
+
+// ===== Contas e cartões =====
+async function abrirContasFinanceiras() {
+  await carregarContasFinanceiras();
+  limparFormContaFinanceira();
+  renderContasFinanceiras();
+  showModal('#modal-contas-financeiras');
+}
+
+function renderContasFinanceiras() {
+  document.getElementById('cf-lista').innerHTML = _contasFinanceiras.map(c => `
+    <div class="fin-cat-item ${c.ativo ? '' : 'inativa'}">
+      <div>
+        <strong>${escapeHtml(c.nome)}</strong>${c.ativo ? '' : ' <span class="fin-muted">(inativa)</span>'}
+        <span class="fin-sub">${c.tipo === 'cartao' ? `Cartão · fatura vence dia ${c.dia_vencimento}${c.dia_fechamento ? `, fecha dia ${c.dia_fechamento}` : ''}` : 'Conta bancária'} · ${c.total_uso} lançamento(s)</span>
+      </div>
+      <div class="fin-cat-acoes">
+        ${botao('edit', 'Editar', `editarContaFinanceira(${c.id})`)}
+        ${botao(c.ativo ? 'ban' : 'refresh', c.ativo ? 'Desativar' : 'Reativar', `alternarContaFinanceira(${c.id})`)}
+      </div>
+    </div>`).join('') || '<p class="fin-muted">Nenhuma conta ou cartão ainda. Cadastre, por exemplo, "Conta Bradesco" e cada cartão de crédito.</p>';
+}
+
+function limparFormContaFinanceira() {
+  contaFinanceiraEmEdicao = null;
+  const form = document.getElementById('form-conta-financeira');
+  form.reset();
+  document.getElementById('cf-campos-cartao').hidden = true;
+  document.getElementById('cf-form-titulo').textContent = 'Nova conta ou cartão';
+  document.getElementById('cf-cancelar').hidden = true;
+}
+
+function editarContaFinanceira(id) {
+  const c = _contasFinanceiras.find(x => x.id === id);
+  if (!c) return;
+  contaFinanceiraEmEdicao = c;
+  const form = document.getElementById('form-conta-financeira');
+  form.nome.value = c.nome;
+  form.tipo.value = c.tipo;
+  form.dia_vencimento.value = c.dia_vencimento || '';
+  form.dia_fechamento.value = c.dia_fechamento || '';
+  document.getElementById('cf-campos-cartao').hidden = c.tipo !== 'cartao';
+  document.getElementById('cf-form-titulo').textContent = `Editando "${c.nome}"`;
+  document.getElementById('cf-cancelar').hidden = false;
+  form.nome.focus();
+}
+
+async function gravarContaFinanceira(id, dados) {
+  const res = await apiFetch(`${API_URL}/financeiro/contas-financeiras${id ? `/${id}` : ''}`, {
+    method: id ? 'PUT' : 'POST', body: JSON.stringify(dados)
+  });
+  if (!res) return false;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return false; }
+  await carregarContasFinanceiras();
+  renderContasFinanceiras();
+  // Se o formulário de lançamento estiver aberto, atualiza a lista de "Pago com"
+  const formConta = document.getElementById('form-conta-pagar');
+  if (document.getElementById('modal-conta-pagar').classList.contains('show')) {
+    const sel = formConta.conta_financeira_id.value;
+    formConta.conta_financeira_id.innerHTML = opcoesContasFinanceiras(sel);
+    formConta.conta_financeira_id.value = sel;
+  }
+  return true;
+}
+
+async function salvarContaFinanceira() {
+  const form = document.getElementById('form-conta-financeira');
+  const c = contaFinanceiraEmEdicao;
+  const ok = await gravarContaFinanceira(c && c.id, {
+    nome: form.nome.value, tipo: form.tipo.value, dia_vencimento: form.dia_vencimento.value,
+    dia_fechamento: form.dia_fechamento.value, ativo: c ? c.ativo : true
+  });
+  if (ok) limparFormContaFinanceira();
+}
+
+function alternarContaFinanceira(id) {
+  const c = _contasFinanceiras.find(x => x.id === id);
+  if (c) gravarContaFinanceira(c.id, { ...c, ativo: !c.ativo });
 }
 
 // ===== Categorias de despesa =====
@@ -965,7 +1197,10 @@ function renderDre() {
   document.getElementById('dre-tabela').innerHTML =
     `<table><thead><tr><th></th>${th}</tr></thead><tbody>${corpo}</tbody></table>`;
   document.getElementById('dre-fora').textContent = _dre.fora_resultado.total
-    ? `Fora da DRE (distribuição de lucros, empréstimos, investimentos): ${formatMoeda(_dre.fora_resultado.total)} no ano. Esses valores aparecem no fluxo de caixa.`
+    ? `Fora da DRE (retiradas, lucros, empréstimos, parcelamentos): ${formatMoeda(_dre.fora_resultado.total)} no ano` +
+      ((_dre.fora_resultado.categorias || []).length
+        ? ` (${_dre.fora_resultado.categorias.map(c => `${c.nome} ${formatMoeda(c.total)}`).join(' · ')})` : '') +
+      '. Esses valores aparecem no fluxo de caixa.'
     : '';
 }
 
@@ -978,4 +1213,6 @@ document.addEventListener('DOMContentLoaded', () => {
   sub('form-conta-pagar', salvarConta);
   sub('form-categoria-despesa', salvarCategoriaDespesa);
   sub('form-saldo-inicial', salvarSaldoInicial);
+  sub('form-conta-financeira', salvarContaFinanceira);
+  sub('form-pagar-fatura', salvarPagarFatura);
 });

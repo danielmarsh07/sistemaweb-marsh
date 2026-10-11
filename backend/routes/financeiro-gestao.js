@@ -41,8 +41,21 @@ const GRUPOS_DRE = {
   despesa_comercial: 'Despesas comerciais',
   despesa_financeira: 'Despesas financeiras',
   ir_csll: 'IRPJ e CSLL',
-  fora_resultado: 'Fora do resultado (lucros, empréstimos, investimentos)'
+  fora_resultado: 'Fora do resultado (retiradas, lucros, empréstimos, parcelamentos)'
 };
+
+// Acrescentadas com o controle mensal (planilha de custos): entram uma vez por empresa, sem mexer nas existentes
+const CATEGORIAS_V2 = [
+  ['Telefonia e internet', 'despesa_administrativa'],
+  ['Veículo', 'despesa_administrativa'],
+  ['Parcelamentos de impostos', 'fora_resultado'],
+  ['Empréstimos e financiamentos', 'fora_resultado'],
+  ['Moradia (pessoal)', 'fora_resultado'],
+  ['Compras pessoais', 'fora_resultado'],
+  ['Saúde (pessoal)', 'fora_resultado'],
+  ['Lazer e assinaturas pessoais', 'fora_resultado']
+];
+const NATUREZAS = ['empresa', 'pessoal'];
 
 const CATEGORIAS_PADRAO = [
   ['ISS', 'impostos_receita'],
@@ -64,12 +77,23 @@ async function garantirCategoriasPadrao(empresa_id) {
   const r = await pool.query(
     `SELECT 1 FROM categorias_transacao WHERE empresa_id = $1 AND tipo = 'saída' AND grupo_dre IS NOT NULL LIMIT 1`,
     [empresa_id]);
-  if (r.rows.length) return;
-  for (const [nome, grupo] of CATEGORIAS_PADRAO) {
-    await pool.query(
-      `INSERT INTO categorias_transacao (empresa_id, nome, tipo, grupo_dre) VALUES ($1, $2, 'saída', $3)
-       ON CONFLICT (empresa_id, nome, tipo) DO UPDATE SET grupo_dre = COALESCE(categorias_transacao.grupo_dre, EXCLUDED.grupo_dre)`,
-      [empresa_id, nome, grupo]);
+  if (!r.rows.length) {
+    for (const [nome, grupo] of CATEGORIAS_PADRAO) {
+      await pool.query(
+        `INSERT INTO categorias_transacao (empresa_id, nome, tipo, grupo_dre) VALUES ($1, $2, 'saída', $3)
+         ON CONFLICT (empresa_id, nome, tipo) DO UPDATE SET grupo_dre = COALESCE(categorias_transacao.grupo_dre, EXCLUDED.grupo_dre)`,
+        [empresa_id, nome, grupo]);
+    }
+  }
+  // Segunda leva: uma única vez por empresa (se o usuário apagar/renomear depois, não volta)
+  const v2 = await pool.query(
+    `INSERT INTO migracoes_app (nome) VALUES ($1) ON CONFLICT DO NOTHING RETURNING nome`, [`categorias_v2_emp_${empresa_id}`]);
+  if (v2.rowCount) {
+    for (const [nome, grupo] of CATEGORIAS_V2) {
+      await pool.query(
+        `INSERT INTO categorias_transacao (empresa_id, nome, tipo, grupo_dre) VALUES ($1, $2, 'saída', $3)
+         ON CONFLICT (empresa_id, nome, tipo) DO NOTHING`, [empresa_id, nome, grupo]);
+    }
   }
 }
 
@@ -132,6 +156,89 @@ router.put('/categorias-despesa/:id', async (req, res) => {
   }
 });
 
+// ===== Contas e cartões (de onde sai o pagamento) =====
+// No cartão, todo lançamento vence no dia da fatura do mês escolhido; "pagar fatura" baixa todos de uma vez.
+const COLUNAS_CF = `cf.id, cf.nome, cf.tipo, cf.dia_fechamento, cf.dia_vencimento, cf.ativo`;
+
+router.get('/contas-financeiras', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT ${COLUNAS_CF}, (SELECT COUNT(*) FROM contas_pagar cp WHERE cp.conta_financeira_id = cf.id)::int AS total_uso
+       FROM contas_financeiras cf WHERE cf.empresa_id = $1
+       ORDER BY cf.ativo DESC, cf.tipo, cf.nome`, [emp(req)]);
+    res.json(r.rows);
+  } catch (err) { erro500(res, 'Erro ao buscar contas e cartões', err); }
+});
+
+function validarContaFinanceira(b) {
+  if (!vazioNulo(b.nome)) return 'Informe o nome (ex.: Cartão Porto, Conta Bradesco).';
+  if (String(b.nome).trim().length > 80) return 'Nome muito longo (máx. 80).';
+  if (!['conta', 'cartao'].includes(b.tipo)) return 'Tipo: conta ou cartão.';
+  if (b.tipo === 'cartao') {
+    const v = Number(b.dia_vencimento);
+    if (!Number.isInteger(v) || v < 1 || v > 31) return 'Informe o dia de vencimento da fatura (1 a 31).';
+    if (vazioNulo(b.dia_fechamento) !== null && !(Number(b.dia_fechamento) >= 1 && Number(b.dia_fechamento) <= 31)) return 'Dia de fechamento: 1 a 31.';
+  }
+  return null;
+}
+
+function paramsContaFinanceira(b) {
+  const cartao = b.tipo === 'cartao';
+  return [String(b.nome).trim(), b.tipo, cartao && vazioNulo(b.dia_fechamento) !== null ? Number(b.dia_fechamento) : null,
+    cartao ? Number(b.dia_vencimento) : null];
+}
+
+router.post('/contas-financeiras', async (req, res) => {
+  const b = req.body || {};
+  const e = validarContaFinanceira(b);
+  if (e) return res.status(400).json({ erro: e });
+  try {
+    const r = await pool.query(
+      `INSERT INTO contas_financeiras (nome, tipo, dia_fechamento, dia_vencimento, empresa_id) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [...paramsContaFinanceira(b), emp(req)]);
+    res.status(201).json({ mensagem: 'Cadastrado!', id: r.rows[0].id });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ erro: 'Já existe uma conta ou cartão com esse nome.' });
+    erro500(res, 'Erro ao cadastrar', err);
+  }
+});
+
+router.put('/contas-financeiras/:id', async (req, res) => {
+  const b = req.body || {};
+  const e = validarContaFinanceira(b);
+  if (e) return res.status(400).json({ erro: e });
+  try {
+    const r = await pool.query(
+      `UPDATE contas_financeiras SET nome=$1, tipo=$2, dia_fechamento=$3, dia_vencimento=$4, ativo=$5
+       WHERE id=$6 AND empresa_id=$7 RETURNING id`,
+      [...paramsContaFinanceira(b), b.ativo !== false, req.params.id, emp(req)]);
+    if (!r.rows.length) return res.status(404).json({ erro: 'Não encontrado.' });
+    res.json({ mensagem: 'Atualizado! Lançamentos já feitos mantêm o vencimento.' });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ erro: 'Já existe uma conta ou cartão com esse nome.' });
+    erro500(res, 'Erro ao atualizar', err);
+  }
+});
+
+// POST /contas-financeiras/:id/pagar-fatura { mes: AAAA-MM, data_pagamento } — baixa todos os lançamentos em aberto da fatura
+router.post('/contas-financeiras/:id/pagar-fatura', async (req, res) => {
+  const b = req.body || {};
+  if (!competenciaValida(b.mes)) return res.status(400).json({ erro: 'Mês da fatura no formato AAAA-MM.' });
+  if (!dataValida(b.data_pagamento)) return res.status(400).json({ erro: 'Data do pagamento inválida.' });
+  try {
+    const r = await pool.query(
+      `UPDATE contas_pagar SET status = 'paga', data_pagamento = $1, valor_pago = valor, forma_pagamento = 'cartao',
+         atualizado_por_usuario_id = $2, data_atualizacao = NOW()
+       WHERE empresa_id = $3 AND conta_financeira_id = $4 AND status = 'aberta'
+         AND data_vencimento >= $5::date AND data_vencimento < $5::date + INTERVAL '1 month'
+       RETURNING valor::float AS valor`,
+      [b.data_pagamento, req.usuario.id, emp(req), req.params.id, `${b.mes}-01`]);
+    if (!r.rows.length) return res.status(400).json({ erro: 'Nenhum lançamento em aberto nessa fatura.' });
+    const total = r2(r.rows.reduce((s, x) => s + x.valor, 0));
+    res.json({ mensagem: `Fatura paga: ${r.rows.length} lançamento(s), total R$ ${total.toFixed(2).replace('.', ',')}.`, qtd: r.rows.length, total });
+  } catch (err) { erro500(res, 'Erro ao pagar fatura', err); }
+});
+
 // ===== Contas a pagar =====
 const COLUNAS_CONTA = `
   cp.id, cp.fornecedor_id, cp.categoria_id, cp.descricao, cp.documento, cp.valor::float AS valor,
@@ -139,19 +246,28 @@ const COLUNAS_CONTA = `
   to_char(cp.data_vencimento, 'YYYY-MM-DD') AS data_vencimento,
   cp.status, to_char(cp.data_pagamento, 'YYYY-MM-DD') AS data_pagamento,
   cp.valor_pago::float AS valor_pago, cp.forma_pagamento, cp.grupo_id, cp.parcela, cp.total_parcelas,
-  cp.observacoes, cp.data_criacao,
+  cp.observacoes, cp.data_criacao, cp.natureza, cp.conta_financeira_id, cp.recorrente,
   (cp.status = 'aberta' AND cp.data_vencimento < CURRENT_DATE) AS vencida,
   COALESCE(NULLIF(fo.nome, ''), fo.razao_social) AS fornecedor_nome,
-  cat.nome AS categoria_nome, COALESCE(cat.grupo_dre, 'despesa_administrativa') AS grupo_dre`;
+  cat.nome AS categoria_nome, COALESCE(cat.grupo_dre, 'despesa_administrativa') AS grupo_dre,
+  cf.nome AS conta_financeira_nome, cf.tipo AS conta_financeira_tipo`;
 
 const FROM_CONTA = `
   FROM contas_pagar cp
   LEFT JOIN fornecedores fo ON fo.id = cp.fornecedor_id
-  LEFT JOIN categorias_transacao cat ON cat.id = cp.categoria_id`;
+  LEFT JOIN categorias_transacao cat ON cat.id = cp.categoria_id
+  LEFT JOIN contas_financeiras cf ON cf.id = cp.conta_financeira_id`;
 
 async function carregarConta(id, empresa_id) {
   const r = await pool.query(`SELECT ${COLUNAS_CONTA} ${FROM_CONTA} WHERE cp.id = $1 AND cp.empresa_id = $2`, [id, empresa_id]);
   return r.rows[0] || null;
+}
+
+// Vencimento de um lançamento no cartão: dia da fatura no mês (limitado ao último dia do mês)
+function vencimentoFatura(mes, dia) {
+  const [a, m] = mes.split('-').map(Number);
+  const ultimo = new Date(Date.UTC(a, m, 0)).getUTCDate();
+  return `${mes}-${String(Math.min(dia, ultimo)).padStart(2, '0')}`;
 }
 
 // GET /contas-pagar?mes=AAAA-MM — contas que vencem no mês + as em aberto de meses anteriores (atrasadas)
@@ -195,81 +311,117 @@ router.get('/contas-pagar/resumo', async (req, res) => {
   } catch (err) { erro500(res, 'Erro ao montar resumo', err); }
 });
 
+router.get('/contas-pagar/:id', async (req, res) => {
+  try {
+    const c = await carregarConta(req.params.id, emp(req));
+    if (!c) return res.status(404).json({ erro: 'Conta não encontrada.' });
+    res.json(c);
+  } catch (err) { erro500(res, 'Erro ao buscar conta', err); }
+});
+
+// Valida e, se for cartão com mes_fatura, calcula o vencimento. Retorna { erro } ou { cartao, vencimento }
 async function validarConta(b, empresa_id) {
-  if (!vazioNulo(b.descricao)) return 'Informe a descrição.';
-  if (!(Number(b.valor) > 0)) return 'Valor deve ser maior que zero.';
-  if (!dataValida(b.data_vencimento)) return 'Data de vencimento inválida.';
-  if (!competenciaValida(b.competencia)) return 'Competência no formato AAAA-MM.';
-  if (!b.categoria_id) return 'Escolha a categoria (define a linha da DRE).';
+  if (!vazioNulo(b.descricao)) return { erro: 'Informe a descrição.' };
+  if (!(Number(b.valor) > 0)) return { erro: 'Valor deve ser maior que zero.' };
+  if (!competenciaValida(b.competencia)) return { erro: 'Competência no formato AAAA-MM.' };
+  if (!b.categoria_id) return { erro: 'Escolha a categoria (define a linha da DRE).' };
+  if (b.natureza && !NATUREZAS.includes(b.natureza)) return { erro: 'Natureza: empresa ou pessoal.' };
   const cat = await pool.query(
     `SELECT 1 FROM categorias_transacao WHERE id = $1 AND empresa_id = $2 AND tipo = 'saída'`, [b.categoria_id, empresa_id]);
-  if (!cat.rows.length) return 'Categoria inválida.';
+  if (!cat.rows.length) return { erro: 'Categoria inválida.' };
   if (vazioNulo(b.fornecedor_id) !== null) {
     const fo = await pool.query('SELECT 1 FROM fornecedores WHERE id = $1 AND empresa_id = $2', [b.fornecedor_id, empresa_id]);
-    if (!fo.rows.length) return 'Fornecedor inválido.';
+    if (!fo.rows.length) return { erro: 'Fornecedor inválido.' };
   }
-  return null;
+  let cartao = null;
+  if (vazioNulo(b.conta_financeira_id) !== null) {
+    const cf = await pool.query('SELECT id, tipo, dia_vencimento FROM contas_financeiras WHERE id = $1 AND empresa_id = $2',
+      [b.conta_financeira_id, empresa_id]);
+    if (!cf.rows.length) return { erro: 'Conta ou cartão inválido.' };
+    if (cf.rows[0].tipo === 'cartao') cartao = cf.rows[0];
+  }
+  // Cartão: o vencimento sai do mês da fatura; nos demais, da data informada
+  if (cartao && competenciaValida(b.mes_fatura)) return { cartao, vencimento: vencimentoFatura(b.mes_fatura, cartao.dia_vencimento) };
+  if (!dataValida(b.data_vencimento)) return { erro: cartao ? 'Informe o mês da fatura.' : 'Data de vencimento inválida.' };
+  return { cartao, vencimento: b.data_vencimento };
 }
 
-// POST /contas-pagar — repetir_meses > 1 cria uma conta por mês (mesmo dia de vencimento)
+// Vencimento da n-ésima repetição: no cartão, sempre o dia da fatura; nos demais, mesmo dia do mês
+const vencimentoN = (cartao, base, n) =>
+  cartao ? vencimentoFatura(mesDe(somarMeses(`${mesDe(base)}-01`, n)), cartao.dia_vencimento) : somarMeses(base, n);
+
+// POST /contas-pagar — tipo: unica | parcelada { parcela_inicial, total_parcelas } | recorrente (12 meses, renovados pela rotina)
+// (aceita o antigo repetir_meses = parcelada de 1 até N)
 router.post('/contas-pagar', async (req, res) => {
   const b = req.body || {};
-  const e = await validarConta(b, emp(req)).catch(err => err.message);
-  if (e) return res.status(400).json({ erro: e });
-  const n = Number(b.repetir_meses || 1);
-  if (!Number.isInteger(n) || n < 1 || n > 60) return res.status(400).json({ erro: 'Repetição: de 1 a 60 meses.' });
+  const v = await validarConta(b, emp(req)).catch(err => ({ erro: err.message }));
+  if (v.erro) return res.status(400).json({ erro: v.erro });
+
+  let tipo = b.tipo || 'unica';
+  let inicial = 1, total = 1;
+  if (tipo === 'unica' && Number(b.repetir_meses) > 1) { tipo = 'parcelada'; total = Number(b.repetir_meses); }
+  else if (tipo === 'parcelada') { inicial = Number(b.parcela_inicial || 1); total = Number(b.total_parcelas); }
+  if (!['unica', 'parcelada', 'recorrente'].includes(tipo)) return res.status(400).json({ erro: 'Tipo de lançamento inválido.' });
+  if (tipo === 'parcelada' && !(Number.isInteger(total) && total >= 2 && total <= 120 && Number.isInteger(inicial) && inicial >= 1 && inicial <= total)) {
+    return res.status(400).json({ erro: 'Parcelas: total de 2 a 120 e parcela atual entre 1 e o total.' });
+  }
+  const qtd = tipo === 'unica' ? 1 : tipo === 'recorrente' ? 12 : total - inicial + 1;
   const pagaAgora = !!b.ja_paga;
   if (pagaAgora && !dataValida(b.data_pagamento)) return res.status(400).json({ erro: 'Data do pagamento inválida.' });
 
-  const grupo = n > 1 ? crypto.randomUUID() : null;
+  const grupo = tipo === 'unica' ? null : crypto.randomUUID();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < qtd; i++) {
       const paga = pagaAgora && i === 0; // só a primeira entra como paga
       await client.query(
         `INSERT INTO contas_pagar (empresa_id, fornecedor_id, categoria_id, descricao, documento, valor, competencia,
            data_vencimento, status, data_pagamento, valor_pago, forma_pagamento, grupo_id, parcela, total_parcelas,
-           observacoes, criado_por_usuario_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7::date,$8::date,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+           observacoes, criado_por_usuario_id, natureza, conta_financeira_id, recorrente)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::date,$8::date,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
         [emp(req), vazioNulo(b.fornecedor_id), b.categoria_id, b.descricao.trim(), vazioNulo(b.documento), Number(b.valor),
-         somarMeses(`${b.competencia}-01`, i), somarMeses(b.data_vencimento, i),
+         somarMeses(`${b.competencia}-01`, i), vencimentoN(v.cartao, v.vencimento, i),
          paga ? 'paga' : 'aberta', paga ? b.data_pagamento : null, paga ? Number(b.valor) : null,
-         paga ? (vazioNulo(b.forma_pagamento) || 'transferencia') : null,
-         grupo, grupo ? i + 1 : null, grupo ? n : null, vazioNulo(b.observacoes), req.usuario.id]);
+         paga ? (vazioNulo(b.forma_pagamento) || (v.cartao ? 'cartao' : 'transferencia')) : null,
+         grupo, grupo ? inicial + i : null, tipo === 'parcelada' ? total : null, vazioNulo(b.observacoes), req.usuario.id,
+         b.natureza || 'empresa', vazioNulo(b.conta_financeira_id), tipo === 'recorrente']);
     }
     await client.query('COMMIT');
-    res.status(201).json({ mensagem: n > 1 ? `${n} contas criadas (uma por mês).` : 'Conta criada!' });
+    const msg = tipo === 'recorrente' ? 'Assinatura criada: 12 meses lançados, renovados automaticamente.'
+      : tipo === 'parcelada' ? `${qtd} parcela(s) criada(s) (${inicial} a ${total} de ${total}).` : 'Conta criada!';
+    res.status(201).json({ mensagem: msg });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     erro500(res, 'Erro ao criar conta', err);
   } finally { client.release(); }
 });
 
-// PUT /contas-pagar/:id — aplicar_seguintes: replica descrição, valor, categoria e fornecedor nas próximas em aberto da série
+// PUT /contas-pagar/:id — aplicar_seguintes: replica descrição, valor, categoria, fornecedor, natureza e conta nas próximas em aberto da série
 router.put('/contas-pagar/:id', async (req, res) => {
   const b = req.body || {};
   try {
     const c = await carregarConta(req.params.id, emp(req));
     if (!c) return res.status(404).json({ erro: 'Conta não encontrada.' });
     if (c.status === 'cancelada') return res.status(400).json({ erro: 'Conta cancelada não pode ser editada.' });
-    const e = await validarConta(b, emp(req));
-    if (e) return res.status(400).json({ erro: e });
+    const v = await validarConta(b, emp(req));
+    if (v.erro) return res.status(400).json({ erro: v.erro });
     await pool.query(
       `UPDATE contas_pagar SET fornecedor_id=$1, categoria_id=$2, descricao=$3, documento=$4, valor=$5,
-         competencia=$6::date, data_vencimento=$7::date, observacoes=$8,
-         atualizado_por_usuario_id=$9, data_atualizacao=NOW()
-       WHERE id=$10`,
+         competencia=$6::date, data_vencimento=$7::date, observacoes=$8, natureza=$9, conta_financeira_id=$10,
+         atualizado_por_usuario_id=$11, data_atualizacao=NOW()
+       WHERE id=$12`,
       [vazioNulo(b.fornecedor_id), b.categoria_id, b.descricao.trim(), vazioNulo(b.documento), Number(b.valor),
-       `${b.competencia}-01`, b.data_vencimento, vazioNulo(b.observacoes), req.usuario.id, c.id]);
+       `${b.competencia}-01`, v.vencimento, vazioNulo(b.observacoes), b.natureza || c.natureza,
+       vazioNulo(b.conta_financeira_id), req.usuario.id, c.id]);
     let extras = 0;
     if (b.aplicar_seguintes && c.grupo_id) {
       const r = await pool.query(
-        `UPDATE contas_pagar SET fornecedor_id=$1, categoria_id=$2, descricao=$3, valor=$4,
-           atualizado_por_usuario_id=$5, data_atualizacao=NOW()
-         WHERE grupo_id=$6 AND empresa_id=$7 AND parcela > $8 AND status = 'aberta'`,
-        [vazioNulo(b.fornecedor_id), b.categoria_id, b.descricao.trim(), Number(b.valor), req.usuario.id,
-         c.grupo_id, emp(req), c.parcela]);
+        `UPDATE contas_pagar SET fornecedor_id=$1, categoria_id=$2, descricao=$3, valor=$4, natureza=$5, conta_financeira_id=$6,
+           atualizado_por_usuario_id=$7, data_atualizacao=NOW()
+         WHERE grupo_id=$8 AND empresa_id=$9 AND parcela > $10 AND status = 'aberta'`,
+        [vazioNulo(b.fornecedor_id), b.categoria_id, b.descricao.trim(), Number(b.valor), b.natureza || c.natureza,
+         vazioNulo(b.conta_financeira_id), req.usuario.id, c.grupo_id, emp(req), c.parcela]);
       extras = r.rowCount;
     }
     res.json({ mensagem: extras ? `Conta atualizada, e mais ${extras} da série.` : 'Conta atualizada!' });
@@ -277,6 +429,7 @@ router.put('/contas-pagar/:id', async (req, res) => {
 });
 
 // DELETE /contas-pagar/:id?seguintes=1 — só em aberto; com seguintes, apaga também as próximas da série
+// (numa assinatura recorrente, isso a encerra: a rotina para de renovar)
 router.delete('/contas-pagar/:id', async (req, res) => {
   try {
     const c = await carregarConta(req.params.id, emp(req));
@@ -287,10 +440,12 @@ router.delete('/contas-pagar/:id', async (req, res) => {
       r = await pool.query(
         `DELETE FROM contas_pagar WHERE grupo_id = $1 AND empresa_id = $2 AND parcela >= $3 AND status <> 'paga'`,
         [c.grupo_id, emp(req), c.parcela]);
+      await pool.query('UPDATE contas_pagar SET recorrente = FALSE WHERE grupo_id = $1 AND empresa_id = $2', [c.grupo_id, emp(req)]);
     } else {
       r = await pool.query('DELETE FROM contas_pagar WHERE id = $1', [c.id]);
     }
-    res.json({ mensagem: r.rowCount > 1 ? `${r.rowCount} contas excluídas.` : 'Conta excluída.' });
+    const fim = req.query.seguintes === '1' && c.recorrente ? ' Assinatura encerrada.' : '';
+    res.json({ mensagem: (r.rowCount > 1 ? `${r.rowCount} contas excluídas.` : 'Conta excluída.') + fim });
   } catch (err) { erro500(res, 'Erro ao excluir conta', err); }
 });
 
@@ -477,8 +632,11 @@ router.get('/dre', async (req, res) => {
          WHERE empresa_id = $1 AND status IN ('aberta','paga') AND EXTRACT(YEAR FROM competencia) = $2
          GROUP BY 1`, [empresa, ano]),
       pool.query(
-        `SELECT EXTRACT(MONTH FROM cp.competencia)::int AS mes, COALESCE(cat.grupo_dre, 'despesa_administrativa') AS grupo,
-                COALESCE(cat.nome, 'Sem categoria') AS categoria, SUM(cp.valor)::float AS total
+        // Pessoal = retirada do sócio: sai da DRE (vai para "fora do resultado"), mesmo com categoria de despesa
+        `SELECT EXTRACT(MONTH FROM cp.competencia)::int AS mes,
+                CASE WHEN cp.natureza = 'pessoal' THEN 'fora_resultado' ELSE COALESCE(cat.grupo_dre, 'despesa_administrativa') END AS grupo,
+                CASE WHEN cp.natureza = 'pessoal' THEN 'Retiradas pessoais' ELSE COALESCE(cat.nome, 'Sem categoria') END AS categoria,
+                SUM(cp.valor)::float AS total
          FROM contas_pagar cp LEFT JOIN categorias_transacao cat ON cat.id = cp.categoria_id
          WHERE cp.empresa_id = $1 AND cp.status <> 'cancelada' AND EXTRACT(YEAR FROM cp.competencia) = $2
          GROUP BY 1, 2, 3`, [empresa, ano])
@@ -532,9 +690,170 @@ router.get('/dre', async (req, res) => {
     const fora = grupos.fora_resultado.total;
     res.json({
       ano, linhas,
-      fora_resultado: { valores: fora.map(r2), total: r2(fora.reduce((s, v) => s + v, 0)) }
+      fora_resultado: {
+        valores: fora.map(r2), total: r2(fora.reduce((s, v) => s + v, 0)),
+        categorias: Object.entries(grupos.fora_resultado.categorias)
+          .map(([nome, v]) => ({ nome, total: r2(v.reduce((s, x) => s + x, 0)) }))
+          .sort((a, b) => b.total - a.total)
+      }
     });
   } catch (err) { erro500(res, 'Erro ao montar DRE', err); }
+});
+
+// ===== Visão mensal (substitui a planilha de custos) =====
+// Linhas = lançamentos agrupados (uma série/assinatura = uma linha), colunas = meses pelo VENCIMENTO (visão de caixa).
+// Seções: por conta/cartão (padrão) ou por categoria. Receitas = faturas (valor líquido) + contratos ainda sem fatura (estimado).
+
+// Contratos ativos que ainda não geraram a fatura cujo vencimento cai no mês m (m >= mês atual)
+async function estimarContratos(empresa, lista, mesAtual, config) {
+  const [contratos, faturasExist] = await Promise.all([
+    pool.query(
+      `SELECT ct.id, ct.cliente_id, COALESCE(NULLIF(c.nome_fantasia, ''), c.razao_social, c.nome) AS cliente_nome,
+              ct.valor::float AS valor, to_char(ct.data_inicio, 'YYYY-MM-DD') AS data_inicio,
+              to_char(ct.data_fim, 'YYYY-MM-DD') AS data_fim, ct.reter_iss, ct.aliquota_iss::float AS aliquota_iss,
+              ct.ret_ir::float AS ret_ir, ct.ret_csll::float AS ret_csll, ct.ret_pis::float AS ret_pis,
+              ct.ret_cofins::float AS ret_cofins, ct.ret_inss::float AS ret_inss
+       FROM contratos ct JOIN clientes c ON c.id = ct.cliente_id
+       WHERE ct.empresa_id = $1 AND ct.status = 'ativo'`, [empresa]),
+    pool.query(
+      `SELECT contrato_id, to_char(competencia, 'YYYY-MM') AS comp FROM faturas
+       WHERE empresa_id = $1 AND contrato_id IS NOT NULL AND status <> 'cancelada' AND competencia >= CURRENT_DATE - INTERVAL '2 months'`,
+      [empresa])
+  ]);
+  const deslocamento = config.vencimento_mes_seguinte === false ? 0 : 1;
+  const jaFaturado = new Set(faturasExist.rows.map(f => `${f.contrato_id}|${f.comp}`));
+  const saida = [];
+  for (const m of lista) {
+    if (m < mesAtual) continue;
+    const comp = mesDe(somarMeses(`${m}-01`, -deslocamento));
+    if (comp < mesDe(somarMeses(`${mesAtual}-01`, -1))) continue;
+    for (const ct of contratos.rows) {
+      if (jaFaturado.has(`${ct.id}|${comp}`)) continue;
+      if (mesDe(ct.data_inicio) > comp || (ct.data_fim && mesDe(ct.data_fim) < comp)) continue;
+      const ret = fat.RETENCOES.reduce((s, r) => s + Number(ct[r] ?? config[r] ?? 0), 0);
+      const iss = ct.reter_iss ? Number(ct.aliquota_iss ?? config.aliquota_iss ?? 0) : 0;
+      saida.push({ mes: m, cliente_id: ct.cliente_id, cliente_nome: ct.cliente_nome, valor: r2(ct.valor * (1 - (ret + iss) / 100)) });
+    }
+  }
+  return saida;
+}
+
+router.get('/visao-mensal', async (req, res) => {
+  const inicio = req.query.inicio;
+  const meses = Number(req.query.meses || 6);
+  const agrupar = req.query.agrupar === 'categoria' ? 'categoria' : 'meio';
+  if (!competenciaValida(inicio)) return res.status(400).json({ erro: 'Início no formato AAAA-MM.' });
+  if (!Number.isInteger(meses) || meses < 1 || meses > 12) return res.status(400).json({ erro: 'Período: 1 a 12 meses.' });
+  const empresa = emp(req);
+  const ini = `${inicio}-01`;
+  const fim = somarMeses(ini, meses);
+  const lista = [];
+  for (let i = 0; i < meses; i++) lista.push(mesDe(somarMeses(ini, i)));
+  try {
+    const config = await fat.carregarConfig(empresa);
+    const mesAtual = (await pool.query(`SELECT to_char(CURRENT_DATE, 'YYYY-MM') AS m`)).rows[0].m;
+    const [contas, faturas, estimados, cartoes] = await Promise.all([
+      pool.query(
+        `SELECT ${COLUNAS_CONTA}, to_char(cp.data_vencimento, 'YYYY-MM') AS mes ${FROM_CONTA}
+         WHERE cp.empresa_id = $1 AND cp.status <> 'cancelada' AND cp.data_vencimento >= $2::date AND cp.data_vencimento < $3::date
+         ORDER BY cp.descricao, cp.data_vencimento`, [empresa, ini, fim]),
+      pool.query(
+        `SELECT f.id, f.cliente_id, COALESCE(NULLIF(c.nome_fantasia, ''), c.razao_social, c.nome) AS cliente_nome,
+                to_char(f.data_vencimento, 'YYYY-MM') AS mes, f.status,
+                CASE WHEN f.status = 'paga' THEN f.valor_pago::float ELSE ${fat.sqlValorLiquido('f')} END AS valor,
+                (f.status = 'aberta' AND f.data_vencimento < CURRENT_DATE) AS vencida
+         FROM faturas f JOIN clientes c ON c.id = f.cliente_id
+         WHERE f.empresa_id = $1 AND f.status <> 'cancelada' AND f.data_vencimento >= $2::date AND f.data_vencimento < $3::date`,
+        [empresa, ini, fim]),
+      estimarContratos(empresa, lista, mesAtual, config),
+      pool.query(`SELECT id, nome, dia_vencimento FROM contas_financeiras WHERE empresa_id = $1 AND tipo = 'cartao'`, [empresa])
+    ]);
+
+    const celulaVazia = () => ({ valor: 0, ids: [], pagas: 0, abertas: 0, vencidas: 0, parcelas: [] });
+    const statusCelula = c => (!c.ids.length ? null : c.vencidas ? 'vencida' : c.abertas === 0 ? 'paga' : c.pagas ? 'misto' : 'aberta');
+    const secoes = new Map();
+    for (const c of contas.rows) {
+      const secaoChave = agrupar === 'categoria' ? `cat:${c.categoria_id}` : `cf:${c.conta_financeira_id || 0}`;
+      const secaoTitulo = agrupar === 'categoria' ? (c.categoria_nome || 'Sem categoria') : (c.conta_financeira_nome || 'Conta / sem cartão');
+      if (!secoes.has(secaoChave)) {
+        secoes.set(secaoChave, {
+          chave: secaoChave, titulo: secaoTitulo, linhas: new Map(),
+          cartao: agrupar === 'meio' && c.conta_financeira_tipo === 'cartao' ? { id: c.conta_financeira_id } : null
+        });
+      }
+      const sec = secoes.get(secaoChave);
+      // Uma série (parcelada/assinatura) é uma linha; lançamentos soltos com a mesma descrição também se juntam
+      const chave = c.grupo_id || `d|${c.descricao.trim().toLowerCase()}|${c.categoria_id}|${c.conta_financeira_id || 0}|${c.natureza}`;
+      if (!sec.linhas.has(chave)) {
+        sec.linhas.set(chave, {
+          chave, descricao: c.descricao, categoria: c.categoria_nome, natureza: c.natureza, recorrente: c.recorrente,
+          total_parcelas: c.total_parcelas, meio: c.conta_financeira_nome,
+          modelo: { descricao: c.descricao, categoria_id: c.categoria_id, natureza: c.natureza, conta_financeira_id: c.conta_financeira_id,
+                    fornecedor_id: c.fornecedor_id, valor: c.valor },
+          celulas: Object.fromEntries(lista.map(m => [m, celulaVazia()]))
+        });
+      }
+      const ln = sec.linhas.get(chave);
+      ln.modelo.valor = c.valor; // o último valor da série é o padrão para lançar um mês vazio
+      const cel = ln.celulas[c.mes];
+      cel.valor += c.valor; cel.ids.push(c.id);
+      if (c.status === 'paga') cel.pagas++; else { cel.abertas++; if (c.vencida) cel.vencidas++; }
+      if (c.parcela) cel.parcelas.push(c.total_parcelas ? `${c.parcela}/${c.total_parcelas}` : null);
+    }
+
+    const finalizarLinha = ln => ({
+      ...ln,
+      celulas: Object.fromEntries(Object.entries(ln.celulas).map(([m, c]) => [m, {
+        valor: r2(c.valor), ids: c.ids, status: statusCelula(c), parcela: c.parcelas.filter(Boolean)[0] || null
+      }]))
+    });
+    const somaMeses = linhas => Object.fromEntries(lista.map(m => [m, r2(linhas.reduce((s, l) => s + l.celulas[m].valor, 0))]));
+
+    const secoesSaida = [...secoes.values()].map(s => {
+      const linhas = [...s.linhas.values()].map(finalizarLinha).sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR'));
+      const totais = somaMeses(linhas);
+      // Cartão: a fatura do mês está toda paga?
+      const faturaPaga = s.cartao ? Object.fromEntries(lista.map(m => {
+        const cels = linhas.map(l => l.celulas[m]).filter(c => c.ids.length);
+        return [m, cels.length ? cels.every(c => c.status === 'paga') : null];
+      })) : null;
+      return { chave: s.chave, titulo: s.titulo, cartao: s.cartao, linhas, totais, fatura_paga: faturaPaga };
+    }).sort((a, b) => (a.cartao ? 1 : 0) - (b.cartao ? 1 : 0) || a.titulo.localeCompare(b.titulo, 'pt-BR'));
+
+    // Receitas por cliente
+    const rec = new Map();
+    const linhaCliente = (id, nome) => {
+      if (!rec.has(id)) rec.set(id, { chave: `cli:${id}`, descricao: nome, celulas: Object.fromEntries(lista.map(m => [m, { valor: 0, ids: [], estimado: 0, pagas: 0, abertas: 0, vencidas: 0 }])) });
+      return rec.get(id);
+    };
+    for (const f of faturas.rows) {
+      const cel = linhaCliente(f.cliente_id, f.cliente_nome).celulas[f.mes];
+      cel.valor += f.valor; cel.ids.push(f.id);
+      if (f.status === 'paga') cel.pagas++; else { cel.abertas++; if (f.vencida) cel.vencidas++; }
+    }
+    for (const e of estimados) {
+      const cel = linhaCliente(e.cliente_id, e.cliente_nome).celulas[e.mes];
+      cel.valor += e.valor; cel.estimado += e.valor;
+    }
+    const receitas = [...rec.values()].map(l => ({
+      ...l,
+      celulas: Object.fromEntries(Object.entries(l.celulas).map(([m, c]) => [m, {
+        valor: r2(c.valor), ids: c.ids, estimado: r2(c.estimado) > 0,
+        status: c.ids.length ? statusCelula(c) : (c.estimado ? 'estimado' : null)
+      }]))
+    })).sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR'));
+
+    const todasLinhas = secoesSaida.flatMap(s => s.linhas);
+    const totais = Object.fromEntries(lista.map(m => {
+      const pagar = r2(todasLinhas.reduce((s, l) => s + l.celulas[m].valor, 0));
+      const pessoal = r2(todasLinhas.filter(l => l.natureza === 'pessoal').reduce((s, l) => s + l.celulas[m].valor, 0));
+      const receber = r2(receitas.reduce((s, l) => s + l.celulas[m].valor, 0));
+      return [m, { pagar, pagar_empresa: r2(pagar - pessoal), pagar_pessoal: pessoal, receber, saldo: r2(receber - pagar) }];
+    }));
+
+    res.json({ meses: lista, mes_atual: mesAtual, agrupar, secoes: secoesSaida, receitas, totais,
+      cartoes: cartoes.rows });
+  } catch (err) { erro500(res, 'Erro ao montar a visão mensal', err); }
 });
 
 // ===== Relatórios (fase 4) =====
