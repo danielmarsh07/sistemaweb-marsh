@@ -35,3 +35,6 @@ build/
 docs/NF_*
 docs/**/*.xml
 docs/**/*.pdf
+
+# Planilhas e documentos de exemplo com dados financeiros reais — nunca versionar
+docs/Docs exemplos/
