@@ -69,18 +69,27 @@
         </div>
       </div>
 
-      <div class="nav-group" data-grupo="produtos">
-        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-produtos">
-          <span>Produtos SAP</span>
+      <div class="nav-group" data-grupo="cadastros">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-cadastros">
+          <span>Cadastros</span>
           <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
-        <div class="nav-group-itens" id="nav-grupo-produtos">
+        <div class="nav-group-itens" id="nav-grupo-cadastros">
           <div class="nav-group-inner">
-          <a href="#" data-page="licencas" class="nav-link">
-            <svg class="icon"><use href="#i-shield"/></svg> Licenças
+          <a href="#" data-page="categorias-despesa" class="nav-link">
+            <svg class="icon"><use href="#i-tag"/></svg> Categorias
           </a>
-          <a href="#" data-page="treinamentos" class="nav-link">
-            <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
+          <a href="#" data-page="clientes" class="nav-link">
+            <svg class="icon"><use href="#i-users"/></svg> Clientes
+          </a>
+          <a href="#" data-page="contas-financeiras" class="nav-link">
+            <svg class="icon"><use href="#i-wallet"/></svg> Contas e cartões
+          </a>
+          <a href="#" data-page="fornecedores" class="nav-link">
+            <svg class="icon"><use href="#i-building"/></svg> Fornecedores
+          </a>
+          <a href="#" data-page="tecnologias" class="nav-link">
+            <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
           </a>
           </div>
         </div>
@@ -107,52 +116,43 @@
         </button>
         <div class="nav-group-itens" id="nav-grupo-financeiro">
           <div class="nav-group-inner">
-          <a href="#" data-page="visao-mensal" class="nav-link">
-            <svg class="icon"><use href="#i-dash"/></svg> Visão mensal
-          </a>
-          <a href="#" data-page="faturamento" class="nav-link">
-            <svg class="icon"><use href="#i-wallet"/></svg> Faturamento
+          <a href="#" data-page="contas-pagar" class="nav-link">
+            <svg class="icon"><use href="#i-trend-down"/></svg> Contas a pagar
           </a>
           <a href="#" data-page="contratos" class="nav-link">
             <svg class="icon"><use href="#i-doc"/></svg> Contratos
           </a>
-          <a href="#" data-page="contas-pagar" class="nav-link">
-            <svg class="icon"><use href="#i-trend-down"/></svg> Contas a pagar
+          <a href="#" data-page="dre" class="nav-link">
+            <svg class="icon"><use href="#i-scale"/></svg> DRE
+          </a>
+          <a href="#" data-page="faturamento" class="nav-link">
+            <svg class="icon"><use href="#i-wallet"/></svg> Faturamento
           </a>
           <a href="#" data-page="fluxo-caixa" class="nav-link">
             <svg class="icon"><use href="#i-trend-up"/></svg> Fluxo de caixa
           </a>
-          <a href="#" data-page="dre" class="nav-link">
-            <svg class="icon"><use href="#i-scale"/></svg> DRE
-          </a>
           <a href="#" data-page="relatorios" class="nav-link">
             <svg class="icon"><use href="#i-dash"/></svg> Relatórios
+          </a>
+          <a href="#" data-page="visao-mensal" class="nav-link">
+            <svg class="icon"><use href="#i-dash"/></svg> Visão mensal
           </a>
           </div>
         </div>
       </div>
 
-      <div class="nav-group" data-grupo="cadastros">
-        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-cadastros">
-          <span>Cadastros</span>
+      <div class="nav-group" data-grupo="produtos">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-produtos">
+          <span>Produtos SAP</span>
           <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
-        <div class="nav-group-itens" id="nav-grupo-cadastros">
+        <div class="nav-group-itens" id="nav-grupo-produtos">
           <div class="nav-group-inner">
-          <a href="#" data-page="clientes" class="nav-link">
-            <svg class="icon"><use href="#i-users"/></svg> Clientes
+          <a href="#" data-page="licencas" class="nav-link">
+            <svg class="icon"><use href="#i-shield"/></svg> Licenças
           </a>
-          <a href="#" data-page="fornecedores" class="nav-link">
-            <svg class="icon"><use href="#i-building"/></svg> Fornecedores
-          </a>
-          <a href="#" data-page="tecnologias" class="nav-link">
-            <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
-          </a>
-          <a href="#" data-page="contas-financeiras" class="nav-link">
-            <svg class="icon"><use href="#i-wallet"/></svg> Contas e cartões
-          </a>
-          <a href="#" data-page="categorias-despesa" class="nav-link">
-            <svg class="icon"><use href="#i-tag"/></svg> Categorias
+          <a href="#" data-page="treinamentos" class="nav-link">
+            <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
           </a>
           </div>
         </div>
@@ -165,17 +165,17 @@
         </button>
         <div class="nav-group-itens" id="nav-grupo-sistema">
           <div class="nav-group-inner">
-          <a href="#" data-page="usuarios" class="nav-link">
-            <svg class="icon"><use href="#i-key"/></svg> Usuários
+          <a href="#" data-page="alertas" class="nav-link">
+            <svg class="icon"><use href="#i-shield"/></svg> Alertas <span class="nav-badge" id="badge-alertas" hidden>0</span>
           </a>
           <a href="#" data-page="configuracoes" class="nav-link">
             <svg class="icon"><use href="#i-sliders"/></svg> Configurações
           </a>
-          <a href="#" data-page="alertas" class="nav-link">
-            <svg class="icon"><use href="#i-shield"/></svg> Alertas <span class="nav-badge" id="badge-alertas" hidden>0</span>
-          </a>
           <a href="#" data-page="roteiro" class="nav-link">
             <svg class="icon"><use href="#i-doc"/></svg> Roteiro de uso
+          </a>
+          <a href="#" data-page="usuarios" class="nav-link">
+            <svg class="icon"><use href="#i-key"/></svg> Usuários
           </a>
           </div>
         </div>
