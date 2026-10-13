@@ -224,6 +224,9 @@
           </div>
         </div>
 
+        <div class="secao-recolhivel" data-secao="dash-indicadores">
+        <h3 class="secao-titulo">Indicadores</h3>
+        <div class="secao-corpo">
         <div class="stats-grid">
           <div class="stat-card" style="cursor:pointer" onclick="showPage('clientes')">
             <div class="stat-icon"><svg class="icon"><use href="#i-users"/></svg></div>
@@ -268,10 +271,13 @@
             </div>
           </div>
         </div>
+        </div>
+        </div>
 
         <!-- Próximos recebimentos (faturas em aberto) -->
-        <div class="dash-fin" style="margin-top:2rem;">
+        <div class="dash-fin secao-recolhivel" data-secao="dash-recebimentos" style="margin-top:2rem;">
           <h3 class="secao-titulo">Próximos recebimentos</h3>
+          <div class="secao-corpo">
           <div class="table-container">
             <table>
               <thead>
@@ -288,11 +294,13 @@
               </tbody>
             </table>
           </div>
+          </div>
         </div>
 
         <!-- Chamados recentes no dashboard -->
-        <div style="margin-top:2rem;">
+        <div class="secao-recolhivel" data-secao="dash-chamados" style="margin-top:2rem;">
           <h3 class="secao-titulo">Chamados recentes</h3>
+          <div class="secao-corpo">
           <div class="table-container">
             <table>
               <thead>
@@ -309,6 +317,7 @@
                 <tr><td colspan="6" class="text-center">Carregando...</td></tr>
               </tbody>
             </table>
+          </div>
           </div>
         </div>
       </section>

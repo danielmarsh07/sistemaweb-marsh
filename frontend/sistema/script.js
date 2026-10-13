@@ -392,6 +392,41 @@ function showPage(page) {
   if (page === 'alertas') loadAlertas();
 }
 
+// ===== SEÇÕES RECOLHÍVEIS (Visão geral) =====
+// .secao-recolhivel[data-secao] com h3.secao-titulo + .secao-corpo: o título vira botão que recolhe/expande.
+// A escolha fica guardada por seção neste navegador.
+function iniciarSecoesRecolhiveis() {
+  document.querySelectorAll('.secao-recolhivel[data-secao]').forEach(secao => {
+    const titulo = secao.querySelector(':scope > .secao-titulo');
+    const corpo = secao.querySelector(':scope > .secao-corpo');
+    if (!titulo || !corpo || titulo.querySelector('.secao-toggle')) return;
+    const chave = `secao-recolhida:${secao.dataset.secao}`;
+    corpo.id = corpo.id || `${secao.dataset.secao}-corpo`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'secao-toggle';
+    btn.setAttribute('aria-controls', corpo.id);
+    btn.innerHTML = `<span>${titulo.innerHTML}</span><span class="secao-chevron" aria-hidden="true"></span>`;
+    titulo.textContent = '';
+    titulo.appendChild(btn);
+    const aplicar = recolhida => {
+      corpo.hidden = recolhida;
+      secao.classList.toggle('recolhida', recolhida);
+      btn.setAttribute('aria-expanded', String(!recolhida));
+      btn.title = recolhida ? 'Expandir' : 'Recolher';
+    };
+    let recolhida = false;
+    try { recolhida = localStorage.getItem(chave) === '1'; } catch { /* sem storage */ }
+    aplicar(recolhida);
+    btn.addEventListener('click', () => {
+      const nova = !corpo.hidden;
+      aplicar(nova);
+      try { nova ? localStorage.setItem(chave, '1') : localStorage.removeItem(chave); } catch { /* sem storage */ }
+    });
+  });
+}
+document.addEventListener('DOMContentLoaded', iniciarSecoesRecolhiveis);
+
 // ===== CONFIGURAÇÕES / THEME PICKER =====
 function renderThemePicker() {
   const root = document.getElementById('theme-picker');
