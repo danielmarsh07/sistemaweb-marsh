@@ -105,6 +105,9 @@
           <a href="#" data-page="funil" class="nav-link">
             <svg class="icon"><use href="#i-funil"/></svg> Funil de vendas
           </a>
+          <a href="#" data-page="simulador-conector" class="nav-link">
+            <svg class="icon"><use href="#i-sliders"/></svg> Simulador Conector SAP
+          </a>
           </div>
         </div>
       </div>
@@ -772,6 +775,8 @@
             <ol>
               <li><strong>Venda (opcional)</strong>: lead → proposta → cliente aceita pelo link → <em>Gerar contrato</em>. Isso já cadastra o cliente e cria o contrato; depois complete CNPJ e endereço.
                 <a href="#" class="roteiro-ir" onclick="showPage('funil'); return false;">Funil de vendas →</a></li>
+              <li><strong>Venda do Conector SAP</strong>: monte a oferta no simulador (usuários, plano, implantação, fábrica ABAP, desconto e ROI) e clique <em>Gerar proposta</em>: ela entra como rascunho na oportunidade e segue o mesmo fluxo.
+                <a href="#" class="roteiro-ir" onclick="showPage('simulador-conector'); return false;">Simulador Conector SAP →</a></li>
               <li><strong>Cadastro do cliente</strong>: razão social, <strong>CNPJ</strong> (obrigatório para nota e PIX), endereço e <strong>e-mail financeiro</strong>. Na mesma ficha, vincule as tecnologias que ele usa.
                 <a href="#" class="roteiro-ir" onclick="showPage('clientes'); return false;">Clientes →</a></li>
               <li><strong>Acesso ao portal</strong>: novo usuário do tipo <em>Cliente</em>, ligado à empresa. Não há convite por e-mail: você define a senha e repassa. Um usuário por pessoa.
@@ -808,6 +813,20 @@
             </ol>
             <p class="fin-muted">Curso vendido: cobre por fatura avulsa ou contrato e libere à parte.</p>
             <a href="#" class="roteiro-ir" onclick="showPage('treinamentos'); return false;">Treinamentos →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Proposta do Conector SAP (simulador)</h3>
+            <p class="fin-muted">O cálculo é feito pelo sistema com a <strong>Tabela de preços</strong> (botão no topo do simulador; vale para as próximas simulações).</p>
+            <ol>
+              <li>Crie a oportunidade no funil (ou abra a existente e clique <strong>Simular Conector SAP</strong>).</li>
+              <li>Informe funcionais e ABAPs, ciclo e modalidade. <em>Automático</em> compara Individual × Empresa e fica com o mais barato.</li>
+              <li>Implantação: nº de sistemas SAP e porte do legado Z. Fábrica ABAP: chamados avulsos estimados por mês <strong>ou</strong> pacotes de sustentação.</li>
+              <li>Desconto (ex.: fundador 50% por 12 meses), validade e, se quiser, o ROI (horas economizadas × custo/hora). O quadro ao lado mostra mensal, único, 1º ano e payback.</li>
+              <li><strong>Gerar proposta</strong>: cria o rascunho na oportunidade com itens e textos padrão e abre a página para imprimir/salvar PDF. Revise na oportunidade e envie o link.</li>
+            </ol>
+            <p class="fin-muted">A assinatura da IA (Claude) é do cliente: não entra no preço e aparece nas condições.</p>
+            <a href="#" class="roteiro-ir" onclick="showPage('simulador-conector'); return false;">Simulador Conector SAP →</a>
           </section>
 
           <section class="rel-card roteiro-card">
@@ -978,6 +997,163 @@
         </div>
         <p class="pagina-descricao">Arraste os cartões entre as colunas (no computador) ou abra o cartão para mudar a etapa.</p>
         <div class="funil-board" id="funil-board"></div>
+      </section>
+
+      <!-- ========== SIMULADOR DE PREÇO — CONECTOR SAP (comercial.js) ========== -->
+      <!-- O cálculo é do backend (POST /api/comercial/simulador-conector/calcular); a tela só mostra o resultado. -->
+      <section id="simulador-conector-page" class="page">
+        <div class="page-header">
+          <h2>Simulador de preço — Conector SAP</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirPrecosConector()">Tabela de preços</button>
+            <button type="button" class="btn btn-primary" id="sim-btn-gerar" onclick="gerarPropostaConector()">Gerar proposta</button>
+          </div>
+        </div>
+        <p class="pagina-descricao">Monte a oferta do Conector SAP Marsh e gere a proposta na oportunidade: ela entra como rascunho e segue o fluxo normal (imprimir, enviar link, aceite, contrato). A assinatura da IA (Claude) é do cliente e não entra no preço.</p>
+
+        <div class="sim-grid">
+          <form id="form-simulador" class="form rel-card sim-form" oninput="agendarSimulacao()" onchange="agendarSimulacao()" onsubmit="return false">
+            <div class="form-group">
+              <label for="sim-oportunidade">Oportunidade</label>
+              <select id="sim-oportunidade" name="oportunidade_id"></select>
+              <small class="form-hint">A proposta é criada nesta oportunidade. Não está na lista? Crie em <a href="#" onclick="showPage('funil'); return false;">Funil de vendas</a>.</small>
+            </div>
+
+            <div class="form-section-title">Usuários e plano</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sim-funcionais">Consultores funcionais</label>
+                <input type="number" id="sim-funcionais" name="funcionais" min="0" step="1" value="3" inputmode="numeric">
+              </div>
+              <div class="form-group">
+                <label for="sim-abaps">Desenvolvedores ABAP</label>
+                <input type="number" id="sim-abaps" name="abaps" min="0" step="1" value="2" inputmode="numeric">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sim-ciclo">Ciclo</label>
+                <select id="sim-ciclo" name="ciclo">
+                  <option value="anual" selected>Anual</option>
+                  <option value="mensal">Mensal</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="sim-modalidade">Modalidade</label>
+                <select id="sim-modalidade" name="modalidade">
+                  <option value="automatico" selected>Automático (o mais barato)</option>
+                  <option value="individual">Individual (por usuário)</option>
+                  <option value="empresa">Empresa (pacote)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-section-title">Implantação</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sim-sistemas">Sistemas SAP</label>
+                <input type="number" id="sim-sistemas" name="sistemas" min="1" step="1" value="1" inputmode="numeric">
+                <small class="form-hint">Ex.: DEV e QAS de um ECC = 1 sistema.</small>
+              </div>
+              <div class="form-group">
+                <label for="sim-porte">Porte do legado Z</label>
+                <select id="sim-porte" name="porte">
+                  <option value="pequeno">Pequeno</option>
+                  <option value="medio" selected>Médio</option>
+                  <option value="grande">Grande</option>
+                  <option value="nenhum">Sem implantação</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-section-title">Fábrica ABAP (opcional)</div>
+            <div class="form-group">
+              <label for="sim-fabrica">Modelo</label>
+              <select id="sim-fabrica" name="fabrica" onchange="alternarFabricaSimulador()">
+                <option value="nenhum" selected>Nenhum</option>
+                <option value="avulso">Chamados avulsos (estimativa por mês)</option>
+                <option value="pacote">Pacote de sustentação</option>
+              </select>
+            </div>
+            <div class="form-row sim-tres" id="sim-avulso" hidden>
+              <div class="form-group">
+                <label for="sim-cp">Chamados P/mês</label>
+                <input type="number" id="sim-cp" name="chamados_p" min="0" step="1" value="0" inputmode="numeric">
+              </div>
+              <div class="form-group">
+                <label for="sim-cm">Chamados M/mês</label>
+                <input type="number" id="sim-cm" name="chamados_m" min="0" step="1" value="0" inputmode="numeric">
+              </div>
+              <div class="form-group">
+                <label for="sim-cg">Chamados G/mês</label>
+                <input type="number" id="sim-cg" name="chamados_g" min="0" step="1" value="0" inputmode="numeric">
+              </div>
+            </div>
+            <div class="form-group" id="sim-pacote" hidden>
+              <label for="sim-pacotes">Pacotes de sustentação</label>
+              <input type="number" id="sim-pacotes" name="pacotes" min="0" step="1" value="1" inputmode="numeric">
+              <small class="form-hint" id="sim-pacote-hint"></small>
+            </div>
+
+            <div class="form-section-title">Desconto e validade</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sim-desconto">Desconto nas licenças (%)</label>
+                <input type="number" id="sim-desconto" name="desconto_pct" min="0" max="100" step="1" value="0" inputmode="decimal">
+                <small class="form-hint">Ex.: preço de fundador 50%.</small>
+              </div>
+              <div class="form-group">
+                <label for="sim-desconto-meses">Por quantos meses</label>
+                <input type="number" id="sim-desconto-meses" name="desconto_meses" min="0" max="120" step="1" value="12" inputmode="numeric">
+              </div>
+            </div>
+            <label class="check-linha"><input type="checkbox" name="desconto_implantacao"> Aplicar o desconto também na implantação</label>
+            <div class="form-group">
+              <label for="sim-validade">Validade da proposta (dias)</label>
+              <input type="number" id="sim-validade" name="validade_dias" min="1" max="180" step="1" inputmode="numeric">
+            </div>
+
+            <div class="form-section-title">ROI (opcional)</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sim-roi-hf">Horas/mês economizadas por funcional</label>
+                <input type="number" id="sim-roi-hf" name="roi_horas_funcional" min="0" step="0.5" inputmode="decimal">
+              </div>
+              <div class="form-group">
+                <label for="sim-roi-cf">Custo/hora do funcional (R$)</label>
+                <input type="number" id="sim-roi-cf" name="roi_custo_funcional" min="0" step="1" inputmode="decimal">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sim-roi-ha">Horas/mês economizadas por ABAP</label>
+                <input type="number" id="sim-roi-ha" name="roi_horas_abap" min="0" step="0.5" inputmode="decimal">
+              </div>
+              <div class="form-group">
+                <label for="sim-roi-ca">Custo/hora do ABAP (R$)</label>
+                <input type="number" id="sim-roi-ca" name="roi_custo_abap" min="0" step="1" inputmode="decimal">
+              </div>
+            </div>
+            <label class="check-linha"><input type="checkbox" name="incluir_roi" checked> Incluir o resumo do ROI na proposta</label>
+          </form>
+
+          <div class="sim-resultado" aria-live="polite">
+            <div class="sim-erro" id="sim-erro" role="alert" hidden></div>
+            <div class="rel-tiles sim-tiles" id="sim-tiles"></div>
+            <section class="rel-card">
+              <h3>Individual × Empresa</h3>
+              <div id="sim-comparacao"></div>
+            </section>
+            <section class="rel-card">
+              <h3>Itens da proposta</h3>
+              <div class="fin-matriz sim-itens" id="sim-itens"></div>
+            </section>
+            <section class="rel-card" id="sim-roi-card">
+              <h3>Retorno estimado (ROI)</h3>
+              <div id="sim-roi"></div>
+            </section>
+          </div>
+        </div>
       </section>
 
       <!-- ========== ALERTAS DO SISTEMA (cadastros.js) ========== -->
@@ -2613,6 +2789,24 @@
           <label>Validade (dias)</label>
           <input type="number" name="prop_validade_dias" min="1" max="180">
         </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabela de preços do simulador do Conector SAP (campos montados pelo comercial.js a partir do backend) -->
+  <div id="modal-precos-conector" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Tabela de preços — Conector SAP</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-precos-conector" class="form">
+        <p class="pagina-descricao">Valores em R$ (por mês nas licenças e serviços mensais). Vale para as próximas simulações; propostas já criadas não mudam. Campo vazio volta ao padrão.</p>
+        <div id="precos-conector-campos"></div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
           <button type="submit" class="btn btn-primary">Salvar</button>

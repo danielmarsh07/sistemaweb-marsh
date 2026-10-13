@@ -882,6 +882,9 @@ async function iniciar() {
                      'prop_apresentacao TEXT', 'prop_condicoes_padrao TEXT', 'prop_validade_dias INTEGER']) {
       await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS ${c};`);
     }
+    //     Tabela de preços do simulador do Conector SAP (Comercial). NULL/chave ausente = padrão do código
+    //     (backend/services/precificacao-conector.js → PRECOS_PADRAO)
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS prop_precos_conector JSONB;`);
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

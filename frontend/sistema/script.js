@@ -358,6 +358,7 @@ function showPage(page) {
     'fluxo-caixa': 'Fluxo de caixa',
     dre: 'DRE gerencial',
     funil: 'Funil de vendas',
+    'simulador-conector': 'Simulador Conector SAP',
     relatorios: 'Relatórios',
     roteiro: 'Roteiro de uso',
     'visao-mensal': 'Visão mensal',
@@ -385,6 +386,7 @@ function showPage(page) {
   if (page === 'fluxo-caixa') loadFluxoCaixa();
   if (page === 'dre') loadDre();
   if (page === 'funil') loadFunil();
+  if (page === 'simulador-conector') loadSimuladorConector();
   if (page === 'relatorios') loadRelatorios();
   if (page === 'visao-mensal') loadVisaoMensal();
   if (page === 'contas-financeiras') loadPaginaContasFinanceiras();

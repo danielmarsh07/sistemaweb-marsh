@@ -10,6 +10,7 @@ const router = express.Router();
 const pool = require('../db');
 const email = require('../services/email');
 const com = require('../services/comercial');
+const conector = require('../services/precificacao-conector');
 
 const emp = req => req.usuario.empresa_id || 1;
 const vazioNulo = v => (v === undefined || v === null || String(v).trim() === '' ? null : v);
@@ -280,6 +281,51 @@ router.put('/config', async (req, res) => {
   } catch (err) { erro500(res, 'Erro ao salvar configuração', err); }
 });
 
+// ===== Simulador de preço — Conector SAP =====
+// Cálculo puro em services/precificacao-conector.js; aqui só carrega a tabela de preços da empresa.
+async function precosConector(empresa_id) {
+  const r = await pool.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = $1', [empresa_id]);
+  return conector.normalizarPrecos((r.rows[0] && r.rows[0].prop_precos_conector) || {}).precos;
+}
+
+// Valida as entradas (com a validade padrão do modelo da proposta) e calcula. Devolve { resultado, precos } ou { erro }
+async function simularConector(b, empresa_id) {
+  const [precos, cfg] = await Promise.all([precosConector(empresa_id), com.configProposta(empresa_id)]);
+  const v = conector.validarEntradas({ validade_dias: cfg.prop_validade_dias, ...b }, precos);
+  if (v.erro) return { erro: v.erro };
+  return { resultado: conector.calcular(v.entradas, precos), precos, cfg };
+}
+
+router.get('/simulador-conector/config', async (req, res) => {
+  try {
+    res.json({ precos: await precosConector(emp(req)), padrao: conector.PRECOS_PADRAO, rotulos: conector.ROTULOS_PRECOS });
+  } catch (err) { erro500(res, 'Erro ao buscar tabela de preços', err); }
+});
+
+// PUT { precos: {...} } — só as chaves conhecidas; vazio = volta ao padrão
+router.put('/simulador-conector/config', async (req, res) => {
+  const entrada = (req.body || {}).precos || {};
+  const v = conector.normalizarPrecos(entrada, { validar: true });
+  if (v.erro) return res.status(400).json({ erro: v.erro });
+  try {
+    await pool.query(
+      `INSERT INTO financeiro_config (empresa_id, prop_precos_conector, data_atualizacao) VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (empresa_id) DO UPDATE SET prop_precos_conector = EXCLUDED.prop_precos_conector, data_atualizacao = NOW()`,
+      [emp(req), JSON.stringify(v.precos)]);
+    res.json({ mensagem: 'Tabela de preços salva!', precos: v.precos });
+  } catch (err) { erro500(res, 'Erro ao salvar tabela de preços', err); }
+});
+
+// POST /simulador-conector/calcular { funcionais, abaps, ciclo, modalidade, sistemas, porte, chamados_p/m/g, pacotes,
+//   desconto_pct, desconto_meses, desconto_implantacao, validade_dias, roi_* } → itens, totais, comparação e ROI
+router.post('/simulador-conector/calcular', async (req, res) => {
+  try {
+    const s = await simularConector(req.body || {}, emp(req));
+    if (s.erro) return res.status(400).json({ erro: s.erro });
+    res.json(s.resultado);
+  } catch (err) { erro500(res, 'Erro ao calcular simulação', err); }
+});
+
 // ===== Propostas =====
 const carregarPropostaEmp = (id, empresa_id) => com.carregarProposta('p.id = $1 AND p.empresa_id = $2', [id, empresa_id]);
 
@@ -297,17 +343,39 @@ function validarProposta(b) {
   return com.calcularItens(b.itens);
 }
 
-// POST /oportunidades/:id/propostas — nova proposta, ou { copiar_de } para criar a próxima versão
+// POST /oportunidades/:id/propostas — nova proposta, ou { copiar_de } para criar a próxima versão,
+// ou { simulador_conector: {entradas}, incluir_roi } para criar já preenchida pelo simulador do Conector SAP
 router.post('/oportunidades/:id/propostas', async (req, res) => {
   const b = req.body || {};
+  // Simulador: valida antes de abrir a transação (erro de entrada = 400)
+  let sim = null;
+  if (b.simulador_conector && !b.copiar_de) {
+    sim = await simularConector(b.simulador_conector, emp(req)).catch(err => ({ falha: err }));
+    if (sim.falha) return erro500(res, 'Erro ao calcular simulação', sim.falha);
+    if (sim.erro) return res.status(400).json({ erro: sim.erro });
+  }
   const client = await pool.connect();
   try {
     const o = await carregarOportunidade(req.params.id, emp(req));
     if (!o) return res.status(404).json({ erro: 'Oportunidade não encontrada.' });
     const cfg = await com.configProposta(emp(req));
+    let validadeDias = cfg.prop_validade_dias;
     await client.query('BEGIN');
     let dados;
-    if (b.copiar_de) {
+    if (sim) {
+      // Itens passam pela mesma normalização da edição manual (calcularItens): totais batem com o editor
+      const r = sim.resultado;
+      const itens = com.calcularItens(r.itens);
+      if (itens.erro) { await client.query('ROLLBACK'); return res.status(400).json({ erro: itens.erro }); }
+      const cliente = o.nome_exibicao || o.contato_nome || o.titulo;
+      dados = {
+        numero: await com.proximoNumero(client, emp(req)), versao: 1,
+        titulo: `Conector SAP Marsh — ${cliente}`.slice(0, 255),
+        ...conector.textosProposta(r, cfg, { incluirRoi: b.incluir_roi !== false }),
+        itens: itens.itens, total_mensal: itens.total_mensal, total_unico: itens.total_unico
+      };
+      validadeDias = r.entradas.validade_dias;
+    } else if (b.copiar_de) {
       const base = await carregarPropostaEmp(b.copiar_de, emp(req));
       if (!base || base.oportunidade_id !== o.id) { await client.query('ROLLBACK'); return res.status(400).json({ erro: 'Proposta de origem inválida.' }); }
       const v = await client.query('SELECT MAX(versao) AS v FROM propostas WHERE empresa_id = $1 AND numero = $2', [emp(req), base.numero]);
@@ -328,8 +396,10 @@ router.post('/oportunidades/:id/propostas', async (req, res) => {
          total_mensal, total_unico, validade, criado_por_usuario_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11, CURRENT_DATE + $12::int, $13) RETURNING id`,
       [emp(req), o.id, dados.numero, dados.versao, dados.titulo, dados.introducao, dados.escopo, dados.condicoes,
-       JSON.stringify(dados.itens || []), dados.total_mensal || 0, dados.total_unico || 0, cfg.prop_validade_dias, req.usuario.id]);
-    await com.registrarHistorico(o.id, 'proposta', `Proposta ${dados.numero}${dados.versao > 1 ? ` v${dados.versao}` : ''} criada (rascunho).`, req.usuario.id, client);
+       JSON.stringify(dados.itens || []), dados.total_mensal || 0, dados.total_unico || 0, validadeDias, req.usuario.id]);
+    await com.registrarHistorico(o.id, 'proposta', `Proposta ${dados.numero}${dados.versao > 1 ? ` v${dados.versao}` : ''} criada (rascunho)` +
+      (sim ? ` pelo simulador do Conector SAP: ${sim.resultado.comparacao.usuarios} usuário(s), plano ${sim.resultado.modalidade_escolhida}, ciclo ${sim.resultado.entradas.ciclo}.` : '.'),
+      req.usuario.id, client);
     await client.query('COMMIT');
     res.status(201).json({ mensagem: 'Proposta criada como rascunho.', id: r.rows[0].id });
   } catch (err) {

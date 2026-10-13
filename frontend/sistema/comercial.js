@@ -194,6 +194,9 @@ async function abrirOportunidade(id) {
   const acoes = [];
   if (o.contrato_id) acoes.push(`<span class="fin-muted">Contrato #${o.contrato_id} gerado</span>`);
   else acoes.push(`<button type="button" class="btn btn-secondary" onclick="abrirGerarContrato()">Gerar contrato</button>`);
+  if (!['ganha', 'perdida'].includes(o.etapa)) {
+    acoes.push(`<button type="button" class="btn btn-secondary" onclick="abrirSimuladorConector(${o.id})">Simular Conector SAP</button>`);
+  }
   if (!o.contrato_id) acoes.push(`<button type="button" class="btn btn-danger btn-icon" title="Excluir oportunidade" aria-label="Excluir oportunidade" onclick="excluirOportunidade()">${iconSVG('trash')}</button>`);
   document.getElementById('op-painel-acoes').innerHTML =
     `${pill(nomeEtapa(o.etapa), COR_ETAPA[o.etapa])} ${acoes.join('')}`;
@@ -470,8 +473,226 @@ async function salvarConfigPropostas() {
   if (r) closeModal(document.getElementById('modal-config-propostas'));
 }
 
+// ===== Simulador de preço — Conector SAP =====
+// A regra de preço fica no backend (services/precificacao-conector.js): a tela manda as entradas para
+// POST /comercial/simulador-conector/calcular (com debounce) e só desenha o resultado.
+let _simTimer = null;
+let _simSeq = 0;
+let _simResultado = null;
+let _simPrecos = null;
+let _simOportunidadePendente = null; // aberto a partir de uma oportunidade
+
+async function loadSimuladorConector() {
+  const form = document.getElementById('form-simulador');
+  const [rc, ro, rp] = await Promise.all([
+    _simPrecos ? null : apiFetch(`${API_URL}/comercial/simulador-conector/config`),
+    apiFetch(`${API_URL}/comercial/oportunidades?fechadas_dias=0`),
+    form.validade_dias.value ? null : apiFetch(`${API_URL}/comercial/config`)
+  ]);
+  if (rc) {
+    const c = await resultadoJson(rc);
+    if (!c) return;
+    _simPrecos = c.precos;
+    // ROI vazio = padrão da tabela de preços
+    ['roi_horas_funcional', 'roi_custo_funcional', 'roi_horas_abap', 'roi_custo_abap'].forEach(k => {
+      if (form[k].value === '') form[k].value = _simPrecos[k];
+    });
+  }
+  if (rp && rp.ok) form.validade_dias.value = (await rp.json()).prop_validade_dias || 15;
+  if (ro && ro.ok) {
+    const lista = await ro.json();
+    const sel = form.oportunidade_id;
+    const atual = _simOportunidadePendente || sel.value;
+    sel.innerHTML = '<option value="">— Escolha a oportunidade —</option>' + lista.map(o =>
+      `<option value="${o.id}">${escapeHtml(o.nome_exibicao || o.contato_nome || '—')} · ${escapeHtml(o.titulo)}</option>`).join('');
+    if (atual) sel.value = String(atual);
+    _simOportunidadePendente = null;
+  }
+  alternarFabricaSimulador();
+  simularConector();
+}
+
+// Atalho do modal da oportunidade: abre o simulador já com ela escolhida
+function abrirSimuladorConector(oportunidadeId) {
+  _simOportunidadePendente = oportunidadeId;
+  closeModal(document.getElementById('modal-oportunidade'));
+  showPage('simulador-conector');
+}
+
+function alternarFabricaSimulador() {
+  const form = document.getElementById('form-simulador');
+  const modo = form.fabrica.value;
+  document.getElementById('sim-avulso').hidden = modo !== 'avulso';
+  document.getElementById('sim-pacote').hidden = modo !== 'pacote';
+  if (_simPrecos) {
+    document.getElementById('sim-pacote-hint').textContent =
+      `${String(_simPrecos.pacote_horas).replace('.', ',')} h por ${formatMoeda(_simPrecos.pacote_valor)}/mês cada pacote.`;
+  }
+}
+
+function entradasSimulador() {
+  const form = document.getElementById('form-simulador');
+  const v = k => form[k].value;
+  const modo = v('fabrica');
+  return {
+    funcionais: v('funcionais'), abaps: v('abaps'), ciclo: v('ciclo'), modalidade: v('modalidade'),
+    sistemas: v('sistemas'), porte: v('porte'),
+    chamados_p: modo === 'avulso' ? v('chamados_p') : 0,
+    chamados_m: modo === 'avulso' ? v('chamados_m') : 0,
+    chamados_g: modo === 'avulso' ? v('chamados_g') : 0,
+    pacotes: modo === 'pacote' ? v('pacotes') : 0,
+    desconto_pct: v('desconto_pct'), desconto_meses: v('desconto_meses'),
+    desconto_implantacao: form.desconto_implantacao.checked,
+    validade_dias: v('validade_dias'),
+    roi_horas_funcional: v('roi_horas_funcional'), roi_custo_funcional: v('roi_custo_funcional'),
+    roi_horas_abap: v('roi_horas_abap'), roi_custo_abap: v('roi_custo_abap')
+  };
+}
+
+function agendarSimulacao() {
+  clearTimeout(_simTimer);
+  _simTimer = setTimeout(simularConector, 300);
+}
+
+async function simularConector() {
+  const seq = ++_simSeq;
+  const res = await apiFetch(`${API_URL}/comercial/simulador-conector/calcular`, {
+    method: 'POST', body: JSON.stringify(entradasSimulador())
+  });
+  if (!res || seq !== _simSeq) return; // resposta atrasada de uma digitação anterior
+  const r = await res.json();
+  const erro = document.getElementById('sim-erro');
+  if (!res.ok) {
+    _simResultado = null;
+    erro.textContent = r.erro || 'Não foi possível calcular.';
+    erro.hidden = false;
+    document.querySelector('.sim-resultado').classList.add('sim-desatualizado');
+    return;
+  }
+  erro.hidden = true;
+  document.querySelector('.sim-resultado').classList.remove('sim-desatualizado');
+  _simResultado = r;
+  renderSimulacao(r);
+}
+
+function renderSimulacao(r) {
+  const t = r.totais;
+  const e = r.entradas;
+  const temDesc = e.desconto_pct > 0;
+  const tile = (rotulo, valor, detalhe) => `
+    <div class="rel-tile"><span class="rel-tile-rotulo">${rotulo}</span>
+      <span class="rel-tile-valor">${valor}</span><span class="rel-tile-detalhe">${detalhe}</span></div>`;
+  document.getElementById('sim-tiles').innerHTML = [
+    tile('Total mensal', `${formatMoeda(temDesc ? t.mensal_desconto : t.mensal_cheio)}`,
+      temDesc ? `com ${String(e.desconto_pct).replace('.', ',')}% por ${e.desconto_meses} ${e.desconto_meses === 1 ? 'mês' : 'meses'} · cheio ${formatMoeda(t.mensal_cheio)}` : 'preço cheio'),
+    tile('Total único', formatMoeda(t.unico), e.porte === 'nenhum' ? 'sem implantação' : `implantação${e.desconto_implantacao ? ' com desconto' : ''}`),
+    tile('Total do 1º ano', formatMoeda(t.primeiro_ano), temDesc ? `${t.meses_desconto_1o_ano} ${t.meses_desconto_1o_ano === 1 ? 'mês' : 'meses'} com desconto + implantação` : '12 meses + implantação'),
+    tile('Licenças por mês', formatMoeda(t.licencas_desconto), `plano ${r.modalidade_escolhida === 'empresa' ? 'Empresa' : 'Individual'} · ${r.comparacao.usuarios} usuário(s)`)
+  ].join('');
+
+  const c = r.comparacao;
+  const linha = (id, nome) => `
+    <tr class="${c.escolhida === id ? 'sim-escolhida' : ''}">
+      <th scope="row">${nome}${c.mais_barata === id ? ' ' + pill('mais barato', '#2e7d4f') : ''}${c.escolhida === id ? ' ' + pill('na proposta', '#1d6fd8') : ''}</th>
+      <td>${formatMoeda(c[id])}/mês</td>
+    </tr>`;
+  document.getElementById('sim-comparacao').innerHTML = `
+    <div class="fin-matriz"><table>
+      <thead><tr><th>Modalidade</th><th>Licenças (preço cheio)</th></tr></thead>
+      <tbody>${linha('individual', 'Individual (por usuário)')}${linha('empresa', 'Empresa (pacote)')}</tbody>
+    </table></div>
+    <p class="fin-muted">${c.diferenca > 0
+      ? `Diferença de ${formatMoeda(c.diferenca)}/mês a favor do ${c.mais_barata === 'empresa' ? 'Empresa' : 'Individual'}.`
+      : 'Mesmo preço: fica o Empresa (inclui painel do gestor).'}</p>`;
+
+  document.getElementById('sim-itens').innerHTML = `
+    <table>
+      <thead><tr><th>Item</th><th>Qtd × valor</th><th>Total</th></tr></thead>
+      <tbody>${r.itens.map(it => `
+        <tr>
+          <th scope="row">${escapeHtml(it.descricao)}<span class="fin-sub">${it.tipo === 'mensal' ? 'Mensal' : 'Valor único'}</span></th>
+          <td>${String(it.quantidade).replace('.', ',')} × ${formatMoeda(it.valor_unitario)}</td>
+          <td><strong>${formatMoeda(it.total)}</strong>${it.tipo === 'mensal' ? '/mês' : ''}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  const roi = r.roi;
+  document.getElementById('sim-roi').innerHTML = roi ? `
+    <div class="fin-matriz"><table><tbody>
+      <tr><th scope="row">Economia estimada</th><td>${formatMoeda(roi.economia_mensal)}/mês</td></tr>
+      <tr><th scope="row">Custo das licenças (cheio)</th><td>${formatMoeda(roi.custo_licencas_mensal)}/mês</td></tr>
+      <tr><th scope="row">Ganho líquido</th><td>${formatMoeda(roi.ganho_liquido_mensal)}/mês${roi.multiplo ? ` · ${String(roi.multiplo).replace('.', ',')}×` : ''}</td></tr>
+      <tr><th scope="row">Payback da implantação</th><td>${roi.payback_meses === null ? 'não se paga com essas premissas' : roi.payback_meses === 0 ? 'imediato' : `${roi.payback_meses} ${roi.payback_meses === 1 ? 'mês' : 'meses'}`}</td></tr>
+    </tbody></table></div>
+    <p class="fin-muted">${escapeHtml(roi.resumo)}</p>` : '<p class="fin-muted">Informe horas economizadas e custo/hora para estimar o retorno.</p>';
+}
+
+async function gerarPropostaConector() {
+  const form = document.getElementById('form-simulador');
+  const opId = form.oportunidade_id.value;
+  if (!opId) { alert('Escolha a oportunidade em que a proposta será criada.'); form.oportunidade_id.focus(); return; }
+  if (!_simResultado) { alert('Corrija os dados da simulação antes de gerar a proposta.'); return; }
+  // Abre a aba já no clique (senão o navegador bloqueia o pop-up depois do await)
+  const aba = window.open('', '_blank');
+  const btn = document.getElementById('sim-btn-gerar');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch(`${API_URL}/comercial/oportunidades/${opId}/propostas`, {
+      method: 'POST',
+      body: JSON.stringify({ simulador_conector: entradasSimulador(), incluir_roi: form.incluir_roi.checked })
+    });
+    const r = await resultadoJson(res);
+    if (!r) { if (aba) aba.close(); return; }
+    const url = `/proposta.html?id=${r.id}`;
+    if (aba) aba.location.href = url; else window.open(url, '_blank');
+    if (confirm('Proposta criada como rascunho na oportunidade.\n\nAbrir a oportunidade para revisar, enviar o link ao cliente ou criar nova versão?')) {
+      abrirOportunidade(Number(opId));
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Tabela de preços (editável): os campos vêm do backend (rótulos + valores)
+async function abrirPrecosConector() {
+  const c = await resultadoJson(await apiFetch(`${API_URL}/comercial/simulador-conector/config`));
+  if (!c) return;
+  const grupos = [
+    ['Licença por usuário (R$/mês)', ['leitura_mensal', 'leitura_anual', 'dev_mensal', 'dev_anual']],
+    ['Plano Empresa (R$/mês)', ['empresa_ate5', 'empresa_ate10', 'empresa_excedente', 'empresa_acrescimo_mensal_pct']],
+    ['Implantação (valor único)', ['impl_pequeno', 'impl_medio', 'impl_grande', 'impl_sistema_adicional']],
+    ['Fábrica ABAP', ['chamado_p', 'chamado_m', 'chamado_g', 'pacote_horas', 'pacote_valor']],
+    ['Padrões do ROI', ['roi_horas_funcional', 'roi_custo_funcional', 'roi_horas_abap', 'roi_custo_abap']]
+  ];
+  document.getElementById('precos-conector-campos').innerHTML = grupos.map(([titulo, chaves]) => `
+    <div class="form-section-title">${titulo}</div>
+    <div class="precos-grade">${chaves.map(k => `
+      <div class="form-group">
+        <label for="preco-${k}">${escapeHtml(c.rotulos[k])}</label>
+        <input type="number" id="preco-${k}" name="${k}" min="0" step="0.01" value="${c.precos[k]}" placeholder="${c.padrao[k]}">
+        <small class="form-hint">Padrão: ${c.padrao[k]}</small>
+      </div>`).join('')}
+    </div>`).join('');
+  showModal('#modal-precos-conector');
+}
+
+async function salvarPrecosConector() {
+  const form = document.getElementById('form-precos-conector');
+  const precos = Object.fromEntries([...form.querySelectorAll('input[name]')].map(i => [i.name, i.value]));
+  const r = await resultadoJson(await apiFetch(`${API_URL}/comercial/simulador-conector/config`, {
+    method: 'PUT', body: JSON.stringify({ precos })
+  }));
+  if (!r) return;
+  _simPrecos = r.precos;
+  closeModal(document.getElementById('modal-precos-conector'));
+  alternarFabricaSimulador();
+  simularConector();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const sub = (id, fn) => document.getElementById(id).addEventListener('submit', e => { e.preventDefault(); fn(); });
+  sub('form-precos-conector', salvarPrecosConector);
   sub('form-oportunidade', salvarOportunidade);
   sub('form-op-nota', adicionarNota);
   sub('form-proposta', salvarProposta);

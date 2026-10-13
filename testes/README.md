@@ -22,6 +22,7 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/assistente-financeiro.js           # tools do assistente de voz no financeiro (sem chamar a OpenAI)
    node testes/listagens-ordenacao.js             # ordenação por coluna e filtros das listagens e da visão mensal (Chrome headless)
    node testes/licencas-ativacao.js               # licenças do conector: ativação por máquina, limite, revogação, conexões, download
+   node testes/simulador-conector.js [saida.pdf]  # simulador de preço do Conector SAP: cálculo, validações, tabela de preços, gerar proposta + PDF A4 (Chrome headless)
    ```
 
    O de licenças precisa do servidor com `LICENCA_CHAVE_PRIVADA` (senão `/validar` dá 503). No Git Bash:

@@ -3983,6 +3983,44 @@ tr:hover .vm-mais, .vm-btn:focus-visible .vm-mais { opacity: 1; }
 .roteiro-tabela tr > :first-child { min-width: 0; }
 .roteiro-tabela tbody th { text-transform: none; letter-spacing: normal; font-size: 0.88rem; font-weight: 500; color: var(--text-main); }
 .roteiro-cuidados { margin-bottom: 24px; border-left: 4px solid #fab219; }
+/* Simulador de preço do Conector SAP (comercial.js) */
+.sim-grid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 12px; align-items: start; margin-bottom: 24px; }
+.sim-form .form-section-title { margin-top: 14px; }
+.sim-form .form-section-title:first-of-type { margin-top: 4px; }
+.sim-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sim-resultado { display: grid; gap: 12px; min-width: 0; position: sticky; top: 12px; transition: opacity .15s; }
+.sim-resultado .rel-tiles { margin-bottom: 0; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.sim-resultado .rel-tile-valor { font-size: 1.3rem; }
+.sim-resultado .fin-matriz tr > :first-child { position: static; box-shadow: none; min-width: 0; max-width: none; }
+.sim-resultado .fin-matriz tbody th { text-transform: none; letter-spacing: normal; font-size: 0.88rem; font-weight: 500; color: var(--text-main); }
+.sim-resultado .fin-matriz thead th:first-child { text-align: left; }
+.sim-resultado .fin-sub { text-transform: none; letter-spacing: normal; }
+.sim-resultado.sim-desatualizado > :not(.sim-erro) { opacity: .45; }
+.sim-erro { padding: 10px 14px; border-radius: 10px; background: #fdecea; color: #b42318; font-size: 0.9rem; }
+.sim-itens th, .sim-comparacao th { white-space: normal; }
+.sim-resultado .fin-matriz tbody th { white-space: normal; min-width: 0; }
+.sim-resultado .fin-matriz td { vertical-align: top; }
+.sim-escolhida > * { background: var(--bg-subtle, rgba(29, 111, 216, .06)); }
+.sim-resultado .fin-pill { margin-left: 4px; }
+.precos-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 0 12px; }
+@media (max-width: 1024px) {
+  .sim-grid { grid-template-columns: minmax(0, 1fr); }
+  .sim-resultado { position: static; }
+}
+@media (max-width: 600px) {
+  .sim-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .sim-resultado .rel-tiles { grid-template-columns: 1fr 1fr; }
+  .sim-resultado .fin-matriz td { white-space: normal; }
+  /* Itens: descrição em cima, quantidade × valor e total na linha de baixo */
+  .sim-itens thead { display: none; }
+  .sim-itens table, .sim-itens tbody { display: block; }
+  .sim-itens tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .sim-itens tr > * { border: 0 !important; padding: 0 !important; text-align: left; }
+  .sim-itens tr > th { grid-column: 1 / -1; }
+  .sim-itens tr > td:last-child { text-align: right; }
+  .sim-itens tbody tr:last-child { border-bottom: 0; }
+}
+
 @media (max-width: 768px) {
   .roteiro-trilha { display: grid; grid-template-columns: 1fr 1fr; }
   .roteiro-trilha li:not(:last-child)::after { content: none; }

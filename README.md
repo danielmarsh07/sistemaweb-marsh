@@ -49,6 +49,19 @@ Local: `docker compose up -d` e `npm run dev:local` (usa `.env.local`, banco Doc
 | Atendimentos | Timeline de ações por chamado (comentários, atualizações) |
 | Usuários | Criação e gestão de usuários com perfis diferenciados |
 
+### Comercial
+
+Só administradores (`admin_sistema`/`admin_empresa`); rotas em `/api/comercial`.
+
+- **Funil de vendas**: oportunidades (cliente ou prospect) em kanban, histórico, propostas com itens mensais/únicos, link público para o cliente aceitar (`/proposta.html?t=...`), impressão/PDF (`/proposta.html?id=...`) e *Gerar contrato* (cria o cliente, se for prospect, e o contrato recorrente).
+- **Simulador Conector SAP** (Comercial → Simulador Conector SAP, ou *Simular Conector SAP* na oportunidade): monta a oferta do Conector SAP Marsh e gera a proposta pelo mesmo fluxo.
+  - Entradas: oportunidade, nº de funcionais e ABAPs, ciclo (mensal/anual), modalidade (Individual, Empresa ou Automático = a mais barata), nº de sistemas SAP, porte do legado Z, chamados P/M/G estimados por mês **ou** pacotes de sustentação, desconto % por N meses (opcionalmente na implantação), validade e ROI (horas economizadas × custo/hora).
+  - Saída ao vivo: itens, total mensal (cheio e com desconto), total único, total do 1º ano, comparação Individual × Empresa e ROI (economia × custo das licenças, payback da implantação).
+  - *Gerar proposta*: `POST /api/comercial/oportunidades/:id/propostas` com `{ simulador_conector: {...}, incluir_roi }` cria o rascunho com itens, totais, título "Conector SAP Marsh — cliente" e textos padrão (produto, implantação, premissas: IA por conta do cliente, só sistemas cadastrados e nunca produção, licença por máquina, LGPD, chamados por demanda aprovada, IPCA, vigência mínima no anual). O total mensal da proposta é o valor com desconto; o preço cheio aparece nos itens e nas condições.
+  - Regra de preço numa função pura: `backend/services/precificacao-conector.js`. Rotas: `POST /api/comercial/simulador-conector/calcular`, `GET/PUT /api/comercial/simulador-conector/config`.
+  - **Tabela de preços** editável no botão *Tabela de preços* do simulador (gravada em `financeiro_config.prop_precos_conector`; campo vazio = padrão do código). Padrões: Leitura R$ 490 mensal / R$ 390 anual; Desenvolvimento R$ 990 / R$ 790; Empresa até 5 = R$ 3.500, até 10 = R$ 6.000, + R$ 450 por usuário acima de 10 (acréscimo opcional no ciclo mensal); implantação P/M/G R$ 8.000 / 15.000 / 25.000 + R$ 2.000 por sistema adicional; chamados P/M/G R$ 1.500 / 4.000 / 9.000; sustentação 40 h por R$ 7.500/mês.
+  - Teste: `node testes/simulador-conector.js [saida.pdf]`.
+
 ### Portal do Cliente (`/portal.html`)
 
 - Acesso isolado: cada cliente vê apenas seus próprios chamados
