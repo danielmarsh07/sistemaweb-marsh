@@ -3499,6 +3499,19 @@ svg.icon {
 }
 .licenca-uso-resumo span { display: block; font-size: 12px; color: var(--text-muted); }
 .licenca-uso-resumo strong { font-size: 20px; color: var(--text-main); font-variant-numeric: tabular-nums; }
+/* Grade editável de conexões SAP no modal da licença */
+.licenca-conexoes { overflow-x: auto; margin-bottom: 8px; }
+.licenca-conexoes table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.licenca-conexoes th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted); padding: 4px; }
+.licenca-conexoes td { padding: 3px 4px; }
+.licenca-conexoes input { width: 100%; min-width: 0; padding: 6px 8px; font-size: 13px; }
+.licenca-conexoes .cx-sid, .licenca-conexoes .cx-idioma { width: 64px; text-transform: uppercase; }
+.licenca-conexoes .cx-mandante { width: 76px; }
+.licenca-conexoes .cx-url { min-width: 200px; }
+.licenca-conexoes .cx-vazio { color: var(--text-muted); font-size: 12.5px; padding: 6px 4px; }
+/* Bolinha de "online nas últimas 24h" na coluna Máquinas */
+.licenca-online { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #94a3b8; vertical-align: middle; }
+.licenca-online.on { background: #10b981; }
 
 /* Logo: símbolo "M" (img/logo-simbolo.png, fundo transparente) no lugar da caixa colorida */
 .logo-box.logo-img {

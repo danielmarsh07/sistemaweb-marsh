@@ -1823,6 +1823,10 @@
     .pix-copiar { width: 100%; min-height: 44px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font: 600 0.9rem inherit; cursor: pointer; }
     .pix-copiar:hover { filter: brightness(1.08); }
     .pix-box small { font-size: 0.75rem; color: var(--text-muted); }
+    .conector-download { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; padding: 14px 16px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); font-size: 0.88rem; color: var(--text-secondary); }
+    .conector-download:empty { display: none; }
+    .conector-download strong { color: var(--text-main); }
+    .conector-download p { margin-top: 2px; }
     .licenca-card h4 { font-size: 1rem; margin-bottom: 8px; color: var(--text-main); display: flex; justify-content: space-between; align-items: center; }
 
     .modal-curso-box { width: 96vw; max-width: 1120px; }
@@ -1947,9 +1951,10 @@
       <div id="lista-faturas" class="licencas-portal"></div>
     </section>
 
-    <!-- Licença do conector SAP (some se a empresa não tiver) -->
+    <!-- Conector SAP: licença + download do instalador (some se a empresa não tiver licença) -->
     <section id="secao-licenca" class="portal-secao" hidden>
-      <div class="section-header"><h3>Licença do conector SAP</h3></div>
+      <div class="section-header"><h3>Conector SAP</h3></div>
+      <div id="conector-download" class="conector-download"></div>
       <div id="lista-licencas" class="licencas-portal"></div>
     </section>
 

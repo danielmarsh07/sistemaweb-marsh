@@ -485,6 +485,34 @@ async function iniciar() {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_licencas_uso_lic_data ON licencas_uso(licenca_id, data);`);
 
+    //     Titular, limite de máquinas e conexões SAP que o instalador recebe pré-preenchidas.
+    //     conexoes = [{ sid, descricao, url, mandante, idioma }] — nunca usuário/senha do SAP
+    await pool.query(`
+      ALTER TABLE licencas
+        ADD COLUMN IF NOT EXISTS titular_nome VARCHAR(150),
+        ADD COLUMN IF NOT EXISTS titular_email VARCHAR(150),
+        ADD COLUMN IF NOT EXISTS max_maquinas INTEGER,
+        ADD COLUMN IF NOT EXISTS conexoes JSONB NOT NULL DEFAULT '[]';
+    `);
+
+    //     Máquinas ativadas pelo instalador (maquina_hash = SHA-256 gerado no cliente)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS licencas_ativacoes (
+        id SERIAL PRIMARY KEY,
+        licenca_id INTEGER NOT NULL REFERENCES licencas(id),
+        maquina_hash VARCHAR(64) NOT NULL,
+        nome_maquina VARCHAR(100),
+        usuario_windows VARCHAR(100),
+        versao_conector VARCHAR(30),
+        primeira_ativacao TIMESTAMP DEFAULT NOW(),
+        ultima_validacao TIMESTAMP,
+        revogada BOOLEAN DEFAULT FALSE,
+        revogada_em TIMESTAMP,
+        UNIQUE (licenca_id, maquina_hash)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_licencas_ativacoes_lic ON licencas_ativacoes(licenca_id);`);
+
     // 21. Treinamentos (portal do cliente): cursos, aulas, liberação por cliente, progresso por usuário
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cursos (

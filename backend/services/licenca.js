@@ -58,4 +58,42 @@ function listaSids(sids) {
   return String(sids || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
 }
 
-module.exports = { PLANOS, VALIDADE_DIAS, gerarChave, hashChave, prefixoChave, chavePublicaPem, assinar, listaSids };
+const MAX_CONEXOES = 10;
+
+/**
+ * Valida e normaliza as conexões SAP da licença (o instalador recebe pré-preenchidas).
+ * Só guarda { sid, descricao, url, mandante, idioma }: qualquer outro campo (usuário, senha...) é descartado.
+ * Devolve { erro } ou { lista }.
+ */
+function validarConexoes(conexoes) {
+  if (conexoes === null || conexoes === '') return { lista: [] };
+  if (!Array.isArray(conexoes)) return { erro: 'Conexões SAP devem ser uma lista.' };
+  if (conexoes.length > MAX_CONEXOES) return { erro: `No máximo ${MAX_CONEXOES} conexões SAP por licença.` };
+  const lista = [];
+  for (const [i, c] of conexoes.entries()) {
+    const n = i + 1;
+    if (!c || typeof c !== 'object') return { erro: `Conexão ${n}: formato inválido.` };
+    const sid = String(c.sid || '').trim().toUpperCase();
+    const descricao = String(c.descricao || '').trim().slice(0, 100);
+    const url = String(c.url || '').trim();
+    const mandante = String(c.mandante || '').trim();
+    const idioma = String(c.idioma || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{3}$/.test(sid)) return { erro: `Conexão ${n}: SID deve ter 3 letras/números.` };
+    let urlOk = /^https?:\/\/\S+$/i.test(url) && url.length <= 255;
+    if (urlOk) { try { new URL(url); } catch (e) { urlOk = false; } }
+    if (!urlOk) return { erro: `Conexão ${n} (${sid}): URL deve começar com http:// ou https://.` };
+    if (!/^\d{3}$/.test(mandante)) return { erro: `Conexão ${n} (${sid}): mandante deve ter 3 dígitos.` };
+    if (!/^[A-Z]{2}$/.test(idioma)) return { erro: `Conexão ${n} (${sid}): idioma deve ter 2 letras (ex.: PT).` };
+    if (lista.some(x => x.sid === sid)) return { erro: `Conexão ${n}: SID ${sid} repetido (uma conexão por SID).` };
+    lista.push({ sid, descricao, url: url.replace(/\/+$/, ''), mandante, idioma });
+  }
+  return { lista };
+}
+
+/** Conexões da licença limitadas aos SIDs contratados (o JSONB chega do pg já como array). */
+function conexoesDosSids(conexoes, sids) {
+  return (Array.isArray(conexoes) ? conexoes : []).filter(c => c && sids.includes(String(c.sid).toUpperCase()));
+}
+
+module.exports = { PLANOS, VALIDADE_DIAS, gerarChave, hashChave, prefixoChave, chavePublicaPem, assinar, listaSids,
+                   validarConexoes, conexoesDosSids };

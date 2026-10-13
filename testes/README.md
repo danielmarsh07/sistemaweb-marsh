@@ -21,7 +21,11 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/financeiro-pix-relatorios.js       # webhook PIX, baixa, relatórios, CSV
    node testes/assistente-financeiro.js           # tools do assistente de voz no financeiro (sem chamar a OpenAI)
    node testes/listagens-ordenacao.js             # ordenação por coluna e filtros das listagens e da visão mensal (Chrome headless)
+   node testes/licencas-ativacao.js               # licenças do conector: ativação por máquina, limite, revogação, conexões, download
    ```
+
+   O de licenças precisa do servidor com `LICENCA_CHAVE_PRIVADA` (senão `/validar` dá 503). No Git Bash:
+   `LICENCA_CHAVE_PRIVADA="$(cat .licenca_chave_privada.txt)" npm run dev:local`.
 
    Cada linha sai como `OK` ou `FAIL`. Linhas com `!` são recusas esperadas pelo teste (ex.: 400 de validação).
 

@@ -842,12 +842,13 @@ function emitirCertificado(id) {
   w.document.close();
 }
 
-// ===== LICENÇA DO CONECTOR SAP (só leitura para o cliente) =====
+// ===== CONECTOR SAP: licença (só leitura) e download do instalador =====
 async function carregarLicencasPortal() {
   const res = await apiFetch(`${API}/licencas/minhas`);
   if (!res || !res.ok) return;
   const lista = await res.json();
   document.getElementById('secao-licenca').hidden = !lista.length;
+  if (lista.length) carregarDownloadConector();
   const planos = { leitura: 'Leitura', desenvolvimento: 'Desenvolvimento', empresa: 'Empresa' };
   const hoje = new Date().toISOString().slice(0, 10);
   document.getElementById('lista-licencas').innerHTML = lista.map(l => {
@@ -858,12 +859,32 @@ async function carregarLicencasPortal() {
       <div class="licenca-card">
         <h4>Plano ${escapeHtml(planos[l.plano] || l.plano)}
           <span style="background:${st[1]}20; color:${st[1]}; padding:2px 8px; border-radius:20px; font-size:0.75rem; font-weight:600">${st[0]}</span></h4>
+        ${l.titular_nome ? `<div class="linha"><span>Titular</span><strong>${escapeHtml(l.titular_nome)}</strong></div>` : ''}
         <div class="linha"><span>Válida até</span><strong>${fim.split('-').reverse().join('/')}</strong></div>
         <div class="linha"><span>Sistemas</span><strong>${escapeHtml(String(l.sids).replace(/,/g, ', '))}</strong></div>
+        <div class="linha"><span>Máquinas ativas</span><strong>${Number(l.maquinas_ativas) || 0}${l.max_maquinas ? ' de ' + l.max_maquinas : ''}</strong></div>
         <div class="linha"><span>Usuários ativos (30 dias)</span><strong>${l.usuarios_ativos}${l.max_usuarios ? ' de ' + l.max_usuarios : ''}</strong></div>
         <div class="linha"><span>Uso do conector (30 dias)</span><strong>${Number(l.chamadas_30d).toLocaleString('pt-BR')} operações</strong></div>
       </div>`;
   }).join('');
+}
+
+// Botão "Baixar instalador": a URL vem do servidor (CONECTOR_DOWNLOAD_URL); sem ela, aviso de "em preparação"
+async function carregarDownloadConector() {
+  const box = document.getElementById('conector-download');
+  const instrucao = '<p>Execute o instalador e informe a chave de licença que a Marsh enviou.</p>';
+  const res = await apiFetch(`${API}/licencas/download`);
+  if (!res) return;
+  if (!res.ok) {
+    box.innerHTML = '<div><strong>Instalador do conector</strong><p>Disponível enquanto a licença estiver ativa. Fale com a Marsh.</p></div>';
+    return;
+  }
+  const { url, versao } = await res.json();
+  const urlSegura = /^https?:\/\//i.test(url || '') ? url : null;
+  box.innerHTML = urlSegura
+    ? `<div><strong>Instalador do conector${versao ? ' — versão ' + escapeHtml(versao) : ''}</strong>${instrucao}</div>
+       <a class="btn-curso" href="${escapeHtml(urlSegura)}" target="_blank" rel="noopener" download>Baixar instalador</a>`
+    : `<div><strong>Instalador do conector</strong><p>Instalador em preparação — fale com a Marsh.</p></div>`;
 }
 
 // ===== FINANCEIRO: faturas e NFS-e do cliente (só leitura) =====

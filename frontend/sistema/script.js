@@ -1146,14 +1146,14 @@ function badgeLicenca(l) {
 
 async function loadLicencas() {
   const tbody = document.getElementById('licencas-tbody');
-  if (tbody && tbody.querySelector('.text-center')) tbody.innerHTML = skeletonRows(8);
+  if (tbody && tbody.querySelector('.text-center')) tbody.innerHTML = skeletonRows(10);
   const res = await apiFetch(`${API_URL}/licencas`);
   if (!res) return;
-  if (!res.ok) { const e = await res.json(); tbody.innerHTML = `<tr><td colspan="8" class="text-center">${escapeHtml(e.erro)}</td></tr>`; return; }
+  if (!res.ok) { const e = await res.json(); tbody.innerHTML = `<tr><td colspan="10" class="text-center">${escapeHtml(e.erro)}</td></tr>`; return; }
   _licencasCache = await res.json();
 
   if (!_licencasCache.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhuma licença cadastrada. Use "+ Nova licença".</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhuma licença cadastrada. Use "+ Nova licença".</td></tr>';
     return;
   }
   tbody.innerHTML = _licencasCache.map(l => `
@@ -1162,14 +1162,23 @@ async function loadLicencas() {
         <strong>${escapeHtml(l.cliente_nome)}</strong>
         <span class="licenca-prefixo">${escapeHtml(l.chave_prefixo)}-••••-••••</span>
       </td>
+      <td data-label="Titular">
+        ${l.titular_nome ? escapeHtml(l.titular_nome) : '-'}
+        ${l.titular_email ? `<span class="licenca-prefixo">${escapeHtml(l.titular_email)}</span>` : ''}
+      </td>
       <td data-label="Plano">${escapeHtml(PLANOS_LICENCA[l.plano] || l.plano)}</td>
       <td data-label="Usuários (30 dias)">${l.usuarios_ativos} / ${l.max_usuarios ? l.max_usuarios : '∞'}</td>
+      <td data-label="Máquinas" data-sort="${l.maquinas_ativas}" title="${l.maquinas_online_24h} online nas últimas 24h">
+        <span class="licenca-online${l.maquinas_online_24h ? ' on' : ''}"></span>${l.maquinas_ativas} / ${l.max_maquinas ? l.max_maquinas : '∞'}
+        <span class="licenca-prefixo">${l.maquinas_online_24h} online 24h</span>
+      </td>
       <td data-label="Sistemas">${escapeHtml(l.sids.replace(/,/g, ', '))}</td>
       <td data-label="Validade">${diaBr(l.data_fim)}</td>
       <td data-label="Status">${badgeLicenca(l)}</td>
       <td data-label="Último contato">${l.ultima_validacao ? new Date(l.ultima_validacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca'}</td>
       <td data-label="Ações" class="td-acoes">
         <button class="btn btn-icon" title="Ver uso" aria-label="Ver uso" onclick="verUsoLicenca(${l.id})">${iconSVG('eye')}</button>
+        <button class="btn btn-icon" title="Máquinas" aria-label="Máquinas" onclick="verMaquinasLicenca(${l.id})">${iconSVG('monitor')}</button>
         <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarLicenca(${l.id})">${iconSVG('edit')}</button>
         <button class="btn btn-icon" title="Gerar nova chave" aria-label="Gerar nova chave" onclick="novaChaveLicenca(${l.id})">${iconSVG('key')}</button>
         <button class="btn btn-icon btn-danger" title="Cancelar licença" aria-label="Cancelar licença" onclick="cancelarLicenca(${l.id})">${iconSVG('ban')}</button>
@@ -1197,6 +1206,7 @@ async function abrirNovaLicenca() {
   const fim = new Date(); fim.setFullYear(fim.getFullYear() + 1);
   form.data_fim.value = fim.toISOString().slice(0, 10);
   form.cliente_id.disabled = false;
+  renderConexoesLicenca([]);
   document.getElementById('licenca-status-row').style.display = 'none';
   document.getElementById('modal-licenca-titulo').textContent = 'Nova licença';
   await preencherClientesLicenca();
@@ -1217,6 +1227,10 @@ async function editarLicenca(id) {
   form.data_fim.value = diaIso(l.data_fim);
   form.status.value = l.status === 'suspensa' ? 'suspensa' : 'ativa';
   form.observacoes.value = l.observacoes || '';
+  form.titular_nome.value = l.titular_nome || '';
+  form.titular_email.value = l.titular_email || '';
+  form.max_maquinas.value = l.max_maquinas || '';
+  renderConexoesLicenca(l.conexoes || []);
   document.getElementById('licenca-status-row').style.display = '';
   document.getElementById('modal-licenca-titulo').textContent = `Editar licença — ${l.cliente_nome}`;
   showModal('#modal-licenca');
@@ -1230,7 +1244,11 @@ async function salvarLicenca() {
     max_usuarios: form.max_usuarios.value,
     data_inicio: form.data_inicio.value,
     data_fim: form.data_fim.value,
-    observacoes: form.observacoes.value
+    observacoes: form.observacoes.value,
+    titular_nome: form.titular_nome.value,
+    titular_email: form.titular_email.value,
+    max_maquinas: form.max_maquinas.value,
+    conexoes: lerConexoesLicenca()
   };
   if (licencaEmEdicao) dados.status = form.status.value;
   else dados.cliente_id = form.cliente_id.value;
@@ -1247,6 +1265,57 @@ async function salvarLicenca() {
   } catch (err) {
     alert('Erro: ' + err.message);
   }
+}
+
+// Grade de conexões SAP do modal (SID, descrição, URL, mandante, idioma — sem usuário/senha)
+const MAX_CONEXOES_LICENCA = 10;
+
+function linhaConexaoLicenca(c = {}) {
+  return `
+    <tr>
+      <td><input class="cx-sid" maxlength="3" placeholder="DEV" value="${escapeHtml(c.sid || '')}" aria-label="SID"></td>
+      <td><input class="cx-descricao" maxlength="100" placeholder="Desenvolvimento" value="${escapeHtml(c.descricao || '')}" aria-label="Descrição"></td>
+      <td><input class="cx-url" placeholder="https://servidor:8000" value="${escapeHtml(c.url || '')}" aria-label="URL"></td>
+      <td><input class="cx-mandante" maxlength="3" inputmode="numeric" placeholder="100" value="${escapeHtml(c.mandante || '')}" aria-label="Mandante"></td>
+      <td><input class="cx-idioma" maxlength="2" placeholder="PT" value="${escapeHtml(c.idioma || 'PT')}" aria-label="Idioma"></td>
+      <td><button type="button" class="btn btn-icon btn-danger" title="Remover conexão" aria-label="Remover conexão"
+            onclick="removerConexaoLicenca(this)">${iconSVG('x')}</button></td>
+    </tr>`;
+}
+
+function renderConexoesLicenca(lista) {
+  const tbody = document.getElementById('licenca-conexoes-tbody');
+  tbody.innerHTML = lista.length
+    ? lista.map(linhaConexaoLicenca).join('')
+    : '<tr class="cx-vazio-linha"><td colspan="6" class="cx-vazio">Nenhuma conexão. Use "+ Conexão".</td></tr>';
+}
+
+function adicionarConexaoLicenca() {
+  const tbody = document.getElementById('licenca-conexoes-tbody');
+  if (tbody.querySelectorAll('tr:not(.cx-vazio-linha)').length >= MAX_CONEXOES_LICENCA) {
+    alert(`No máximo ${MAX_CONEXOES_LICENCA} conexões por licença.`);
+    return;
+  }
+  const vazio = tbody.querySelector('.cx-vazio-linha');
+  if (vazio) vazio.remove();
+  tbody.insertAdjacentHTML('beforeend', linhaConexaoLicenca());
+  tbody.lastElementChild.querySelector('.cx-sid').focus();
+}
+
+function removerConexaoLicenca(btn) {
+  btn.closest('tr').remove();
+  if (!document.querySelector('#licenca-conexoes-tbody tr')) renderConexoesLicenca([]);
+}
+
+// Linhas totalmente vazias são ignoradas; o resto o servidor valida
+function lerConexoesLicenca() {
+  return [...document.querySelectorAll('#licenca-conexoes-tbody tr:not(.cx-vazio-linha)')].map(tr => ({
+    sid: tr.querySelector('.cx-sid').value.trim().toUpperCase(),
+    descricao: tr.querySelector('.cx-descricao').value.trim(),
+    url: tr.querySelector('.cx-url').value.trim(),
+    mandante: tr.querySelector('.cx-mandante').value.trim(),
+    idioma: tr.querySelector('.cx-idioma').value.trim().toUpperCase()
+  })).filter(c => c.sid || c.descricao || c.url || c.mandante);
 }
 
 function mostrarChaveLicenca(chave) {
@@ -1311,6 +1380,65 @@ async function verUsoLicenca(id) {
         </tr>`).join('')}
       </tbody></table></div>` : '<p class="text-center">Nenhum uso registrado ainda.</p>'}
   `;
+}
+
+// Máquinas ativadas pelo instalador: revogar libera a vaga; reativar respeita o limite
+let licencaMaquinasAtual = null;
+const dataHoraBr = v => (v ? new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca');
+
+async function verMaquinasLicenca(id) {
+  licencaMaquinasAtual = id;
+  const l = _licencasCache.find(x => x.id === id);
+  const corpo = document.getElementById('licenca-maquinas-corpo');
+  document.getElementById('modal-licenca-maquinas-titulo').textContent = `Máquinas ativadas — ${l ? l.cliente_nome : ''}`;
+  corpo.textContent = 'Carregando...';
+  showModal('#modal-licenca-maquinas');
+
+  const res = await apiFetch(`${API_URL}/licencas/${id}/maquinas`);
+  if (!res) return;
+  const lista = await res.json();
+  if (!res.ok) { corpo.textContent = lista.erro; return; }
+
+  const ativas = lista.filter(m => !m.revogada).length;
+  const online = lista.filter(m => !m.revogada && m.ultima_validacao &&
+    Date.now() - new Date(m.ultima_validacao).getTime() < 86400000).length;
+  corpo.innerHTML = `
+    <div class="licenca-uso-resumo">
+      <div><span>Ativas</span><strong>${ativas}${l && l.max_maquinas ? ' / ' + l.max_maquinas : ''}</strong></div>
+      <div><span>Online (24h)</span><strong>${online}</strong></div>
+      <div><span>Revogadas</span><strong>${lista.length - ativas}</strong></div>
+      <div><span>Limite</span><strong>${l && l.max_maquinas ? l.max_maquinas : '∞'}</strong></div>
+    </div>
+    <p class="pagina-descricao">A máquina revogada deixa de ativar e validar; o conector dela para em até 7 dias.</p>
+    ${lista.length ? `
+    <div class="table-container"><table>
+      <thead><tr><th>Máquina</th><th>Usuário Windows</th><th>Versão</th><th>Primeira ativação</th><th>Última validação</th><th>Status</th><th>Ações</th></tr></thead>
+      <tbody>${lista.map(m => `
+        <tr>
+          <td data-label="Máquina"><strong>${escapeHtml(m.nome_maquina || '-')}</strong></td>
+          <td data-label="Usuário Windows">${escapeHtml(m.usuario_windows || '-')}</td>
+          <td data-label="Versão">${escapeHtml(m.versao_conector || '-')}</td>
+          <td data-label="Primeira ativação">${dataHoraBr(m.primeira_ativacao)}</td>
+          <td data-label="Última validação">${dataHoraBr(m.ultima_validacao)}</td>
+          <td data-label="Status">${m.revogada
+            ? `<span style="background:#ef444420; color:#ef4444; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">Revogada</span>`
+            : `<span style="background:#10b98120; color:#10b981; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">Ativa</span>`}</td>
+          <td data-label="Ações" class="td-acoes">${m.revogada
+            ? `<button class="btn btn-secondary btn-sm" onclick="alterarMaquinaLicenca(${m.id}, 'reativar')">Reativar</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="alterarMaquinaLicenca(${m.id}, 'revogar')">Revogar</button>`}</td>
+        </tr>`).join('')}
+      </tbody></table></div>` : '<p class="text-center">Nenhuma máquina ativada ainda. O cliente ativa ao rodar o instalador com a chave.</p>'}
+  `;
+}
+
+async function alterarMaquinaLicenca(mid, acao) {
+  if (acao === 'revogar' && !confirm('Revogar esta máquina? O conector dela deixa de funcionar em até 7 dias e a vaga é liberada.')) return;
+  const res = await apiFetch(`${API_URL}/licencas/${licencaMaquinasAtual}/maquinas/${mid}/${acao}`, { method: 'POST' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  await loadLicencas();
+  verMaquinasLicenca(licencaMaquinasAtual);
 }
 
 // ===== TREINAMENTOS (cursos em vídeo do portal) =====
@@ -2944,6 +3072,7 @@ const _ICONS = {
   key: '<circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="m18 5 2 2"/><path d="m15 8 2 2"/>',
   ban: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
   check: '<polyline points="20 6 9 17 4 12"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
   x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
 };
 function iconSVG(name, size = 16) {

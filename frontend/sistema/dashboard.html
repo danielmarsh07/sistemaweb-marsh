@@ -483,8 +483,10 @@
             <thead>
               <tr>
                 <th>Cliente</th>
+                <th>Titular</th>
                 <th>Plano</th>
                 <th>Usuários (30 dias)</th>
+                <th>Máquinas</th>
                 <th>Sistemas</th>
                 <th>Validade</th>
                 <th>Status</th>
@@ -493,7 +495,7 @@
               </tr>
             </thead>
             <tbody id="licencas-tbody">
-              <tr><td colspan="8" class="text-center">Carregando...</td></tr>
+              <tr><td colspan="10" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -812,10 +814,11 @@
             <h3>Licença do conector SAP</h3>
             <p class="fin-muted">A chave aparece <strong>uma única vez</strong>, na criação: copie e envie na hora.</p>
             <ol>
-              <li>Nova licença: cliente, plano (leitura, desenvolvimento ou empresa), SIDs (ex.: DEV, QAS, PRD), limite de usuários e data de fim.</li>
-              <li>Envie a chave <code>MRSH-XXXX-XXXX-XXXX</code> ao cliente. Perdeu? <strong>Nova chave</strong> (a antiga deixa de valer).</li>
+              <li>Nova licença: cliente, titular, plano (leitura, desenvolvimento ou empresa), SIDs (ex.: DEV, QAS, PRD), limites de usuários e de máquinas, data de fim e as <strong>conexões SAP</strong> (SID, URL, mandante, idioma — nunca usuário/senha).</li>
+              <li>Envie a chave <code>MRSH-XXXX-XXXX-XXXX</code> ao titular. Ele baixa o instalador no portal, executa e informa a chave: a máquina é ativada e as conexões vêm preenchidas. Perdeu? <strong>Nova chave</strong> (a antiga deixa de valer).</li>
+              <li><strong>Máquinas</strong>: veja quem ativou e quem falou com o servidor nas últimas 24h. Trocou de computador? Revogue a máquina antiga para liberar a vaga.</li>
               <li>Renovação: altere a data de fim. A licença <strong>não acompanha o contrato</strong>: vence na data dela.</li>
-              <li>Suspender ou cancelar bloqueia o conector em até 7 dias.</li>
+              <li>Suspender, cancelar ou revogar a máquina bloqueia o conector em até 7 dias.</li>
             </ol>
             <a href="#" class="roteiro-ir" onclick="showPage('licencas'); return false;">Licenças →</a>
           </section>
@@ -2619,7 +2622,7 @@
   </div>
 
   <div id="modal-licenca" class="modal">
-    <div class="modal-content">
+    <div class="modal-content modal-lg">
       <div class="modal-header">
         <h3 id="modal-licenca-titulo">Nova licença</h3>
         <button class="btn-close">&times;</button>
@@ -2649,6 +2652,36 @@
             <label>Máximo de usuários</label>
             <input type="number" name="max_usuarios" min="1" placeholder="Vazio = ilimitado">
           </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Titular (nome)</label>
+            <input type="text" name="titular_nome" maxlength="150" placeholder="Consultor/funcional responsável">
+          </div>
+          <div class="form-group">
+            <label>Titular (e-mail)</label>
+            <input type="email" name="titular_email" maxlength="150" placeholder="fulano@cliente.com.br">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Máximo de máquinas</label>
+            <input type="number" name="max_maquinas" min="1" placeholder="Vazio = ilimitado">
+            <small class="form-hint">Computadores ativados pelo instalador (revogados não contam).</small>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Conexões SAP (o instalador recebe pré-preenchidas)</label>
+          <div class="licenca-conexoes">
+            <table>
+              <thead>
+                <tr><th>SID</th><th>Descrição</th><th>URL</th><th>Mandante</th><th>Idioma</th><th></th></tr>
+              </thead>
+              <tbody id="licenca-conexoes-tbody"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="adicionarConexaoLicenca()">+ Conexão</button>
+          <small class="form-hint">Só endereço, mandante e idioma — usuário e senha do SAP ficam na máquina do cliente. O conector só usa as conexões dos SIDs da licença.</small>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -2689,7 +2722,8 @@
         <button class="btn-close">&times;</button>
       </div>
       <div class="licenca-chave-corpo">
-        <p>Envie esta chave ao cliente (vai no <code>.env</code> do conector, em <code>SAP_LICENSE_KEY</code>).
+        <p>Envie esta chave ao cliente. Ele baixa o instalador no portal (seção <strong>Conector SAP</strong>),
+           executa e informa a chave no assistente — a máquina é ativada na hora.
            <strong>Ela não será exibida de novo</strong> — se perder, gere uma nova.</p>
         <div class="licenca-chave-box">
           <code id="licenca-chave-texto">MRSH-XXXX-XXXX-XXXX</code>
@@ -2836,6 +2870,17 @@
         <button class="btn-close">&times;</button>
       </div>
       <div id="licenca-uso-corpo" class="licenca-uso-corpo">Carregando...</div>
+    </div>
+  </div>
+
+  <!-- MODAL: MÁQUINAS ATIVADAS DA LICENÇA (instalador) -->
+  <div id="modal-licenca-maquinas" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="modal-licenca-maquinas-titulo">Máquinas ativadas</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <div id="licenca-maquinas-corpo" class="licenca-uso-corpo">Carregando...</div>
     </div>
   </div>
 
