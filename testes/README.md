@@ -19,6 +19,8 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/financeiro-contas-fluxo-dre.js     # contas a pagar, fluxo de caixa, DRE
    node testes/comercial-funil-propostas.js       # lead do site, propostas, aceite, contrato
    node testes/financeiro-pix-relatorios.js       # webhook PIX, baixa, relatórios, CSV
+   node testes/assistente-financeiro.js           # tools do assistente de voz no financeiro (sem chamar a OpenAI)
+   node testes/listagens-ordenacao.js             # ordenação por coluna e filtros das listagens e da visão mensal (Chrome headless)
    ```
 
    Cada linha sai como `OK` ou `FAIL`. Linhas com `!` são recusas esperadas pelo teste (ex.: 400 de validação).

@@ -262,15 +262,25 @@
     }
   }
 
+  // Recarrega a tela aberta quando o assistente gravou algo nela.
+  // currentPage é um `let` global do script.js (não fica em window), por isso o typeof.
+  const RECARREGAR = {
+    clientes: 'loadClientes',
+    fornecedores: 'loadFornecedores',
+    chamados: 'loadChamados',
+    'contas-pagar': 'loadContasPagar',
+    'fluxo-caixa': 'loadFluxoCaixa',
+    faturamento: 'loadFaturamento',
+    'categorias-despesa': 'loadPaginaCategoriasDespesa'
+  };
+
   function refreshPage(page) {
     try {
+      const paginaAtual = typeof currentPage !== 'undefined' ? currentPage : null;
       // Dashboard (admin)
-      if (page === 'dashboard'    && typeof window.loadDashboard    === 'function') window.loadDashboard();
-      if (page === 'transacoes'   && typeof window.loadTransacoes   === 'function' && window.currentPage === 'transacoes') window.loadTransacoes();
-      if (page === 'clientes'     && typeof window.loadClientes     === 'function' && window.currentPage === 'clientes')   window.loadClientes();
-      if (page === 'fornecedores' && typeof window.loadFornecedores === 'function' && window.currentPage === 'fornecedores') window.loadFornecedores();
-      if (page === 'chamados'     && typeof window.loadChamados     === 'function' && window.currentPage === 'chamados')   window.loadChamados();
-      if (page === 'categorias-transacao' && typeof window.loadCategoriasTransacao === 'function' && window.currentPage === 'categorias-transacao') window.loadCategoriasTransacao();
+      if (page === 'dashboard' && paginaAtual === 'dashboard' && typeof window.loadDashboard === 'function') window.loadDashboard();
+      const fn = RECARREGAR[page];
+      if (fn && paginaAtual === page && typeof window[fn] === 'function') window[fn]();
       // Portal (cliente)
       if (page === 'chamados'  && typeof window.carregarPortal === 'function') window.carregarPortal();
       if (page === 'dashboard' && typeof window.carregarPortal === 'function') window.carregarPortal();

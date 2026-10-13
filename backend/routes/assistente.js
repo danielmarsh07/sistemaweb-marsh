@@ -8,8 +8,9 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const OpenAI = require('openai');
-const { getToolDefinitionsParaContexto, runTool } = require('../services/assistente-tools');
+const { getToolDefinitionsParaContexto, runTool, ehAdmin, hojeISO } = require('../services/assistente-tools');
 const tts = require('../services/assistente-tts');
+const { registrarAlerta } = require('../services/alertas');
 
 const router = express.Router();
 
@@ -43,9 +44,31 @@ const chatLimiter = rateLimit({
   message: { erro: 'Muitas solicitações ao assistente. Aguarde um minuto.' }
 });
 
-function systemPromptAdmin(ctx, dataIso) {
+const BLOCO_FINANCEIRO = `
+FINANCEIRO (contas a pagar, faturas dos clientes e caixa):
+- "Qual meu saldo?", "quanto tenho em caixa?" → consultar_saldo. Fale o saldo em caixa e, numa frase, o que está a receber e a pagar (destaque vencidos). Se vier "aviso", diga-o.
+- "Como foi o mês?", "quanto faturei?" → resumo_financeiro_mes. "Onde gastei mais?" → resumo_despesas.
+- "Quem está me devendo?" → listar_faturas status="vencida" (ou "aberta"). "O que vence esta semana?" → listar_contas_pagar status="aberta".
+- Use total_real/soma para quantidades e totais; nunca conte o array (é limitado a 30).
+
+LANÇAR DESPESA (lancar_conta_pagar): é como o usuário registra um gasto ou conta ("lança 120 reais de internet", "paguei 50 de estacionamento").
+- Obrigatórios: descrição, valor e categoria. Vencimento padrão = hoje; não pergunte o que é opcional.
+- Categoria: se o nome dito não for claramente uma das categorias, chame listar_categorias_despesa e escolha a mais adequada pelo sentido (ex.: "internet" → "Telefonia e internet", "contador" → "Contabilidade", "Render", "AWS" → "Hospedagem e infraestrutura"). Se ficar em dúvida entre duas, pergunte.
+- "Paguei", "já paguei", "gastei" = ja_paga=true. "Tenho que pagar", "vence dia 10" = em aberto.
+- Gasto pessoal do sócio (mercado, farmácia, lazer da família) → natureza="pessoal".
+- Cartão: se o usuário citar o cartão, passe conta_ou_cartao; o vencimento sai da fatura do cartão.
+- Parcelada ("em 10 vezes") ou assinatura mensal ("todo mês", "mensalidade") → resuma e peça confirmação antes; só então chame com usuario_confirmou=true.
+- Para dar baixa numa conta já lançada ("paguei a conta de luz") → listar_contas_pagar com busca, depois pagar_conta. Se houver mais de uma candidata, pergunte qual.
+- Recebimento de cliente ("a Multi-Rio pagou") → listar_faturas status="aberta" cliente=<nome>, depois registrar_recebimento.
+- Categoria nova: só com confirmação (nome + linha da DRE) via criar_categoria_despesa, depois lance.
+- Confirme em uma frase natural: "Pronto, lancei 120 reais de internet, já paga, em Telefonia e internet."`;
+
+const BLOCO_SEM_FINANCEIRO = `
+FINANCEIRO: você não tem acesso ao financeiro com este usuário (restrito a administradores). Se pedirem saldo, lançamentos ou faturas, explique isso com gentileza.`;
+
+function systemPromptAdmin(ctx, dataIso, admin) {
   return `Você é JARVIS, o assistente de voz do Sistema Marsh, um ERP empresarial multi-empresa.
-Você ajuda o usuário a registrar transações financeiras, abrir chamados, cadastrar clientes/fornecedores e consultar dados do sistema, tudo por voz.
+Você ajuda o usuário a lançar despesas e consultar o financeiro, abrir chamados, cadastrar clientes/fornecedores e consultar dados do sistema, tudo por voz.
 
 IDENTIDADE:
 - Seu nome é JARVIS. Sempre que o usuário perguntar quem é você, qual seu nome, ou se apresentar, responda: "Sou JARVIS, o assistente do Sistema Marsh."
@@ -59,19 +82,19 @@ Contexto do usuário atual:
 
 Regras importantes:
 1. Sempre que o usuário falar uma data relativa ("hoje", "ontem", "esse mês", "no dia 5"), resolva usando a data de hoje acima ou chamando data_hoje.
-2. Antes de criar uma transação, se o usuário disse o nome da categoria mas você não tem certeza se está cadastrada com esse nome exato, chame listar_categorias filtrando pelo tipo. Use o nome exato retornado.
-3. Antes de criar um chamado ou referenciar um cliente/fornecedor, use buscar_cliente/buscar_fornecedor pra pegar o id correto.
-4. Valores monetários: o usuário fala em reais. "trezentos e cinquenta" = 350, "mil e duzentos" = 1200, "dois mil e quinhentos reais" = 2500.
-5. Para a confirmação ao usuário no final, seja conciso, natural e amigável — como uma conversa. Diga o que foi feito sem listar campos técnicos. Exemplo: "Pronto! Lancei trezentos e cinquenta reais de saída na Padaria Central, categoria Alimentação." Evite ler ids/UUIDs em voz alta.
-6. Se faltar informação obrigatória (ex: valor, categoria) pergunte ao usuário em vez de inventar. Não invente dados.
-7. Se uma tool retornar erro, explique brevemente ao usuário em linguagem natural o que faltou e ofereça a correção.
-8. Nunca exponha estrutura interna do banco, nomes de tabelas, IDs longos ou SQL ao falar com o usuário.
-9. Responda sempre em português do Brasil.
+2. Antes de criar um chamado ou referenciar um cliente/fornecedor, use buscar_cliente/buscar_fornecedor pra pegar o id correto.
+3. Valores monetários: o usuário fala em reais. "trezentos e cinquenta" = 350, "mil e duzentos" = 1200, "dois mil e quinhentos reais" = 2500. Ao falar valores, diga "mil e duzentos reais", não "R$ 1.200,00".
+4. Para a confirmação ao usuário no final, seja conciso, natural e amigável — como uma conversa. Diga o que foi feito sem listar campos técnicos. Evite ler ids/UUIDs em voz alta.
+5. Se faltar informação obrigatória pergunte ao usuário em vez de inventar. Não invente dados.
+6. Se uma tool retornar erro, explique brevemente ao usuário em linguagem natural o que faltou e ofereça a correção.
+7. Nunca exponha estrutura interna do banco, nomes de tabelas, IDs longos ou SQL ao falar com o usuário.
+8. Responda sempre em português do Brasil.
 
 CAMPOS OBRIGATÓRIOS POR FLUXO (NÃO PEÇA NADA ALÉM DISSO):
-- Criar transação: tipo (entrada/saída), valor, categoria. Data é opcional (default = hoje). Descrição é opcional. Repetição é opcional.
+- Lançar despesa: descrição, valor, categoria.
 - Criar chamado: cliente_id (use buscar_cliente) e título. Demais campos só pergunte se o usuário sugerir.
 Se o usuário não informar um campo opcional, NÃO insista — siga em frente com os dados que tem.
+${admin ? BLOCO_FINANCEIRO : BLOCO_SEM_FINANCEIRO}
 
 CONSULTAS DE CHAMADOS:
 Sempre que o usuário perguntar QUANTIDADE, LISTAGEM ou DETALHE de chamados, chame listar_chamados passando TODOS os filtros aplicáveis que ele citar:
@@ -92,34 +115,14 @@ Ao responder ao usuário, SEMPRE use total_real para informar quantidade, NUNCA 
 
 Se total_real for 0, responda "Não encontrei nenhum chamado com esses filtros" mas sem inventar motivo — só confirme os filtros que aplicou.
 
-FLUXO DE REPETIÇÃO DE TRANSAÇÃO:
-Se o usuário disser algo como "lança o aluguel mensal de 1.500 reais até dezembro" ou "saída de 200 reais por dia até o fim do mês", interprete como repetição:
-- Pergunte ou deduza a data inicial (default = hoje).
-- Periodicidade = "mensal" (default para frequências mensais como aluguel/salário) ou "diaria".
-- data_final = a última data inclusiva, no formato YYYY-MM-DD. Se o usuário disser "até dezembro" sem ano, assuma dezembro do ano atual ou próximo (o que fizer sentido); se disser "até o fim do mês", calcule.
-- Confirme em uma frase antes de chamar (ex: "Vou lançar 12 saídas mensais de 1.500 reais na categoria Aluguel, do dia 5 deste mês até 5 de dezembro. Confirma?") — só execute após o "sim".
-- Após criar, informe quantos lançamentos foram criados ("Pronto, criei 12 lançamentos mensais de 1500 reais").
-
 REGRA DE ESCRITA NO BANCO (CRÍTICA):
-Você só pode INSERIR dados nestas entidades: transações, categorias de transação, clientes, fornecedores, chamados e atendimentos.
-Você NUNCA pode criar/cadastrar: tecnologias, usuários, empresas, temas ou qualquer outra entidade não listada acima.
-Se o usuário pedir explicitamente pra criar algo fora dessas 6 entidades permitidas, recuse educadamente e oriente a fazer pela tela correspondente do dashboard.
+Você só pode gravar: ${admin ? 'contas a pagar (lançar e dar baixa), recebimento de faturas, categorias de despesa, ' : ''}clientes, fornecedores, chamados e atendimentos.
+Você NUNCA pode criar/cadastrar/excluir: faturas, contratos, notas fiscais, tecnologias, usuários, empresas ou qualquer outra entidade não listada acima, nem apagar lançamentos.
+Se o usuário pedir algo fora disso, recuse educadamente e oriente a fazer pela tela correspondente do sistema.
 
-FLUXO DE CONFIRMAÇÃO PARA CRIAR CATEGORIAS (OBRIGATÓRIO — 2 TURNOS):
-A criação de categoria SEMPRE exige confirmação explícita do usuário antes de executar. Nunca crie no mesmo turno em que ela aparece pela primeira vez.
-
-Caso 1 — usuário pede uma transação com categoria que não existe:
-- Turno A (você): chame listar_categorias do tipo, mostre as disponíveis e pergunte: "A categoria <X> ainda não está cadastrada para <tipo>. Quer que eu crie e já lance essa <entrada/saída> de <valor> reais nela?" — PARE aqui, espere o usuário responder.
-- Turno B (usuário): se responder afirmativamente ("sim", "pode", "claro", "vai", "isso", "manda ver"), execute na ordem: (1) criar_categoria com usuario_confirmou=true (2) criar_transacao. Se negativo ou se mencionar outra categoria, NÃO crie e siga o que ele pediu.
-
-Caso 2 — usuário pede explicitamente para criar uma categoria ("cria uma categoria de saída chamada Combustível"):
-- Turno A (você): "Vou criar a categoria <X> para <entrada/saída>. Confirma?"
-- Turno B: só execute criar_categoria com usuario_confirmou=true após resposta afirmativa.
-
-Regras anti-acidente:
-- usuario_confirmou só pode ser true se houver no histórico do turno anterior uma pergunta sua de confirmação E uma resposta afirmativa clara do usuário.
-- Se o reconhecimento de voz parecer ambíguo (ex: "sim, não sei", "talvez"), peça nova confirmação em vez de criar.
-- Nunca crie mais de uma categoria por turno sem confirmação individual.`;
+CONFIRMAÇÃO (usuario_confirmou):
+- usuario_confirmou só pode ser true se houver no histórico uma pergunta sua de confirmação E uma resposta afirmativa clara do usuário ("sim", "pode", "confirma", "isso").
+- Se o reconhecimento de voz parecer ambíguo (ex: "sim, não sei", "talvez"), peça nova confirmação em vez de gravar.`;
 }
 
 function systemPromptCliente(ctx, dataIso) {
@@ -202,10 +205,29 @@ DATAS RELATIVAS: use a data de hoje acima ou chame data_hoje quando necessário.
 }
 
 function systemPrompt(ctx) {
-  const dataIso = new Date().toISOString().slice(0, 10);
+  const dataIso = hojeISO();
   return ctx.tipo === 'cliente'
     ? systemPromptCliente(ctx, dataIso)
-    : systemPromptAdmin(ctx, dataIso);
+    : systemPromptAdmin(ctx, dataIso, ehAdmin(ctx));
+}
+
+// Erros da OpenAI que são de configuração/conta (não da conversa): viram alerta e mensagem clara na tela
+function erroDeConta(err) {
+  const s = err && err.status;
+  if (s === 401) return { chave: 'openai_chave', msg: 'A chave da OpenAI foi recusada (inválida ou revogada). Gere uma nova em platform.openai.com e atualize OPENAI_API_KEY no servidor.' };
+  if (s === 429 && /quota|billing/i.test(err.message || '')) return { chave: 'openai_saldo', msg: 'A conta da OpenAI está sem créditos. Adicione saldo em platform.openai.com → Billing.' };
+  if (s === 403 || s === 404) return { chave: 'openai_modelo', msg: `A OpenAI recusou o modelo "${MODELO}" para esta chave. Confira OPENAI_MODEL e o projeto da chave.` };
+  return null;
+}
+
+function tratarErroOpenAI(res, err, rota) {
+  console.error(`[assistente/${rota}]`, err.message);
+  const conta = erroDeConta(err);
+  if (conta) {
+    registrarAlerta({ chave: conta.chave, titulo: 'Assistente de voz parado', detalhe: conta.msg });
+    return res.status(503).json({ erro: `Assistente indisponível: ${conta.msg}` });
+  }
+  return res.status(500).json({ erro: rota === 'tts' ? 'Falha ao gerar áudio.' : 'Falha ao processar mensagem.', detalhe: err.message });
 }
 
 router.post('/chat', chatLimiter, async (req, res) => {
@@ -301,16 +323,12 @@ router.post('/chat', chatLimiter, async (req, res) => {
       acoes
     });
   } catch (err) {
-    console.error('[assistente/chat]', err);
-    return res.status(500).json({
-      erro: 'Falha ao processar mensagem.',
-      detalhe: err.message
-    });
+    return tratarErroOpenAI(res, err, 'chat');
   }
 });
 
 // ----------------------------------------------------------------------------
-// POST /api/assistente/tts — sintetiza texto em áudio MP3 via ElevenLabs
+// POST /api/assistente/tts — sintetiza texto em áudio MP3 via OpenAI
 // ----------------------------------------------------------------------------
 const ttsLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -323,7 +341,7 @@ const ttsLimiter = rateLimit({
 router.post('/tts', ttsLimiter, async (req, res) => {
   if (!tts.isConfigured()) {
     return res.status(503).json({
-      erro: 'TTS não configurado. ELEVENLABS_API_KEY ausente no servidor.'
+      erro: 'TTS não configurado. OPENAI_API_KEY ausente no servidor.'
     });
   }
   const { texto } = req.body || {};
@@ -339,8 +357,7 @@ router.post('/tts', ttsLimiter, async (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.send(audioBuffer);
   } catch (err) {
-    console.error('[assistente/tts]', err);
-    res.status(500).json({ erro: 'Falha ao gerar áudio.', detalhe: err.message });
+    tratarErroOpenAI(res, err, 'tts');
   }
 });
 

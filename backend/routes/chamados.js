@@ -5,8 +5,25 @@ const { notificarNovoChamado, notificarAtualizacaoStatus } = require('../service
 const { calcularSla } = require('../services/sla');
 const storage = require('../services/storage');
 
+// Ordenação da listagem (?ordem=coluna&direcao=asc|desc). Lista fechada: nada do usuário entra cru no SQL.
+const ORDENS_CHAMADOS = {
+  id: 'ch.id',
+  titulo: 'LOWER(ch.titulo)',
+  cliente: 'LOWER(COALESCE(c.razao_social, c.nome))',
+  tecnologia: 'LOWER(t.nome)',
+  status: `CASE ch.status WHEN 'aberto' THEN 1 WHEN 'em_andamento' THEN 2 WHEN 'aguardando_cliente' THEN 3
+           WHEN 'resolvido' THEN 4 WHEN 'fechado' THEN 5 ELSE 6 END`,
+  prioridade: `CASE ch.prioridade WHEN 'critica' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 WHEN 'baixa' THEN 4 ELSE 5 END`,
+  abertura: 'ch.data_criacao'
+};
+function ordemChamados(ordem, direcao) {
+  const col = ORDENS_CHAMADOS[ordem];
+  if (!col) return 'ch.data_criacao DESC';
+  return `${col} ${direcao === 'desc' ? 'DESC' : 'ASC'} NULLS LAST, ch.data_criacao DESC`;
+}
+
 // GET - Listar chamados (cliente vê só os seus; admin vê todos)
-// Suporta: status, prioridade, cliente_id, busca (texto), data_de, data_ate, page, limit
+// Suporta: status, prioridade, cliente_id, busca (texto), data_de, data_ate, page, limit, ordem, direcao
 router.get('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   const usuario_id = req.usuario.id;
@@ -78,7 +95,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN usuarios u3 ON u3.id = ch.atualizado_por_usuario_id
       LEFT JOIN chamados_avaliacao av ON av.chamado_id = ch.id
       ${where}
-      ORDER BY ch.data_criacao DESC
+      ORDER BY ${ordemChamados(req.query.ordem, req.query.direcao)}
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `, dadosParams);
 

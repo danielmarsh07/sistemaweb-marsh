@@ -557,13 +557,13 @@
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Título</th>
-                <th>Cliente</th>
-                <th>Tecnologia</th>
-                <th>Status</th>
-                <th>Prioridade</th>
-                <th>Abertura</th>
+                <th data-ordem="id">#</th>
+                <th data-ordem="titulo">Título</th>
+                <th data-ordem="cliente">Cliente</th>
+                <th data-ordem="tecnologia">Tecnologia</th>
+                <th data-ordem="status">Status</th>
+                <th data-ordem="prioridade">Prioridade</th>
+                <th data-ordem="abertura">Abertura</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -1042,9 +1042,36 @@
             <option value="pessoal">Só pessoal</option>
           </select>
         </div>
+        <div class="filtros-bar">
+          <input type="text" id="vm-busca" class="filtro-select" placeholder="Buscar lançamento ou cliente..."
+                 aria-label="Buscar lançamento ou cliente" style="min-width:220px; flex:1" oninput="vmAgendarRender()">
+          <select id="vm-categoria" class="filtro-select" onchange="renderVisaoMensal()" aria-label="Categoria">
+            <option value="">Todas as categorias</option>
+          </select>
+          <select id="vm-tipo" class="filtro-select" onchange="renderVisaoMensal()" aria-label="Tipo de lançamento">
+            <option value="">Todos os tipos</option>
+            <option value="assinatura">Assinaturas</option>
+            <option value="parcelado">Parcelados</option>
+            <option value="avulso">Avulsos</option>
+          </select>
+          <select id="vm-situacao" class="filtro-select" onchange="renderVisaoMensal()" aria-label="Situação">
+            <option value="">Qualquer situação</option>
+            <option value="pendente">Com valor em aberto</option>
+            <option value="vencida">Com valor vencido</option>
+            <option value="paga">Tudo pago</option>
+          </select>
+          <select id="vm-ordem" class="filtro-select" onchange="vmMudarOrdem()" aria-label="Ordenar linhas">
+            <option value="">Ordem padrão</option>
+            <option value="nome">Nome A-Z</option>
+            <option value="total_desc">Maior total no período</option>
+            <option value="total_asc">Menor total no período</option>
+          </select>
+          <span id="vm-contador" class="filtros-contador"></span>
+        </div>
         <p class="pagina-descricao">
           Cada linha é um lançamento (parcelado ou assinatura = uma linha só), cada coluna é o mês do vencimento.
           Clique num valor para editar ou dar baixa, ou numa célula vazia para lançar naquele mês. No cartão, clique no total da seção para pagar a fatura.
+          Clique no nome de um mês para ordenar as linhas pelo valor daquele mês.
         </p>
         <div class="vm-legenda" aria-hidden="true">
           <span><i class="vm-st-aberta"></i>em aberto</span>
@@ -3221,7 +3248,7 @@
       </div>
 
       <p class="assistente-hint">
-        Exemplos: <i>"saída de 350 reais na padaria, categoria alimentação"</i> · <i>"qual meu saldo desse mês?"</i> · <i>"liste meus chamados abertos"</i>
+        Exemplos: <i>"paguei 120 reais de internet"</i> · <i>"qual meu saldo?"</i> · <i>"quem está me devendo?"</i> · <i>"liste meus chamados abertos"</i>
       </p>
     </div>
   </div>
@@ -3284,6 +3311,7 @@
   <script src="relatorios.js"></script>
   <script src="visao-mensal.js"></script>
   <script src="cadastros.js"></script>
+  <script src="tabela-ordenavel.js"></script>
   <script src="assistente-voz.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

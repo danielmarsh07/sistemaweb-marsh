@@ -1516,6 +1516,7 @@ async function preencherSelectsChamado() {
 }
 
 let chamadosPaginacao = { page: 1, limit: 25 };
+let chamadosOrdem = {}; // { ordem, direcao } — definido pelo clique no cabeçalho (tabela-ordenavel.js)
 
 async function loadChamados() {
   const tbodyPre = document.getElementById('chamados-tbody');
@@ -1537,6 +1538,7 @@ async function loadChamados() {
   if (clienteId) params.set('cliente_id', clienteId);
   if (dataDe) params.set('data_de', dataDe);
   if (dataAte) params.set('data_ate', dataAte);
+  if (chamadosOrdem.ordem) { params.set('ordem', chamadosOrdem.ordem); params.set('direcao', chamadosOrdem.direcao); }
   params.set('page', chamadosPaginacao.page);
   params.set('limit', chamadosPaginacao.limit);
 

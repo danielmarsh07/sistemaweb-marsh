@@ -130,6 +130,22 @@ async function cancelarPix(fatura) {
   await pool.query(`UPDATE faturas SET pix_status = 'cancelado', data_atualizacao = NOW() WHERE id = $1`, [fatura.id]);
 }
 
+// Baixa manual (transferência etc.) de uma fatura em aberto; o PIX pendente no Asaas não pode mais ser pago.
+// Retorna true se baixou.
+async function registrarPagamento(faturaId, empresa_id, usuario_id, { data_pagamento, valor_pago, forma_pagamento }) {
+  const forma = forma_pagamento === undefined || forma_pagamento === null || String(forma_pagamento).trim() === ''
+    ? 'transferencia' : forma_pagamento;
+  const r = await pool.query(
+    `UPDATE faturas SET status = 'paga', data_pagamento = $1, valor_pago = $2, forma_pagamento = $3,
+       atualizado_por_usuario_id = $4, data_atualizacao = NOW()
+     WHERE id = $5 AND empresa_id = $6 AND status = 'aberta' RETURNING id`,
+    [data_pagamento, Number(valor_pago), forma, usuario_id, faturaId, empresa_id]);
+  if (!r.rows.length) return false;
+  const f = await carregarFatura(faturaId, empresa_id);
+  if (f.pix_status === 'pendente') await cancelarPix(f);
+  return true;
+}
+
 // Tarifa do Asaas vira despesa paga (categoria de despesa financeira), para a DRE e o fluxo ficarem certos
 async function lancarTarifaAsaas(fatura, taxa, dataPagamento) {
   const cat = await pool.query(
@@ -193,5 +209,5 @@ async function aprovarFatura(fatura, usuario_id) {
 module.exports = {
   RETENCOES, sqlValorLiquido, COLUNAS_FATURA, carregarConfig, carregarFatura, carregarCliente,
   enviarEmailFatura, emitirNfse, sincronizarNfse, aposAtualizarNota, aprovarFatura,
-  gerarPix, cancelarPix, aplicarCobrancaNaFatura, sincronizarPix
+  gerarPix, cancelarPix, aplicarCobrancaNaFatura, sincronizarPix, registrarPagamento
 };

@@ -1913,6 +1913,33 @@ tbody tr:last-child td {
   border-color: var(--blue);
 }
 
+/* ===== ORDENAÇÃO POR COLUNA (tabela-ordenavel.js) ===== */
+th.th-ordenavel { padding: 0; }
+.th-ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.th-ordenar:hover { color: var(--blue); }
+.th-ordenar:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; border-radius: 4px; }
+.th-seta { width: 0.8em; opacity: 0.35; font-size: 0.85em; }
+.th-seta::after { content: '↕'; }
+th[aria-sort] .th-seta { opacity: 1; color: var(--blue); }
+th[aria-sort="ascending"] .th-seta::after { content: '↑'; }
+th[aria-sort="descending"] .th-seta::after { content: '↓'; }
+.ordenar-mobile { display: none; }
+tr.linha-oculta { display: none !important; }
+
 /* ===== TOTALIZADORES FINANCEIROS ===== */
 .totais-finance {
   display: grid;
@@ -2187,6 +2214,7 @@ tbody tr:last-child td {
   input.filtro-select[type="text"] {
     flex-basis: 100% !important;
   }
+  .ordenar-mobile { display: block; }
   .filtros-label {
     flex: 1 1 calc(50% - 5px) !important;
     font-size: 11.5px;

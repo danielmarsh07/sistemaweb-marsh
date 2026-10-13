@@ -456,15 +456,9 @@ router.post('/faturas/:id/baixa', async (req, res) => {
   if (!dataValida(b.data_pagamento)) return res.status(400).json({ erro: 'Data do pagamento inválida.' });
   if (!(Number(b.valor_pago) > 0)) return res.status(400).json({ erro: 'Valor recebido deve ser maior que zero.' });
   try {
-    const r = await pool.query(
-      `UPDATE faturas SET status = 'paga', data_pagamento = $1, valor_pago = $2, forma_pagamento = $3,
-         atualizado_por_usuario_id = $4, data_atualizacao = NOW()
-       WHERE id = $5 AND empresa_id = $6 AND status = 'aberta' RETURNING id`,
-      [b.data_pagamento, Number(b.valor_pago), vazioNulo(b.forma_pagamento) || 'transferencia', req.usuario.id, req.params.id, emp(req)]);
-    if (!r.rows.length) return res.status(400).json({ erro: 'Só faturas em aberto recebem baixa.' });
-    // Pagou por fora (transferência): o PIX pendente no Asaas não pode mais ser pago
-    const f = await fat.carregarFatura(req.params.id, emp(req));
-    if (f.pix_status === 'pendente') await fat.cancelarPix(f);
+    if (!(await fat.registrarPagamento(req.params.id, emp(req), req.usuario.id, b))) {
+      return res.status(400).json({ erro: 'Só faturas em aberto recebem baixa.' });
+    }
     res.json({ mensagem: 'Pagamento registrado!' });
   } catch (err) { erro500(res, 'Erro ao registrar pagamento', err); }
 });
