@@ -1259,6 +1259,7 @@ async function abrirNovaLicenca() {
   const fim = new Date(); fim.setFullYear(fim.getFullYear() + 1);
   form.data_fim.value = fim.toISOString().slice(0, 10);
   form.cliente_id.disabled = false;
+  form.chamados_exigem_aprovacao.checked = true;
   renderConexoesLicenca([]);
   document.getElementById('licenca-status-row').style.display = 'none';
   document.getElementById('modal-licenca-titulo').textContent = 'Nova licença';
@@ -1283,6 +1284,7 @@ async function editarLicenca(id) {
   form.titular_nome.value = l.titular_nome || '';
   form.titular_email.value = l.titular_email || '';
   form.max_maquinas.value = l.max_maquinas || '';
+  form.chamados_exigem_aprovacao.checked = l.chamados_exigem_aprovacao !== false;
   renderConexoesLicenca(l.conexoes || []);
   document.getElementById('licenca-status-row').style.display = '';
   document.getElementById('modal-licenca-titulo').textContent = `Editar licença — ${l.cliente_nome}`;
@@ -1301,6 +1303,7 @@ async function salvarLicenca() {
     titular_nome: form.titular_nome.value,
     titular_email: form.titular_email.value,
     max_maquinas: form.max_maquinas.value,
+    chamados_exigem_aprovacao: form.chamados_exigem_aprovacao.checked,
     conexoes: lerConexoesLicenca()
   };
   if (licencaEmEdicao) dados.status = form.status.value;
@@ -1743,6 +1746,7 @@ async function loadChamados() {
   const clienteId = document.getElementById('filtro-chamados-cliente')?.value || '';
   const dataDe = document.getElementById('filtro-chamados-data-de')?.value || '';
   const dataAte = document.getElementById('filtro-chamados-data-ate')?.value || '';
+  const origem = document.getElementById('filtro-chamados-origem')?.value || '';
 
   // popula select de clientes (uma vez)
   await popularSelectClientesChamados();
@@ -1754,6 +1758,9 @@ async function loadChamados() {
   if (clienteId) params.set('cliente_id', clienteId);
   if (dataDe) params.set('data_de', dataDe);
   if (dataAte) params.set('data_ate', dataAte);
+  // Origem: conector | manual; "pendente"/"aprovado" = conector com aquela situação da aprovação do cliente
+  if (origem === 'pendente' || origem === 'aprovado') { params.set('origem', 'conector'); params.set('aprovacao', origem); }
+  else if (origem) params.set('origem', origem);
   if (chamadosOrdem.ordem) { params.set('ordem', chamadosOrdem.ordem); params.set('direcao', chamadosOrdem.direcao); }
   params.set('page', chamadosPaginacao.page);
   params.set('limit', chamadosPaginacao.limit);
@@ -1782,6 +1789,7 @@ async function loadChamados() {
           ${escapeHtml(ch.titulo)}
           ${naoLidos > 0 ? `<span class="badge-novo-dash" title="${naoLidos} não lido(s)">${naoLidos}</span>` : ''}
         </div>
+        ${ch.origem === 'conector' ? `<div class="cc-selos-linha">${ChamadoConector.selos(ch)}</div>` : ''}
         ${auditMeta(ch)}
       </td>
       <td data-label="Cliente">${escapeHtml(ch.cliente_nome || '-')}</td>
@@ -2001,6 +2009,9 @@ async function deletarChamado(id) {
 }
 
 // ===== DETALHE DO CHAMADO + ATENDIMENTOS =====
+// Aprovar chamado do conector em nome do cliente: só administradores (técnico não)
+const usuarioEhAdmin = () => !!usuario && (usuario.tipo === 'admin_empresa' || usuario.tipo === 'admin_sistema');
+
 async function abrirDetalheChamado(id) {
   const res = await apiFetch(`${API_URL}/chamados/${id}`);
   if (!res) return;
@@ -2022,9 +2033,16 @@ async function abrirDetalheChamado(id) {
       <div><strong>Atribuído para:</strong> ${escapeHtml(ch.atribuido_para_nome || '-')}</div>
       ${ch.avaliacao ? `<div><strong>Avaliação:</strong> <span class="detalhe-chamado-stars">${'★'.repeat(ch.avaliacao.nota)}${'☆'.repeat(5 - ch.avaliacao.nota)}</span></div>` : ''}
     </div>
-    ${ch.descricao ? `<div class="detalhe-chamado-descricao"><strong>Descrição:</strong><br>${escapeHtml(ch.descricao)}</div>` : ''}
+    ${ch.descricao && ch.origem !== 'conector' ? `<div class="detalhe-chamado-descricao"><strong>Descrição:</strong><br>${escapeHtml(ch.descricao)}</div>` : ''}
     ${ch.avaliacao && ch.avaliacao.comentario ? `<div class="detalhe-chamado-comentario"><strong>Comentário do cliente:</strong><br><em>"${escapeHtml(ch.avaliacao.comentario)}"</em></div>` : ''}
   `;
+  document.getElementById('detalhe-chamado-conector').innerHTML = ChamadoConector.blocoHtml(ch, {
+    painel: true,
+    podeAprovar: usuarioEhAdmin(),
+    rotuloAprovar: 'Aprovar em nome do cliente'
+  });
+  // Depois de aprovar/recusar: recarrega o detalhe e a lista
+  ChamadoConector.aoDecidir = async (cid) => { await abrirDetalheChamado(cid); loadChamados(); };
 
   renderTimeline(ch.atendimentos || []);
   renderAnexosDashboard(ch);
@@ -3323,9 +3341,12 @@ function badgeTipoAtendimento(tipo) {
     comentario: { label: 'Comentário', color: '#64748b' },
     contato_cliente: { label: 'Contato c/ cliente', color: '#0d6efd' },
     escalamento: { label: 'Escalamento', color: '#f59e0b' },
-    solucao: { label: 'Solução', color: '#10b981' }
+    solucao: { label: 'Solução', color: '#10b981' },
+    reabertura: { label: 'Reabertura', color: '#0d6efd' },
+    aprovacao: { label: 'Aprovação do cliente', color: '#10b981' },
+    recusa: { label: 'Recusa do cliente', color: '#ef4444' }
   };
-  const t = map[tipo] || { label: tipo, color: '#64748b' };
+  const t = map[tipo] || { label: escapeHtml(tipo), color: '#64748b' };
   return `<span style="background:${t.color}20; color:${t.color}; padding:2px 6px; border-radius:4px; font-size:0.78rem; font-weight:600">${t.label}</span>`;
 }
 

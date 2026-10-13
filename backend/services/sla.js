@@ -15,10 +15,14 @@ const HORAS_POR_PRIORIDADE = {
   baixa: 72
 };
 
+// Chamado do Conector SAP que exige aprovação do gestor do cliente:
+//   pendente → sem SLA (a bola está com o cliente); aprovado → o prazo conta a partir da aprovação.
 function calcularSla(chamado) {
   if (!chamado || !chamado.data_abertura) return null;
+  if (chamado.aprovacao_cliente === 'pendente') return null;
   const horas = HORAS_POR_PRIORIDADE[chamado.prioridade] || HORAS_POR_PRIORIDADE.media;
-  const abertura = new Date(chamado.data_abertura);
+  const abertura = new Date(chamado.aprovacao_cliente === 'aprovado' && chamado.data_aprovacao
+    ? chamado.data_aprovacao : chamado.data_abertura);
   const prazo = new Date(abertura.getTime() + horas * 3600 * 1000);
 
   const concluido = chamado.status === 'resolvido' || chamado.status === 'fechado';

@@ -143,14 +143,14 @@ async function notificarNovoChamado({ chamado, empresa_id, aberto_por }) {
 
   const html = templateBase({
     titulo: `Novo chamado #${chamado.id}`,
-    preheader: `${aberto_por} abriu um novo chamado: ${chamado.titulo}`,
+    preheader: `${esc(aberto_por)} abriu um novo chamado: ${esc(chamado.titulo)}`,
     corpo: `
       <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">Novo chamado aberto</h2>
-      <p style="margin:0 0 24px;color:#64748b;font-size:14px">por <strong>${aberto_por}</strong></p>
+      <p style="margin:0 0 24px;color:#64748b;font-size:14px">por <strong>${esc(aberto_por)}</strong></p>
 
       <div style="background:#f8fafc;border-radius:10px;padding:20px;margin-bottom:24px;border-left:4px solid #0ea5e9">
-        <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#0f172a">#${chamado.id} — ${chamado.titulo}</p>
-        <p style="margin:0 0 12px;color:#64748b;font-size:14px">${chamado.descricao || 'Sem descrição.'}</p>
+        <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#0f172a">#${chamado.id} — ${esc(chamado.titulo)}</p>
+        <p style="margin:0 0 12px;color:#64748b;font-size:14px;white-space:pre-line">${chamado.descricao ? esc(chamado.descricao) : 'Sem descrição.'}</p>
         <table>
           <tr>
             <td style="padding-right:16px;font-size:13px;color:#64748b">Status:</td>
@@ -233,19 +233,21 @@ async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, 
     solucao: 'Solução registrada',
     atualizacao: 'Atualização',
     visita: 'Visita registrada',
-    ligacao: 'Ligação registrada'
+    ligacao: 'Ligação registrada',
+    aprovacao: 'Chamado aprovado',
+    recusa: 'Chamado recusado'
   };
   const labelTipo = tipoLabel[atendimento.tipo] || 'Novo atendimento';
 
   const corpo = `
     <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">${labelTipo}</h2>
     <p style="margin:0 0 24px;color:#64748b;font-size:14px">
-      por <strong>${remetente_nome}</strong> no chamado <strong>#${chamado.id}</strong>
+      por <strong>${esc(remetente_nome)}</strong> no chamado <strong>#${chamado.id}</strong>
     </p>
 
     <div style="background:#f8fafc;border-radius:10px;padding:20px;margin-bottom:24px;border-left:4px solid #0ea5e9">
-      <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#0f172a">${chamado.titulo}</p>
-      <p style="margin:0;color:#374151;font-size:14px;line-height:1.6">${atendimento.descricao}</p>
+      <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#0f172a">${esc(chamado.titulo)}</p>
+      <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;white-space:pre-line">${esc(atendimento.descricao)}</p>
     </div>
 
     <a href="https://www.marshconsultoria.com.br/login.html"
@@ -256,7 +258,7 @@ async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, 
 
   const html = templateBase({
     titulo: `${labelTipo} no chamado #${chamado.id}`,
-    preheader: `${remetente_nome}: ${atendimento.descricao.substring(0, 80)}...`,
+    preheader: `${esc(remetente_nome)}: ${esc(atendimento.descricao.substring(0, 80))}...`,
     corpo
   });
 

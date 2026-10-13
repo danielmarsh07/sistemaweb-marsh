@@ -128,7 +128,27 @@ async function carregarChamados() {
   todosOsChamados = Array.isArray(data) ? data : (data.chamados || []);
 
   atualizarStats();
-  renderChamados(todosOsChamados);
+  atualizarFaixaAprovacao();
+  // Mantém o filtro escolhido (ex.: depois de aprovar, a lista "aguardando aprovação" já sai sem o chamado)
+  renderChamados(filtrarLista(filtroAtivo));
+}
+
+// Faixa "N chamados aguardando sua aprovação" (chamados abertos pelo Conector SAP)
+function atualizarFaixaAprovacao() {
+  const faixa = document.getElementById('faixa-aprovacao');
+  if (!faixa) return;
+  const n = todosOsChamados.filter(c => c.aprovacao_cliente === 'pendente').length;
+  if (!n) { faixa.hidden = true; faixa.innerHTML = ''; return; }
+  faixa.hidden = false;
+  faixa.innerHTML = `
+    <span><strong>${n} ${n === 1 ? 'chamado aguardando' : 'chamados aguardando'} sua aprovação</strong>
+      — abertos pelo Conector SAP; a Marsh só começa depois que você aprovar.</span>
+    <button type="button" class="cc-btn cc-btn-primario" onclick="filtrarChamados(null, '__aprovacao')">Ver ${n === 1 ? 'o chamado' : 'os chamados'}</button>`;
+}
+
+function filtrarLista(status) {
+  if (status === '__aprovacao') return todosOsChamados.filter(c => c.aprovacao_cliente === 'pendente');
+  return status ? todosOsChamados.filter(c => c.status === status) : todosOsChamados;
 }
 
 async function carregarTecnologias() {
@@ -162,14 +182,9 @@ function atualizarStats() {
 // ===== RENDER CHAMADOS =====
 function filtrarChamados(btn, status) {
   document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
   filtroAtivo = status;
-
-  const filtrados = status
-    ? todosOsChamados.filter(c => c.status === status)
-    : todosOsChamados;
-
-  renderChamados(filtrados);
+  renderChamados(filtrarLista(status));
 }
 
 function renderChamados(lista) {
@@ -194,6 +209,7 @@ function renderChamados(lista) {
           ${escapeHtml(ch.titulo)}
           ${naoLidos > 0 ? `<span class="badge-novo" title="${naoLidos} novo(s) comentário(s)">${naoLidos} novo${naoLidos > 1 ? 's' : ''}</span>` : ''}
         </div>
+        ${ch.origem === 'conector' ? `<div class="cc-selos-linha">${ChamadoConector.selos(ch, true)}</div>` : ''}
         <div class="chamado-meta">
           ${ch.tecnologia_nome ? `<span>💻 ${escapeHtml(ch.tecnologia_nome)}</span>` : ''}
           <span>📅 ${formatData(ch.data_criacao)}</span>
@@ -244,8 +260,13 @@ async function abrirDetalhe(id) {
     ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA</strong>${badgeSlaDetalhe(ch.sla)}</div>` : ''}
     ${ch.categoria ? `<div><strong>Categoria</strong>${escapeHtml(ch.categoria)}</div>` : ''}
     ${ch.data_fechamento ? `<div><strong>Fechado em</strong>${formatDataHora(ch.data_fechamento)}</div>` : ''}
-    <div style="grid-column:1/-1"><strong>Descrição</strong>${escapeHtml(ch.descricao || '—')}</div>
+    ${ch.origem === 'conector' ? '' : `<div style="grid-column:1/-1"><strong>Descrição</strong>${escapeHtml(ch.descricao || '—')}</div>`}
   `;
+
+  // Chamado do Conector SAP: SID, módulo, objetos, pedido, especificação e a aprovação do gestor
+  document.getElementById('detalhe-conector').innerHTML =
+    ChamadoConector.blocoHtml(ch, { podeAprovar: true, podeRecusar: true });
+  ChamadoConector.aoDecidir = async (cid) => { await carregarChamados(); await abrirDetalhe(cid); };
 
   // Timeline
   renderTimeline(ch.atendimentos || []);
@@ -510,14 +531,20 @@ function renderTimeline(atendimentos) {
     comentario: '#64748b',
     contato_cliente: '#0d6efd',
     escalamento: '#f59e0b',
-    solucao: '#10b981'
+    solucao: '#10b981',
+    reabertura: '#0d6efd',
+    aprovacao: '#10b981',
+    recusa: '#ef4444'
   };
 
   const labels = {
     comentario: 'Comentário',
     contato_cliente: 'Retorno da equipe',
     escalamento: 'Escalamento',
-    solucao: 'Solução'
+    solucao: 'Solução',
+    reabertura: 'Reabertura',
+    aprovacao: 'Aprovação',
+    recusa: 'Recusa'
   };
 
   container.innerHTML = atendimentos.map(a => `

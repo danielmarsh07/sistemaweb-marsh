@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assistente-voz.css">
+  <link rel="stylesheet" href="chamado-conector.css">
   <link rel="icon" type="image/png" href="/img/logo-simbolo.png">
   <meta name="theme-color" content="#0066cc" />
   <script src="theme.js"></script>
@@ -1969,6 +1970,7 @@
           <button class="filtro-btn" data-filtro="resolvido" onclick="filtrarChamados(this, 'resolvido')">Resolvidos</button>
         </div>
       </div>
+      <div id="faixa-aprovacao" class="cc-faixa-aprovacao" hidden></div>
       <div id="lista-chamados">
         <div class="empty-state"><div class="icon">⏳</div><p>Carregando...</p></div>
       </div>
@@ -2011,6 +2013,7 @@
       </div>
       <div class="modal-body">
         <div class="chamado-info-grid" id="detalhe-info"></div>
+        <div id="detalhe-conector"></div>
 
         <div class="timeline">
           <h4>Histórico de Atendimentos</h4>
@@ -2200,6 +2203,7 @@
     </div>
   </div>
 
+  <script src="chamado-conector.js"></script>
   <script src="portal-script.js"></script>
   <script src="assistente-voz.js"></script>
   <script>

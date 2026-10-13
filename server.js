@@ -12,6 +12,8 @@ app.set('trust proxy', 1);
 
 // Middleware
 app.use(cors());
+// Chamado do Conector SAP traz a especificação em markdown (até 200 mil caracteres): limite maior só nessa rota
+app.use('/api/licencas-conector/chamados', express.json({ limit: '2mb' }));
 app.use(express.json());
 
 // Toda resposta 5xx vira alerta (Sistema → Alertas + e-mail aos administradores, agrupado)
@@ -527,6 +529,32 @@ async function iniciar() {
         data_publicacao TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    //     Chamados abertos pelo Conector SAP (ferramenta abrir_chamado): mesmo chamado do sistema, com a
+    //     especificação em markdown e os dados do SAP. origem NULL = chamado do portal/painel (como antes).
+    //     aprovacao_cliente: NULL (não se aplica) | pendente | aprovado | recusado — o gestor do cliente
+    //     aprova no portal antes de a fábrica ABAP desenvolver (licencas.chamados_exigem_aprovacao).
+    await pool.query(`
+      ALTER TABLE chamados
+        ADD COLUMN IF NOT EXISTS origem VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS licenca_id INTEGER,
+        ADD COLUMN IF NOT EXISTS sid VARCHAR(10),
+        ADD COLUMN IF NOT EXISTS modulo VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS tipo_demanda VARCHAR(30),
+        ADD COLUMN IF NOT EXISTS pedido_original TEXT,
+        ADD COLUMN IF NOT EXISTS especificacao TEXT,
+        ADD COLUMN IF NOT EXISTS objetos_sap JSONB,
+        ADD COLUMN IF NOT EXISTS solicitante_nome VARCHAR(150),
+        ADD COLUMN IF NOT EXISTS solicitante_email VARCHAR(150),
+        ADD COLUMN IF NOT EXISTS usuario_hash VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS maquina_hash VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS aprovacao_cliente VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS aprovado_por_usuario_id INTEGER,
+        ADD COLUMN IF NOT EXISTS data_aprovacao TIMESTAMP;
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_chamados_origem_aprov ON chamados(origem, aprovacao_cliente);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_chamados_licenca ON chamados(licenca_id) WHERE licenca_id IS NOT NULL;`);
+    await pool.query(`ALTER TABLE licencas ADD COLUMN IF NOT EXISTS chamados_exigem_aprovacao BOOLEAN NOT NULL DEFAULT TRUE;`);
 
     // 21. Treinamentos (portal do cliente): cursos, aulas, liberação por cliente, progresso por usuário
     await pool.query(`

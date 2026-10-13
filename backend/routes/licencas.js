@@ -3,6 +3,8 @@
  *
  * Admin (admin_empresa / admin_sistema): listar, criar, editar, nova chave, cancelar, uso.
  * Admin: máquinas ativadas pelo instalador (listar, revogar, reativar).
+ * chamados_exigem_aprovacao (padrão true): chamado aberto pelo conector fica 'pendente' até o gestor
+ * do cliente aprovar no portal; false = já entra aprovado na fila da Marsh.
  * Cliente: GET /minhas — só as licenças do próprio cliente, sem dados de chave.
  * Logado com licença ativa (ou admin): GET /download — link do instalador do conector.
  * A chave em texto aparece UMA vez (criação / nova chave); no banco fica só o hash.
@@ -21,7 +23,7 @@ const uploadInstalador = multer({ storage: multer.memoryStorage(), limits: { fil
 
 const COLUNAS = `l.id, l.cliente_id, l.produto, l.plano, l.max_usuarios, l.sids, l.data_inicio, l.data_fim,
   l.status, l.chave_prefixo, l.ultima_validacao, l.versao_conector, l.observacoes, l.data_criacao,
-  l.titular_nome, l.titular_email, l.max_maquinas, l.conexoes`;
+  l.titular_nome, l.titular_email, l.max_maquinas, l.conexoes, l.chamados_exigem_aprovacao`;
 
 const USO_30D = `
   (SELECT COUNT(DISTINCT u.usuario_hash) FROM licencas_uso u
@@ -71,6 +73,10 @@ function validarCampos(body, parcial = false) {
   if (titular_email && String(titular_email).trim() &&
       !(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(titular_email).trim()) && String(titular_email).trim().length <= 150)) {
     return 'E-mail do titular inválido.';
+  }
+  const { chamados_exigem_aprovacao } = body;
+  if (chamados_exigem_aprovacao !== undefined && typeof chamados_exigem_aprovacao !== 'boolean') {
+    return 'chamados_exigem_aprovacao deve ser verdadeiro ou falso.';
   }
   if (status !== undefined && !['ativa', 'suspensa', 'cancelada'].includes(status)) {
     return 'Status inválido (ativa, suspensa ou cancelada).';
@@ -310,13 +316,14 @@ router.post('/', async (req, res) => {
     const r = await pool.query(
       `INSERT INTO licencas (empresa_id, cliente_id, plano, max_usuarios, sids, data_inicio, data_fim,
          status, chave_hash, chave_prefixo, observacoes, criado_por_usuario_id,
-         titular_nome, titular_email, max_maquinas, conexoes)
+         titular_nome, titular_email, max_maquinas, conexoes, chamados_exigem_aprovacao)
        VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, 'ativa', $8, $9, $10, $11,
-         $12, $13, $14, $15::jsonb)
+         $12, $13, $14, $15::jsonb, $16)
        RETURNING id`,
       [empresa_id, cliente_id, plano, maxOuNulo(max_usuarios), listaSids(sids || 'DEV').join(','),
        data_inicio || null, data_fim, hashChave(chave), prefixoChave(chave), observacoes || null, req.usuario.id,
-       textoOuNulo(titular_nome), textoOuNulo(titular_email), maxOuNulo(max_maquinas), JSON.stringify(cx.lista)]
+       textoOuNulo(titular_nome), textoOuNulo(titular_email), maxOuNulo(max_maquinas), JSON.stringify(cx.lista),
+       req.body.chamados_exigem_aprovacao !== false]
     );
     res.status(201).json({ mensagem: 'Licença criada! Copie a chave agora: ela não será exibida de novo.',
                            id: r.rows[0].id, chave });
@@ -343,7 +350,8 @@ router.put('/:id', async (req, res) => {
     await pool.query(
       `UPDATE licencas SET plano = $1, max_usuarios = $2, sids = $3, data_inicio = $4, data_fim = $5,
          status = $6, observacoes = $7, atualizado_por_usuario_id = $8, data_atualizacao = NOW(),
-         titular_nome = $11, titular_email = $12, max_maquinas = $13, conexoes = $14::jsonb
+         titular_nome = $11, titular_email = $12, max_maquinas = $13, conexoes = $14::jsonb,
+         chamados_exigem_aprovacao = $15
        WHERE id = $9 AND empresa_id = $10`,
       [b.plano ?? l.plano,
        b.max_usuarios !== undefined ? maxOuNulo(b.max_usuarios) : l.max_usuarios,
@@ -354,7 +362,8 @@ router.put('/:id', async (req, res) => {
        b.titular_nome !== undefined ? textoOuNulo(b.titular_nome) : l.titular_nome,
        b.titular_email !== undefined ? textoOuNulo(b.titular_email) : l.titular_email,
        b.max_maquinas !== undefined ? maxOuNulo(b.max_maquinas) : l.max_maquinas,
-       JSON.stringify(cx ? cx.lista : (l.conexoes || []))]
+       JSON.stringify(cx ? cx.lista : (l.conexoes || [])),
+       b.chamados_exigem_aprovacao !== undefined ? b.chamados_exigem_aprovacao : l.chamados_exigem_aprovacao]
     );
     res.json({ mensagem: 'Licença atualizada!' });
   } catch (err) {

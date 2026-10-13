@@ -22,6 +22,7 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/assistente-financeiro.js           # tools do assistente de voz no financeiro (sem chamar a OpenAI)
    node testes/listagens-ordenacao.js             # ordenação por coluna e filtros das listagens e da visão mensal (Chrome headless)
    node testes/licencas-ativacao.js               # licenças do conector: ativação por máquina, limite, revogação, conexões, download
+   node testes/chamados-conector.js               # chamados abertos pelo conector: abrir/listar, recusas, limite/h, aprovação do gestor, .md, fila
    node testes/simulador-conector.js [saida.pdf]  # simulador de preço do Conector SAP: cálculo, validações, tabela de preços, gerar proposta + PDF A4 (Chrome headless)
    ```
 
@@ -34,4 +35,6 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
 
 - `comercial-funil-propostas.js` usa o limite de 5 leads por 15 minutos: rodar duas vezes seguidas pode dar 429. Reinicie o servidor para zerar.
 - `financeiro-pix-relatorios.js` tenta criar um PIX real no **sandbox** do Asaas. Sem chave PIX cadastrada no sandbox, o Asaas recusa e o teste apenas registra a mensagem.
+- As rotas do conector (`/api/licencas-conector`) aceitam 60 requisições/minuto por IP: `licencas-ativacao.js` e `chamados-conector.js` juntos passam disso; rode um, espere 1 minuto (ou reinicie o servidor) e rode o outro.
+- `screenshot-dashboard.js` com página `portal` entra como usuário cliente (`SCREENSHOT_CLIENTE_ID` escolhe a empresa).
 - `screenshot-dashboard.js` abre o dashboard logado no Chrome headless e salva um PNG da página pedida, para conferir layout (desktop e celular, tema claro ou escuro).

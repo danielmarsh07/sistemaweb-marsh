@@ -125,6 +125,10 @@ Authorization: Bearer <token>
 - `POST /api/chamados` — Abrir chamado
 - `PUT /api/chamados/:id` — Atualizar status/prioridade
 - `DELETE /api/chamados/:id` — Desativar
+- `POST /api/chamados/:id/aprovacao` — Gestor do cliente aprova/recusa chamado do Conector SAP
+- `GET /api/chamados/:id/especificacao.md` — Especificação do chamado do conector (download)
+- `GET /api/chamados/fila-conector` — Fila da fábrica ABAP (equipe)
+- Chamados abertos pelo Conector SAP: `POST /api/licencas-conector/chamados` e `/chamados/listar` (ver `docs/licencas-conector.md`)
 
 ### Atendimentos (timeline)
 - `GET /api/atendimentos?chamado_id=X` — Histórico do chamado

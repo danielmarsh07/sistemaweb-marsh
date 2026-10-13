@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { notificarNovoChamado, notificarAtualizacaoStatus } = require('../services/email');
+const { notificarNovoChamado, notificarAtualizacaoStatus, notificarNovoAtendimento } = require('../services/email');
 const { calcularSla } = require('../services/sla');
 const storage = require('../services/storage');
 
@@ -22,13 +22,84 @@ function ordemChamados(ordem, direcao) {
   return `${col} ${direcao === 'desc' ? 'DESC' : 'ASC'} NULLS LAST, ch.data_criacao DESC`;
 }
 
+const ehAdmin = tipo => tipo === 'admin_empresa' || tipo === 'admin_sistema';
+
+// Colunas da listagem: tudo do chamado MENOS os textos grandes do Conector SAP (pedido/especificação)
+// e os hashes de usuário/máquina — esses só no detalhe.
+const COLUNAS_LISTA = `ch.id, ch.empresa_id, ch.cliente_id, ch.tecnologia_id, ch.aberto_por_usuario_id,
+  ch.atribuido_para_usuario_id, ch.titulo, ch.descricao, ch.status, ch.prioridade, ch.categoria,
+  ch.data_abertura, ch.data_fechamento, ch.ativo, ch.data_criacao, ch.atualizado_por_usuario_id, ch.data_atualizacao,
+  ch.origem, ch.licenca_id, ch.sid, ch.modulo, ch.tipo_demanda, ch.objetos_sap, ch.solicitante_nome,
+  ch.solicitante_email, ch.aprovacao_cliente, ch.aprovado_por_usuario_id, ch.data_aprovacao`;
+
+const ROTULO_TIPO_DEMANDA = { melhoria: 'Melhoria', erro: 'Erro (correção)', nova_funcionalidade: 'Nova funcionalidade', duvida: 'Dúvida' };
+const ROTULO_PRIORIDADE = { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' };
+const ROTULO_STATUS = { aberto: 'Aberto', em_andamento: 'Em andamento', aguardando_cliente: 'Aguardando cliente', resolvido: 'Resolvido', fechado: 'Fechado' };
+const ROTULO_APROVACAO = { pendente: 'Aguardando aprovação do cliente', aprovado: 'Aprovado', recusado: 'Recusado' };
+
+const dataHoraBr = d => (d ? new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }) : '-');
+const celulaMd = v => String(v ?? '-').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+const slug = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50).replace(/-+$/, '') || 'chamado';
+
+/** Markdown do chamado do conector: cabeçalho (dados do chamado), objetos SAP, pedido original e especificação. */
+function markdownEspecificacao(ch) {
+  const objetos = Array.isArray(ch.objetos_sap) ? ch.objetos_sap : [];
+  const solicitante = ch.solicitante_email ? `${ch.solicitante_nome} <${ch.solicitante_email}>` : ch.solicitante_nome;
+  let aprovacao = ROTULO_APROVACAO[ch.aprovacao_cliente] || '-';
+  if (ch.aprovacao_cliente === 'aprovado' || ch.aprovacao_cliente === 'recusado') {
+    aprovacao += ` (${ch.aprovado_por_nome || '-'}, ${dataHoraBr(ch.data_aprovacao)})`;
+  }
+  return [
+    `# Chamado #${ch.id} — ${ch.titulo}`,
+    '',
+    '| Campo | Valor |',
+    '|---|---|',
+    `| Cliente | ${celulaMd(ch.cliente_nome)} |`,
+    `| Sistema SAP (SID) | ${celulaMd(ch.sid)} |`,
+    `| Módulo | ${celulaMd(ch.modulo)} |`,
+    `| Tipo | ${celulaMd(ROTULO_TIPO_DEMANDA[ch.tipo_demanda] || ch.tipo_demanda)} |`,
+    `| Prioridade | ${celulaMd(ROTULO_PRIORIDADE[ch.prioridade] || ch.prioridade)} |`,
+    `| Solicitante | ${celulaMd(solicitante)} |`,
+    `| Aberto em | ${celulaMd(dataHoraBr(ch.data_abertura))} |`,
+    `| Status | ${celulaMd(ROTULO_STATUS[ch.status] || ch.status)} |`,
+    `| Aprovação do cliente | ${celulaMd(aprovacao)} |`,
+    '',
+    '## Objetos SAP',
+    '',
+    ...(objetos.length ? objetos.map(o => `- ${o.tipo} \`${o.nome}\``) : ['Nenhum objeto informado.']),
+    '',
+    '## Pedido original',
+    '',
+    ch.pedido_original || '-',
+    '',
+    '## Especificação',
+    '',
+    ch.especificacao || '_Sem especificação (dúvida)._',
+    ''
+  ].join('\n');
+}
+
+/** Chamado da empresa com o nome do cliente e de quem aprovou (null se não existe). */
+async function buscarChamadoCompleto(id, empresa_id) {
+  const r = await pool.query(
+    `SELECT ch.*, COALESCE(c.razao_social, c.nome) AS cliente_nome, ua.nome AS aprovado_por_nome
+     FROM chamados ch
+     LEFT JOIN clientes c ON c.id = ch.cliente_id
+     LEFT JOIN usuarios ua ON ua.id = ch.aprovado_por_usuario_id
+     WHERE ch.id = $1 AND ch.empresa_id = $2 AND ch.ativo = TRUE`,
+    [id, empresa_id]);
+  return r.rows[0] || null;
+}
+
 // GET - Listar chamados (cliente vê só os seus; admin vê todos)
-// Suporta: status, prioridade, cliente_id, busca (texto), data_de, data_ate, page, limit, ordem, direcao
+// Suporta: status, prioridade, cliente_id, busca (texto), data_de, data_ate, page, limit, ordem, direcao,
+//          origem (conector | manual), aprovacao (pendente | aprovado | recusado)
 router.get('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   const usuario_id = req.usuario.id;
   const isCliente = req.usuario.tipo === 'cliente';
-  const { status, prioridade, cliente_id, busca, data_de, data_ate } = req.query;
+  const { status, prioridade, cliente_id, busca, data_de, data_ate, origem, aprovacao } = req.query;
 
   // Paginação (default: page=1, limit=50, max=200)
   const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -50,6 +121,11 @@ router.get('/', async (req, res) => {
     if (!isCliente && cliente_id) { where += ` AND ch.cliente_id = $${idx++}`; whereParams.push(cliente_id); }
     if (data_de) { where += ` AND ch.data_criacao >= $${idx++}::date`; whereParams.push(data_de); }
     if (data_ate) { where += ` AND ch.data_criacao < ($${idx++}::date + INTERVAL '1 day')`; whereParams.push(data_ate); }
+    if (origem === 'conector') where += ` AND ch.origem = 'conector'`;
+    if (origem === 'manual') where += ' AND ch.origem IS NULL';
+    if (['pendente', 'aprovado', 'recusado'].includes(aprovacao)) {
+      where += ` AND ch.aprovacao_cliente = $${idx++}`; whereParams.push(aprovacao);
+    }
     if (busca && busca.trim()) {
       where += ` AND (ch.titulo ILIKE $${idx} OR ch.descricao ILIKE $${idx} OR CAST(ch.id AS TEXT) = $${idx + 1})`;
       whereParams.push(`%${busca.trim()}%`);
@@ -71,7 +147,7 @@ router.get('/', async (req, res) => {
     const dadosParams = [...whereParams, usuario_id, limit, offset];
 
     const result = await pool.query(`
-      SELECT ch.*,
+      SELECT ${COLUNAS_LISTA},
         COALESCE(c.razao_social, c.nome) as cliente_nome,
         t.nome as tecnologia_nome,
         u1.nome as aberto_por_nome,
@@ -112,6 +188,140 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET - Fila da fábrica ABAP: chamados do Conector SAP já aprovados pelo cliente e ainda em aberto,
+// mais antigos primeiro, com a especificação. Só equipe Marsh. (Antes de /:id.)
+router.get('/fila-conector', async (req, res) => {
+  if (req.usuario.tipo === 'cliente') {
+    return res.status(403).json({ erro: 'Acesso restrito à equipe Marsh.' });
+  }
+  const empresa_id = req.usuario.empresa_id || 1;
+  try {
+    const r = await pool.query(
+      `SELECT ch.id, ch.titulo, ch.status, ch.prioridade, ch.cliente_id, COALESCE(c.razao_social, c.nome) AS cliente_nome,
+              ch.sid, ch.modulo, ch.tipo_demanda, ch.objetos_sap, ch.solicitante_nome, ch.solicitante_email,
+              ch.pedido_original, ch.especificacao, ch.aprovacao_cliente, ch.data_aprovacao, ua.nome AS aprovado_por_nome,
+              ch.data_abertura, ch.atribuido_para_usuario_id, u2.nome AS atribuido_para_nome
+       FROM chamados ch
+       LEFT JOIN clientes c ON c.id = ch.cliente_id
+       LEFT JOIN usuarios ua ON ua.id = ch.aprovado_por_usuario_id
+       LEFT JOIN usuarios u2 ON u2.id = ch.atribuido_para_usuario_id
+       WHERE ch.empresa_id = $1 AND ch.ativo = TRUE AND ch.origem = 'conector'
+         AND ch.aprovacao_cliente = 'aprovado' AND ch.status IN ('aberto', 'em_andamento')
+       ORDER BY ch.data_abertura ASC, ch.id ASC`,
+      [empresa_id]);
+    res.json(r.rows.map(ch => ({ ...ch, numero: `#${ch.id}`, sla: calcularSla(ch) })));
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar a fila do conector', detalhe: err.message });
+  }
+});
+
+// GET - Especificação do chamado do conector em markdown (download). Equipe Marsh ou o cliente dono.
+router.get('/:id/especificacao.md', async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  try {
+    const ch = await buscarChamadoCompleto(req.params.id, empresa_id);
+    if (!ch || (req.usuario.tipo === 'cliente' && (!req.usuario.cliente_id || ch.cliente_id !== req.usuario.cliente_id))) {
+      return res.status(404).json({ erro: 'Chamado não encontrado' });
+    }
+    if (ch.origem !== 'conector') {
+      return res.status(404).json({ erro: 'Este chamado não foi aberto pelo Conector SAP: não tem especificação.' });
+    }
+    const nome = `chamado-${ch.id}-${slug(ch.titulo)}.md`;
+    res.set('Content-Type', 'text/markdown; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="${nome}"`);
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.send(markdownEspecificacao(ch));
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao gerar a especificação', detalhe: err.message });
+  }
+});
+
+// POST - Aprovação do chamado do conector pelo gestor do cliente (ou pela Marsh em nome dele).
+// { decisao: 'aprovado' | 'recusado', comentario } — só quando aprovacao_cliente = 'pendente'.
+// Recusado fecha o chamado com o comentário.
+router.post('/:id/aprovacao', async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  const isCliente = req.usuario.tipo === 'cliente';
+  const decisao = req.body?.decisao;
+  const comentario = typeof req.body?.comentario === 'string' ? req.body.comentario.trim() : '';
+
+  if (!isCliente && !ehAdmin(req.usuario.tipo)) {
+    return res.status(403).json({ erro: 'Só o cliente (ou um administrador da Marsh) aprova chamados do conector.' });
+  }
+  if (!['aprovado', 'recusado'].includes(decisao)) {
+    return res.status(400).json({ erro: 'decisao deve ser "aprovado" ou "recusado".' });
+  }
+  if (decisao === 'recusado' && !comentario) {
+    return res.status(400).json({ erro: 'Informe o motivo da recusa.' });
+  }
+  if (comentario.length > 5000) return res.status(400).json({ erro: 'Comentário deve ter até 5.000 caracteres.' });
+
+  try {
+    const ch = await buscarChamadoCompleto(req.params.id, empresa_id);
+    if (!ch) return res.status(404).json({ erro: 'Chamado não encontrado' });
+    if (isCliente && (!req.usuario.cliente_id || ch.cliente_id !== req.usuario.cliente_id)) {
+      return res.status(403).json({ erro: 'Este chamado é de outra empresa.' });
+    }
+    if (ch.origem !== 'conector' || ch.aprovacao_cliente !== 'pendente') {
+      return res.status(409).json({ erro: 'Este chamado não está aguardando aprovação.' });
+    }
+
+    const nome = req.usuario.nome || (await pool.query('SELECT nome FROM usuarios WHERE id = $1', [req.usuario.id])).rows[0]?.nome || 'usuário';
+    const quem = isCliente ? `pelo gestor do cliente (${nome})` : `pela Marsh em nome do cliente (${nome})`;
+    const texto = decisao === 'aprovado'
+      ? `Chamado aprovado ${quem}.${comentario ? `\n\n${comentario}` : ''}`
+      : `Chamado recusado ${quem}: ${comentario}`;
+    const statusNovo = decisao === 'recusado' ? 'fechado' : ch.status;
+
+    const client = await pool.connect();
+    let chamado, atendimento;
+    try {
+      await client.query('BEGIN');
+      // A condição aprovacao_cliente = 'pendente' no UPDATE segura duas decisões simultâneas
+      const up = await client.query(
+        `UPDATE chamados SET aprovacao_cliente = $1, aprovado_por_usuario_id = $2, data_aprovacao = NOW(),
+           status = $3, data_fechamento = CASE WHEN $6 THEN NOW() ELSE data_fechamento END,
+           atualizado_por_usuario_id = $2, data_atualizacao = NOW()
+         WHERE id = $4 AND empresa_id = $5 AND aprovacao_cliente = 'pendente'
+         RETURNING *`,
+        [decisao, req.usuario.id, statusNovo, ch.id, empresa_id, statusNovo === 'fechado']);
+      if (!up.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ erro: 'Este chamado não está aguardando aprovação.' });
+      }
+      chamado = up.rows[0];
+      atendimento = (await client.query(
+        `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, data_atendimento)
+         VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
+        [ch.id, req.usuario.id, decisao === 'aprovado' ? 'aprovacao' : 'recusa', texto])).rows[0];
+      await client.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [ch.id, empresa_id, req.usuario.id, ch.status, statusNovo,
+         decisao === 'aprovado' ? `Aprovado ${quem}` : `Recusado ${quem}: ${comentario}`]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    notificarNovoAtendimento({
+      atendimento, chamado, remetente_tipo: req.usuario.tipo, remetente_nome: nome, empresa_id
+    }).catch(() => {});
+
+    res.json({
+      mensagem: decisao === 'aprovado'
+        ? 'Chamado aprovado: ele entrou na fila de desenvolvimento da Marsh.'
+        : 'Chamado recusado e fechado.',
+      chamado: { id: chamado.id, status: chamado.status, aprovacao_cliente: chamado.aprovacao_cliente, data_aprovacao: chamado.data_aprovacao }
+    });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao registrar a aprovação', detalhe: err.message });
+  }
+});
+
 // GET - Um chamado por ID (com atendimentos, status_log, avaliação, SLA)
 router.get('/:id', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
@@ -122,13 +332,17 @@ router.get('/:id', async (req, res) => {
         t.nome as tecnologia_nome,
         u1.nome as aberto_por_nome,
         u2.nome as atribuido_para_nome,
-        u3.nome as atualizado_por_nome
+        u3.nome as atualizado_por_nome,
+        ua.nome as aprovado_por_nome,
+        (SELECT la.nome_maquina FROM licencas_ativacoes la
+          WHERE la.licenca_id = ch.licenca_id AND la.maquina_hash = ch.maquina_hash) as maquina_nome
        FROM chamados ch
        LEFT JOIN clientes c ON c.id = ch.cliente_id
        LEFT JOIN tecnologias t ON t.id = ch.tecnologia_id
        LEFT JOIN usuarios u1 ON u1.id = ch.aberto_por_usuario_id
        LEFT JOIN usuarios u2 ON u2.id = ch.atribuido_para_usuario_id
        LEFT JOIN usuarios u3 ON u3.id = ch.atualizado_por_usuario_id
+       LEFT JOIN usuarios ua ON ua.id = ch.aprovado_por_usuario_id
        WHERE ch.id = $1 AND ch.empresa_id = $2 AND ch.ativo = TRUE`;
     const params = [req.params.id, empresa_id];
 
@@ -147,6 +361,13 @@ router.get('/:id', async (req, res) => {
 
     const chamado = result.rows[0];
     chamado.sla = calcularSla(chamado);
+    // Portal: sem os hashes do usuário/máquina e sem a ligação interna com a licença
+    if (isCliente) {
+      delete chamado.usuario_hash;
+      delete chamado.maquina_hash;
+      delete chamado.maquina_nome;
+      delete chamado.licenca_id;
+    }
 
     // Atendimentos (com flag se já foi lido pelo usuário atual)
     const atend = await pool.query(`

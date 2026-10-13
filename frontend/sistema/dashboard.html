@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="assistente-voz.css">
+  <link rel="stylesheet" href="chamado-conector.css">
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#1d6fd8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -573,6 +574,13 @@
           <select id="filtro-chamados-cliente" class="filtro-select" onchange="onFiltroChamadosChange()">
             <option value="">Todos os clientes</option>
           </select>
+          <select id="filtro-chamados-origem" class="filtro-select" onchange="onFiltroChamadosChange()">
+            <option value="">Todas as origens</option>
+            <option value="conector">Conector SAP</option>
+            <option value="pendente">Conector SAP: aguardando aprovação</option>
+            <option value="aprovado">Conector SAP: aprovados</option>
+            <option value="manual">Portal e painel</option>
+          </select>
           <label class="filtros-label">De <input type="date" id="filtro-chamados-data-de" class="filtro-select" onchange="onFiltroChamadosChange()"></label>
           <label class="filtros-label">Até <input type="date" id="filtro-chamados-data-ate" class="filtro-select" onchange="onFiltroChamadosChange()"></label>
         </div>
@@ -868,6 +876,19 @@
             </div>
             <p class="fin-muted">E-mails: chamado novo → admins e técnicos; mudança de status → usuários do cliente; comentário → o outro lado.</p>
             <a href="#" class="roteiro-ir" onclick="showPage('chamados'); return false;">Chamados →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Chamados do Conector SAP</h3>
+            <p class="fin-muted">O consultor do cliente pede no Claude; o Claude analisa o Z, escreve a especificação e, com o OK dele, abre o chamado aqui.</p>
+            <ol>
+              <li>O chamado chega com o selo <strong>Conector SAP</strong>: SID, módulo, tipo, solicitante, objetos SAP, pedido original e a especificação em markdown (baixe o <code>.md</code> ou copie no detalhe).</li>
+              <li>Se a licença exige aprovação (padrão), ele fica <strong>Aguardando aprovação do cliente</strong>: o gestor aprova ou recusa no portal. Sem SLA enquanto espera; o prazo conta a partir da aprovação. Recusa fecha o chamado com o motivo.</li>
+              <li>Cliente aprovou por e-mail ou telefone? No detalhe, <strong>Aprovar em nome do cliente</strong> (fica registrado que foi a Marsh).</li>
+              <li>Fila da fábrica ABAP: filtro <em>Conector SAP: aprovados</em> (ou <code>GET /api/chamados/fila-conector</code>), mais antigos primeiro.</li>
+              <li>Para não exigir aprovação: Licenças → editar → desmarque <em>Chamados do conector exigem aprovação</em>. Limite: 20 chamados por hora por licença.</li>
+            </ol>
+            <a href="#" class="roteiro-ir" onclick="document.getElementById('filtro-chamados-origem').value='pendente'; showPage('chamados'); return false;">Chamados aguardando aprovação →</a>
           </section>
 
           <section class="rel-card roteiro-card">
@@ -2873,6 +2894,11 @@
             <input type="number" name="max_maquinas" min="1" placeholder="Vazio = ilimitado">
             <small class="form-hint">Computadores ativados pelo instalador (revogados não contam).</small>
           </div>
+          <div class="form-group">
+            <label>Chamados do conector</label>
+            <label class="check-linha"><input type="checkbox" name="chamados_exigem_aprovacao" checked> Chamados do conector exigem aprovação do gestor do cliente</label>
+            <small class="form-hint">Marcado: o chamado aberto pelo Claude fica aguardando o gestor aprovar no portal. Desmarcado: entra direto na fila da Marsh.</small>
+          </div>
         </div>
         <div class="form-group">
           <label>Conexões SAP (o instalador recebe pré-preenchidas)</label>
@@ -3179,6 +3205,8 @@
       <div id="detalhe-chamado-info" class="detalhe-chamado-info">
         <!-- Preenchido via JS -->
       </div>
+      <!-- Chamado do Conector SAP: SID, objetos, pedido, especificação e aprovação (chamado-conector.js) -->
+      <div id="detalhe-chamado-conector" style="padding:0 0.5rem;"></div>
 
       <div style="padding:0 0.5rem;">
         <h4 class="detalhe-chamado-section-title">Timeline de Atendimentos</h4>
@@ -3564,6 +3592,7 @@
     </button>
   </nav>
 
+  <script src="chamado-conector.js"></script>
   <script src="script.js"></script>
   <script src="financeiro.js"></script>
   <script src="comercial.js"></script>
