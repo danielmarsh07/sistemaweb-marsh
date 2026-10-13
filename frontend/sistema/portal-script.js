@@ -881,10 +881,26 @@ async function carregarDownloadConector() {
   }
   const { url, versao } = await res.json();
   const urlSegura = /^https?:\/\//i.test(url || '') ? url : null;
+  // O link do storage vale poucos minutos: o botão pede um link novo a cada clique
   box.innerHTML = urlSegura
     ? `<div><strong>Instalador do conector${versao ? ' — versão ' + escapeHtml(versao) : ''}</strong>${instrucao}</div>
-       <a class="btn-curso" href="${escapeHtml(urlSegura)}" target="_blank" rel="noopener" download>Baixar instalador</a>`
+       <button type="button" class="btn-curso" id="btn-baixar-conector">Baixar instalador</button>`
     : `<div><strong>Instalador do conector</strong><p>Instalador em preparação — fale com a Marsh.</p></div>`;
+  const btn = document.getElementById('btn-baixar-conector');
+  if (btn) btn.addEventListener('click', baixarInstaladorConector);
+}
+
+async function baixarInstaladorConector(ev) {
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    const res = await apiFetch(`${API}/licencas/download`);
+    const dados = res && res.ok ? await res.json() : null;
+    if (dados && /^https?:\/\//i.test(dados.url || '')) window.location.href = dados.url;
+    else alert('Não foi possível gerar o link do instalador. Fale com a Marsh.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ===== FINANCEIRO: faturas e NFS-e do cliente (só leitura) =====

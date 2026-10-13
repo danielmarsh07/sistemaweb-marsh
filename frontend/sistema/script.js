@@ -1146,7 +1146,58 @@ function badgeLicenca(l) {
   return `<span style="background:${cor}20; color:${cor}; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">${txt}</span>`;
 }
 
+// ===== Instalador do conector: versão publicada e envio de um zip novo =====
+async function loadInstaladorConector() {
+  const info = document.getElementById('instalador-conector-info');
+  if (!info) return;
+  const res = await apiFetch(`${API_URL}/licencas/instaladores`);
+  if (!res || !res.ok) { info.textContent = 'Não foi possível consultar o instalador.'; return; }
+  const { storage, instaladores } = await res.json();
+  const atual = instaladores[0];
+  const btn = document.getElementById('btn-publicar-instalador');
+  btn.disabled = !storage;
+  if (!storage) {
+    info.textContent = 'Storage (S3/R2) não configurado no servidor: configure as variáveis S3_* no Render para publicar.';
+  } else if (atual) {
+    const mb = (Number(atual.tamanho_bytes) / 1048576).toFixed(1);
+    const quando = new Date(atual.data_publicacao).toLocaleString('pt-BR');
+    info.innerHTML = `Versão <strong>${escapeHtml(atual.versao)}</strong> (${mb} MB), publicada em ${escapeHtml(quando)}. ` +
+      `É a que o portal entrega aos clientes com licença ativa. SHA-256: <code>${escapeHtml(atual.sha256.slice(0, 16))}…</code>`;
+  } else {
+    info.textContent = 'Nenhum instalador publicado: o portal mostra "Instalador em preparação".';
+  }
+}
+
+async function publicarInstaladorConector(arquivo) {
+  const info = document.getElementById('instalador-conector-info');
+  const btn = document.getElementById('btn-publicar-instalador');
+  const form = new FormData();
+  form.append('arquivo', arquivo);
+  btn.disabled = true;
+  info.textContent = `Enviando ${arquivo.name} (${(arquivo.size / 1048576).toFixed(1)} MB)...`;
+  try {
+    // fetch direto: o apiFetch fixa Content-Type JSON, e o upload precisa do multipart do navegador
+    const res = await fetch(`${API_URL}/licencas/instaladores`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+    const corpo = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(corpo.erro || `Falha ao publicar (HTTP ${res.status}).`); }
+    else alert(corpo.mensagem);
+  } finally {
+    btn.disabled = false;
+    loadInstaladorConector();
+  }
+}
+
+document.getElementById('btn-publicar-instalador')?.addEventListener('click', () =>
+  document.getElementById('instalador-conector-arquivo').click());
+document.getElementById('instalador-conector-arquivo')?.addEventListener('change', ev => {
+  const arq = ev.target.files[0];
+  ev.target.value = '';
+  if (arq) publicarInstaladorConector(arq);
+});
+
 async function loadLicencas() {
+  loadInstaladorConector();
   const tbody = document.getElementById('licencas-tbody');
   if (tbody && tbody.querySelector('.text-center')) tbody.innerHTML = skeletonRows(10);
   const res = await apiFetch(`${API_URL}/licencas`);

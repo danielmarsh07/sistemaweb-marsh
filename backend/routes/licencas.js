@@ -9,8 +9,15 @@
  */
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
+const multer = require('multer');
 const pool = require('../db');
+const storage = require('../services/storage');
 const { PLANOS, gerarChave, hashChave, prefixoChave, listaSids, validarConexoes } = require('../services/licenca');
+
+// Instalador do conector (~30 MB com o Python embutido)
+const INSTALADOR_MAX_MB = parseInt(process.env.CONECTOR_INSTALADOR_MAX_MB || '100', 10);
+const uploadInstalador = multer({ storage: multer.memoryStorage(), limits: { fileSize: INSTALADOR_MAX_MB * 1024 * 1024 } });
 
 const COLUNAS = `l.id, l.cliente_id, l.produto, l.plano, l.max_usuarios, l.sids, l.data_inicio, l.data_fim,
   l.status, l.chave_prefixo, l.ultima_validacao, l.versao_conector, l.observacoes, l.data_criacao,
@@ -107,6 +114,14 @@ router.get('/download', async (req, res) => {
         [req.usuario.cliente_id]);
       if (!r.rows.length) return res.status(403).json({ erro: 'Nenhuma licença ativa do conector para esta empresa.' });
     }
+    // Instalador publicado pelo painel (storage) tem prioridade: link assinado de poucos minutos,
+    // gerado a cada clique. Sem publicação, vale o link fixo das variáveis de ambiente.
+    const pub = await pool.query(
+      'SELECT versao, storage_key, nome_arquivo FROM conector_instaladores ORDER BY id DESC LIMIT 1');
+    if (pub.rows.length && storage.disponivel) {
+      const i = pub.rows[0];
+      return res.json({ url: await storage.getDownloadUrl(i.storage_key, i.nome_arquivo), versao: i.versao, temporario: true });
+    }
     res.json({ url: process.env.CONECTOR_DOWNLOAD_URL || null, versao: process.env.CONECTOR_VERSAO || null });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao buscar o instalador', detalhe: err.message });
@@ -114,6 +129,53 @@ router.get('/download', async (req, res) => {
 });
 
 router.use(somenteAdmin);
+
+// GET /instaladores — versões publicadas (a primeira é a que o portal entrega)
+router.get('/instaladores', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, versao, nome_arquivo, tamanho_bytes, sha256, data_publicacao
+       FROM conector_instaladores ORDER BY id DESC LIMIT 20`);
+    res.json({ storage: storage.disponivel, instaladores: r.rows });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao listar instaladores', detalhe: err.message });
+  }
+});
+
+// POST /instaladores — publica o zip montado por instalador/montar_pacote.ps1 (campo "arquivo")
+router.post('/instaladores', (req, res) => {
+  if (!storage.disponivel) {
+    return res.status(503).json({ erro: 'Storage (S3/R2) não configurado no servidor: configure as variáveis S3_* no Render.' });
+  }
+  uploadInstalador.single('arquivo')(req, res, async (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ erro: `Arquivo maior que ${INSTALADOR_MAX_MB} MB.` });
+      return res.status(400).json({ erro: 'Erro no upload', detalhe: err.message });
+    }
+    const f = req.file;
+    if (!f) return res.status(400).json({ erro: 'Nenhum arquivo enviado.' });
+    // Nome gerado pelo montar_pacote.ps1: MarshSAP-Conector-<versão>.zip; conteúdo precisa ser zip (PK\3\4)
+    const m = /^MarshSAP-Conector-(\d+\.\d+\.\d+)\.zip$/i.exec(f.originalname || '');
+    if (!m) return res.status(400).json({ erro: 'Envie o zip gerado pelo montar_pacote.ps1 (MarshSAP-Conector-<versão>.zip).' });
+    if (f.buffer.length < 4 || f.buffer.readUInt32LE(0) !== 0x04034b50) {
+      return res.status(400).json({ erro: 'O arquivo não é um zip válido.' });
+    }
+    const versao = m[1];
+    const nome = `MarshSAP-Conector-${versao}.zip`;
+    try {
+      const key = await storage.uploadNaKey({ key: `conector/${nome}`, buffer: f.buffer, mimeType: 'application/zip' });
+      const sha256 = crypto.createHash('sha256').update(f.buffer).digest('hex');
+      const r = await pool.query(
+        `INSERT INTO conector_instaladores (versao, storage_key, nome_arquivo, tamanho_bytes, sha256, publicado_por_usuario_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, versao, nome_arquivo, tamanho_bytes, sha256, data_publicacao`,
+        [versao, key, nome, f.buffer.length, sha256, req.usuario.id]);
+      res.status(201).json({ mensagem: `Instalador ${versao} publicado: o portal dos clientes já entrega esta versão.`,
+                             instalador: r.rows[0] });
+    } catch (e) {
+      res.status(500).json({ erro: 'Erro ao publicar o instalador', detalhe: e.message });
+    }
+  });
+});
 
 // GET / — lista
 router.get('/', async (req, res) => {

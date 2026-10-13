@@ -481,6 +481,16 @@
           nunca código-fonte nem dados do SAP do cliente.
         </p>
 
+        <!-- Instalador que o portal entrega (zip do montar_pacote.ps1, guardado no storage S3/R2) -->
+        <div class="instalador-conector" id="instalador-conector">
+          <div>
+            <strong>Instalador do conector</strong>
+            <p id="instalador-conector-info">Carregando...</p>
+          </div>
+          <input type="file" id="instalador-conector-arquivo" accept=".zip" hidden>
+          <button type="button" id="btn-publicar-instalador" class="btn btn-secondary">Publicar instalador</button>
+        </div>
+
         <div class="table-container">
           <table>
             <thead>

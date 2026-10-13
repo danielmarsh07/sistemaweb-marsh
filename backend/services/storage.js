@@ -54,9 +54,24 @@ async function upload({ chamadoId, nomeOriginal, buffer, mimeType }) {
   return key;
 }
 
-async function getDownloadUrl(key) {
+// Grava numa key já definida (ex.: instalador do conector em conector/...)
+async function uploadNaKey({ key, buffer, mimeType }) {
   if (!disponivel) throw new Error('Storage não configurado');
-  return getSignedUrl(client(), new GetObjectCommand({ Bucket: BUCKET, Key: key }), {
+  await client().send(new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: mimeType || 'application/octet-stream'
+  }));
+  return key;
+}
+
+// nomeArquivo (opcional): força o download com esse nome em vez de abrir no navegador
+async function getDownloadUrl(key, nomeArquivo) {
+  if (!disponivel) throw new Error('Storage não configurado');
+  const cmd = { Bucket: BUCKET, Key: key };
+  if (nomeArquivo) cmd.ResponseContentDisposition = `attachment; filename="${sanitizarNome(nomeArquivo)}"`;
+  return getSignedUrl(client(), new GetObjectCommand(cmd), {
     expiresIn: URL_TTL_SECONDS
   });
 }
@@ -66,4 +81,4 @@ async function remove(key) {
   await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
-module.exports = { disponivel, upload, getDownloadUrl, remove };
+module.exports = { disponivel, upload, uploadNaKey, getDownloadUrl, remove };

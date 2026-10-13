@@ -513,6 +513,21 @@ async function iniciar() {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_licencas_ativacoes_lic ON licencas_ativacoes(licenca_id);`);
 
+    //     Instaladores do conector publicados pelo painel (zip no storage S3/R2; o portal entrega
+    //     um link temporário só para quem tem licença ativa). O mais recente é o que vale.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conector_instaladores (
+        id SERIAL PRIMARY KEY,
+        versao VARCHAR(30) NOT NULL,
+        storage_key VARCHAR(255) NOT NULL,
+        nome_arquivo VARCHAR(150) NOT NULL,
+        tamanho_bytes BIGINT NOT NULL,
+        sha256 VARCHAR(64) NOT NULL,
+        publicado_por_usuario_id INTEGER,
+        data_publicacao TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
     // 21. Treinamentos (portal do cliente): cursos, aulas, liberação por cliente, progresso por usuário
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cursos (
