@@ -34,7 +34,16 @@ async function emailsCliente(cliente_id) {
 // Retorna true só quando o Resend aceitou o envio
 async function enviar({ to, subject, html, cc, semAlerta }) {
   const resend = getResend();
-  if (!resend) return false; // chave não configurada
+  if (!resend) {
+    // Fora do ar no servidor (Render define RENDER=true) é problema; no ambiente local é de propósito
+    if (process.env.RENDER && !semAlerta) {
+      require('./alertas').registrarAlerta({
+        chave: 'email:sem-chave', titulo: 'E-mails não estão sendo enviados',
+        detalhe: `RESEND_API_KEY não está configurada no servidor. Não saiu: "${subject}".`
+      });
+    }
+    return false;
+  }
   try {
     const destinatarios = Array.isArray(to) ? to.map(u => (typeof u === 'string' ? u : u.email)) : [to];
     if (!destinatarios.length) return false;
@@ -421,6 +430,30 @@ async function enviarLinkSenha({ nome, email, link, tipo, horas }) {
   return enviar({ to: [email], subject: convite ? '[Marsh] Seu acesso ao Sistema Marsh' : '[Marsh] Redefinição de senha', html });
 }
 
+/** Boas-vindas para quem foi criado com senha definida pelo administrador (sem convite). Não leva a senha. */
+async function enviarBoasVindas({ nome, email, tipo }) {
+  const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
+  const oQueFaz = tipo === 'cliente'
+    ? 'Pelo portal você abre e acompanha chamados de suporte, envia anexos e consulta suas faturas e notas fiscais.'
+    : 'Pelo sistema você acompanha chamados, clientes e o restante da operação da Marsh.';
+  const html = templateBase({
+    titulo: 'Bem-vindo ao Sistema Marsh',
+    preheader: 'Sua conta foi criada',
+    corpo: `
+      <h2 style="margin:0 0 8px;color:#0f172a;font-size:20px">Bem-vindo ao Sistema Marsh</h2>
+      <p style="margin:0 0 12px;color:#334155;font-size:14px">Olá, ${esc(nome)}. Sua conta foi criada. ${oQueFaz}</p>
+      <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;margin-bottom:20px;border-left:4px solid #1d6fd8">
+        <table>
+          <tr><td style="padding:4px 16px 4px 0;font-size:13px;color:#64748b">Login</td><td style="font-size:13px;font-weight:600;color:#0f172a">${esc(email)}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;font-size:13px;color:#64748b">Senha</td><td style="font-size:13px;color:#0f172a">a que foi combinada com quem criou o seu acesso</td></tr>
+        </table>
+      </div>
+      <a href="${esc(base)}/login.html" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Acessar o sistema →</a>
+      <p style="margin:20px 0 0;color:#64748b;font-size:13px">Não sabe a senha? Na tela de entrada, use "Esqueci minha senha" para receber um link e criar uma nova.</p>`
+  });
+  return enviar({ to: [email], subject: '[Marsh] Bem-vindo ao Sistema Marsh', html });
+}
+
 // ===== Comercial (funil e propostas) =====
 
 /** Proposta enviada ao contato da oportunidade, com o link público para ver e responder */
@@ -474,6 +507,7 @@ module.exports = {
   enviarProposta,
   enviarAlertaSistema,
   enviarLinkSenha,
+  enviarBoasVindas,
   notificarAdminsComercial,
   emailConfigurado: () => !!process.env.RESEND_API_KEY
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const senhas = require('../services/senhas');
+const emailSvc = require('../services/email');
 
 // Middleware: apenas admin_empresa e admin_sistema podem gerenciar usuários
 // Se tipo não veio no JWT (token antigo), assume admin_empresa
@@ -141,7 +142,13 @@ router.post('/', apenasAdmin, async (req, res) => {
         usuario: result.rows[0], convite_enviado: enviado
       });
     }
-    res.status(201).json({ mensagem: 'Usuário criado com sucesso!', usuario: result.rows[0] });
+    // Sem convite: avisa a pessoa que a conta existe (a senha não vai no e-mail)
+    const boasVindas = await emailSvc.enviarBoasVindas(result.rows[0]).catch(() => false);
+    res.status(201).json({
+      mensagem: boasVindas ? `Usuário criado! E-mail de boas-vindas enviado para ${result.rows[0].email} (sem a senha: passe a senha à pessoa).`
+        : 'Usuário criado com sucesso! (o e-mail de boas-vindas não pôde ser enviado)',
+      usuario: result.rows[0], boas_vindas_enviado: boasVindas
+    });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao criar usuário', detalhe: err.message });
   }
