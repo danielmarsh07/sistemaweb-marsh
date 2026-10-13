@@ -1075,12 +1075,13 @@
             <option value="total_desc">Maior total no período</option>
             <option value="total_asc">Menor total no período</option>
           </select>
+          <button type="button" id="vm-btn-tudo" class="btn btn-secondary vm-btn-tudo" onclick="vmAlternarTudo()">Recolher tudo</button>
           <span id="vm-contador" class="filtros-contador"></span>
         </div>
         <p class="pagina-descricao">
           Cada linha é um lançamento (parcelado ou assinatura = uma linha só), cada coluna é o mês do vencimento.
           Clique num valor para editar ou dar baixa, ou numa célula vazia para lançar naquele mês. No cartão, clique no total da seção para pagar a fatura.
-          Clique no nome de um mês para ordenar as linhas pelo valor daquele mês.
+          Clique no nome de um mês para ordenar as linhas pelo valor daquele mês, e no nome de uma seção para recolhê-la ou expandi-la.
         </p>
         <div class="vm-legenda" aria-hidden="true">
           <span><i class="vm-st-aberta"></i>em aberto</span>

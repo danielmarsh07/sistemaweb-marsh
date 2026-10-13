@@ -115,6 +115,21 @@ const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     await js(`document.getElementById('vm-categoria').value = document.getElementById('vm-categoria').options[1].value; renderVisaoMensal()`);
     ok((await linhasVm()).length < 3, 'visão mensal: filtro por categoria');
 
+    // Seções recolhíveis: as linhas somem, o total da seção fica; a escolha sobrevive ao recarregar
+    await js(`document.getElementById('vm-categoria').value = ''; renderVisaoMensal()`);
+    await js(`document.querySelector('#vm-tabela .vm-secao .vm-secao-toggle').click()`);
+    ok((await linhasVm()).length === 0 && await js(`document.querySelector('#vm-tabela .vm-secao .vm-secao-toggle').getAttribute('aria-expanded') === 'false'`),
+      'visão mensal: seção recolhida esconde as linhas');
+    ok(await js(`/R\\$/.test(document.querySelector('#vm-tabela .vm-secao').textContent)`), 'visão mensal: total da seção recolhida continua');
+    await js(`loadVisaoMensal()`); await espera(1500);
+    ok((await linhasVm()).length === 0, 'visão mensal: seção continua recolhida depois de recarregar');
+    await js(`document.querySelector('#vm-tabela .vm-secao .vm-secao-toggle').click()`);
+    ok((await linhasVm()).length === 3, 'visão mensal: expandir mostra as linhas de novo');
+    await js(`vmAlternarTudo()`);
+    ok((await linhasVm()).length === 0 && await js(`document.getElementById('vm-btn-tudo').textContent === 'Expandir tudo'`), 'visão mensal: recolher tudo');
+    await js(`vmAlternarTudo()`);
+    ok((await linhasVm()).length === 3, 'visão mensal: expandir tudo');
+
     ok(!errosJs.length, `sem erros de JavaScript${errosJs.length ? ': ' + errosJs.join(' | ') : ''}`);
   } finally {
     ws.close(); chrome.kill();

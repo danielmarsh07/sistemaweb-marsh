@@ -3387,6 +3387,26 @@ svg.icon {
 .secao-recolhivel.recolhida .secao-chevron { transform: rotate(-45deg); }
 @media (prefers-reduced-motion: reduce) { .secao-chevron { transition: none; } }
 
+/* Visão mensal: título da seção recolhe/expande as linhas */
+.vm-secao-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 2px 4px 2px 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vm-secao-toggle:hover { color: var(--blue); }
+.vm-secao-toggle:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+.vm-secao-toggle[aria-expanded="false"] .secao-chevron { transform: rotate(-45deg); }
+.vm-qtd { font-size: 11px; font-weight: 500; opacity: 0.65; margin-left: 4px; }
+.vm-btn-tudo { padding: 6px 12px; font-size: 12.5px; }
+
 /* Banner com imagem da marca. Véu do lado do texto garante leitura;
    sem a imagem, fica o degradê azul de reserva. */
 :root,

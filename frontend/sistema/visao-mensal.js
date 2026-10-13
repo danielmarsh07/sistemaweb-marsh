@@ -35,6 +35,34 @@ function vmPreencherCategorias() {
   sel.value = cats.includes(atual) ? atual : '';
 }
 
+// Seções recolhidas (chave da seção, ou 'receitas'): guardadas neste navegador
+const VM_RECOLHIDAS = 'vm-secoes-recolhidas';
+let _vmRecolhidas = new Set();
+try { _vmRecolhidas = new Set(JSON.parse(localStorage.getItem(VM_RECOLHIDAS)) || []); } catch { /* sem storage */ }
+
+function vmAlternarSecao(chave) {
+  _vmRecolhidas.has(chave) ? _vmRecolhidas.delete(chave) : _vmRecolhidas.add(chave);
+  try { localStorage.setItem(VM_RECOLHIDAS, JSON.stringify([..._vmRecolhidas])); } catch { /* sem storage */ }
+  renderVisaoMensal();
+}
+
+// Botão do título da seção: recolhe/expande as linhas (o total da seção continua na tela)
+function vmTituloSecao(chave, rotulo) {
+  const aberta = !_vmRecolhidas.has(chave);
+  return `<button type="button" class="vm-secao-toggle" data-chave="${escapeHtml(chave)}" aria-expanded="${aberta}"
+    title="${aberta ? 'Recolher' : 'Expandir'}" onclick="vmAlternarSecao(this.dataset.chave)">
+    <span class="secao-chevron" aria-hidden="true"></span>${rotulo}</button>`;
+}
+
+// Recolher tudo / expandir tudo (seções da tela + receitas)
+function vmAlternarTudo() {
+  const chaves = [..._vm.secoes.map(s => s.chave), 'receitas'];
+  const recolher = chaves.some(c => !_vmRecolhidas.has(c));
+  chaves.forEach(c => (recolher ? _vmRecolhidas.add(c) : _vmRecolhidas.delete(c)));
+  try { localStorage.setItem(VM_RECOLHIDAS, JSON.stringify([..._vmRecolhidas])); } catch { /* sem storage */ }
+  renderVisaoMensal();
+}
+
 let _vmTimerBusca = null;
 function vmAgendarRender() { clearTimeout(_vmTimerBusca); _vmTimerBusca = setTimeout(renderVisaoMensal, 200); }
 
@@ -147,7 +175,8 @@ function renderVisaoMensal() {
   const linhasSecao = s => {
     const cabecalho = `
       <tr class="vm-secao">
-        <th scope="rowgroup">${escapeHtml(s.titulo)}${s.cartao ? ' <span class="vm-tag">cartão</span>' : ''}</th>
+        <th scope="rowgroup">${vmTituloSecao(s.chave, `${escapeHtml(s.titulo)}${s.cartao ? ' <span class="vm-tag">cartão</span>' : ''}`)}${
+          _vmRecolhidas.has(s.chave) ? ` <span class="vm-qtd">${s.linhas.length} item(ns)</span>` : ''}</th>
         ${d.meses.map(m => {
           const total = s.totais[m];
           // Com filtro o total é parcial: pagar a fatura só com a seção inteira na tela
@@ -158,6 +187,7 @@ function renderVisaoMensal() {
             : `${vmValor(total)}${paga ? ' <span class="vm-ok" title="Fatura paga">✓</span>' : ''}`}</td>`;
         }).join('')}
       </tr>`;
+    if (_vmRecolhidas.has(s.chave)) return cabecalho;
     const corpo = s.linhas.map(l => `
       <tr>
         <th scope="row" class="vm-item">
@@ -197,6 +227,8 @@ function renderVisaoMensal() {
 
   const totalLinhas = d.secoes.reduce((t, s) => t + s.linhas.length, 0);
   const visiveis = secoes.reduce((t, s) => t + s.linhas.length, 0);
+  const todasRecolhidas = [...d.secoes.map(s => s.chave), 'receitas'].every(c => _vmRecolhidas.has(c));
+  document.getElementById('vm-btn-tudo').textContent = todasRecolhidas ? 'Expandir tudo' : 'Recolher tudo';
   document.getElementById('vm-contador').textContent = filtrando ? `${visiveis} de ${totalLinhas} lançamento(s)` : `${totalLinhas} lançamento(s)`;
 
   document.getElementById('vm-tabela').innerHTML = `
@@ -207,9 +239,10 @@ function renderVisaoMensal() {
           `<tr><td colspan="${d.meses.length + 1}" class="vm-vazio">${filtrando
             ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento no período. Use "+ Lançamento".'}</td></tr>`}
         ${receitas.length ? `
-        <tr class="vm-secao vm-secao-receita"><th scope="rowgroup">Receitas (líquido de retenções)</th>${d.meses.map(m =>
+        <tr class="vm-secao vm-secao-receita"><th scope="rowgroup">${vmTituloSecao('receitas', 'Receitas (líquido de retenções)')}${
+          _vmRecolhidas.has('receitas') ? ` <span class="vm-qtd">${receitas.length} item(ns)</span>` : ''}</th>${d.meses.map(m =>
           `<td class="fin-num${colAtual(m)}">${vmValor(totRec[m])}</td>`).join('')}</tr>
-        ${linhasReceita}` : ''}
+        ${_vmRecolhidas.has('receitas') ? '' : linhasReceita}` : ''}
         ${linhaTotal('Total a pagar', totPagar, 'vm-total')}
         ${comReceita ? linhaTotal('Total a receber', totRec, 'vm-total') : ''}
         ${comReceita ? linhaTotal('Saldo do mês', saldo, 'vm-saldo') : ''}
