@@ -3651,7 +3651,7 @@
   </div>
 
   <!-- ASSISTENTE DE VOZ - Botão flutuante -->
-  <button id="btn-assistente-voz" class="assistente-fab" type="button" aria-label="JARVIS — assistente de voz" title="JARVIS">
+  <button id="btn-assistente-voz" class="assistente-fab" type="button" aria-label="Ivy — assistente de voz" title="Ivy">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
       <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -3664,9 +3664,20 @@
   <div id="modal-assistente" class="assistente-modal" aria-hidden="true">
     <div class="assistente-modal-content">
       <div class="assistente-header">
-        <h3>JARVIS</h3>
+        <h3>Ivy</h3>
         <div class="assistente-header-actions">
+          <button type="button" class="mode-btn voz-robotica-btn" id="btn-voz-robotica" title="Voz robótica" aria-label="Voz robótica" aria-pressed="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12h2l2-5 3 10 3-14 3 14 3-10 2 5h2"></path>
+            </svg>
+          </button>
           <div class="assistente-mode-group" role="tablist" aria-label="Modo de apresentação">
+            <button type="button" class="mode-btn" data-modo="ivy" title="Ivy (tela cheia)" aria-label="Ivy em tela cheia">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="7" width="14" height="12" rx="4"></rect>
+                <path d="M12 3v4M9 12h.01M15 12h.01M10 16h4"></path>
+              </svg>
+            </button>
             <button type="button" class="mode-btn" data-modo="holograma" title="Holograma compacto" aria-label="Holograma compacto">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -3685,7 +3696,7 @@
                 <path d="M12 2l2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-3.4z"></path>
               </svg>
             </button>
-            <button type="button" class="mode-btn" data-modo="jarvis" title="JARVIS HUD (tela cheia)" aria-label="JARVIS HUD em tela cheia">
+            <button type="button" class="mode-btn" data-modo="jarvis" title="HUD (tela cheia)" aria-label="HUD em tela cheia">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9"></circle>
                 <circle cx="12" cy="12" r="5"></circle>
@@ -3697,8 +3708,27 @@
         </div>
       </div>
 
-      <div class="assistente-body" data-modo="jarvis">
-        <!-- Modo JARVIS HUD (fullscreen, estilo Iron Man) -->
+      <div class="assistente-body" data-modo="ivy">
+        <!-- Modo IVY (fullscreen): o robô da marca, que se mexe e fala -->
+        <div class="assistente-ivy" id="assistente-ivy" aria-hidden="true">
+          <div class="ivy-palco" id="ivy-palco">
+            <div class="ivy-halo"></div>
+            <canvas id="assistente-ivy-canvas"></canvas>
+            <div class="ivy-moldura">
+              <div class="ivy-cabeca" id="ivy-cabeca">
+                <img src="/img/ivy-rosto.webp" alt="" draggable="false">
+                <span class="ivy-olho"></span>
+                <span class="ivy-olho-longe"></span>
+                <span class="ivy-palpebra"></span>
+                <span class="ivy-orelha"><i></i></span>
+                <span class="ivy-boca"></span>
+              </div>
+              <span class="ivy-scan"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modo HUD (fullscreen, estilo Iron Man) -->
         <div class="assistente-jarvis" id="assistente-jarvis" aria-hidden="true">
           <canvas id="assistente-jarvis-canvas"></canvas>
           <div class="jarvis-ring jarvis-ring-outer"></div>
@@ -3708,7 +3738,7 @@
           <span class="jarvis-bracket tr"></span>
           <span class="jarvis-bracket bl"></span>
           <span class="jarvis-bracket br"></span>
-          <span class="jarvis-hud-text tl">SYS // J.A.R.V.I.S</span>
+          <span class="jarvis-hud-text tl">SYS // I.V.Y</span>
           <span class="jarvis-hud-text tr">STATUS // ONLINE</span>
           <span class="jarvis-hud-text bl">VOICE INPUT // READY</span>
           <span class="jarvis-hud-text br">MARSH CONSULTORIA</span>

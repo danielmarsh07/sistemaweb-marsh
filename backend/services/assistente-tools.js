@@ -995,8 +995,8 @@ const criar_chamado = {
     notificarNovoChamado({
       chamado,
       empresa_id: ctx.empresa_id,
-      aberto_por: ctx.nome || 'Assistente JARVIS'
-    }).catch(err => console.error('[JARVIS criar_chamado] falha ao notificar:', err.message));
+      aberto_por: ctx.nome || 'Assistente Ivy'
+    }).catch(err => console.error('[Ivy criar_chamado] falha ao notificar:', err.message));
 
     return { sucesso: true, chamado, _ui_refresh: ['chamados', 'dashboard'] };
   }
@@ -1062,9 +1062,9 @@ const criar_atendimento = {
       atendimento,
       chamado,
       remetente_tipo: ctx.tipo || 'admin_empresa',
-      remetente_nome: ctx.nome || 'Assistente JARVIS',
+      remetente_nome: ctx.nome || 'Assistente Ivy',
       empresa_id: ctx.empresa_id
-    }).catch(err => console.error('[JARVIS criar_atendimento] falha ao notificar:', err.message));
+    }).catch(err => console.error('[Ivy criar_atendimento] falha ao notificar:', err.message));
 
     return {
       sucesso: true,

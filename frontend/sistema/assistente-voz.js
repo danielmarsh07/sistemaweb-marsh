@@ -43,6 +43,10 @@
   const canvasJarvis = document.getElementById('assistente-jarvis-canvas');
   const jarvisWrap = document.getElementById('assistente-jarvis');
   const jarvisHint = document.getElementById('jarvis-hint');
+  const ivyWrap = document.getElementById('assistente-ivy');
+  const ivyPalco = document.getElementById('ivy-palco');
+  const canvasIvy = document.getElementById('assistente-ivy-canvas');
+  const btnVozRobotica = document.getElementById('btn-voz-robotica');
   const statusEl = document.getElementById('assistente-status');
   const transcriptEl = document.getElementById('assistente-transcript');
   const respostaEl = document.getElementById('assistente-resposta');
@@ -52,10 +56,17 @@
   const btnReset = document.getElementById('btn-reset-assistente');
   const modeButtons = modal.querySelectorAll('.mode-btn');
 
-  const MODO_KEY = 'assistente_modo_visual';
-  const MODOS_VALIDOS = ['holograma', 'texto', 'nebulosa', 'jarvis'];
+  // v2: quem já tinha um modo salvo passa a abrir na Ivy uma vez
+  const MODO_KEY = 'assistente_modo_visual_v2';
+  const MODOS_VALIDOS = ['ivy', 'holograma', 'texto', 'nebulosa', 'jarvis'];
   let modoSalvo = localStorage.getItem(MODO_KEY);
-  let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'jarvis';
+  let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'ivy';
+
+  // Efeito de voz robótica (aplicado no áudio da OpenAI): liga/desliga no botão do cabeçalho
+  const VOZ_KEY = 'assistente_voz_robotica';
+  let vozRobotica = localStorage.getItem(VOZ_KEY) !== 'off';
+  const EFEITO_ROBO = { ringHz: 48, ring: 0.4, seco: 0.75, metal: 0.28, metalAtraso: 0.006, metalRetorno: 0.35 };
+  let nosEfeito = [];
 
   let particulas = [];
 
@@ -84,9 +95,16 @@
     body.setAttribute('data-modo', modo);
     modal.classList.toggle('modo-nebulosa-on', modo === 'nebulosa');
     modal.classList.toggle('modo-jarvis-on', modo === 'jarvis');
+    modal.classList.toggle('modo-ivy-on', modo === 'ivy');
     modeButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.modo === modo));
     localStorage.setItem(MODO_KEY, modo);
     pararVisualizer();
+    if (modo === 'ivy') {
+      ajustarCanvasIvy();
+      iniciarLoopIvy();
+    } else {
+      pararLoopIvy();
+    }
     if (modo === 'holograma') desenharHolograma();
     if (modo === 'nebulosa') {
       ajustarCanvasNebulosa();
@@ -120,6 +138,7 @@
     btnFalarTexto.textContent = (novo === 'listening') ? 'Parar' : 'Falar';
     if (nebulosaHint) nebulosaHint.classList.toggle('hidden', novo !== 'idle');
     if (jarvisHint)   jarvisHint.classList.toggle('hidden',   novo !== 'idle');
+    if (ivyWrap) ivyWrap.dataset.estado = novo;
   }
 
   function mostrarTranscript(texto) {
@@ -154,6 +173,7 @@
     modal.classList.remove('show');
     modal.setAttribute('aria-hidden', 'true');
     pararVisualizer();
+    pararLoopIvy();
     setEstado('idle');
   }
 
@@ -331,7 +351,8 @@
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.75;
-        audioSourceNode.connect(analyser);
+        if (vozRobotica) ligarEfeitoRobo(audioSourceNode, analyser);
+        else audioSourceNode.connect(analyser);
         analyser.connect(audioCtx.destination);
 
         iniciarVisualizerPorModo();
@@ -346,7 +367,53 @@
     });
   }
 
+  // Voz "meio robótica": parte do sinal passa por um modulador em anel (timbre metálico)
+  // e por um atraso curto com retorno (ressonância de lata); o resto segue limpo para manter a clareza.
+  function ligarEfeitoRobo(origem, destino) {
+    const seco = audioCtx.createGain();
+    seco.gain.value = EFEITO_ROBO.seco;
+    origem.connect(seco).connect(destino);
+
+    const anel = audioCtx.createGain();
+    anel.gain.value = 0;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = EFEITO_ROBO.ringHz;
+    osc.connect(anel.gain);
+    osc.start();
+    const anelSaida = audioCtx.createGain();
+    anelSaida.gain.value = EFEITO_ROBO.ring;
+    origem.connect(anel).connect(anelSaida).connect(destino);
+
+    const atraso = audioCtx.createDelay(0.05);
+    atraso.delayTime.value = EFEITO_ROBO.metalAtraso;
+    const retorno = audioCtx.createGain();
+    retorno.gain.value = EFEITO_ROBO.metalRetorno;
+    atraso.connect(retorno).connect(atraso);
+    const metal = audioCtx.createGain();
+    metal.gain.value = EFEITO_ROBO.metal;
+    origem.connect(atraso).connect(metal).connect(destino);
+
+    nosEfeito = [seco, anel, osc, anelSaida, atraso, retorno, metal];
+  }
+
+  function desligarEfeitoRobo() {
+    nosEfeito.forEach(n => {
+      try { if (n.stop) n.stop(); } catch {}
+      try { n.disconnect(); } catch {}
+    });
+    nosEfeito = [];
+  }
+
+  function aplicarVozRobotica() {
+    if (!btnVozRobotica) return;
+    btnVozRobotica.classList.toggle('is-active', vozRobotica);
+    btnVozRobotica.setAttribute('aria-pressed', String(vozRobotica));
+    btnVozRobotica.title = vozRobotica ? 'Voz robótica: ligada' : 'Voz robótica: desligada';
+  }
+
   function iniciarVisualizerPorModo() {
+    if (modoAtual === 'ivy') return; // o loop da Ivy lê o analyser sozinho
     if (modoAtual === 'nebulosa') iniciarVisualizerNebulosa();
     else if (modoAtual === 'jarvis') iniciarVisualizerJarvis();
     else iniciarVisualizer();
@@ -355,6 +422,7 @@
   function pararAudio() {
     if (audioEl) { try { audioEl.pause(); } catch {} audioEl = null; }
     if (audioSourceNode) { try { audioSourceNode.disconnect(); } catch {} audioSourceNode = null; }
+    desligarEfeitoRobo();
     analyser = null;
   }
 
@@ -363,16 +431,22 @@
     speechSynth.cancel();
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = 'pt-BR';
-    u.rate = 0.98;
-    u.pitch = 0.92;
-    const vozes = speechSynth.getVoices();
-    const vozPt = vozes.find(v => v.lang === 'pt-BR') || vozes.find(v => v.lang && v.lang.startsWith('pt'));
+    u.rate = 1.0;
+    u.pitch = 1.1;
+    // Ivy é feminina: prefere uma voz feminina pt-BR do navegador (a "Google português do Brasil" é feminina)
+    const vozes = speechSynth.getVoices().filter(v => v.lang && v.lang.replace('_', '-').startsWith('pt'));
+    const feminina = /francisca|maria|luciana|thalita|vit[oó]ria|let[ií]cia|camila|helo[ií]sa|google portugu[eê]s do brasil|female|feminina/i;
+    const vozPt = vozes.find(v => v.lang.replace('_', '-') === 'pt-BR' && feminina.test(v.name))
+      || vozes.find(v => feminina.test(v.name))
+      || vozes.find(v => v.lang.replace('_', '-') === 'pt-BR')
+      || vozes[0];
     if (vozPt) u.voice = vozPt;
     u.onend = () => { pararVisualizer(); setEstado('idle'); };
     u.onerror = () => { pararVisualizer(); setEstado('idle'); };
+    // Na Ivy o próprio loop simula a boca enquanto o estado é "speaking"
     if (modoAtual === 'nebulosa') iniciarVisualizerNebulosaFake();
     else if (modoAtual === 'jarvis') iniciarVisualizerJarvisFake();
-    else iniciarVisualizerFake();
+    else if (modoAtual !== 'ivy') iniciarVisualizerFake();
     speechSynth.speak(u);
   }
 
@@ -859,6 +933,139 @@
     tick();
   }
 
+  // ---------- IVY (robô da marca que se mexe e fala) ----------
+  // Um loop só, enquanto o modo está aberto: cabeça flutuando, olhar seguindo o mouse,
+  // piscadas, boca/olhos/orelha pelo volume da fala e um anel de onda em volta.
+
+  const semMovimento = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let rafIvy = null;
+  const ivy = { amp: 0, dx: 0, dy: 0, rz: 0, mx: 0, my: 0, proxPiscada: 0, piscadaIni: 0 };
+  let dadosIvy = new Uint8Array(128);
+
+  function ajustarCanvasIvy() {
+    if (!canvasIvy) return;
+    const rect = canvasIvy.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvasIvy.width  = Math.max(1, Math.floor(rect.width  * dpr));
+    canvasIvy.height = Math.max(1, Math.floor(rect.height * dpr));
+    canvasIvy.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Volume da fala 0..1: do analyser (áudio da OpenAI) ou simulado em sílabas (voz do navegador)
+  function volumeIvy(t) {
+    if (estado !== 'speaking') return 0;
+    if (analyser) {
+      if (dadosIvy.length !== analyser.frequencyBinCount) dadosIvy = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(dadosIvy);
+      // faixa da voz (≈ 170 Hz a 3,5 kHz com fftSize 256)
+      let s = 0; const ini = 1, fim = Math.min(20, dadosIvy.length);
+      for (let i = ini; i < fim; i++) s += dadosIvy[i];
+      return Math.min(1, Math.pow((s / (fim - ini)) / 255, 0.8) * 1.5);
+    }
+    const silaba = Math.max(0, Math.sin(t * 13.5)) * (0.55 + 0.45 * Math.sin(t * 2.7 + 1));
+    return Math.min(1, silaba * 0.9 + Math.random() * 0.1);
+  }
+
+  function frameIvy() {
+    rafIvy = requestAnimationFrame(frameIvy);
+    if (modoAtual !== 'ivy' || !ivyWrap) return;
+    const agora = performance.now();
+    const t = agora / 1000;
+
+    // Boca abre rápido e fecha um pouco mais devagar
+    const alvo = volumeIvy(t);
+    ivy.amp += (alvo - ivy.amp) * (alvo > ivy.amp ? 0.55 : 0.22);
+
+    // Cabeça: flutua, segue o mouse e acena um pouco quando fala; ouvindo, se inclina para o usuário
+    const ouvindo = estado === 'listening';
+    const mov = semMovimento ? 0 : 1;
+    const alvoDx = (ivy.mx * 1.6 + (ouvindo ? 0.8 : 0)) * mov;
+    const alvoDy = (Math.sin(t * 0.9) * 1.1 + ivy.my * 1.0 + ivy.amp * 0.5) * mov;
+    const alvoRz = (Math.sin(t * 0.6) * 1.1 + ivy.mx * 1.2 + Math.sin(t * 7) * ivy.amp * 1.4 + (ouvindo ? -1.5 : 0)) * mov;
+    ivy.dx += (alvoDx - ivy.dx) * 0.06;
+    ivy.dy += (alvoDy - ivy.dy) * 0.06;
+    ivy.rz += (alvoRz - ivy.rz) * 0.08;
+
+    // Piscadas a cada 2,5–6 s (180 ms)
+    if (!ivy.proxPiscada) ivy.proxPiscada = agora + 1500;
+    if (agora >= ivy.proxPiscada) { ivy.piscadaIni = agora; ivy.proxPiscada = agora + 2500 + Math.random() * 3500; }
+    const p = (agora - ivy.piscadaIni) / 180;
+    const piscar = (p >= 0 && p <= 1) ? 1 - Math.abs(p * 2 - 1) : 0;
+
+    const tam = ivyPalco ? ivyPalco.clientWidth : 300;
+    const st = ivyWrap.style;
+    st.setProperty('--ivy-amp', ivy.amp.toFixed(3));
+    st.setProperty('--ivy-dx', ivy.dx.toFixed(2) + '%');
+    st.setProperty('--ivy-dy', ivy.dy.toFixed(2) + '%');
+    st.setProperty('--ivy-rz', ivy.rz.toFixed(2) + 'deg');
+    st.setProperty('--ivy-ox', (ivy.mx * tam * 0.005 * mov).toFixed(2) + 'px');
+    st.setProperty('--ivy-oy', (ivy.my * tam * 0.004 * mov).toFixed(2) + 'px');
+    st.setProperty('--ivy-piscar', piscar.toFixed(3));
+
+    desenharOndaIvy(t);
+  }
+
+  // Anel de onda em volta da moldura: calmo parado, vivo quando ela fala ou ouve
+  function desenharOndaIvy(t) {
+    if (!canvasIvy) return;
+    const ctx = canvasIvy.getContext('2d');
+    const w = canvasIvy.clientWidth, h = canvasIvy.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    const { cor1, cor2 } = corJarvis();
+    const [r1, g1, b1] = hexToRgb(cor1);
+    const [r2, g2, b2] = hexToRgb(cor2);
+    const cx = w / 2, cy = h / 2;
+    const raio = (Math.min(w, h) / 1.32) / 2 + 8; // canvas é 132% da moldura
+    const barras = 120;
+    const maxLen = Math.min(w, h) * 0.075;
+    const ouvindo = estado === 'listening';
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < barras; i++) {
+      const ang = (i / barras) * Math.PI * 2 - Math.PI / 2 + t * 0.06;
+      let v;
+      if (estado === 'speaking' && analyser) {
+        const k = 1 + Math.floor(Math.abs(Math.sin(i * 0.9)) * 30);
+        v = (dadosIvy[k] || 0) / 255 * 0.8 + ivy.amp * 0.3;
+      } else {
+        const base = ouvindo ? 0.32 : 0.12;
+        v = base * (0.5 + 0.5 * Math.sin(i * 0.45 + t * (ouvindo ? 4 : 1.4))) + ivy.amp * 0.6 * Math.abs(Math.sin(i * 1.7 + t * 9));
+      }
+      const len = 2 + v * maxLen;
+      const x1 = cx + Math.cos(ang) * raio, y1 = cy + Math.sin(ang) * raio;
+      const x2 = cx + Math.cos(ang) * (raio + len), y2 = cy + Math.sin(ang) * (raio + len);
+      const mix = (Math.sin(ang * 2 + t) + 1) / 2;
+      ctx.strokeStyle = `rgba(${Math.round(r1 * mix + r2 * (1 - mix))}, ${Math.round(g1 * mix + g2 * (1 - mix))}, ${Math.round(b1 * mix + b2 * (1 - mix))}, ${0.35 + v * 0.6})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function iniciarLoopIvy() {
+    if (rafIvy || !ivyWrap) return;
+    ivyWrap.dataset.estado = estado;
+    frameIvy();
+  }
+
+  function pararLoopIvy() {
+    if (rafIvy) cancelAnimationFrame(rafIvy);
+    rafIvy = null;
+  }
+
+  // Olhar e cabeça seguem o ponteiro (normalizado -1..1 em relação ao centro do robô)
+  modal.addEventListener('pointermove', (e) => {
+    if (modoAtual !== 'ivy' || !ivyPalco) return;
+    const r = ivyPalco.getBoundingClientRect();
+    const nx = (e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2);
+    const ny = (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2);
+    ivy.mx = Math.max(-1, Math.min(1, nx));
+    ivy.my = Math.max(-1, Math.min(1, ny));
+  });
+
   // ---------- Listeners ----------
 
   function toggleFalar() {
@@ -891,6 +1098,22 @@
       toggleFalar();
     });
   }
+  if (ivyPalco) {
+    ivyPalco.addEventListener('click', (e) => {
+      if (modoAtual !== 'ivy') return;
+      e.stopPropagation();
+      toggleFalar();
+    });
+  }
+  if (btnVozRobotica) {
+    aplicarVozRobotica();
+    btnVozRobotica.addEventListener('click', (e) => {
+      e.stopPropagation();
+      vozRobotica = !vozRobotica;
+      localStorage.setItem(VOZ_KEY, vozRobotica ? 'on' : 'off');
+      aplicarVozRobotica();
+    });
+  }
   window.addEventListener('resize', () => {
     if (!modal.classList.contains('show')) return;
     if (modoAtual === 'nebulosa') {
@@ -900,12 +1123,15 @@
     if (modoAtual === 'jarvis') {
       ajustarCanvasJarvis();
     }
+    if (modoAtual === 'ivy') {
+      ajustarCanvasIvy();
+    }
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('show')) fecharModal();
   });
   modal.addEventListener('click', (e) => {
-    if (modoAtual === 'nebulosa' || modoAtual === 'jarvis') return;
+    if (modoAtual === 'nebulosa' || modoAtual === 'jarvis' || modoAtual === 'ivy') return;
     if (e.target === modal) fecharModal();
   });
   if (hasWebTTS) speechSynth.onvoiceschanged = () => {};
