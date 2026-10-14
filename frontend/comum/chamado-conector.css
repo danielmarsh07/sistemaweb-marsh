@@ -185,3 +185,6 @@
 /* Timeline do painel: cor do marcador dos tipos novos */
 .badge-tipo-aprovacao { background: #10b981; }
 .badge-tipo-recusa { background: #ef4444; }
+
+/* O display flex acima anulava o atributo hidden: sem chamado pendente a faixa aparecia vazia */
+.cc-faixa-aprovacao[hidden] { display: none; }

@@ -1180,7 +1180,8 @@ async function publicarInstaladorConector(arquivo) {
     const res = await fetch(`${API_URL}/licencas/instaladores`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
     const corpo = await res.json().catch(() => ({}));
-    if (!res.ok) { alert(corpo.erro || `Falha ao publicar (HTTP ${res.status}).`); }
+    // detalhe = mensagem do storage (ex.: "The specified bucket does not exist"): ajuda a achar a variável errada
+    if (!res.ok) { alert((corpo.erro || `Falha ao publicar (HTTP ${res.status}).`) + (corpo.detalhe ? `\n\nMotivo: ${corpo.detalhe}` : '')); }
     else alert(corpo.mensagem);
   } finally {
     btn.disabled = false;
