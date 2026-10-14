@@ -39,6 +39,9 @@
     <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
     <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M7 7l-4 8a4 4 0 0 0 8 0zM17 7l-4 8a4 4 0 0 0 8 0z"/></symbol>
     <symbol id="i-funil" viewBox="0 0 24 24"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></symbol>
+    <symbol id="i-calendario" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></symbol>
+    <symbol id="i-grafico" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></symbol>
   </svg>
 
   <!-- SIDEBAR -->
@@ -140,6 +143,26 @@
           </a>
           <a href="#" data-page="visao-mensal" class="nav-link">
             <svg class="icon"><use href="#i-dash"/></svg> Visão mensal
+          </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-group" data-grupo="marketing">
+        <button type="button" class="nav-group-title" aria-expanded="true" aria-controls="nav-grupo-marketing">
+          <span>Marketing</span>
+          <svg class="nav-group-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-group-itens" id="nav-grupo-marketing">
+          <div class="nav-group-inner">
+          <a href="#" data-page="marketing-calendario" class="nav-link">
+            <svg class="icon"><use href="#i-calendario"/></svg> Calendário
+          </a>
+          <a href="#" data-page="marketing-conta" class="nav-link">
+            <svg class="icon"><use href="#i-camera"/></svg> Conta do Instagram
+          </a>
+          <a href="#" data-page="marketing-metricas" class="nav-link">
+            <svg class="icon"><use href="#i-grafico"/></svg> Métricas
           </a>
           </div>
         </div>
@@ -769,6 +792,118 @@
         </div>
       </section>
 
+      <!-- ========== MARKETING: CALENDÁRIO DE POSTS DO INSTAGRAM (marketing.js) ========== -->
+      <section id="marketing-calendario-page" class="page">
+        <div class="page-header">
+          <h2>Calendário de posts</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirImportarAgenda()">Importar agenda</button>
+            <button type="button" class="btn btn-primary" onclick="abrirEditorPost()">+ Novo post</button>
+          </div>
+        </div>
+        <p class="pagina-descricao">Posts do Instagram. Horários de Brasília (America/Sao_Paulo). Na hora marcada o sistema publica sozinho (confere a cada 5 minutos); clique num dia vazio para criar um post nele.</p>
+        <div id="mkt-aviso-conta"></div>
+        <div class="filtros-bar mkt-barra">
+          <div class="mkt-mes-nav">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="mudarMesMarketing(-1)" aria-label="Mês anterior">&lsaquo;</button>
+            <strong id="mkt-mes-titulo">—</strong>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="mudarMesMarketing(1)" aria-label="Próximo mês">&rsaquo;</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="mudarMesMarketing(0)">Hoje</button>
+          </div>
+          <div class="mkt-visao" role="group" aria-label="Visão">
+            <button type="button" class="btn btn-sm" data-visao="mes" onclick="mudarVisaoMarketing('mes')">Mês</button>
+            <button type="button" class="btn btn-sm" data-visao="lista" onclick="mudarVisaoMarketing('lista')">Lista</button>
+          </div>
+          <select id="mkt-filtro-status" class="filtro-select" onchange="renderCalendarioMarketing()" aria-label="Filtrar por status">
+            <option value="">Todos os status</option>
+            <option value="rascunho">Rascunho</option>
+            <option value="agendado">Agendado</option>
+            <option value="publicado">Publicado</option>
+            <option value="erro">Com erro</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+          <span class="filtros-contador" id="mkt-contador"></span>
+        </div>
+        <div id="mkt-calendario"></div>
+        <div id="mkt-sem-data"></div>
+      </section>
+
+      <!-- ========== MARKETING: MÉTRICAS (marketing.js) ========== -->
+      <section id="marketing-metricas-page" class="page">
+        <div class="page-header">
+          <h2>Métricas do Instagram</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" id="mkt-btn-atualizar-metricas" onclick="atualizarMetricasMarketing()">Atualizar agora</button>
+          </div>
+        </div>
+        <p class="pagina-descricao">Seguidores e métricas são lidos do Instagram uma vez por dia (posts dos últimos 30 dias). Alcance e interações somam os posts publicados nos últimos 30 dias.</p>
+        <div class="rel-tiles" id="mkt-tiles"></div>
+        <figure class="rel-card viz mkt-graf-card">
+          <figcaption>
+            <strong>Seguidores</strong>
+            <span>Um ponto por dia (últimos 90 dias)</span>
+          </figcaption>
+          <div class="rel-grafico" id="mkt-graf-seguidores" role="img" aria-label="Gráfico de linha dos seguidores por dia"></div>
+        </figure>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Post</th>
+                <th>Publicado em</th>
+                <th>Alcance</th>
+                <th>Curtidas</th>
+                <th>Comentários</th>
+                <th>Salvamentos</th>
+                <th>Compart.</th>
+                <th>Link</th>
+              </tr>
+            </thead>
+            <tbody id="mkt-metricas-tbody">
+              <tr><td colspan="8" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== MARKETING: CONTA DO INSTAGRAM (marketing.js) ========== -->
+      <section id="marketing-conta-page" class="page">
+        <div class="page-header">
+          <h2>Conta do Instagram</h2>
+        </div>
+        <p class="pagina-descricao">O sistema publica pela API oficial do Instagram (login do Instagram). O token fica cifrado no banco e não aparece de novo em nenhuma tela.</p>
+        <div class="mkt-conta-grid">
+          <section class="rel-card">
+            <h3>Conexão</h3>
+            <div id="mkt-conta-status"><p class="fin-muted">Carregando...</p></div>
+            <form id="form-mkt-conta" class="mkt-conta-form" onsubmit="conectarContaMarketing(event)">
+              <div class="form-group">
+                <label for="mkt-token">Token de acesso de longa duração</label>
+                <input type="password" id="mkt-token" autocomplete="off" spellcheck="false" placeholder="Cole aqui o token gerado no Meta for Developers">
+                <small class="form-hint">Vale 60 dias; o sistema renova sozinho quando faltar menos de 10.</small>
+              </div>
+              <div class="mkt-conta-acoes">
+                <button type="submit" class="btn btn-primary" id="mkt-btn-conectar">Conectar</button>
+                <button type="button" class="btn btn-secondary" id="mkt-btn-testar" onclick="testarContaMarketing()">Testar conexão</button>
+                <button type="button" class="btn btn-secondary" id="mkt-btn-desconectar" onclick="desconectarContaMarketing()">Desconectar</button>
+              </div>
+            </form>
+          </section>
+          <section class="rel-card">
+            <h3>Como gerar o token</h3>
+            <ol class="mkt-passos">
+              <li>A conta <strong>@marshconsultoria</strong> precisa ser <strong>Profissional</strong> (Empresa ou Criador de conteúdo): no app, Configurações → Tipo de conta.</li>
+              <li>Em <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">Meta for Developers</a>, crie (ou abra) um app do tipo <em>Empresa</em>.</li>
+              <li>Adicione o produto <strong>Instagram</strong> e abra <strong>API com login do Instagram</strong> (Instagram API with Instagram Login).</li>
+              <li>Em <em>Gerar tokens de acesso</em>, adicione a conta @marshconsultoria (o Instagram pede login e autorização, com as permissões de publicar conteúdo e ver insights).</li>
+              <li>Clique em <strong>Gerar token</strong>, copie e cole aqui. Ele já é o de longa duração (60 dias).</li>
+              <li>Clique em <strong>Conectar</strong>. Depois use <em>Testar conexão</em> quando quiser conferir.</li>
+            </ol>
+            <p class="fin-muted">Enquanto o app estiver em modo de desenvolvimento, só contas adicionadas ao app (função Testador do Instagram) funcionam; para a conta da própria Marsh isso basta.</p>
+          </section>
+        </div>
+      </section>
+
       <!-- ========== ROTEIRO DE USO (estático; os links "→" abrem a tela citada) ========== -->
       <section id="roteiro-page" class="page">
         <div class="page-header">
@@ -889,6 +1024,20 @@
               <li>Para não exigir aprovação: Licenças → editar → desmarque <em>Chamados do conector exigem aprovação</em>. Limite: 20 chamados por hora por licença.</li>
             </ol>
             <a href="#" class="roteiro-ir" onclick="document.getElementById('filtro-chamados-origem').value='pendente'; showPage('chamados'); return false;">Chamados aguardando aprovação →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Marketing: posts do Instagram</h3>
+            <p class="fin-muted">Publicação automática pela API oficial. Horários de Brasília; o sistema confere a fila a cada 5 minutos.</p>
+            <ol>
+              <li><strong>Conectar a conta</strong> (uma vez, e a cada troca de token): cole o token de longa duração em Conta do Instagram. A renovação dos 60 dias é automática.</li>
+              <li><strong>Criar o post</strong>: no Calendário, <em>+ Novo post</em> ou clique no dia. Imagens de 1 a 10 (2 ou mais = carrossel), padrão 1080×1350; legenda até 2.200 caracteres e 30 hashtags.</li>
+              <li><strong>Agendar</strong> com data e hora, ou <strong>Publicar agora</strong>. Rascunho não publica.</li>
+              <li>Vários de uma vez: <strong>Importar agenda</strong> e selecione a pasta com o <code>agenda.json</code> e as imagens (ex.: Marketing\Instagram\2026-10 SAP+IA).</li>
+              <li>Falhou? O sistema tenta 3 vezes (5 e 15 min depois), então marca <em>Com erro</em> e avisa em Alertas. Limite diário do Instagram reagenda para 1 h depois.</li>
+              <li><strong>Métricas</strong>: seguidores e, por post, alcance, curtidas, comentários, salvamentos e compartilhamentos, atualizados 1 vez por dia.</li>
+            </ol>
+            <a href="#" class="roteiro-ir" onclick="showPage('marketing-calendario'); return false;">Calendário de posts →</a>
           </section>
 
           <section class="rel-card roteiro-card">
@@ -2828,6 +2977,79 @@
     </div>
   </div>
 
+  <!-- Editor de post do Instagram (marketing.js) -->
+  <div id="modal-mkt-post" class="modal">
+    <div class="modal-content modal-lg mkt-editor-modal">
+      <div class="modal-header">
+        <h3 id="mkt-editor-titulo">Novo post</h3>
+        <button type="button" class="mkt-fechar" onclick="fecharEditorPost()" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="form mkt-editor">
+        <div class="mkt-editor-form">
+          <div id="mkt-editor-status"></div>
+          <div class="form-group">
+            <label for="mkt-titulo">Título interno <small class="fin-muted">(não vai para o Instagram)</small></label>
+            <input type="text" id="mkt-titulo" maxlength="150" placeholder="Ex.: Post 1: A Marsh agora é SAP + IA">
+          </div>
+          <div class="form-group">
+            <label>Imagens <small class="fin-muted">(1 a 10; 2 ou mais viram carrossel)</small></label>
+            <div class="mkt-dropzone" id="mkt-dropzone" tabindex="0" role="button" aria-label="Enviar imagens">
+              <strong>Arraste as imagens aqui</strong> ou clique para escolher
+              <small>PNG, JPEG ou WebP até 8 MB · proporção de 4:5 a 1,91:1 (padrão 1080×1350) · viram JPEG</small>
+              <input type="file" id="mkt-arquivos" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            </div>
+            <div class="mkt-envio" id="mkt-envio" hidden></div>
+            <ol class="mkt-midias" id="mkt-midias"></ol>
+          </div>
+          <div class="form-group">
+            <label for="mkt-legenda">Legenda (com as hashtags)</label>
+            <textarea id="mkt-legenda" rows="9" maxlength="2200" oninput="atualizarContadoresLegenda()"></textarea>
+            <div class="mkt-contadores" id="mkt-contadores" aria-live="polite"></div>
+          </div>
+          <div class="form-group">
+            <label for="mkt-data">Data e hora da publicação</label>
+            <input type="datetime-local" id="mkt-data">
+            <small class="form-hint">Horário de Brasília (America/Sao_Paulo). Vazio = rascunho sem data.</small>
+          </div>
+        </div>
+        <aside class="mkt-previa" aria-label="Prévia">
+          <div class="mkt-previa-abas" role="tablist">
+            <button type="button" class="btn btn-sm" data-previa="feed" onclick="mudarPrevia('feed')">Feed</button>
+            <button type="button" class="btn btn-sm" data-previa="carrossel" onclick="mudarPrevia('carrossel')">Carrossel</button>
+          </div>
+          <div class="mkt-ig" id="mkt-previa"></div>
+        </aside>
+      </div>
+      <div class="form-actions mkt-editor-acoes" id="mkt-editor-acoes"></div>
+    </div>
+  </div>
+
+  <!-- Importar agenda (agenda.json + imagens de uma pasta) -->
+  <div id="modal-mkt-importar" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Importar agenda</h3>
+        <button type="button" class="btn-close">&times;</button>
+      </div>
+      <div class="form">
+        <p class="pagina-descricao">Selecione os arquivos da pasta da campanha: o <code>agenda.json</code> e as imagens citadas nele. Os posts entram agendados (data já passada = rascunho); post com o mesmo título e data já existente é ignorado.</p>
+        <div class="mkt-importar-escolha">
+          <label class="btn btn-secondary">Escolher arquivos
+            <input type="file" id="mkt-importar-arquivos" multiple accept=".json,image/png,image/jpeg,image/webp" hidden onchange="lerArquivosAgenda(this.files)">
+          </label>
+          <label class="btn btn-secondary">Escolher a pasta
+            <input type="file" id="mkt-importar-pasta" webkitdirectory multiple hidden onchange="lerArquivosAgenda(this.files)">
+          </label>
+        </div>
+        <div id="mkt-importar-resumo"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Fechar</button>
+          <button type="button" class="btn btn-primary" id="mkt-btn-importar" disabled onclick="confirmarImportacaoAgenda()">Importar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Tabela de preços do simulador do Conector SAP (campos montados pelo comercial.js a partir do backend) -->
   <div id="modal-precos-conector" class="modal">
     <div class="modal-content modal-lg">
@@ -3598,6 +3820,7 @@
   <script src="comercial.js"></script>
   <script src="relatorios.js"></script>
   <script src="visao-mensal.js"></script>
+  <script src="marketing.js"></script>
   <script src="cadastros.js"></script>
   <script src="tabela-ordenavel.js"></script>
   <script src="assistente-voz.js"></script>

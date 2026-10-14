@@ -62,6 +62,29 @@ Só administradores (`admin_sistema`/`admin_empresa`); rotas em `/api/comercial`
   - **Tabela de preços** editável no botão *Tabela de preços* do simulador (gravada em `financeiro_config.prop_precos_conector`; campo vazio = padrão do código). Padrões: Leitura R$ 490 mensal / R$ 390 anual; Desenvolvimento R$ 990 / R$ 790; Empresa até 5 = R$ 3.500, até 10 = R$ 6.000, + R$ 450 por usuário acima de 10 (acréscimo opcional no ciclo mensal); implantação P/M/G R$ 8.000 / 15.000 / 25.000 + R$ 2.000 por sistema adicional; chamados P/M/G R$ 1.500 / 4.000 / 9.000; sustentação 40 h por R$ 7.500/mês.
   - Teste: `node testes/simulador-conector.js [saida.pdf]`.
 
+### Marketing (Instagram)
+
+Só administradores (`admin_sistema`/`admin_empresa`; técnico e cliente recebem 403); rotas em `/api/marketing`. Menu **Marketing**: Calendário, Conta do Instagram e Métricas.
+
+- **Calendário**: grade do mês com miniaturas (ou lista), filtro por status, clique no dia vazio cria um post. Horários sempre em America/Sao_Paulo.
+- **Editor**: 1 a 10 imagens (arrastar e soltar, setas para reordenar; 2 ou mais = carrossel), prévia do feed (4:5) e do carrossel, legenda com contador (2.200 caracteres, 30 hashtags), data/hora, *Salvar rascunho*, *Agendar*, *Publicar agora*, *Cancelar post*, *Duplicar*, *Excluir*. Publicado fica só leitura, com o link do Instagram.
+- **Imagens**: PNG/JPEG/WebP até 8 MB, convertidas no upload para JPEG sRGB (qualidade 90, sem metadados, até 1440 px de largura) com `sharp`; proporção aceita de 4:5 a 1,91:1 (padrão Marsh 1080×1350). Ficam no storage em `marketing/<post_id>/<nn>-<nome>.jpg`; sem storage, 503.
+- **Importar agenda**: seleciona os arquivos (ou a pasta) com `agenda.json` + imagens; mostra o resumo e cria os posts agendados (data passada = rascunho; mesmo título e data = ignorado). Formato: `{ "posts": [ { "titulo", "data": "2026-10-19T12:30:00-03:00", "imagens": ["post-01.png"], "legenda" } ] }`.
+- **Publicação** (`backend/services/instagram.js`, Instagram API with Instagram Login): `POST /{ig_user_id}/media` (imagem, ou itens `is_carousel_item` + contêiner `CAROUSEL`) → `status_code` até `FINISHED` → `media_publish` → `permalink`. A `image_url` é um link assinado do storage de 1 hora.
+- **Rotina** (`backend/services/marketing-jobs.js`, dentro do servidor): a cada 5 min publica os agendados vencidos (trava com `UPDATE ... WHERE status='agendado' RETURNING`, então duas instâncias não publicam duas vezes); 1x por dia renova o token se faltar < 10 dias, grava os seguidores do dia e as métricas (alcance, curtidas, comentários, salvamentos, compartilhamentos, interações, visualizações; a que a API não der fica nula) dos posts dos últimos 30 dias. Falha: 3 tentativas (de novo em 5 e 15 min), depois status *erro* + alerta em Sistema → Alertas; limite de publicação do Instagram reagenda +1 h sem contar tentativa. Post parado em *publicando* por 15 min vira erro (não republica sozinho).
+- **Conta**: o admin cola o token de longa duração; o servidor valida em `/me`, renova para saber a validade e grava **cifrado** (AES-256-GCM com `MARKETING_CHAVE_CIFRA`). O token nunca volta em nenhuma rota.
+- Tabelas: `marketing_posts`, `marketing_midias`, `marketing_metricas`, `marketing_conta`, `marketing_seguidores`.
+- Teste: `node testes/marketing.js` (servidor falso do Graph; ver o topo do arquivo).
+
+Variáveis (Render → Environment):
+
+| Variável | Para quê |
+|---|---|
+| `MARKETING_CHAVE_CIFRA` | 32 bytes em hex (64 caracteres) ou base64 para cifrar o token. Gerar: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Sem ela, conectar a conta responde 503. **Não troque depois**: o token gravado deixa de abrir (aí é só conectar de novo). |
+| `INSTAGRAM_GRAPH_URL` | Base da API (padrão `https://graph.instagram.com`; os testes apontam para o servidor falso). |
+| `INSTAGRAM_API_VERSION` | Versão da API (padrão `v23.0`). |
+| `MARKETING_JOBS` | `off` desliga a rotina de publicação/métricas (testes e ambiente local). |
+
 ### Portal do Cliente (`/portal.html`)
 
 - Acesso isolado: cada cliente vê apenas seus próprios chamados
@@ -185,7 +208,7 @@ O projeto está configurado para deploy no Render como **Web Service**:
 
 - **Build Command**: `npm install`
 - **Start Command**: `node server.js`
-- **Variáveis de ambiente**: `DATABASE_URL`, `JWT_SECRET`
+- **Variáveis de ambiente**: `DATABASE_URL`, `JWT_SECRET` (marketing: `MARKETING_CHAVE_CIFRA` e as `S3_*` do storage; veja a seção Marketing)
 
 O banco PostgreSQL também é hospedado no Render (plano free).
 

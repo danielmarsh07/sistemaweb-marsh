@@ -2,7 +2,7 @@
 // Inicialização lazy: se as env vars não estiverem configuradas, `disponivel` fica false
 // e os endpoints retornam 503 — o resto do app continua funcionando.
 
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CopyObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 
@@ -67,13 +67,25 @@ async function uploadNaKey({ key, buffer, mimeType }) {
 }
 
 // nomeArquivo (opcional): força o download com esse nome em vez de abrir no navegador
-async function getDownloadUrl(key, nomeArquivo) {
+// ttlSegundos (opcional): validade do link; padrão S3_URL_TTL (5 min). O Instagram usa 1 h para buscar a imagem.
+async function getDownloadUrl(key, nomeArquivo, ttlSegundos) {
   if (!disponivel) throw new Error('Storage não configurado');
   const cmd = { Bucket: BUCKET, Key: key };
   if (nomeArquivo) cmd.ResponseContentDisposition = `attachment; filename="${sanitizarNome(nomeArquivo)}"`;
   return getSignedUrl(client(), new GetObjectCommand(cmd), {
-    expiresIn: URL_TTL_SECONDS
+    expiresIn: ttlSegundos || URL_TTL_SECONDS
   });
+}
+
+// Copia um objeto dentro do bucket (ex.: duplicar post do marketing com as mesmas imagens)
+async function copiar(keyOrigem, keyDestino) {
+  if (!disponivel) throw new Error('Storage não configurado');
+  await client().send(new CopyObjectCommand({
+    Bucket: BUCKET,
+    Key: keyDestino,
+    CopySource: `${BUCKET}/${keyOrigem.split('/').map(encodeURIComponent).join('/')}`
+  }));
+  return keyDestino;
 }
 
 async function remove(key) {
@@ -81,4 +93,4 @@ async function remove(key) {
   await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
-module.exports = { disponivel, upload, uploadNaKey, getDownloadUrl, remove };
+module.exports = { disponivel, upload, uploadNaKey, getDownloadUrl, copiar, remove, sanitizarNome };

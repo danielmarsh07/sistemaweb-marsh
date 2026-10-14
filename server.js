@@ -52,6 +52,8 @@ const asaasWebhookRoutes = require('./backend/routes/asaas-webhook');
 const comercialRoutes = require('./backend/routes/comercial');
 const publicoRoutes = require('./backend/routes/publico');
 const financeiroJobs = require('./backend/services/financeiro-jobs');
+const marketingRoutes = require('./backend/routes/marketing');
+const marketingJobs = require('./backend/services/marketing-jobs');
 const autenticar = require('./backend/middleware/autenticar');
 const apenasEquipe = require('./backend/middleware/apenas-equipe');
 const alertasRoutes = require('./backend/routes/alertas');
@@ -79,6 +81,7 @@ app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/financeiro', autenticar, financeiroRoutes);
 app.use('/api/comercial', autenticar, comercialRoutes);
 app.use('/api/alertas', autenticar, alertasRoutes);
+app.use('/api/marketing', autenticar, marketingRoutes); // só administradores (o router confere)
 
 // Saúde: para monitor externo (UptimeRobot etc.). 200 = servidor e banco respondendo; 503 = banco fora.
 app.get('/api/saude', async (req, res) => {
@@ -931,6 +934,88 @@ async function iniciar() {
     //     (backend/services/precificacao-conector.js → PRECOS_PADRAO)
     await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS prop_precos_conector JSONB;`);
 
+    // 29. Marketing: calendário de posts do Instagram, publicação automática (marketing-jobs.js) e métricas
+    //     status: rascunho (data opcional) → agendado → publicando → publicado | erro | cancelado
+    //     tipo: imagem (1 mídia) | carrossel (2 a 10). data_agendada NULL = rascunho sem data.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS marketing_posts (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        canal VARCHAR(20) NOT NULL DEFAULT 'instagram',
+        tipo VARCHAR(20) NOT NULL DEFAULT 'imagem' CHECK (tipo IN ('imagem', 'carrossel')),
+        titulo VARCHAR(150),
+        legenda TEXT NOT NULL DEFAULT '',
+        data_agendada TIMESTAMPTZ,
+        status VARCHAR(20) NOT NULL DEFAULT 'rascunho'
+          CHECK (status IN ('rascunho', 'agendado', 'publicando', 'publicado', 'erro', 'cancelado')),
+        tentativas INTEGER NOT NULL DEFAULT 0,
+        ultimo_erro TEXT,
+        ig_container_id VARCHAR(50),
+        ig_media_id VARCHAR(50),
+        permalink TEXT,
+        data_publicacao TIMESTAMPTZ,
+        criado_por INTEGER,
+        data_criacao TIMESTAMPTZ DEFAULT NOW(),
+        data_atualizacao TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mkt_posts_emp_data ON marketing_posts(empresa_id, data_agendada);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mkt_posts_fila ON marketing_posts(data_agendada) WHERE status = 'agendado';`);
+    //     Imagens do post (sempre JPEG, convertidas no upload); arquivo no storage em marketing/<post_id>/<nn>-<nome>.jpg
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS marketing_midias (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES marketing_posts(id) ON DELETE CASCADE,
+        ordem INTEGER NOT NULL DEFAULT 1,
+        storage_key VARCHAR(500) NOT NULL,
+        nome_arquivo VARCHAR(255),
+        largura INTEGER,
+        altura INTEGER,
+        tamanho_bytes BIGINT,
+        mime VARCHAR(50) NOT NULL DEFAULT 'image/jpeg'
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mkt_midias_post ON marketing_midias(post_id, ordem);`);
+    //     Métricas por post e dia (insights do Instagram; NULL = a API não informou)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS marketing_metricas (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES marketing_posts(id) ON DELETE CASCADE,
+        data DATE NOT NULL,
+        alcance INTEGER,
+        curtidas INTEGER,
+        comentarios INTEGER,
+        salvamentos INTEGER,
+        compartilhamentos INTEGER,
+        interacoes INTEGER,
+        visualizacoes INTEGER,
+        UNIQUE (post_id, data)
+      );
+    `);
+    //     Conta conectada (uma por empresa). token_cifrado = AES-256-GCM com MARKETING_CHAVE_CIFRA; nunca sai em rota.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS marketing_conta (
+        empresa_id INTEGER PRIMARY KEY,
+        canal VARCHAR(20) NOT NULL DEFAULT 'instagram',
+        ig_user_id VARCHAR(50),
+        username VARCHAR(100),
+        token_cifrado TEXT,
+        token_expira_em TIMESTAMPTZ,
+        seguidores INTEGER,
+        atualizado_em TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    //     Histórico diário de seguidores (gráfico das métricas)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS marketing_seguidores (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL,
+        data DATE NOT NULL,
+        seguidores INTEGER NOT NULL,
+        UNIQUE (empresa_id, data)
+      );
+    `);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);
@@ -943,6 +1028,7 @@ async function iniciar() {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
     console.log(`📊 Dashboard: http://localhost:${PORT}`);
     financeiroJobs.iniciar(); // NFS-e pendentes + lembretes de faturas vencidas, a cada hora
+    marketingJobs.iniciar();  // Instagram: posts agendados a cada 5 min + token/seguidores/métricas 1x por dia
   });
 }
 

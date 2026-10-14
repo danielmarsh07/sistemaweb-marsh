@@ -24,10 +24,15 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/licencas-ativacao.js               # licenças do conector: ativação por máquina, limite, revogação, conexões, download
    node testes/chamados-conector.js               # chamados abertos pelo conector: abrir/listar, recusas, limite/h, aprovação do gestor, .md, fila
    node testes/simulador-conector.js [saida.pdf]  # simulador de preço do Conector SAP: cálculo, validações, tabela de preços, gerar proposta + PDF A4 (Chrome headless)
+   node testes/marketing.js                       # Instagram: conta cifrada, upload PNG→JPEG, posts, importar agenda, publicação num Graph falso, retentativa, limite, métricas, token
    ```
 
    O de licenças precisa do servidor com `LICENCA_CHAVE_PRIVADA` (senão `/validar` dá 503). No Git Bash:
    `LICENCA_CHAVE_PRIVADA="$(cat .licenca_chave_privada.txt)" npm run dev:local`.
+
+   O de marketing sobe um servidor falso do Graph na porta 3999 e precisa do servidor local apontando para ele, com storage S3 local
+   (`docker run -d --name marsh-s3mock -p 9090:9090 -e initialBuckets=marsh-teste adobe/s3mock`):
+   `INSTAGRAM_GRAPH_URL=http://localhost:3999 MARKETING_CHAVE_CIFRA=abababababababababababababababababababababababababababababababab MARKETING_JOBS=off S3_BUCKET=marsh-teste S3_ENDPOINT=http://localhost:9090 S3_REGION=us-east-1 S3_ACCESS_KEY_ID=teste S3_SECRET_ACCESS_KEY=teste npm run dev:local`.
 
    Cada linha sai como `OK` ou `FAIL`. Linhas com `!` são recusas esperadas pelo teste (ex.: 400 de validação).
 

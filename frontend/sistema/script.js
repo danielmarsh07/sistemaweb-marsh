@@ -364,7 +364,10 @@ function showPage(page) {
     'visao-mensal': 'Visão mensal',
     'contas-financeiras': 'Contas e cartões',
     'categorias-despesa': 'Categorias de despesa',
-    alertas: 'Alertas do sistema'
+    alertas: 'Alertas do sistema',
+    'marketing-calendario': 'Calendário de posts',
+    'marketing-metricas': 'Métricas do Instagram',
+    'marketing-conta': 'Conta do Instagram'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -392,6 +395,9 @@ function showPage(page) {
   if (page === 'contas-financeiras') loadPaginaContasFinanceiras();
   if (page === 'categorias-despesa') loadPaginaCategoriasDespesa();
   if (page === 'alertas') loadAlertas();
+  if (page === 'marketing-calendario') loadCalendarioMarketing();
+  if (page === 'marketing-metricas') loadMetricasMarketing();
+  if (page === 'marketing-conta') loadContaMarketing();
 }
 
 // ===== SEÇÕES RECOLHÍVEIS (Visão geral) =====
