@@ -13,6 +13,30 @@ const tts = require('../services/assistente-tts');
 const { registrarAlerta } = require('../services/alertas');
 
 const router = express.Router();
+const pool = require('../db');
+
+// A Ivy é exclusiva do super usuário (o dono do sistema): ela lê o banco inteiro.
+// Confere no banco a cada chamada, então vale mesmo para tokens antigos e pode ser revogado na hora.
+async function ehSuperUsuario(usuario) {
+  if (!usuario || !usuario.id) return false;
+  const r = await pool.query('SELECT 1 FROM usuarios WHERE id = $1 AND ativo = TRUE AND super_usuario = TRUE', [usuario.id]);
+  return r.rows.length > 0;
+}
+
+// GET /acesso — o front só mostra o botão da Ivy se for true
+router.get('/acesso', async (req, res) => {
+  try { res.json({ permitido: await ehSuperUsuario(req.usuario) }); }
+  catch { res.json({ permitido: false }); }
+});
+
+router.use(async (req, res, next) => {
+  try {
+    if (await ehSuperUsuario(req.usuario)) return next();
+    return res.status(403).json({ erro: 'A Ivy é de uso exclusivo do super usuário do sistema.' });
+  } catch (err) {
+    return res.status(500).json({ erro: 'Falha ao verificar acesso à Ivy.', detalhe: err.message });
+  }
+});
 
 // Detecta o "tom" da resposta pro frontend pintar o holograma na cor certa.
 // 'alerta' quando houve algum erro nas tools OU a resposta menciona problemas.
@@ -31,7 +55,7 @@ function detectarTom(respostaTexto, acoes) {
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const MODELO = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const MAX_TOOL_ITERATIONS = 6;
+const MAX_TOOL_ITERATIONS = 8; // estrutura_banco → consultar_banco → correção consomem rodadas
 
 const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
@@ -80,6 +104,15 @@ GESTÃO (só consultas; nada aqui grava no banco):
 - Ao falar números grandes, arredonde ("cerca de doze mil e quinhentos reais por mês") e não leia listas inteiras: cite os 3 principais e diga quantos são no total.
 - Criar ou mudar oportunidade, proposta, post, contrato ou licença NÃO é possível por voz: oriente a fazer pela tela.`;
 
+// Só o super usuário (dono do sistema) usa a Ivy: ela pode responder qualquer coisa do sistema, inclusive a estrutura
+const BLOCO_SISTEMA = `
+SISTEMA INTEIRO (você fala com o dono do sistema; pode explicar estrutura, tabelas, regras e dados à vontade):
+- Prefira as tools específicas (financeiro, comercial, marketing...) quando cobrirem a pergunta: elas já trazem os números como nas telas.
+- Pergunta sobre dados que nenhuma tool cobre ("quantos clientes cadastrei este ano?", "qual cliente abriu mais chamados?", "quanto gastei com AWS?") → estrutura_banco (para achar tabela e colunas) e depois consultar_banco com um SELECT. Filtre pelo empresa_id do contexto acima quando a tabela tiver essa coluna. Agregue no SQL em vez de trazer linhas soltas. Se o banco recusar, corrija e tente de novo (no máximo 2 vezes).
+- Pergunta sobre estrutura ("quais tabelas existem?", "como é guardado um contrato?") → estrutura_banco.
+- Pergunta sobre como algo funciona, regras, variáveis de ambiente, testes ou o que falta fazer → documentacao_sistema (sem busca = índice).
+- Na resposta falada, conte o resultado em linguagem natural; só mostre o SQL ou nomes de colunas se ele pedir.`;
+
 function systemPromptAdmin(ctx, dataIso, admin) {
   return `Você é Ivy, a assistente de voz do Sistema Marsh, um ERP empresarial multi-empresa.
 Você ajuda o usuário a lançar despesas e consultar o financeiro, abrir chamados, cadastrar clientes/fornecedores e consultar dados do sistema (comercial, contratos, DRE, caixa, Instagram, licenças e alertas), tudo por voz.
@@ -91,7 +124,8 @@ IDENTIDADE:
 
 Contexto do usuário atual:
 - Nome: ${ctx.nome || 'usuário'}
-- Tipo: ${ctx.tipo || 'admin'}
+- Tipo: ${ctx.tipo || 'admin'}${ctx.super_usuario ? ' (super usuário, dono do sistema)' : ''}
+- empresa_id: ${ctx.empresa_id}
 - Data de hoje: ${dataIso}
 
 Regras importantes:
@@ -101,7 +135,7 @@ Regras importantes:
 4. Para a confirmação ao usuário no final, seja conciso, natural e amigável — como uma conversa. Diga o que foi feito sem listar campos técnicos. Evite ler ids/UUIDs em voz alta.
 5. Se faltar informação obrigatória pergunte ao usuário em vez de inventar. Não invente dados.
 6. Se uma tool retornar erro, explique brevemente ao usuário em linguagem natural o que faltou e ofereça a correção.
-7. Nunca exponha estrutura interna do banco, nomes de tabelas, IDs longos ou SQL ao falar com o usuário.
+7. Fale de estrutura, tabelas e SQL só quando o usuário perguntar sobre isso; nas respostas do dia a dia, use linguagem natural e não leia IDs longos.
 8. Responda sempre em português do Brasil.
 
 CAMPOS OBRIGATÓRIOS POR FLUXO (NÃO PEÇA NADA ALÉM DISSO):
@@ -109,6 +143,7 @@ CAMPOS OBRIGATÓRIOS POR FLUXO (NÃO PEÇA NADA ALÉM DISSO):
 - Criar chamado: cliente_id (use buscar_cliente) e título. Demais campos só pergunte se o usuário sugerir.
 Se o usuário não informar um campo opcional, NÃO insista — siga em frente com os dados que tem.
 ${admin ? BLOCO_FINANCEIRO + '\n' + BLOCO_GESTAO : BLOCO_SEM_FINANCEIRO}
+${ctx.super_usuario ? BLOCO_SISTEMA : ''}
 
 CONSULTAS DE CHAMADOS:
 Sempre que o usuário perguntar QUANTIDADE, LISTAGEM ou DETALHE de chamados, chame listar_chamados passando TODOS os filtros aplicáveis que ele citar:
@@ -220,6 +255,7 @@ DATAS RELATIVAS: use a data de hoje acima ou chame data_hoje quando necessário.
 
 function systemPrompt(ctx) {
   const dataIso = hojeISO();
+  if (ctx.super_usuario) return systemPromptAdmin(ctx, dataIso, true);
   return ctx.tipo === 'cliente'
     ? systemPromptCliente(ctx, dataIso)
     : systemPromptAdmin(ctx, dataIso, ehAdmin(ctx));
@@ -264,7 +300,9 @@ router.post('/chat', chatLimiter, async (req, res) => {
     usuario_id: req.usuario.id,
     tipo: req.usuario.tipo,
     nome: req.usuario.nome,
-    cliente_id: req.usuario.cliente_id || null
+    cliente_id: req.usuario.cliente_id || null,
+    super_usuario: true // o router.use acima já barrou quem não é
+
   };
 
   // Reconstrói o histórico curto (últimas 6 mensagens) se enviado pelo cliente,

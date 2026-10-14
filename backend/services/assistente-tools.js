@@ -18,6 +18,7 @@ const { notificarNovoChamado, notificarNovoAtendimento } = require('./email');
 const fat = require('./faturamento');
 const cp = require('./contas-pagar');
 const { TOOLS_GESTAO } = require('./assistente-tools-gestao');
+const { TOOLS_SISTEMA } = require('./assistente-tools-sistema');
 
 const MAX_LIST_ROWS = 30;
 
@@ -1113,7 +1114,8 @@ const TOOLS = {
   listar_chamados,
   criar_chamado,
   criar_atendimento,
-  ...TOOLS_GESTAO
+  ...TOOLS_GESTAO,
+  ...TOOLS_SISTEMA
 };
 
 // Tools que clientes (usuários do portal) podem acessar via voz.
@@ -1137,6 +1139,9 @@ const TOOLS_SO_ADMIN = new Set([...TOOLS_FINANCEIRO, ...Object.keys(TOOLS_GESTAO
 const ehAdmin = ctx => !!ctx && (ctx.tipo === 'admin_empresa' || ctx.tipo === 'admin_sistema');
 
 function permitida(name, ctx) {
+  // Super usuário (dono do sistema) usa tudo, inclusive a leitura livre do banco
+  if (ctx && ctx.super_usuario) return true;
+  if (TOOLS_SISTEMA[name]) return false;
   if (ctx && ctx.tipo === 'cliente') return TOOLS_PERMITIDAS_CLIENTE.has(name);
   if (TOOLS_SO_ADMIN.has(name)) return ehAdmin(ctx);
   return true;
@@ -1159,6 +1164,7 @@ async function runTool(name, ctx, args) {
   if (!permitida(name, ctx)) {
     return { erro: ctx && ctx.tipo === 'cliente'
       ? `Operação "${name}" não está disponível pelo portal do cliente.`
+      : TOOLS_SISTEMA[name] ? 'Essa consulta é exclusiva do super usuário.'
       : (TOOLS_FINANCEIRO.has(name) ? 'O financeiro é restrito aos administradores.' : 'Essa consulta é restrita aos administradores.') };
   }
   try {

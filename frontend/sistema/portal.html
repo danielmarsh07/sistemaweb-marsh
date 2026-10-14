@@ -7,7 +7,6 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assistente-voz.css">
   <link rel="stylesheet" href="chamado-conector.css">
   <link rel="icon" type="image/png" href="/img/logo-simbolo.png">
   <meta name="theme-color" content="#0066cc" />
@@ -2094,148 +2093,8 @@
     </div>
   </div>
 
-  <!-- ASSISTENTE DE VOZ — botão flutuante -->
-  <button id="btn-assistente-voz" class="assistente-fab" type="button" aria-label="Ivy — assistente de voz" title="Ivy">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-      <line x1="12" y1="19" x2="12" y2="23"></line>
-      <line x1="8" y1="23" x2="16" y2="23"></line>
-    </svg>
-  </button>
-
-  <!-- ASSISTENTE DE VOZ — modal -->
-  <div id="modal-assistente" class="assistente-modal" aria-hidden="true">
-    <div class="assistente-modal-content">
-      <div class="assistente-header">
-        <h3>Ivy</h3>
-        <div class="assistente-header-actions">
-          <button type="button" class="mode-btn voz-robotica-btn" id="btn-voz-robotica" title="Voz robótica" aria-label="Voz robótica" aria-pressed="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M2 12h2l2-5 3 10 3-14 3 14 3-10 2 5h2"></path>
-            </svg>
-          </button>
-          <div class="assistente-mode-group" role="tablist" aria-label="Modo de apresentação">
-            <button type="button" class="mode-btn" data-modo="ivy" title="Ivy (tela cheia)" aria-label="Ivy em tela cheia">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="5" y="7" width="14" height="12" rx="4"></rect>
-                <path d="M12 3v4M9 12h.01M15 12h.01M10 16h4"></path>
-              </svg>
-            </button>
-            <button type="button" class="mode-btn" data-modo="holograma" title="Holograma compacto" aria-label="Holograma compacto">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M3 12h2M19 12h2M12 3v2M12 19v2"></path>
-              </svg>
-            </button>
-            <button type="button" class="mode-btn" data-modo="texto" title="Texto" aria-label="Modo texto">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="5" y1="7" x2="19" y2="7"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <line x1="5" y1="17" x2="14" y2="17"></line>
-              </svg>
-            </button>
-            <button type="button" class="mode-btn" data-modo="nebulosa" title="Nebulosa em tela cheia" aria-label="Nebulosa em tela cheia">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2l2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-3.4z"></path>
-              </svg>
-            </button>
-            <button type="button" class="mode-btn" data-modo="jarvis" title="HUD (tela cheia)" aria-label="HUD em tela cheia">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="9"></circle>
-                <circle cx="12" cy="12" r="5"></circle>
-                <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
-              </svg>
-            </button>
-          </div>
-          <button type="button" class="assistente-close" id="btn-fechar-assistente" aria-label="Fechar">×</button>
-        </div>
-      </div>
-
-      <div class="assistente-body" data-modo="ivy">
-        <!-- Modo IVY (fullscreen): o robô da marca, que se mexe e fala -->
-        <div class="assistente-ivy" id="assistente-ivy" aria-hidden="true">
-          <div class="ivy-palco" id="ivy-palco">
-            <div class="ivy-halo"></div>
-            <canvas id="assistente-ivy-canvas"></canvas>
-            <div class="ivy-moldura">
-              <div class="ivy-cabeca" id="ivy-cabeca">
-                <img src="/img/ivy-rosto.webp" alt="" draggable="false">
-                <span class="ivy-olho"></span>
-                <span class="ivy-olho-longe"></span>
-                <span class="ivy-palpebra"></span>
-                <span class="ivy-orelha"><i></i></span>
-                <span class="ivy-boca"></span>
-              </div>
-              <span class="ivy-scan"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modo HUD (fullscreen, estilo Iron Man) -->
-        <div class="assistente-jarvis" id="assistente-jarvis" aria-hidden="true">
-          <canvas id="assistente-jarvis-canvas"></canvas>
-          <div class="jarvis-ring jarvis-ring-outer"></div>
-          <div class="jarvis-ring jarvis-ring-mid"></div>
-          <div class="jarvis-ring jarvis-ring-inner"></div>
-          <span class="jarvis-bracket tl"></span>
-          <span class="jarvis-bracket tr"></span>
-          <span class="jarvis-bracket bl"></span>
-          <span class="jarvis-bracket br"></span>
-          <span class="jarvis-hud-text tl">SYS // I.V.Y</span>
-          <span class="jarvis-hud-text tr">STATUS // ONLINE</span>
-          <span class="jarvis-hud-text bl">VOICE INPUT // READY</span>
-          <span class="jarvis-hud-text br">MARSH CONSULTORIA</span>
-          <div class="jarvis-hint" id="jarvis-hint">toque para falar</div>
-        </div>
-
-        <div class="assistente-nebulosa" id="assistente-nebulosa" aria-hidden="true">
-          <canvas id="assistente-nebulosa-canvas"></canvas>
-          <div class="nebulosa-hint" id="nebulosa-hint">toque para falar</div>
-        </div>
-
-        <div class="assistente-holograma" id="assistente-holograma">
-          <canvas id="assistente-canvas" width="320" height="160" aria-hidden="true"></canvas>
-          <div class="holograma-ring"></div>
-          <div class="holograma-glow"></div>
-        </div>
-
-        <div class="assistente-orb" id="assistente-orb">
-          <div class="orb-pulse"></div>
-          <div class="orb-pulse delay-1"></div>
-          <div class="orb-pulse delay-2"></div>
-          <div class="orb-mic">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="23"></line>
-              <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
-          </div>
-        </div>
-
-        <p class="assistente-status" id="assistente-status">Toque no microfone e fale</p>
-
-        <div class="assistente-transcript" id="assistente-transcript"></div>
-        <div class="assistente-resposta" id="assistente-resposta"></div>
-      </div>
-
-      <div class="assistente-footer">
-        <button type="button" class="btn btn-secondary" id="btn-reset-assistente">Limpar</button>
-        <button type="button" class="btn btn-primary" id="btn-falar-assistente">
-          <span id="btn-falar-texto">Falar</span>
-        </button>
-      </div>
-
-      <p class="assistente-hint">
-        Ex.: <i>"abrir chamado pra paciente João Silva, unidade centro, exame eletrocardiograma, o aparelho não está sincronizando"</i>
-      </p>
-    </div>
-  </div>
-
   <script src="chamado-conector.js"></script>
   <script src="portal-script.js"></script>
-  <script src="assistente-voz.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');

@@ -85,6 +85,20 @@ Variáveis (Render → Environment):
 | `INSTAGRAM_API_VERSION` | Versão da API (padrão `v23.0`). |
 | `MARKETING_JOBS` | `off` desliga a rotina de publicação/métricas (testes e ambiente local). |
 
+### Ivy (assistente de voz)
+
+Exclusiva do **super usuário** (`usuarios.super_usuario`, o dono do sistema): administradores comuns, técnicos e clientes não veem o botão e a API responde 403. A marca é conferida no banco a cada chamada.
+
+- Fala e ouve no navegador (Web Speech), conversa com a OpenAI usando tools (`backend/services/assistente-tools*.js`): financeiro, cadastros, chamados, comercial, contratos, DRE, caixa, Instagram, alertas, licenças.
+- **Sistema inteiro**: `estrutura_banco` (tabelas e colunas), `consultar_banco` (SELECT livre em transação só leitura, timeout 5 s, até 50 linhas, colunas de senha/token/hash mascaradas) e `documentacao_sistema` (este README e `docs/*.md`).
+- Testes: `node testes/assistente-sistema.js` (acesso e tools de sistema; precisa do servidor local), `assistente-gestao.js`, `assistente-financeiro.js`.
+
+| Variável | Para quê |
+|---|---|
+| `SUPER_USUARIO_EMAIL` | E-mail marcado como super usuário a cada subida do servidor (padrão `daniel.marsh.sap@gmail.com`). |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | Conversa (padrão `gpt-4o-mini`). |
+| `IVY_TTS_VOICE` / `IVY_TTS_MODEL` / `IVY_TTS_INSTRUCTIONS` | Voz (padrão `nova` + `gpt-4o-mini-tts`). |
+
 ### Portal do Cliente (`/portal.html`)
 
 - Acesso isolado: cada cliente vê apenas seus próprios chamados

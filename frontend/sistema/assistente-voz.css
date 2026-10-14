@@ -25,6 +25,8 @@
   box-shadow: 0 14px 36px rgba(37, 99, 235, 0.6), 0 0 0 1px rgba(255,255,255,0.12) inset;
 }
 .assistente-fab:active { transform: translateY(0) scale(0.98); }
+/* Só aparece para o super usuário (o JS consulta /api/assistente/acesso) */
+.assistente-fab[hidden] { display: none; }
 
 @media (max-width: 768px) {
   .assistente-fab {

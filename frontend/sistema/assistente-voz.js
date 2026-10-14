@@ -1075,6 +1075,12 @@
     else { iniciarEscuta(); }
   }
 
+  // A Ivy é exclusiva do super usuário: o botão nasce escondido e só aparece se o servidor liberar
+  apiFetch(`${API_URL}/assistente/acesso`)
+    .then(res => (res && res.ok ? res.json() : { permitido: false }))
+    .then(d => { fab.hidden = !(d && d.permitido); })
+    .catch(() => { fab.hidden = true; });
+
   fab.addEventListener('click', abrirModal);
   btnFechar.addEventListener('click', fecharModal);
   btnReset.addEventListener('click', resetar);

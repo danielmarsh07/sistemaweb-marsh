@@ -151,6 +151,11 @@ async function iniciar() {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;`);
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cliente_id INTEGER;`);
     await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tema VARCHAR(20) DEFAULT 'sereno';`);
+    // Super usuário: o dono do sistema. Só ele usa a Ivy (assistente com acesso ao banco inteiro);
+    // administradores comuns não. Marcado pelo e-mail de SUPER_USUARIO_EMAIL a cada subida.
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS super_usuario BOOLEAN NOT NULL DEFAULT FALSE;`);
+    await pool.query(`UPDATE usuarios SET super_usuario = TRUE WHERE LOWER(email) = LOWER($1) AND NOT super_usuario`,
+      [process.env.SUPER_USUARIO_EMAIL || 'daniel.marsh.sap@gmail.com']);
     await pool.query(`ALTER TABLE usuarios ALTER COLUMN tema SET DEFAULT 'sereno';`);
     await pool.query(`UPDATE usuarios SET tema = 'sereno' WHERE tema IS NULL;`);
 
