@@ -1751,14 +1751,23 @@ async function abrirAulas(id) {
 function renderAulas() {
   const el = document.getElementById('aulas-lista');
   const aulas = cursoAulasAtual.aulas || [];
-  if (!aulas.length) { el.innerHTML = '<p class="text-center">Nenhuma aula ainda.</p>'; return; }
-  el.innerHTML = aulas.map(a => `
-    <div class="aula-item">
-      <span class="aula-ordem">${a.ordem}</span>
+  const resumo = document.getElementById('aulas-resumo');
+  if (!aulas.length) { el.innerHTML = '<p class="text-center">Nenhuma aula ainda.</p>'; if (resumo) resumo.textContent = ''; return; }
+  // Resumo: quantas aulas e quantas ainda sem vídeo (a lista rola quando passa da altura)
+  const semVideo = aulas.filter(a => !a.video_url).length;
+  if (resumo) {
+    resumo.innerHTML = `<strong>${aulas.length} aula${aulas.length > 1 ? 's' : ''}</strong> · ${aulas.length - semVideo} com vídeo` +
+      (semVideo ? ` · <span class="aula-sem-video">${semVideo} sem vídeo</span>` : '') +
+      (aulas.length > 5 ? ' <span class="aulas-rolar">— role a lista para ver todas</span>' : '');
+  }
+  // O número mostrado é a posição (Aula 1, 2, 3...), igual aos arquivos aula-01, aula-02...; a ordem continua no formulário
+  el.innerHTML = aulas.map((a, i) => `
+    <div class="aula-item${a.video_url ? '' : ' sem-video'}">
+      <span class="aula-ordem" title="Aula ${i + 1} (ordem ${a.ordem})">${i + 1}</span>
       <div class="aula-info">
         <strong>${escapeHtml(a.titulo)}</strong>
         <span>${escapeHtml(a.modulo || '')}${a.duracao_min ? ` · ${a.duracao_min} min` : ''}
-          · ${a.video_url ? 'com vídeo' : '<em>sem vídeo</em>'}${a.material_url ? ' · material' : ''}</span>
+          · ${a.video_url ? 'com vídeo' : '<em class="aula-sem-video">sem vídeo</em>'}${a.material_url ? ' · material' : ''}</span>
       </div>
       <button class="btn btn-icon btn-edit" title="Editar aula" aria-label="Editar aula" onclick="editarAula(${a.id})">${iconSVG('edit')}</button>
       <button class="btn btn-icon btn-danger" title="Remover aula" aria-label="Remover aula" onclick="removerAula(${a.id})">${iconSVG('trash')}</button>

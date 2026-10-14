@@ -23,6 +23,14 @@
 (function (raiz) {
   const CHANGELOG = [
     {
+      versao: 'v3.0',
+      data: '2026-10-14',
+      destaques: [
+        'Cursos com videoaulas: IA no Desenvolvimento ABAP (12 aulas), IA para Consultores Funcionais (10), Portal do Cliente (6) e Conector SAP (6) cadastrados com duração e descrição de cada aula.',
+        'Na lista de aulas do curso: resumo de quantas aulas têm vídeo, numeração a partir de 1 (igual aos arquivos de vídeo), aulas sem vídeo destacadas e lista mais alta, com aviso para rolar.',
+      ],
+    },
+    {
       versao: 'v2.9',
       data: '2026-10-14',
       destaques: [

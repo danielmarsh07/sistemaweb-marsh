@@ -3532,7 +3532,13 @@ svg.icon {
 .btn.btn-sm { padding: 5px 10px; font-size: 12.5px; }
 
 /* Treinamentos: lista de aulas, liberação e progresso */
-.aulas-lista { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; margin-bottom: 16px; }
+.aulas-lista { display: flex; flex-direction: column; gap: 6px; max-height: min(52vh, 560px); overflow-y: auto; margin-bottom: 16px; padding-right: 4px; }
+.aulas-resumo { margin: 0 0 8px; font-size: 13px; color: var(--text-muted); }
+.aulas-resumo strong { color: var(--text-main); }
+.aulas-rolar { font-style: italic; }
+.aula-sem-video { color: #b45309; font-weight: 600; font-style: normal; }
+:root[data-theme="sereno-escuro"] .aula-sem-video, :root[data-theme="dark"] .aula-sem-video, :root:not([data-theme]) .aula-sem-video { color: #fbbf24; }
+.aula-item.sem-video { border-left: 3px solid #f59e0b; }
 .aula-item {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card);
