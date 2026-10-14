@@ -292,7 +292,9 @@
     'contas-pagar': 'loadContasPagar',
     'fluxo-caixa': 'loadFluxoCaixa',
     faturamento: 'loadFaturamento',
-    'categorias-despesa': 'loadPaginaCategoriasDespesa'
+    'categorias-despesa': 'loadPaginaCategoriasDespesa',
+    funil: 'loadFunil',
+    'marketing-calendario': 'loadCalendarioMarketing'
   };
 
   function refreshPage(page) {

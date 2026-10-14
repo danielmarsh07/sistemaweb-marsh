@@ -19,6 +19,7 @@ const fat = require('./faturamento');
 const cp = require('./contas-pagar');
 const { TOOLS_GESTAO } = require('./assistente-tools-gestao');
 const { TOOLS_SISTEMA } = require('./assistente-tools-sistema');
+const { TOOLS_ACOES } = require('./assistente-tools-acoes');
 
 const MAX_LIST_ROWS = 30;
 
@@ -1115,7 +1116,8 @@ const TOOLS = {
   criar_chamado,
   criar_atendimento,
   ...TOOLS_GESTAO,
-  ...TOOLS_SISTEMA
+  ...TOOLS_SISTEMA,
+  ...TOOLS_ACOES
 };
 
 // Tools que clientes (usuários do portal) podem acessar via voz.
@@ -1135,7 +1137,7 @@ const TOOLS_FINANCEIRO = new Set([
   'registrar_recebimento', 'criar_categoria_despesa'
 ]);
 // Gestão (comercial, contratos, DRE, caixa, marketing, alertas, licenças): só administradores, como as rotas
-const TOOLS_SO_ADMIN = new Set([...TOOLS_FINANCEIRO, ...Object.keys(TOOLS_GESTAO)]);
+const TOOLS_SO_ADMIN = new Set([...TOOLS_FINANCEIRO, ...Object.keys(TOOLS_GESTAO), ...Object.keys(TOOLS_ACOES)]);
 const ehAdmin = ctx => !!ctx && (ctx.tipo === 'admin_empresa' || ctx.tipo === 'admin_sistema');
 
 function permitida(name, ctx) {

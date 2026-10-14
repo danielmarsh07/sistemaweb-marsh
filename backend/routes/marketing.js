@@ -39,15 +39,8 @@ const STATUS = ['rascunho', 'agendado', 'publicando', 'publicado', 'erro', 'canc
 const semStorage = res => res.status(503).json({
   erro: 'Storage (S3/R2) não configurado no servidor: configure as variáveis S3_* no Render para enviar imagens.' });
 
-// Data/hora do agendamento. Sem fuso no texto = horário de São Paulo (-03:00, sem horário de verão desde 2019).
-function lerData(v) {
-  if (v === undefined) return undefined;
-  if (v === null || v === '') return null;
-  let s = String(v).trim();
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) s += '-03:00';
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? 'invalida' : d;
-}
+// Data/hora do agendamento e as regras para agendar ficam em services/marketing.js (a Ivy usa as mesmas)
+const { lerData, erroParaAgendar } = mk;
 
 // Erro do multer em mensagem legível
 function erroUpload(err, res) {
@@ -150,14 +143,6 @@ function validarCampos(body) {
   return { campos };
 }
 
-// Para agendar: imagem, data futura e legenda válida
-async function erroParaAgendar(postId, dataAgendada) {
-  const n = (await pool.query('SELECT COUNT(*)::int AS n FROM marketing_midias WHERE post_id = $1', [postId])).rows[0].n;
-  if (!n) return 'Envie ao menos uma imagem antes de agendar.';
-  if (!dataAgendada) return 'Informe a data e a hora da publicação.';
-  if (new Date(dataAgendada).getTime() < Date.now() + 60000) return 'A data/hora já passou. Escolha um horário futuro ou use Publicar agora.';
-  return null;
-}
 
 // POST /posts — cria (rascunho por padrão; status 'agendado' exige imagem, então só faz sentido depois do upload)
 router.post('/posts', async (req, res) => {

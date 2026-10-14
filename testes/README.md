@@ -22,6 +22,7 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/assistente-financeiro.js           # tools do assistente de voz no financeiro (sem chamar a OpenAI)
    node testes/versoes.js                         # histórico de versões (frontend/comum/changelog.js): numeração e datas; sem banco, rode antes de cada commit
    node testes/assistente-sistema.js              # Ivy só do super usuário (API) + estrutura do banco, SELECT só leitura e documentação
+   node testes/assistente-acoes.js                # ações por voz da Ivy (oportunidades, posts) com confirmação + consultas de treinamentos
    node testes/assistente-gestao.js               # tools de gestão da Ivy (comercial, DRE, caixa, marketing, alertas, licenças): permissões e números iguais aos das telas
    node testes/listagens-ordenacao.js             # ordenação por coluna e filtros das listagens e da visão mensal (Chrome headless)
    node testes/licencas-ativacao.js               # licenças do conector: ativação por máquina, limite, revogação, conexões, download

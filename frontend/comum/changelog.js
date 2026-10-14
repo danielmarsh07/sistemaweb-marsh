@@ -23,6 +23,16 @@
 (function (raiz) {
   const CHANGELOG = [
     {
+      versao: 'v2.9',
+      data: '2026-10-14',
+      destaques: [
+        'A Ivy agora executa ações por voz no comercial: cria oportunidades (de cliente ou prospect), muda a etapa no funil (inclusive marcar como perdida, com o motivo) e anota no histórico.',
+        'Também agenda, reagenda e cancela posts do Instagram que já estão no calendário, sempre no horário de Brasília.',
+        'Toda ação por voz mostra um resumo e só grava depois que você confirma.',
+        'A Ivy responde sobre os cursos: quantas aulas cada um tem, quais ainda estão sem vídeo e o progresso de cada aluno.',
+      ],
+    },
+    {
       versao: 'v2.8',
       data: '2026-10-14',
       destaques: [

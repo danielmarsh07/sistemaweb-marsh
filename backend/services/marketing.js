@@ -402,7 +402,27 @@ async function carregarPost(id, empresaId) {
   return r.rows[0] || null;
 }
 
+// Data/hora do agendamento. Sem fuso no texto = horário de São Paulo (-03:00, sem horário de verão desde 2019).
+function lerData(v) {
+  if (v === undefined) return undefined;
+  if (v === null || v === '') return null;
+  let s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) s += '-03:00';
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? 'invalida' : d;
+}
+
+// Para agendar: imagem e data futura (a legenda já é validada ao salvar). Devolve o motivo ou null.
+async function erroParaAgendar(postId, dataAgendada) {
+  const n = (await pool.query('SELECT COUNT(*)::int AS n FROM marketing_midias WHERE post_id = $1', [postId])).rows[0].n;
+  if (!n) return 'Envie ao menos uma imagem antes de agendar.';
+  if (!dataAgendada) return 'Informe a data e a hora da publicação.';
+  if (new Date(dataAgendada).getTime() < Date.now() + 60000) return 'A data/hora já passou. Escolha um horário futuro ou use Publicar agora.';
+  return null;
+}
+
 module.exports = {
+  lerData, erroParaAgendar,
   FUSO, LEGENDA_MAX, HASHTAGS_MAX, IMAGENS_MAX, IMAGEM_MAX_BYTES, MAX_TENTATIVAS,
   ErroValidacao, cifraConfigurada, cifrar, decifrar,
   dadosConta, contaComToken, conectarConta, registrarSeguidores,
