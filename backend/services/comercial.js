@@ -1,5 +1,6 @@
 // Comercial (fase 3): regras compartilhadas entre as rotas internas (/api/comercial) e as públicas (/api/publico)
 const pool = require('../db');
+const conector = require('./precificacao-conector');
 
 const BASE_URL = process.env.APP_URL || 'https://www.marshconsultoria.com.br';
 
@@ -113,8 +114,38 @@ async function carregarProposta(where, params) {
 const linkPublico = token => `${BASE_URL}/proposta.html?t=${token}`;
 const linkSistema = () => `${BASE_URL}/dashboard.html`;
 
+// Resumo do funil: oportunidades abertas, valor do pipeline (cheio e ponderado pela probabilidade) e últimos 90 dias
+async function resumoFunil(empresa_id) {
+  const r = await pool.query(
+    `SELECT
+       COUNT(*) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao'))::int AS abertas,
+       COALESCE(SUM(valor_mensal) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao')), 0)::float AS pipeline_mensal,
+       COALESCE(SUM(valor_mensal * COALESCE(probabilidade, 0) / 100.0) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao')), 0)::float AS ponderado_mensal,
+       COALESCE(SUM(valor_unico) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao')), 0)::float AS pipeline_unico,
+       COUNT(*) FILTER (WHERE etapa = 'ganha' AND data_fechamento >= CURRENT_DATE - 90)::int AS ganhas_90,
+       COUNT(*) FILTER (WHERE etapa = 'perdida' AND data_fechamento >= CURRENT_DATE - 90)::int AS perdidas_90,
+       COALESCE(SUM(valor_mensal) FILTER (WHERE etapa = 'ganha' AND data_fechamento >= CURRENT_DATE - 90), 0)::float AS ganho_mensal_90,
+       COUNT(*) FILTER (WHERE etapa = 'lead' AND origem = 'site' AND data_criacao >= NOW() - INTERVAL '7 days')::int AS leads_site_7
+     FROM oportunidades WHERE empresa_id = $1`, [empresa_id]);
+  return r.rows[0];
+}
+
+// Simulador de preço do Conector SAP: o cálculo é puro (precificacao-conector.js); aqui só carrega a tabela da empresa
+async function precosConector(empresa_id) {
+  const r = await pool.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = $1', [empresa_id]);
+  return conector.normalizarPrecos((r.rows[0] && r.rows[0].prop_precos_conector) || {}).precos;
+}
+
+// Valida as entradas (com a validade padrão do modelo da proposta) e calcula. Devolve { resultado, precos, cfg } ou { erro }
+async function simularConector(b, empresa_id) {
+  const [precos, cfg] = await Promise.all([precosConector(empresa_id), configProposta(empresa_id)]);
+  const v = conector.validarEntradas({ validade_dias: cfg.prop_validade_dias, ...b }, precos);
+  if (v.erro) return { erro: v.erro };
+  return { resultado: conector.calcular(v.entradas, precos), precos, cfg };
+}
+
 module.exports = {
   ETAPAS, ETAPAS_ABERTAS, ORIGENS, PADRAO_PROPOSTA, COLUNAS_PROPOSTA,
   configProposta, calcularItens, proximoNumero, registrarHistorico, mudarEtapa, carregarProposta,
-  linkPublico, linkSistema
+  linkPublico, linkSistema, resumoFunil, precosConector, simularConector
 };

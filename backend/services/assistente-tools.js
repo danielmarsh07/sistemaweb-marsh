@@ -17,6 +17,7 @@ const { validarDocumento, validarCNPJ } = require('./validacao');
 const { notificarNovoChamado, notificarNovoAtendimento } = require('./email');
 const fat = require('./faturamento');
 const cp = require('./contas-pagar');
+const { TOOLS_GESTAO } = require('./assistente-tools-gestao');
 
 const MAX_LIST_ROWS = 30;
 
@@ -817,7 +818,9 @@ const listar_chamados = {
           data: { type: 'string', description: 'YYYY-MM-DD — chamados criados nesse dia exato' },
           data_de: { type: 'string', description: 'YYYY-MM-DD inclusivo (criados a partir desta data)' },
           data_ate: { type: 'string', description: 'YYYY-MM-DD inclusivo (criados até esta data)' },
-          busca: { type: 'string', description: 'Termo livre em título/descrição' }
+          busca: { type: 'string', description: 'Termo livre em título/descrição' },
+          origem: { type: 'string', enum: ['conector', 'portal'], description: 'conector = abertos pelo Conector SAP; portal = abertos no portal ou no painel.' },
+          aprovacao: { type: 'string', enum: ['pendente', 'aprovado', 'recusado'], description: 'Aprovação do cliente (só chamados do Conector). pendente = aguardando o cliente aprovar.' }
         },
         additionalProperties: false
       }
@@ -860,6 +863,9 @@ const listar_chamados = {
       where += ` AND (ch.titulo ILIKE $${i} OR ch.descricao ILIKE $${i})`;
       params.push(`%${args.busca}%`); i++;
     }
+    if (args.origem === 'conector') where += " AND ch.origem = 'conector'";
+    else if (args.origem === 'portal') where += ' AND ch.origem IS NULL';
+    if (args.aprovacao) { where += ` AND ch.aprovacao_cliente = $${i++}`; params.push(args.aprovacao); }
 
     // Total real (sem LIMIT) pra IA poder responder "tenho 47 chamados abertos" mesmo que só mostre 30
     const totalRes = await pool.query(
@@ -870,7 +876,7 @@ const listar_chamados = {
 
     const r = await pool.query(
       `SELECT ch.id, ch.titulo, ch.status, ch.prioridade, ch.data_criacao,
-              ch.tecnologia_id,
+              ch.tecnologia_id, ch.origem, ch.aprovacao_cliente,
               COALESCE(c.razao_social, c.nome) AS cliente_nome,
               t.nome AS tecnologia_nome,
               t.categoria AS tecnologia_categoria
@@ -895,7 +901,9 @@ const listar_chamados = {
         data_de: args.data_de || null,
         data_ate: args.data_ate || null,
         cliente_id: args.cliente_id || (ctx.tipo === 'cliente' ? ctx.cliente_id : null),
-        busca: args.busca || null
+        busca: args.busca || null,
+        origem: args.origem || null,
+        aprovacao: args.aprovacao || null
       },
       chamados: r.rows.map(c => ({
         id: c.id,
@@ -905,7 +913,9 @@ const listar_chamados = {
         data_criacao: c.data_criacao,
         cliente: c.cliente_nome,
         tecnologia: c.tecnologia_nome,
-        categoria: c.tecnologia_categoria
+        categoria: c.tecnologia_categoria,
+        origem: c.origem === 'conector' ? 'Conector SAP' : 'portal/painel',
+        aprovacao_cliente: c.aprovacao_cliente
       }))
     };
   }
@@ -1102,7 +1112,8 @@ const TOOLS = {
   listar_tecnologias_do_cliente,
   listar_chamados,
   criar_chamado,
-  criar_atendimento
+  criar_atendimento,
+  ...TOOLS_GESTAO
 };
 
 // Tools que clientes (usuários do portal) podem acessar via voz.
@@ -1121,11 +1132,13 @@ const TOOLS_FINANCEIRO = new Set([
   'listar_categorias_despesa', 'listar_contas_financeiras', 'lancar_conta_pagar', 'pagar_conta',
   'registrar_recebimento', 'criar_categoria_despesa'
 ]);
+// Gestão (comercial, contratos, DRE, caixa, marketing, alertas, licenças): só administradores, como as rotas
+const TOOLS_SO_ADMIN = new Set([...TOOLS_FINANCEIRO, ...Object.keys(TOOLS_GESTAO)]);
 const ehAdmin = ctx => !!ctx && (ctx.tipo === 'admin_empresa' || ctx.tipo === 'admin_sistema');
 
 function permitida(name, ctx) {
   if (ctx && ctx.tipo === 'cliente') return TOOLS_PERMITIDAS_CLIENTE.has(name);
-  if (TOOLS_FINANCEIRO.has(name)) return ehAdmin(ctx);
+  if (TOOLS_SO_ADMIN.has(name)) return ehAdmin(ctx);
   return true;
 }
 
@@ -1146,7 +1159,7 @@ async function runTool(name, ctx, args) {
   if (!permitida(name, ctx)) {
     return { erro: ctx && ctx.tipo === 'cliente'
       ? `Operação "${name}" não está disponível pelo portal do cliente.`
-      : 'O financeiro é restrito aos administradores.' };
+      : (TOOLS_FINANCEIRO.has(name) ? 'O financeiro é restrito aos administradores.' : 'Essa consulta é restrita aos administradores.') };
   }
   try {
     return await tool.run(ctx, args || {});

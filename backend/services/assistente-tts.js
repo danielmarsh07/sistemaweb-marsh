@@ -1,7 +1,7 @@
 // ============================================================================
 // Serviço de TTS via OpenAI (Audio API) — voz da Ivy.
 // Recebe texto → devolve Buffer de áudio MP3 (a rota faz o stream pro cliente).
-// O toque "robótico" vem do jeito de falar (instruções) + um efeito aplicado no navegador.
+// Voz natural; o efeito robótico do navegador existe, mas vem desligado (botão no cabeçalho da Ivy).
 //
 // Configuração via env vars (as antigas OPENAI_TTS_VOICE/MODEL do JARVIS são ignoradas de propósito:
 // no Render elas ainda apontavam para a voz masculina onyx):
@@ -16,9 +16,8 @@
 
 const OpenAI = require('openai');
 
-const INSTRUCOES_PADRAO = 'Você é Ivy, uma assistente virtual feminina com voz levemente sintética e robótica: '
-  + 'timbre limpo e preciso, entonação contida e uniforme, ritmo constante, articulação clara de cada sílaba. '
-  + 'Fale em português do Brasil, com calma e simpatia discreta.';
+const INSTRUCOES_PADRAO = 'Você é Ivy, uma assistente virtual feminina: voz natural, clara e simpática, '
+  + 'ritmo tranquilo e articulação precisa. Fale em português do Brasil.';
 
 let _client = null;
 function client() {

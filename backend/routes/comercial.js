@@ -240,20 +240,8 @@ router.post('/oportunidades/:id/gerar-contrato', async (req, res) => {
 
 // ===== Resumo do funil =====
 router.get('/resumo', async (req, res) => {
-  try {
-    const r = await pool.query(
-      `SELECT
-         COUNT(*) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao'))::int AS abertas,
-         COALESCE(SUM(valor_mensal) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao')), 0)::float AS pipeline_mensal,
-         COALESCE(SUM(valor_mensal * COALESCE(probabilidade, 0) / 100.0) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao')), 0)::float AS ponderado_mensal,
-         COALESCE(SUM(valor_unico) FILTER (WHERE etapa IN ('lead','qualificacao','proposta','negociacao')), 0)::float AS pipeline_unico,
-         COUNT(*) FILTER (WHERE etapa = 'ganha' AND data_fechamento >= CURRENT_DATE - 90)::int AS ganhas_90,
-         COUNT(*) FILTER (WHERE etapa = 'perdida' AND data_fechamento >= CURRENT_DATE - 90)::int AS perdidas_90,
-         COALESCE(SUM(valor_mensal) FILTER (WHERE etapa = 'ganha' AND data_fechamento >= CURRENT_DATE - 90), 0)::float AS ganho_mensal_90,
-         COUNT(*) FILTER (WHERE etapa = 'lead' AND origem = 'site' AND data_criacao >= NOW() - INTERVAL '7 days')::int AS leads_site_7
-       FROM oportunidades WHERE empresa_id = $1`, [emp(req)]);
-    res.json(r.rows[0]);
-  } catch (err) { erro500(res, 'Erro ao montar resumo', err); }
+  try { res.json(await com.resumoFunil(emp(req))); }
+  catch (err) { erro500(res, 'Erro ao montar resumo', err); }
 });
 
 // ===== Configuração das propostas =====
@@ -282,19 +270,9 @@ router.put('/config', async (req, res) => {
 });
 
 // ===== Simulador de preço — Conector SAP =====
-// Cálculo puro em services/precificacao-conector.js; aqui só carrega a tabela de preços da empresa.
-async function precosConector(empresa_id) {
-  const r = await pool.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = $1', [empresa_id]);
-  return conector.normalizarPrecos((r.rows[0] && r.rows[0].prop_precos_conector) || {}).precos;
-}
-
-// Valida as entradas (com a validade padrão do modelo da proposta) e calcula. Devolve { resultado, precos } ou { erro }
-async function simularConector(b, empresa_id) {
-  const [precos, cfg] = await Promise.all([precosConector(empresa_id), com.configProposta(empresa_id)]);
-  const v = conector.validarEntradas({ validade_dias: cfg.prop_validade_dias, ...b }, precos);
-  if (v.erro) return { erro: v.erro };
-  return { resultado: conector.calcular(v.entradas, precos), precos, cfg };
-}
+// Cálculo puro em services/precificacao-conector.js; a tabela de preços da empresa vem de services/comercial.js.
+const precosConector = com.precosConector;
+const simularConector = com.simularConector;
 
 router.get('/simulador-conector/config', async (req, res) => {
   try {

@@ -62,9 +62,10 @@
   let modoSalvo = localStorage.getItem(MODO_KEY);
   let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'ivy';
 
-  // Efeito de voz robótica (aplicado no áudio da OpenAI): liga/desliga no botão do cabeçalho
-  const VOZ_KEY = 'assistente_voz_robotica';
-  let vozRobotica = localStorage.getItem(VOZ_KEY) !== 'off';
+  // Efeito de voz robótica (aplicado no áudio da OpenAI): desligado por padrão (ficou forte demais);
+  // o botão do cabeçalho ainda liga para testes. v2: zera a escolha de quem já tinha ligado.
+  const VOZ_KEY = 'assistente_voz_robotica_v2';
+  let vozRobotica = localStorage.getItem(VOZ_KEY) === 'on';
   const EFEITO_ROBO = { ringHz: 48, ring: 0.4, seco: 0.75, metal: 0.28, metalAtraso: 0.006, metalRetorno: 0.35 };
   let nosEfeito = [];
 
