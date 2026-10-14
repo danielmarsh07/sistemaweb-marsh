@@ -23,6 +23,16 @@
 (function (raiz) {
   const CHANGELOG = [
     {
+      versao: 'v2.8',
+      data: '2026-10-14',
+      destaques: [
+        'No celular, a barra de baixo agora tem 5 botões fixos (Início, Chamados, Clientes, Faturas e Menu) que cabem na tela inteira, sem precisar arrastar para o lado.',
+        'O botão Menu abre uma gaveta com todas as telas do sistema, agrupadas como no computador — inclusive Marketing, DRE, Fluxo de caixa, Alertas e Versões, que antes não tinham acesso pelo celular.',
+        'O gesto de voltar do iPhone (arrastar da borda) e o voltar do Android agora voltam para a tela anterior do sistema, em vez de sair do aplicativo.',
+        'A barra de baixo e o topo respeitam a área da barrinha de gestos e do recorte da tela do iPhone, sem cortar os botões.',
+      ],
+    },
+    {
       versao: 'v2.7',
       data: '2026-10-14',
       destaques: [

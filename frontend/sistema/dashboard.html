@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Dashboard - Marsh Consultoria</title>
   <script src="theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3805,8 +3805,9 @@
     </div>
   </div>
 
-  <!-- BOTTOM NAV (mobile) -->
-  <nav class="bottom-nav">
+  <!-- BOTTOM NAV (mobile): 4 atalhos fixos + Menu (gaveta com todas as telas). Sem rolagem lateral:
+       no iPhone o arrasto para o lado vira o gesto de voltar do Safari. -->
+  <nav class="bottom-nav" aria-label="Navegação principal">
     <button class="bottom-nav-item active" data-page="dashboard">
       <span class="bn-icon"><svg class="icon"><use href="#i-dash"/></svg></span>
       <span>Início</span>
@@ -3819,43 +3820,32 @@
       <span class="bn-icon"><svg class="icon"><use href="#i-users"/></svg></span>
       <span>Clientes</span>
     </button>
-    <button class="bottom-nav-item" data-page="licencas">
-      <span class="bn-icon"><svg class="icon"><use href="#i-shield"/></svg></span>
-      <span>Licenças</span>
-    </button>
-    <button class="bottom-nav-item" data-page="treinamentos">
-      <span class="bn-icon"><svg class="icon"><use href="#i-cap"/></svg></span>
-      <span>Cursos</span>
-    </button>
-    <button class="bottom-nav-item" data-page="tecnologias">
-      <span class="bn-icon"><svg class="icon"><use href="#i-cpu"/></svg></span>
-      <span>Tecno</span>
-    </button>
-    <button class="bottom-nav-item" data-page="funil">
-      <span class="bn-icon"><svg class="icon"><use href="#i-funil"/></svg></span>
-      <span>Funil</span>
-    </button>
     <button class="bottom-nav-item" data-page="faturamento">
       <span class="bn-icon"><svg class="icon"><use href="#i-wallet"/></svg></span>
       <span>Faturas</span>
     </button>
-    <button class="bottom-nav-item" data-page="contratos">
-      <span class="bn-icon"><svg class="icon"><use href="#i-doc"/></svg></span>
-      <span>Contratos</span>
-    </button>
-    <button class="bottom-nav-item" data-page="contas-pagar">
-      <span class="bn-icon"><svg class="icon"><use href="#i-trend-down"/></svg></span>
-      <span>A pagar</span>
-    </button>
-    <button class="bottom-nav-item" data-page="usuarios">
-      <span class="bn-icon"><svg class="icon"><use href="#i-key"/></svg></span>
-      <span>Usuários</span>
-    </button>
-    <button class="bottom-nav-item" data-page="configuracoes">
-      <span class="bn-icon"><svg class="icon"><use href="#i-sliders"/></svg></span>
-      <span>Config</span>
+    <button class="bottom-nav-item bottom-nav-menu" id="btn-menu-mobile" type="button" aria-haspopup="dialog" aria-controls="menu-mobile">
+      <span class="bn-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
+      <span>Menu</span>
     </button>
   </nav>
+
+  <!-- MENU MOBILE: gaveta montada pelo script.js a partir do menu lateral (sempre igual a ele) -->
+  <div class="menu-mobile" id="menu-mobile" hidden>
+    <div class="menu-mobile-fundo" data-fechar-menu></div>
+    <div class="menu-mobile-painel" role="dialog" aria-modal="true" aria-labelledby="menu-mobile-titulo">
+      <div class="menu-mobile-alca" aria-hidden="true"></div>
+      <div class="menu-mobile-topo">
+        <strong id="menu-mobile-titulo">Menu</strong>
+        <button type="button" class="icon-btn" data-fechar-menu aria-label="Fechar menu">×</button>
+      </div>
+      <div class="menu-mobile-corpo" id="menu-mobile-corpo"></div>
+      <div class="menu-mobile-rodape">
+        <span id="menu-mobile-usuario"></span>
+        <button type="button" class="btn btn-secondary" onclick="logout()">Sair</button>
+      </div>
+    </div>
+  </div>
 
   <script src="chamado-conector.js"></script>
   <script src="changelog.js"></script>

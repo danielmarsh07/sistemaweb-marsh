@@ -97,18 +97,20 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   iniciarMenuGrupos();
   loadDashboard();
+  iniciarHistoricoNavegacao();
 });
 
 // ===== EVENT LISTENERS =====
 function setupEventListeners() {
   // Navegação
-  document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(link => {
+  document.querySelectorAll('.nav-link, .bottom-nav-item[data-page]').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const page = link.dataset.page;
       showPage(page);
     });
   });
+  iniciarMenuMobile();
 
   // Versão atual no rodapé do menu (vem de /changelog.js); clicar abre o histórico
   const versaoEl = document.getElementById('versao-sistema');
@@ -337,10 +339,124 @@ function marcarGrupoAtivo(page) {
   });
 }
 
+// ===== MENU MOBILE (gaveta com todas as telas) =====
+// No celular a barra de baixo tem só 4 atalhos + "Menu"; a gaveta é montada a partir do menu lateral,
+// então qualquer tela nova no menu aparece aqui sem mexer no HTML.
+const PAGINAS_BARRA_MOBILE = ['dashboard', 'chamados', 'clientes', 'faturamento'];
+
+function montarMenuMobile() {
+  const corpo = document.getElementById('menu-mobile-corpo');
+  if (!corpo) return;
+  corpo.textContent = '';
+  const item = link => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'menu-mobile-item';
+    b.dataset.page = link.dataset.page;
+    if (link.dataset.page === currentPage) b.classList.add('active');
+    const icone = link.querySelector('svg.icon');
+    if (icone) b.appendChild(icone.cloneNode(true));
+    const rotulo = document.createElement('span');
+    rotulo.textContent = [...link.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join(' ').trim();
+    b.appendChild(rotulo);
+    const badge = link.querySelector('.nav-badge');
+    if (badge && !badge.hidden && badge.textContent.trim() !== '0') {
+      const s = document.createElement('span');
+      s.className = 'menu-mobile-badge';
+      s.textContent = badge.textContent.trim();
+      b.appendChild(s);
+    }
+    b.addEventListener('click', () => { fecharMenuMobile(); showPage(b.dataset.page); });
+    return b;
+  };
+  const secao = (titulo, links) => {
+    if (!links.length) return;
+    const div = document.createElement('section');
+    div.className = 'menu-mobile-secao';
+    if (titulo) {
+      const h = document.createElement('h3');
+      h.textContent = titulo;
+      div.appendChild(h);
+    }
+    const grade = document.createElement('div');
+    grade.className = 'menu-mobile-grade';
+    links.forEach(l => grade.appendChild(item(l)));
+    div.appendChild(grade);
+    corpo.appendChild(div);
+  };
+  const nav = document.querySelector('.sidebar nav');
+  if (!nav) return;
+  // Links soltos no topo (Visão geral) e depois cada grupo, na ordem do menu lateral; grupos escondidos pelo perfil ficam de fora
+  secao(null, [...nav.querySelectorAll(':scope > .nav-link[data-page]')]);
+  nav.querySelectorAll(':scope > .nav-group').forEach(g => {
+    if (g.hidden || g.style.display === 'none') return;
+    const titulo = g.querySelector('.nav-group-title span');
+    secao(titulo ? titulo.textContent.trim() : '', [...g.querySelectorAll('.nav-link[data-page]')].filter(l => !l.hidden && l.style.display !== 'none'));
+  });
+  const usuario = document.getElementById('menu-mobile-usuario');
+  if (usuario) {
+    const nome = (document.getElementById('usuario-nome') || {}).textContent || '';
+    usuario.textContent = [nome, window.MARSH_VERSAO ? `Sistema Marsh ${window.MARSH_VERSAO}` : ''].filter(Boolean).join(' · ');
+  }
+}
+
+function abrirMenuMobile() {
+  const menu = document.getElementById('menu-mobile');
+  if (!menu) return;
+  montarMenuMobile();
+  menu.hidden = false;
+  document.body.classList.add('menu-mobile-aberto');
+  requestAnimationFrame(() => menu.classList.add('aberto'));
+  const fechar = menu.querySelector('.menu-mobile-topo [data-fechar-menu]');
+  if (fechar) fechar.focus({ preventScroll: true });
+}
+
+function fecharMenuMobile() {
+  const menu = document.getElementById('menu-mobile');
+  if (!menu || menu.hidden) return;
+  menu.classList.remove('aberto');
+  document.body.classList.remove('menu-mobile-aberto');
+  setTimeout(() => { if (!menu.classList.contains('aberto')) menu.hidden = true; }, 220);
+}
+
+function iniciarMenuMobile() {
+  const btn = document.getElementById('btn-menu-mobile');
+  const menu = document.getElementById('menu-mobile');
+  if (!btn || !menu) return;
+  btn.addEventListener('click', () => (menu.hidden ? abrirMenuMobile() : fecharMenuMobile()));
+  menu.querySelectorAll('[data-fechar-menu]').forEach(el => el.addEventListener('click', fecharMenuMobile));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenuMobile(); });
+}
+
+// ===== HISTÓRICO DE NAVEGAÇÃO =====
+// Cada tela vira uma entrada no histórico do navegador: o gesto de voltar do iPhone (arrastar da borda)
+// e o botão voltar do Android passam a voltar para a tela anterior em vez de sair do sistema.
+function iniciarHistoricoNavegacao() {
+  window.addEventListener('popstate', e => {
+    const page = e.state && e.state.page;
+    fecharMenuMobile();
+    if (page && document.getElementById(`${page}-page`)) showPage(page, { semHistorico: true });
+  });
+  // Abrir já numa tela pelo endereço (ex.: /dashboard.html#versoes)
+  const inicial = decodeURIComponent(location.hash.slice(1));
+  if (inicial && inicial !== 'dashboard' && document.getElementById(`${inicial}-page`)) {
+    history.replaceState({ page: 'dashboard' }, '', location.pathname);
+    showPage(inicial);
+  } else {
+    history.replaceState({ page: 'dashboard' }, '', location.pathname);
+  }
+}
+
 // ===== NAVIGATION =====
-function showPage(page) {
+function showPage(page, opcoes = {}) {
+  if (!page) return;
+  if (!opcoes.semHistorico && history.state && history.state.page !== page) {
+    history.pushState({ page }, '', `#${page}`);
+  }
   document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(link => link.classList.remove('active'));
   document.querySelectorAll(`[data-page="${page}"]`).forEach(el => el.classList.add('active'));
+  const btnMenu = document.getElementById('btn-menu-mobile');
+  if (btnMenu) btnMenu.classList.toggle('active', !PAGINAS_BARRA_MOBILE.includes(page));
   marcarGrupoAtivo(page);
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
