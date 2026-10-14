@@ -1,113 +1,165 @@
-// ===== MOBILE MENU =====
-const menuToggle = document.getElementById('menuToggle');
-const nav = document.getElementById('nav');
+// Landing Marsh Consultoria — SAP + IA
+// (a versão anterior está em frontend/site-classica)
 
-menuToggle.addEventListener('click', () => {
-  nav.classList.toggle('open');
+const menosMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ===== MENU (celular) =====
+const menu = document.getElementById('menu');
+const menuBotao = document.getElementById('menuBotao');
+menuBotao.addEventListener('click', () => {
+  const aberto = menu.classList.toggle('aberto');
+  menuBotao.setAttribute('aria-expanded', String(aberto));
+});
+menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+  menu.classList.remove('aberto');
+  menuBotao.setAttribute('aria-expanded', 'false');
+}));
+
+// ===== CABEÇALHO: fundo ao rolar =====
+const topo = document.getElementById('topo');
+const marcarTopo = () => topo.classList.toggle('rolado', window.scrollY > 30);
+window.addEventListener('scroll', marcarTopo, { passive: true });
+marcarTopo();
+
+// ===== REVELAR SEÇÕES AO ROLAR =====
+const revelar = new IntersectionObserver(entradas => {
+  entradas.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('visivel'); revelar.unobserve(e.target); }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.revelar').forEach((el, i) => {
+  el.style.transitionDelay = `${(i % 4) * 80}ms`;
+  revelar.observe(el);
 });
 
-// Close menu when a link is clicked
-nav.querySelectorAll('a').forEach(link => {
-  link.addEventListener('click', () => nav.classList.remove('open'));
-});
+// ===== ROBÔ: inclina levemente acompanhando o mouse =====
+const robo = document.getElementById('robo');
+if (robo && !menosMovimento && window.matchMedia('(pointer: fine)').matches) {
+  let alvoX = 0, alvoY = 0, atualX = 0, atualY = 0, rodando = false;
+  const animar = () => {
+    atualX += (alvoX - atualX) * 0.08;
+    atualY += (alvoY - atualY) * 0.08;
+    // a inclinação fica no contêiner; o quadro mantém a "respiração" do CSS
+    robo.style.transform = `rotateY(${atualX * 6}deg) rotateX(${-atualY * 4}deg)`;
+    if (Math.abs(alvoX - atualX) > 0.001 || Math.abs(alvoY - atualY) > 0.001) requestAnimationFrame(animar);
+    else rodando = false;
+  };
+  document.getElementById('ia').addEventListener('pointermove', ev => {
+    const r = robo.getBoundingClientRect();
+    alvoX = Math.max(-1, Math.min(1, (ev.clientX - (r.left + r.width / 2)) / (r.width / 2)));
+    alvoY = Math.max(-1, Math.min(1, (ev.clientY - (r.top + r.height / 2)) / (r.height / 2)));
+    if (!rodando) { rodando = true; requestAnimationFrame(animar); }
+  });
+  document.getElementById('ia').addEventListener('pointerleave', () => {
+    alvoX = 0; alvoY = 0;
+    if (!rodando) { rodando = true; requestAnimationFrame(animar); }
+  });
+}
 
-// ===== HEADER SCROLL EFFECT =====
-const header = document.getElementById('header');
-window.addEventListener('scroll', () => {
-  if (window.scrollY > 20) {
-    header.style.background = 'rgba(13,27,42,.97)';
-  } else {
-    header.style.background = 'rgba(13,27,42,.92)';
+// ===== PARTÍCULAS DE DADOS na seção de IA =====
+(function particulas() {
+  const canvas = document.getElementById('iaParticulas');
+  if (!canvas || menosMovimento) return;
+  const ctx = canvas.getContext('2d');
+  const secao = document.getElementById('ia');
+  let largura = 0, altura = 0, pontos = [], visivel = false, quadroId = 0;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function dimensionar() {
+    largura = secao.clientWidth; altura = secao.clientHeight;
+    canvas.width = largura * dpr; canvas.height = altura * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.round(Math.min(90, largura / 16));
+    pontos = Array.from({ length: n }, () => novoPonto(true));
   }
-});
-
-// ===== CONTACT FORM =====
-const form = document.getElementById('contactForm');
-const submitBtn = document.getElementById('submitBtn');
-const formSuccess = document.getElementById('formSuccess');
-const emailInput = document.getElementById('email');
-const replyto = document.getElementById('replyto');
-
-emailInput.addEventListener('input', () => {
-  replyto.value = emailInput.value;
-});
-
-form.addEventListener('submit', async (e) => {
-  const action = form.getAttribute('action');
-
-  // If Formspree endpoint is not configured, use mailto fallback
-  if (!action || action.includes('SEU_ENDPOINT_AQUI')) {
-    e.preventDefault();
-    const name    = document.getElementById('name').value;
-    const email   = document.getElementById('email').value;
-    const phone   = document.getElementById('phone').value;
-    const subject = document.getElementById('subject').value;
-    const message = document.getElementById('message').value;
-
-    const body = encodeURIComponent(
-      `Nome: ${name}\nE-mail: ${email}\nTelefone: ${phone}\n\nServiço: ${subject}\n\nMensagem:\n${message}`
-    );
-    const mailtoLink = `mailto:daniel.marsh@marshconsultoria.com.br?subject=Contato%20via%20site%20-%20${encodeURIComponent(subject)}&body=${body}`;
-    window.location.href = mailtoLink;
-
-    formSuccess.style.display = 'block';
-    formSuccess.textContent = 'Seu cliente de e-mail foi aberto! Clique em Enviar para concluir.';
-    return;
+  function novoPonto(inicio) {
+    // fluxo da direita para a esquerda, como dados saindo dos cabos do robô
+    return {
+      x: inicio ? Math.random() * largura : largura + Math.random() * 60,
+      y: Math.random() * altura,
+      v: 0.4 + Math.random() * 1.3,
+      r: 0.6 + Math.random() * 1.8,
+      a: 0.25 + Math.random() * 0.6,
+      rastro: 10 + Math.random() * 40
+    };
   }
+  function desenhar() {
+    ctx.clearRect(0, 0, largura, altura);
+    for (const p of pontos) {
+      p.x -= p.v;
+      if (p.x < -p.rastro) Object.assign(p, novoPonto(false));
+      // some ao chegar no lado do texto (esquerda), para não atrapalhar a leitura
+      const a = p.a * Math.min(1, Math.max(0, (p.x / largura - 0.3) / 0.35));
+      if (a <= 0.01) continue;
+      const g = ctx.createLinearGradient(p.x, p.y, p.x + p.rastro, p.y);
+      g.addColorStop(0, `rgba(150, 225, 255, ${a})`);
+      g.addColorStop(1, 'rgba(19, 168, 224, 0)');
+      ctx.strokeStyle = g; ctx.lineWidth = p.r;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + p.rastro, p.y); ctx.stroke();
+      ctx.fillStyle = `rgba(190, 240, 255, ${a})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    if (visivel) quadroId = requestAnimationFrame(desenhar);
+  }
+  // Só anima com a seção na tela
+  new IntersectionObserver(([e]) => {
+    visivel = e.isIntersecting;
+    cancelAnimationFrame(quadroId);
+    if (visivel) quadroId = requestAnimationFrame(desenhar);
+  }).observe(secao);
+  window.addEventListener('resize', dimensionar);
+  dimensionar();
+})();
 
-  // Formspree submission
-  e.preventDefault();
-  submitBtn.textContent = 'Enviando...';
-  submitBtn.disabled = true;
+// ===== BOTÕES QUE ESCOLHEM O ASSUNTO DO FORMULÁRIO =====
+document.querySelectorAll('[data-assunto]').forEach(b => b.addEventListener('click', () => {
+  const sel = document.getElementById('assunto');
+  if (sel) sel.value = b.dataset.assunto;
+}));
 
+// ===== FORMULÁRIO: funil do sistema (lead) + Formspree (e-mail) =====
+const form = document.getElementById('formContato');
+const botao = document.getElementById('botaoEnviar');
+const aviso = document.getElementById('formAviso');
+document.getElementById('email').addEventListener('input', e => {
+  document.getElementById('replyto').value = e.target.value;
+});
+
+function mostrarAviso(texto, erro = false) {
+  aviso.hidden = false;
+  aviso.textContent = texto;
+  aviso.classList.toggle('erro', erro);
+}
+
+form.addEventListener('submit', async ev => {
+  ev.preventDefault();
+  botao.disabled = true;
+  botao.textContent = 'Enviando...';
+  const dados = new FormData(form);
+  const empresa = (dados.get('company') || '').trim();
+  const mensagem = (empresa ? `Empresa: ${empresa}\n\n` : '') + dados.get('message');
   try {
-    const data = new FormData(form);
-    // Vai para o Formspree (e-mail) e para o funil do sistema (lead); basta um dos dois dar certo
+    // Basta um dos dois dar certo
     const lead = fetch('/api/publico/lead', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nome: data.get('name'), email: data.get('email'), telefone: data.get('phone'),
-        interesse: data.get('subject'), mensagem: data.get('message'), website: data.get('website')
+        nome: dados.get('name'), email: dados.get('email'), telefone: dados.get('phone'),
+        interesse: dados.get('subject'), mensagem, website: dados.get('website')
       })
     }).then(r => r.ok).catch(() => false);
-    const formspree = fetch(form.action, {
-      method: 'POST',
-      body: data,
-      headers: { Accept: 'application/json' }
-    }).then(r => r.ok).catch(() => false);
+    const formspree = fetch(form.action, { method: 'POST', body: dados, headers: { Accept: 'application/json' } })
+      .then(r => r.ok).catch(() => false);
     const [okLead, okFormspree] = await Promise.all([lead, formspree]);
-
-    if (okLead || okFormspree) {
-      form.reset();
-      formSuccess.style.display = 'block';
-      formSuccess.textContent = 'Mensagem enviada com sucesso! Em breve entraremos em contato.';
-      submitBtn.textContent = 'Enviado!';
-    } else {
-      throw new Error('Erro no envio');
-    }
+    if (!okLead && !okFormspree) throw new Error('falha');
+    form.reset();
+    mostrarAviso('Mensagem enviada! Em breve entraremos em contato.');
+    botao.textContent = 'Enviado';
   } catch {
-    submitBtn.textContent = 'Enviar Mensagem';
-    submitBtn.disabled = false;
-    alert('Ocorreu um erro. Por favor, entre em contato diretamente pelo e-mail ou WhatsApp.');
+    botao.disabled = false;
+    botao.textContent = 'Enviar mensagem';
+    mostrarAviso('Não foi possível enviar agora. Fale com a gente pelo WhatsApp (21) 96780-6718 ou pelo e-mail.', true);
   }
 });
 
-// ===== SCROLL ANIMATIONS =====
-const observerOptions = { threshold: 0.12, rootMargin: '0px 0px -40px 0px' };
-
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.style.opacity = '1';
-      entry.target.style.transform = 'translateY(0)';
-    }
-  });
-}, observerOptions);
-
-document.querySelectorAll('.card, .why-item, .info-item, .avatar-card, .about-text').forEach(el => {
-  el.style.opacity = '0';
-  el.style.transform = 'translateY(28px)';
-  el.style.transition = 'opacity .5s ease, transform .5s ease';
-  observer.observe(el);
-});
+document.getElementById('ano').textContent = new Date().getFullYear();

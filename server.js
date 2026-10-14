@@ -28,6 +28,8 @@ const FRONTEND = path.join(__dirname, 'frontend');
 for (const pasta of ['comum', 'site', 'sistema']) {
   app.use(express.static(path.join(FRONTEND, pasta)));
 }
+//   frontend/site-classica → landing anterior (dark), guardada em /classica/ (noindex)
+app.use('/classica', express.static(path.join(FRONTEND, 'site-classica'), { redirect: true }));
 
 // Importar rotas
 const authRoutes = require('./backend/routes/auth');
