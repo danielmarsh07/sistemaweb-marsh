@@ -152,7 +152,7 @@
       <p>Chamados, licenças e treinamentos em um só lugar — com segurança e governança.</p>
       <div class="marca-pontos"><span>SAP + IA</span><span>Fiscal BR</span><span>Suporte com SLA</span></div>
     </div>
-    <div class="marca-rodape">© Marsh Consultoria</div>
+    <div class="marca-rodape">© Marsh Consultoria<span id="login-versao"></span></div>
   </aside>
 
   <main class="login-lado">
@@ -179,6 +179,11 @@
     </div>
   </main>
 
+  <script src="changelog.js"></script>
+  <script>
+    // Versão atual do sistema (de /changelog.js) no rodapé do painel da marca
+    if (window.MARSH_VERSAO) document.getElementById('login-versao').textContent = ` · Sistema ${window.MARSH_VERSAO}`;
+  </script>
   <script>
     // Redireciona se já autenticado
     const tokenExistente = localStorage.getItem('token');

@@ -204,6 +204,9 @@
           <a href="#" data-page="usuarios" class="nav-link">
             <svg class="icon"><use href="#i-key"/></svg> Usuários
           </a>
+          <a href="#" data-page="versoes" class="nav-link">
+            <svg class="icon"><use href="#i-tag"/></svg> Versões
+          </a>
           </div>
         </div>
       </div>
@@ -214,6 +217,7 @@
       <div class="who">
         <strong id="usuario-nome">Carregando...</strong>
         <span id="usuario-perfil"></span>
+        <a href="#" class="versao-sistema" id="versao-sistema" data-page="versoes" title="Histórico de versões"></a>
       </div>
       <button class="icon-btn" onclick="logout()" title="Sair" aria-label="Sair">
         <svg class="icon"><use href="#i-out"/></svg>
@@ -902,6 +906,15 @@
             <p class="fin-muted">Enquanto o app estiver em modo de desenvolvimento, só contas adicionadas ao app (função Testador do Instagram) funcionam; para a conta da própria Marsh isso basta.</p>
           </section>
         </div>
+      </section>
+
+      <!-- ========== VERSÕES (lidas de /changelog.js; renderVersoes em script.js) ========== -->
+      <section id="versoes-page" class="page">
+        <div class="page-header">
+          <h2>Histórico de versões</h2>
+        </div>
+        <p class="pagina-descricao">Tudo o que foi adicionado, melhorado ou corrigido em cada atualização do sistema. A mais recente fica no topo.</p>
+        <div id="versoes-lista" class="versoes-lista"></div>
       </section>
 
       <!-- ========== ROTEIRO DE USO (estático; os links "→" abrem a tela citada) ========== -->
@@ -3845,6 +3858,7 @@
   </nav>
 
   <script src="chamado-conector.js"></script>
+  <script src="changelog.js"></script>
   <script src="script.js"></script>
   <script src="financeiro.js"></script>
   <script src="comercial.js"></script>

@@ -110,6 +110,13 @@ function setupEventListeners() {
     });
   });
 
+  // Versão atual no rodapé do menu (vem de /changelog.js); clicar abre o histórico
+  const versaoEl = document.getElementById('versao-sistema');
+  if (versaoEl && window.MARSH_VERSAO) {
+    versaoEl.textContent = `Sistema Marsh ${window.MARSH_VERSAO}`;
+    versaoEl.addEventListener('click', (e) => { e.preventDefault(); showPage('versoes'); });
+  }
+
   // Botões de novo
   document.getElementById('btn-novo-cliente').addEventListener('click', async () => {
     clienteEmEdicao = null;
@@ -361,6 +368,7 @@ function showPage(page) {
     'simulador-conector': 'Simulador Conector SAP',
     relatorios: 'Relatórios',
     roteiro: 'Roteiro de uso',
+    versoes: 'Versões',
     'visao-mensal': 'Visão mensal',
     'contas-financeiras': 'Contas e cartões',
     'categorias-despesa': 'Categorias de despesa',
@@ -398,6 +406,27 @@ function showPage(page) {
   if (page === 'marketing-calendario') loadCalendarioMarketing();
   if (page === 'marketing-metricas') loadMetricasMarketing();
   if (page === 'marketing-conta') loadContaMarketing();
+  if (page === 'versoes') renderVersoes();
+}
+
+// ===== VERSÕES (histórico em /changelog.js) =====
+function renderVersoes() {
+  const lista = document.getElementById('versoes-lista');
+  const versoes = window.MARSH_CHANGELOG || [];
+  if (!versoes.length) { lista.innerHTML = '<p class="fin-muted">Histórico indisponível.</p>'; return; }
+  const dataLonga = iso => {
+    const [a, m, d] = iso.split('-').map(Number);
+    return new Date(Date.UTC(a, m - 1, d)).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  };
+  lista.innerHTML = versoes.map((v, i) => `
+    <article class="rel-card versao-card${i === 0 ? ' atual' : ''}">
+      <header class="versao-cabecalho">
+        <span class="versao-numero">${escapeHtml(v.versao)}</span>
+        ${i === 0 ? '<span class="versao-selo">Versão atual</span>' : ''}
+        <time datetime="${escapeHtml(v.data)}">${escapeHtml(dataLonga(v.data))}</time>
+      </header>
+      <ul>${v.destaques.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
+    </article>`).join('');
 }
 
 // ===== SEÇÕES RECOLHÍVEIS (Visão geral) =====

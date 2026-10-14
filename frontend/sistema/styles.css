@@ -4256,3 +4256,27 @@ tr:hover .vm-mais, .vm-btn:focus-visible .vm-mais { opacity: 1; }
 }
 /* botões desabilitados do marketing (importar sem arquivos válidos, setas da ordem, publicando) */
 #modal-mkt-importar .btn:disabled, #modal-mkt-post .btn:disabled, .mkt-conta-acoes .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+/* ===== Versões (Sistema → Versões; dados em /changelog.js) ===== */
+.versoes-lista { display: grid; gap: 12px; max-width: 860px; margin-bottom: 24px; }
+.versao-card { padding: 0; overflow: hidden; }
+.versao-cabecalho {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle, rgba(127, 127, 127, 0.05));
+}
+.versao-numero {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; font-size: 0.85rem;
+  padding: 2px 10px; border-radius: 8px; background: rgba(127, 127, 127, 0.16); color: var(--text-main);
+}
+.versao-card.atual { border-color: var(--primary); }
+.versao-card.atual .versao-numero { background: var(--primary); color: #fff; }
+.versao-selo { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--primary); }
+.versao-cabecalho time { margin-left: auto; font-size: 0.8rem; color: var(--text-muted); }
+.versao-card ul { margin: 0; padding: 10px 16px 12px 34px; display: grid; gap: 6px; font-size: 0.9rem; line-height: 1.5; color: var(--text-secondary); }
+.versao-card.atual li::marker { color: var(--primary); }
+.sidebar-usuario .who .versao-sistema {
+  display: inline-block; margin-top: 2px; font-size: 11px; color: var(--text-muted); text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.sidebar-usuario .who .versao-sistema:hover { color: var(--primary); text-decoration: underline; }

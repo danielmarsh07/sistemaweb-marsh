@@ -84,12 +84,14 @@ app.use('/api/alertas', autenticar, alertasRoutes);
 app.use('/api/marketing', autenticar, marketingRoutes); // só administradores (o router confere)
 
 // Saúde: para monitor externo (UptimeRobot etc.). 200 = servidor e banco respondendo; 503 = banco fora.
+// "versao" (de frontend/comum/changelog.js) confirma qual atualização está no ar depois do deploy.
+const { VERSAO_ATUAL } = require('./frontend/comum/changelog');
 app.get('/api/saude', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, banco: 'ok', em: new Date().toISOString() });
+    res.json({ ok: true, banco: 'ok', versao: VERSAO_ATUAL, em: new Date().toISOString() });
   } catch (err) {
-    res.status(503).json({ ok: false, banco: 'erro' });
+    res.status(503).json({ ok: false, banco: 'erro', versao: VERSAO_ATUAL });
   }
 });
 

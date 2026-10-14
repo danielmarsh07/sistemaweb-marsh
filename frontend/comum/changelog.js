@@ -1,0 +1,170 @@
+// ─────────────────────────────────────────────────────────────────────
+// Histórico de versões do Sistema Marsh
+// ─────────────────────────────────────────────────────────────────────
+//
+// TODA atualização publicada (commit enviado ao GitHub → deploy no Render) DEVE
+// adicionar uma nova entrada no TOPO deste array, no mesmo commit. A versão que
+// aparece no menu, no login, em /api/saude e na página Sistema → Versões vem
+// daqui: este é o único lugar para mexer. O teste testes/versoes.js confere as regras.
+//
+// Linguagem dos destaques: de usuário. O que MUDOU para quem usa, não como foi feito
+// (evite rota, tabela, endpoint, refactor...).
+//
+// REGRA DE NUMERAÇÃO: o número depois do ponto vai de .0 a .9. NUNCA .10 ou mais:
+// depois de v2.9 vem v3.0. Assim a ordem nunca fica ambígua (v2.10 < v2.2 como texto).
+// Mudança grande (módulo novo, visual novo) pode pular para o próximo número inteiro.
+//
+// REGRA DE DATA: `data` é a data da publicação NO HORÁRIO DE BRASÍLIA. Entre 21h e
+// 23h59 em Brasília o UTC já virou o dia seguinte; confira com
+//   new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+//
+// Este arquivo roda no navegador (window.MARSH_CHANGELOG) e no servidor (require).
+
+(function (raiz) {
+  const CHANGELOG = [
+    {
+      versao: 'v2.7',
+      data: '2026-10-14',
+      destaques: [
+        'Nova página Sistema → Versões com o histórico de todas as atualizações do sistema; o número da versão atual aparece no rodapé do menu e na tela de login.',
+        'A Ivy passou a ser de uso exclusivo do super usuário (o dono do sistema). Administradores, técnicos e clientes não veem mais o botão, e ela saiu do portal do cliente.',
+        'A Ivy responde qualquer pergunta sobre o sistema: mostra a estrutura do banco de dados, faz consultas livres (só leitura, com senhas e tokens ocultos) e explica como cada módulo funciona a partir da documentação.',
+      ],
+    },
+    {
+      versao: 'v2.6',
+      data: '2026-10-14',
+      destaques: [
+        'O assistente de voz agora se chama Ivy: novo visual em tela cheia com o robô da Marsh, que pisca, segue o mouse e mexe a boca enquanto fala.',
+        'Voz feminina e natural (o efeito robótico ficou opcional, num botão no topo da Ivy).',
+        'A Ivy passou a responder sobre o comercial (funil, propostas e preço do Conector), contratos, DRE, projeção de caixa, Instagram, alertas e licenças, com os mesmos números das telas.',
+        'Ela também lista os chamados abertos pelo Conector SAP e os que aguardam aprovação do cliente.',
+      ],
+    },
+    {
+      versao: 'v2.5',
+      data: '2026-10-13',
+      destaques: [
+        'Novo site institucional "SAP + IA" com a mesma identidade visual da tela de login.',
+        'Novo menu Marketing: calendário de posts do Instagram com prévia do feed e do carrossel, agendamento e publicação automática no horário marcado.',
+        'Importação de uma agenda inteira de posts (arquivo de agenda + imagens) e páginas de métricas (seguidores, alcance e interações) e de conexão da conta do Instagram.',
+      ],
+    },
+    {
+      versao: 'v2.4',
+      data: '2026-10-13',
+      destaques: [
+        'Licenças do Conector SAP com ativação por máquina, conexões com os sistemas SAP do cliente e download do instalador; o instalador novo é publicado pelo próprio painel.',
+        'Simulador de preço do Conector SAP no Comercial, com tabela de preços editável e geração da proposta em PDF.',
+        'Chamados abertos direto pelo Conector SAP, com aprovação do gestor do cliente antes de entrar na fila da fábrica.',
+      ],
+    },
+    {
+      versao: 'v2.3',
+      data: '2026-10-12',
+      destaques: [
+        'O assistente de voz passou a lançar e consultar despesas, contas, faturas e saldo do financeiro novo (só administradores).',
+        'Listagens com ordenação por coluna e filtros.',
+        'Visão geral e visão mensal com blocos que recolhem e expandem.',
+        'Usuário novo recebe e-mail de boas-vindas; aparece um alerta quando o envio de e-mails está desligado.',
+      ],
+    },
+    {
+      versao: 'v2.2',
+      data: '2026-10-10',
+      destaques: [
+        'Controle mensal do financeiro: visão mês a mês, cartões de crédito, assinaturas e separação entre gastos pessoais e da empresa.',
+        'Menu Cadastros reorganizado e ficha 360 do cliente (contratos, faturas, chamados e licenças num lugar só).',
+        'Alertas de falha do sistema (Sistema → Alertas) e convite/recuperação de senha por e-mail.',
+        'A NFS-e recusada mostra o motivo; exclusão definitiva de usuários; mais segurança no portal do cliente.',
+        'Itens do menu lateral em ordem alfabética.',
+      ],
+    },
+    {
+      versao: 'v2.1',
+      data: '2026-10-10',
+      destaques: [
+        'Financeiro completo: contas a pagar (com recorrência), fluxo de caixa realizado e previsto e DRE gerencial.',
+        'Novo módulo Comercial: funil de vendas e propostas com link para o cliente aceitar online.',
+        'Relatórios, receita recorrente (MRR) e cobrança por PIX pelo Asaas.',
+        'Página Sistema → Roteiro de uso explicando a jornada do cliente no sistema.',
+      ],
+    },
+    {
+      versao: 'v2.0',
+      data: '2026-10-09',
+      destaques: [
+        'Visual novo "Marsh Sereno": logo novo, menu azul-céu recolhível e nova tela de login.',
+        'Faturamento mensal dos contratos com emissão de NFS-e pelo Asaas.',
+        'Novos módulos de Licenças do Conector SAP e Treinamentos.',
+      ],
+    },
+    {
+      versao: 'v1.6',
+      data: '2026-05-22',
+      destaques: [
+        'Modo HUD em tela cheia no assistente de voz, que passou a se apresentar como JARVIS.',
+        'Chamados abertos e atendimentos registrados por voz também disparam os e-mails de aviso.',
+      ],
+    },
+    {
+      versao: 'v1.5',
+      data: '2026-05-21',
+      destaques: [
+        'Assistente de voz: lança transações, cadastra clientes e fornecedores e abre chamados falando.',
+        'Visual animado do assistente (holograma e nebulosa em tela cheia) que reage à voz.',
+        'Clientes podem abrir chamados de telemedicina por voz no portal.',
+        'Tecnologias contratadas no cadastro do cliente, com formulário de chamado adequado a cada uma.',
+      ],
+    },
+    {
+      versao: 'v1.4',
+      data: '2026-05-14',
+      destaques: [
+        'Categorias de transação, cartões de saldo em caixa e filtro por mês e ano.',
+        'Repetir um lançamento em várias datas de uma vez.',
+      ],
+    },
+    {
+      versao: 'v1.3',
+      data: '2026-05-13',
+      destaques: [
+        'No celular, as tabelas viram cartões e todas as ações ficam acessíveis.',
+        'Novo visual escuro, filtros e totalizador no financeiro, carregamento mais rápido.',
+        'Configurações com 3 temas (escuro, claro e enterprise) salvos por usuário.',
+      ],
+    },
+    {
+      versao: 'v1.2',
+      data: '2026-04-29',
+      destaques: [
+        'Cadastros completos com validação de CPF e CNPJ e registro de quem criou e editou cada item.',
+        'Chamados com SLA, pesquisa de satisfação, reabertura, busca, paginação e aviso de não lido.',
+        'Anexos nos chamados, já na abertura, com pré-visualização de imagens.',
+        'Reforço de segurança no portal do cliente.',
+      ],
+    },
+    {
+      versao: 'v1.1',
+      data: '2026-04-08',
+      destaques: [
+        'Várias empresas no mesmo sistema, portal do cliente e gestão de usuários.',
+        'Avisos por e-mail.',
+        'Site atualizado com CPI, IA e agentes e apps integradas ao SAP.',
+      ],
+    },
+    {
+      versao: 'v1.0',
+      data: '2026-03-27',
+      destaques: [
+        'Primeira versão do Sistema Marsh: painel com clientes, fornecedores, chamados e financeiro, com login.',
+        'Site institucional com acesso ao sistema.',
+        'Instalável como aplicativo no celular e com layout adaptado para telas pequenas.',
+      ],
+    },
+  ];
+
+  const api = { CHANGELOG, VERSAO_ATUAL: CHANGELOG[0].versao };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else { raiz.MARSH_CHANGELOG = CHANGELOG; raiz.MARSH_VERSAO = api.VERSAO_ATUAL; }
+})(typeof window !== 'undefined' ? window : globalThis);
