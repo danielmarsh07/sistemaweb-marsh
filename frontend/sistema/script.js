@@ -482,6 +482,7 @@ function showPage(page, opcoes = {}) {
     dre: 'DRE gerencial',
     funil: 'Funil de vendas',
     'simulador-conector': 'Simulador Conector SAP',
+    'precos-conector': 'Preços Conector SAP',
     relatorios: 'Relatórios',
     roteiro: 'Roteiro de uso',
     versoes: 'Versões',
@@ -514,6 +515,7 @@ function showPage(page, opcoes = {}) {
   if (page === 'dre') loadDre();
   if (page === 'funil') loadFunil();
   if (page === 'simulador-conector') loadSimuladorConector();
+  if (page === 'precos-conector') loadPaginaPrecosConector();
   if (page === 'relatorios') loadRelatorios();
   if (page === 'visao-mensal') loadVisaoMensal();
   if (page === 'contas-financeiras') loadPaginaContasFinanceiras();

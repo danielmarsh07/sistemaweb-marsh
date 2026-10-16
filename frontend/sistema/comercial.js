@@ -654,10 +654,9 @@ async function gerarPropostaConector() {
   }
 }
 
-// Tabela de preços (editável): os campos vêm do backend (rótulos + valores)
-async function abrirPrecosConector() {
-  const c = await resultadoJson(await apiFetch(`${API_URL}/comercial/simulador-conector/config`));
-  if (!c) return;
+// Tabela de preços (editável): os campos vêm do backend (rótulos + valores).
+// Aparece no modal do simulador e na página Cadastros → Preços Conector SAP.
+function montarCamposPrecos(container, c) {
   const grupos = [
     ['Licença por usuário (R$/mês)', ['leitura_mensal', 'leitura_anual', 'dev_mensal', 'dev_anual']],
     ['Plano Empresa (R$/mês)', ['empresa_ate5', 'empresa_ate10', 'empresa_excedente', 'empresa_acrescimo_mensal_pct']],
@@ -665,34 +664,64 @@ async function abrirPrecosConector() {
     ['Fábrica ABAP', ['chamado_p', 'chamado_m', 'chamado_g', 'pacote_horas', 'pacote_valor']],
     ['Padrões do ROI', ['roi_horas_funcional', 'roi_custo_funcional', 'roi_horas_abap', 'roi_custo_abap']]
   ];
-  document.getElementById('precos-conector-campos').innerHTML = grupos.map(([titulo, chaves]) => `
+  // Prefixo do id por container: o modal e a página ficam no DOM ao mesmo tempo
+  const pre = container.id;
+  container.innerHTML = grupos.map(([titulo, chaves]) => `
     <div class="form-section-title">${titulo}</div>
     <div class="precos-grade">${chaves.map(k => `
       <div class="form-group">
-        <label for="preco-${k}">${escapeHtml(c.rotulos[k])}</label>
-        <input type="number" id="preco-${k}" name="${k}" min="0" step="0.01" value="${c.precos[k]}" placeholder="${c.padrao[k]}">
+        <label for="${pre}-${k}">${escapeHtml(c.rotulos[k])}</label>
+        <input type="number" id="${pre}-${k}" name="${k}" min="0" step="0.01" value="${c.precos[k]}" placeholder="${c.padrao[k]}">
         <small class="form-hint">Padrão: ${c.padrao[k]}</small>
       </div>`).join('')}
     </div>`).join('');
+}
+
+async function abrirPrecosConector() {
+  const c = await resultadoJson(await apiFetch(`${API_URL}/comercial/simulador-conector/config`));
+  if (!c) return;
+  montarCamposPrecos(document.getElementById('precos-conector-campos'), c);
   showModal('#modal-precos-conector');
 }
 
-async function salvarPrecosConector() {
-  const form = document.getElementById('form-precos-conector');
+async function loadPaginaPrecosConector() {
+  const c = await resultadoJson(await apiFetch(`${API_URL}/comercial/simulador-conector/config`));
+  if (!c) return;
+  montarCamposPrecos(document.getElementById('precos-conector-pagina-campos'), c);
+}
+
+async function gravarPrecosConector(form) {
   const precos = Object.fromEntries([...form.querySelectorAll('input[name]')].map(i => [i.name, i.value]));
   const r = await resultadoJson(await apiFetch(`${API_URL}/comercial/simulador-conector/config`, {
     method: 'PUT', body: JSON.stringify({ precos })
   }));
-  if (!r) return;
-  _simPrecos = r.precos;
+  if (r) _simPrecos = r.precos;
+  return r;
+}
+
+async function salvarPrecosConector() {
+  if (!await gravarPrecosConector(document.getElementById('form-precos-conector'))) return;
   closeModal(document.getElementById('modal-precos-conector'));
   alternarFabricaSimulador();
   simularConector();
 }
 
+async function salvarPaginaPrecosConector() {
+  const r = await gravarPrecosConector(document.getElementById('form-precos-conector-pagina'));
+  if (!r) return;
+  loadPaginaPrecosConector();
+  alert('Tabela de preços salva.');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const sub = (id, fn) => document.getElementById(id).addEventListener('submit', e => { e.preventDefault(); fn(); });
   sub('form-precos-conector', salvarPrecosConector);
+  sub('form-precos-conector-pagina', salvarPaginaPrecosConector);
+  // Preços são do comercial (só administradores): técnico não vê o atalho em Cadastros
+  if (!usuario || !['admin_empresa', 'admin_sistema'].includes(usuario.tipo)) {
+    const l = document.getElementById('nav-precos-conector');
+    if (l) l.hidden = true;
+  }
   sub('form-oportunidade', salvarOportunidade);
   sub('form-op-nota', adicionarNota);
   sub('form-proposta', salvarProposta);

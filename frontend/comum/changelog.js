@@ -23,6 +23,13 @@
 (function (raiz) {
   const CHANGELOG = [
     {
+      versao: 'v3.2',
+      data: '2026-10-15',
+      destaques: [
+        'Nova página Cadastros → Preços Conector SAP: a tabela de preços do simulador agora também pode ser aberta e editada pelo menu',
+      ],
+    },
+    {
       versao: 'v3.1',
       data: '2026-10-15',
       destaques: [

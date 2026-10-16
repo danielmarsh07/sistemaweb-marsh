@@ -95,6 +95,9 @@
           <a href="#" data-page="tecnologias" class="nav-link">
             <svg class="icon"><use href="#i-cpu"/></svg> Tecnologias
           </a>
+          <a href="#" data-page="precos-conector" class="nav-link" id="nav-precos-conector">
+            <svg class="icon"><use href="#i-sliders"/></svg> Preços Conector SAP
+          </a>
           </div>
         </div>
       </div>
@@ -1190,6 +1193,23 @@
         </div>
         <p class="pagina-descricao">Arraste os cartões entre as colunas (no computador) ou abra o cartão para mudar a etapa.</p>
         <div class="funil-board" id="funil-board"></div>
+      </section>
+
+      <!-- ========== CADASTROS: tabela de preços do Conector SAP (comercial.js; a mesma do simulador) ========== -->
+      <section id="precos-conector-page" class="page">
+        <div class="page-header">
+          <h2>Tabela de preços — Conector SAP</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="showPage('simulador-conector')">Abrir simulador</button>
+          </div>
+        </div>
+        <p class="pagina-descricao">Valores em R$ (por mês nas licenças e serviços mensais). É a mesma tabela usada pelo simulador: vale para as próximas simulações; propostas já criadas não mudam. Campo vazio volta ao padrão.</p>
+        <form id="form-precos-conector-pagina" class="form rel-card">
+          <div id="precos-conector-pagina-campos"></div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </form>
       </section>
 
       <!-- ========== SIMULADOR DE PREÇO — CONECTOR SAP (comercial.js) ========== -->
