@@ -1207,6 +1207,71 @@ async function iniciar() {
       console.log('Migração fase2_admins_e_estado_vagas: gestores viraram administradores; vagas ocupadas = ativa');
     }
 
+    // 33. Fluxo novo — fase 3: benefícios, matrículas e direitos de acesso
+    //     beneficios: cursos gratuitos incluídos em cada perfil de licença (produto 'conector'); editável em
+    //     Cadastros → Benefícios do Conector. O acesso por benefício é conferido ao vivo (licença ativa + contrato vigente).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS beneficios (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        produto VARCHAR(20) NOT NULL DEFAULT 'conector',
+        perfil VARCHAR(20) NOT NULL,
+        curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+        ativo BOOLEAN NOT NULL DEFAULT TRUE,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (produto, perfil, curso_id)
+      );
+    `);
+    //     matriculas: histórico acadêmico (quando a pessoa passou a ter o curso, quando concluiu). Nunca é apagada
+    //     quando o acesso acaba — o progresso continua em cursos_progresso.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS matriculas (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        concluido_em TIMESTAMPTZ,
+        UNIQUE (usuario_id, curso_id)
+      );
+    `);
+    //     direitos_acesso: por que a pessoa tem (ou teve) cada curso. origem: compra | beneficio | liberacao | manual;
+    //     origem_id: pedido, vaga ou cliente (0 = sem referência). status: ativo | revogado | expirado.
+    //     Compra/manual valem por este registro; benefício e liberação são conferidos ao vivo e aqui ficam rastreados.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS direitos_acesso (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+        origem VARCHAR(12) NOT NULL CHECK (origem IN ('compra', 'beneficio', 'liberacao', 'manual')),
+        origem_id INTEGER NOT NULL DEFAULT 0,
+        origem_descricao VARCHAR(255),
+        inicio TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        fim DATE,
+        status VARCHAR(10) NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo', 'revogado', 'expirado')),
+        revogado_em TIMESTAMPTZ,
+        motivo VARCHAR(255),
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (usuario_id, curso_id, origem, origem_id)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_direitos_usuario ON direitos_acesso(usuario_id, status);`);
+    //     Uma vez: benefícios criados com a regra das trilhas (ABAP → IA no ABAP + Portal + Conector; Funcional → IA para
+    //     Funcionais + Portal + Conector; Ambos → os 4) para os cursos que já existem
+    const migBenef = await pool.query(
+      `INSERT INTO migracoes_app (nome) VALUES ('fase3_beneficios_iniciais') ON CONFLICT DO NOTHING RETURNING nome;`);
+    if (migBenef.rowCount) {
+      const { PERFIS } = require('./backend/services/contratos-conector');
+      for (const [perfil, d] of Object.entries(PERFIS)) {
+        await pool.query(
+          `INSERT INTO beneficios (empresa_id, produto, perfil, curso_id)
+           SELECT c.empresa_id, 'conector', $1, c.id FROM cursos c WHERE c.trilha = ANY($2) ON CONFLICT DO NOTHING`,
+          [perfil, d.trilhas]);
+      }
+      console.log('Migração fase3_beneficios_iniciais: benefícios do Conector criados a partir das trilhas');
+    }
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

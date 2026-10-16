@@ -4,6 +4,7 @@ require('./_ambiente-local');
 // SIDs do contrato até o limite; liberar vaga e suspender contrato cortam o acesso.
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
+const { incluirNoBeneficioPelaTrilha } = require('../backend/services/acessos');
 const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
 const { ativarConvites } = require('../backend/services/contratos-conector'); // simula a pessoa aceitando o convite
 const BASE = 'http://localhost:3000/api';
@@ -27,6 +28,7 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     cursos[t] = (await pool.query(
       `INSERT INTO cursos (empresa_id, titulo, status, trilha, ordem) VALUES (1, $1, 'publicado', $2, 999) RETURNING id`,
       [`TESTE vagas ${t} ${sufixo}`, t])).rows[0].id;
+    await incluirNoBeneficioPelaTrilha(cursos[t], t); // como a tela faz ao criar curso com trilha
     aulas[t] = [];
     for (let i = 0; i < 2; i++) {
       aulas[t].push((await pool.query(

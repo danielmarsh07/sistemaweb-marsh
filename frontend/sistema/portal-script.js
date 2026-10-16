@@ -168,7 +168,9 @@ function renderMinhasVagas() {
       return `
         <div class="licenca-card minha-vaga">
           ${titulo}
-          <p class="ajuda" style="margin-top:0">Conclua todas as aulas destes cursos para receber o certificado, a sua licença e o instalador do Conector.</p>
+          <p class="ajuda" style="margin-top:0">${p.trilhas.length
+            ? 'Conclua todas as aulas destes cursos para receber o certificado, a sua licença e o instalador do Conector.'
+            : 'Os cursos deste perfil estão sendo preparados. Assim que forem publicados, eles aparecem aqui e em Treinamentos.'}</p>
           <ul class="trilhas">${p.trilhas.map(t => {
             const tot = t.cursos.reduce((s, c) => s + c.total, 0);
             const fei = t.cursos.reduce((s, c) => s + Math.min(c.feitas, c.total), 0);
@@ -1114,6 +1116,16 @@ const ICONE_CURSO = {
 };
 const svgCurso = capa => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_CURSO[capa] || ICONE_CURSO.geral}</svg>`;
 
+// Por que a pessoa tem o curso: licença do Conector (gratuito enquanto a licença valer), compra própria ou empresa
+function origensCurso(c) {
+  const br = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
+  const chips = [];
+  if (c.via_compra) chips.push(['#1d6fd8', c.compra_sem_fim || !c.compra_fim ? 'Seu' : `Seu até ${br(c.compra_fim)}`]);
+  if (c.via_beneficio) chips.push(['#10b981', 'Incluso na licença do Conector']);
+  if (c.via_liberacao) chips.push(['#64748b', 'Liberado pela empresa']);
+  return chips.map(([cor, txt]) => `<span class="chip" style="background:${cor}1a; color:${cor}">${escapeHtml(txt)}</span>`).join(' ');
+}
+
 async function carregarTreinamentos() {
   const res = await apiFetch(`${API}/treinamentos/meus`);
   if (!res || !res.ok) return;
@@ -1129,6 +1141,7 @@ async function carregarTreinamentos() {
         <div class="curso-capa capa-${capa}">${svgCurso(capa)}</div>
         <div class="curso-corpo">
           <h4>${escapeHtml(c.titulo)}</h4>
+          <div class="curso-origens">${origensCurso(c)}</div>
           <p>${escapeHtml(c.descricao || '')}</p>
           <div class="curso-meta"><span>${c.total_aulas} aulas${c.carga_horaria ? ' · ' + escapeHtml(c.carga_horaria) : ''}</span><span>${pct}%</span></div>
           <div class="barra-curso"><i style="width:${pct}%"></i></div>

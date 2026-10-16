@@ -20,6 +20,7 @@ const pool = require('../db');
 const jwt = require('jsonwebtoken');
 const cc = require('../services/contratos-conector');
 const cert = require('../services/certificacao');
+const acessos = require('../services/acessos');
 const storage = require('../services/storage');
 const { validarConexoes } = require('../services/licenca');
 
@@ -35,13 +36,17 @@ function responderErro(res, err, msg) {
 }
 
 // Depois de ocupar: se a pessoa já tinha concluído o perfil, a licença dela volta a valer
+// e os cursos do benefício entram no rastro de acessos (o acesso em si é conferido ao vivo)
 async function depoisDeOcupar(r) {
   await cert.avaliarUsuario(r.usuario.id).catch(err => console.error('[certificacao] ocupar:', err.message));
+  await acessos.sincronizarUsuario(r.usuario.id).catch(err => console.error('[acessos] ocupar:', err.message));
 }
 
+// Liberar = a licença e os cursos gratuitos dela acabam; compras próprias e progresso ficam
 async function liberarComLicenca(k, vagaId, atorId) {
   const usuarioId = await cc.liberarVaga(k, vagaId, atorId);
   await cert.cancelarLicencaVaga(Number(vagaId), usuarioId);
+  await acessos.sincronizarUsuario(usuarioId, { atorId }).catch(err => console.error('[acessos] liberar:', err.message));
 }
 
 function mensagemOcupacao(r) {
@@ -434,6 +439,8 @@ router.put('/:id', async (req, res) => {
       [b.status || k.status, inicio, fim, maxSids,
        b.observacoes !== undefined ? (String(b.observacoes).trim() || null) : k.observacoes, k.id]);
     await cert.sincronizarContrato(k.id);
+    // Suspender, cancelar, vencer ou renovar o contrato muda os cursos gratuitos de todas as vagas
+    await acessos.sincronizarTodos({ contratoId: k.id }).catch(err => console.error('[acessos] contrato:', err.message));
     res.json({ mensagem: 'Contrato atualizado.' });
   } catch (err) { responderErro(res, err, 'Erro ao atualizar contrato'); }
 });

@@ -1,10 +1,10 @@
 /**
  * certificacao.js — certificado da vaga e licença individual do Conector.
  *
- * Quem ocupa uma vaga e conclui TODAS as aulas dos cursos publicados das trilhas do perfil ganha:
+ * Quem ocupa uma vaga e conclui TODAS as aulas dos cursos publicados incluídos no perfil (cadastro de benefícios) ganha:
  *   1. um certificado gravado (código verificável em /certificado.html?c=CODIGO);
  *   2. uma licença só dele: chave própria, 1 máquina, plano do perfil, SIDs e validade do contrato.
- * Cada trilha do perfil precisa ter ao menos um curso publicado com aula (senão não há o que concluir).
+ * O perfil precisa ter ao menos um curso publicado com aula (senão não há o que concluir).
  * A licença acompanha o contrato: SIDs, fim e status são copiados de novo a cada mudança (sincronizarContrato).
  * Liberar a vaga cancela a licença; se a mesma pessoa voltar, a licença dela volta a valer (mesma chave).
  */
@@ -20,24 +20,29 @@ const hojeBrasilia = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'A
 
 const STATUS_LICENCA = { ativo: 'ativa', suspenso: 'suspensa', cancelado: 'cancelada' };
 
-/** Cursos do perfil com o progresso do usuário, agrupados por trilha. completo = pode certificar. */
+/**
+ * Cursos do perfil (cadastro de benefícios) com o progresso do usuário, agrupados por trilha para exibir.
+ * completo = pode certificar: há ao menos um curso com aula e todas as aulas de todos foram concluídas.
+ */
 async function progressoPerfil(db, perfil, usuarioId) {
-  const trilhas = PERFIS[perfil] ? PERFIS[perfil].trilhas : [];
+  const ordem = PERFIS[perfil] ? PERFIS[perfil].trilhas : [];
   const r = await db.query(
     `SELECT c.id, c.titulo, c.trilha, c.carga_horaria,
             (SELECT COUNT(*)::int FROM cursos_aulas a WHERE a.curso_id = c.id AND a.ativo) AS total,
             (SELECT COUNT(*)::int FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
               WHERE a.curso_id = c.id AND a.ativo AND p.usuario_id = $2) AS feitas
-     FROM cursos c
-     WHERE c.ativo AND c.status = 'publicado' AND c.trilha = ANY($1)
-     ORDER BY array_position($1::text[], c.trilha::text), c.ordem, c.titulo`, [trilhas, usuarioId]);
-  const porTrilha = trilhas.map(t => {
-    const cursos = r.rows.filter(c => c.trilha === t && c.total > 0);
-    return { trilha: t, nome: TRILHAS[t], cursos, concluida: cursos.length > 0 && cursos.every(c => c.feitas >= c.total) };
+     FROM beneficios b JOIN cursos c ON c.id = b.curso_id
+     WHERE b.produto = 'conector' AND b.perfil = $1 AND b.ativo AND c.ativo AND c.status = 'publicado'
+     ORDER BY COALESCE(array_position($3::text[], c.trilha::text), 99), c.ordem, c.titulo`, [perfil, usuarioId, ordem]);
+  const comAula = r.rows.filter(c => c.total > 0);
+  const chaves = [...new Set(comAula.map(c => c.trilha || 'outros'))];
+  const porTrilha = chaves.map(t => {
+    const cursos = comAula.filter(c => (c.trilha || 'outros') === t);
+    return { trilha: t, nome: TRILHAS[t] || 'Outros cursos', cursos, concluida: cursos.every(c => c.feitas >= c.total) };
   });
-  const total = r.rows.reduce((s, c) => s + c.total, 0);
-  const feitas = r.rows.reduce((s, c) => s + Math.min(c.feitas, c.total), 0);
-  return { trilhas: porTrilha, total, feitas, completo: porTrilha.length > 0 && porTrilha.every(t => t.concluida) };
+  const total = comAula.reduce((s, c) => s + c.total, 0);
+  const feitas = comAula.reduce((s, c) => s + Math.min(c.feitas, c.total), 0);
+  return { trilhas: porTrilha, total, feitas, completo: comAula.length > 0 && porTrilha.every(t => t.concluida) };
 }
 
 /** Linhas de licença a partir do contrato (SIDs, conexões, fim, status). */

@@ -98,6 +98,9 @@
           <a href="#" data-page="precos-conector" class="nav-link" id="nav-precos-conector">
             <svg class="icon"><use href="#i-sliders"/></svg> Preços Conector SAP
           </a>
+          <a href="#" data-page="beneficios-conector" class="nav-link">
+            <svg class="icon"><use href="#i-doc"/></svg> Benefícios do Conector
+          </a>
           </div>
         </div>
       </div>
@@ -588,9 +591,9 @@
           <button id="btn-novo-curso" class="btn btn-primary">+ Novo curso</button>
         </div>
         <p class="pagina-descricao">
-          Cursos em vídeo para o portal do cliente. Só aparecem para o cliente quando estão
-          <strong>publicados</strong> e <strong>liberados</strong> para a empresa dele.
-          Vídeos: YouTube (não listado), Vimeo, Panda Video ou Bunny Stream.
+          Cursos em vídeo para o portal do cliente. Só aparecem quando estão <strong>publicados</strong> e a pessoa tem uma origem de acesso:
+          curso <strong>liberado para a empresa</strong>, <strong>incluso na licença do Conector</strong> (Cadastros → Benefícios do Conector),
+          compra ou liberação individual. Vídeos: YouTube (não listado), Vimeo, Panda Video ou Bunny Stream.
         </p>
         <div class="table-container">
           <table>
@@ -1233,6 +1236,24 @@
       </section>
 
       <!-- ========== CADASTROS: tabela de preços do Conector SAP (comercial.js; a mesma do simulador) ========== -->
+      <section id="beneficios-conector-page" class="page">
+        <div class="page-header">
+          <h2>Benefícios do Conector</h2>
+        </div>
+        <p class="pagina-descricao">Cursos gratuitos incluídos em cada licença do Conector. Quem tem a licença ativa (convite aceito e contrato vigente)
+          acessa os cursos marcados do seu perfil; perdeu a licença, perde esses cursos na hora — o progresso e o certificado ficam,
+          e cursos comprados à parte continuam. Para o certificado e a licença individual, a pessoa conclui todos os cursos marcados do perfil.</p>
+        <form id="form-beneficios" class="form rel-card">
+          <div class="table-container"><table>
+            <thead id="beneficios-cabecalho"></thead>
+            <tbody id="beneficios-corpo"><tr><td class="text-center">Carregando…</td></tr></tbody>
+          </table></div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Salvar benefícios</button>
+          </div>
+        </form>
+      </section>
+
       <section id="precos-conector-page" class="page">
         <div class="page-header">
           <h2>Tabela de preços — Conector SAP</h2>

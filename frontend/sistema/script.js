@@ -483,6 +483,7 @@ function showPage(page, opcoes = {}) {
     funil: 'Funil de vendas',
     'simulador-conector': 'Simulador Conector SAP',
     'precos-conector': 'Preços Conector SAP',
+    'beneficios-conector': 'Benefícios do Conector',
     'contratos-conector': 'Contratos do Conector',
     relatorios: 'Relatórios',
     roteiro: 'Roteiro de uso',
@@ -517,6 +518,7 @@ function showPage(page, opcoes = {}) {
   if (page === 'funil') loadFunil();
   if (page === 'simulador-conector') loadSimuladorConector();
   if (page === 'precos-conector') loadPaginaPrecosConector();
+  if (page === 'beneficios-conector') loadBeneficiosConector();
   if (page === 'contratos-conector') loadContratosConector();
   if (page === 'relatorios') loadRelatorios();
   if (page === 'visao-mensal') loadVisaoMensal();
@@ -1872,18 +1874,65 @@ async function verProgressoCurso(id) {
   if (!res) return;
   const lista = await res.json();
   if (!res.ok) { corpo.textContent = lista.erro; return; }
-  if (!lista.length) { corpo.innerHTML = '<p class="text-center">Nenhum aluno ainda (libere o curso para um cliente com usuários do portal).</p>'; return; }
-  corpo.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>Aluno</th><th>Cliente</th><th>Progresso</th></tr></thead>
+  const progresso = !lista.length
+    ? '<p class="text-center">Nenhum aluno ainda (libere o curso para um cliente, inclua no benefício do Conector ou libere para uma pessoa).</p>'
+    : `<div class="table-container"><table>
+    <thead><tr><th>Aluno</th><th>Cliente</th><th>Progresso</th><th>Acesso</th></tr></thead>
     <tbody>${lista.map(p => {
       const pct = p.total ? Math.round(100 * p.concluidas / p.total) : 0;
       return `<tr>
         <td data-label="Aluno"><strong>${escapeHtml(p.nome)}</strong></td>
-        <td data-label="Cliente">${escapeHtml(p.cliente)}</td>
+        <td data-label="Cliente">${escapeHtml(p.cliente || '—')}</td>
         <td data-label="Progresso"><div class="barra-progresso"><i style="width:${pct}%"></i></div>
-          <span class="licenca-prefixo">${p.concluidas} de ${p.total} aulas (${pct}%)</span></td>
+          <span class="licenca-prefixo">${p.concluidas} de ${p.total} aulas (${pct}%)${p.concluido_em ? ' · concluído' : ''}</span></td>
+        <td data-label="Acesso">${p.acesso_atual ? 'Sim' : '<span class="fin-muted">Não (histórico guardado)</span>'}</td>
       </tr>`; }).join('')}
     </tbody></table></div>`;
+  corpo.innerHTML = `${progresso}
+    <div class="form-section-title">Origem dos acessos</div>
+    <div id="acessos-curso">Carregando…</div>
+    <div class="form-actions" style="justify-content:flex-start">
+      <button type="button" class="btn btn-secondary" onclick="liberarCursoParaPessoa(${id})">+ Liberar para uma pessoa</button>
+    </div>`;
+  carregarAcessosCurso(id);
+}
+
+const ORIGEM_ACESSO = { beneficio: 'Licença do Conector', compra: 'Compra', liberacao: 'Empresa', manual: 'Liberação individual' };
+async function carregarAcessosCurso(id) {
+  const box = document.getElementById('acessos-curso');
+  const res = await apiFetch(`${API_URL}/treinamentos/cursos/${id}/acessos`);
+  if (!res || !res.ok) { box.textContent = 'Não foi possível carregar.'; return; }
+  const itens = await res.json();
+  if (!itens.length) { box.innerHTML = '<p class="fin-muted">Nenhum acesso registrado ainda.</p>'; return; }
+  box.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Pessoa</th><th>Origem</th><th>Situação</th><th></th></tr></thead>
+    <tbody>${itens.map(d => `<tr>
+      <td data-label="Pessoa"><strong>${escapeHtml(d.nome)}</strong><span class="licenca-prefixo">${escapeHtml(d.email)}${d.cliente ? ' · ' + escapeHtml(d.cliente) : ''}</span></td>
+      <td data-label="Origem">${escapeHtml(ORIGEM_ACESSO[d.origem] || d.origem)}${d.origem_descricao ? `<span class="licenca-prefixo">${escapeHtml(d.origem_descricao)}</span>` : ''}</td>
+      <td data-label="Situação">${d.status === 'ativo' ? `Ativo${d.fim ? ` até ${diaBr(d.fim)}` : ''}` : `<span class="fin-muted">${d.status === 'expirado' ? 'Expirado' : 'Revogado'}${d.motivo ? ': ' + escapeHtml(d.motivo) : ''}</span>`}</td>
+      <td data-label="Ações" class="td-acoes">${d.status === 'ativo' && ['manual', 'compra'].includes(d.origem)
+        ? `<button class="btn btn-secondary btn-sm" onclick="revogarAcessoCurso(${d.id}, ${id})">Revogar</button>` : ''}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+async function liberarCursoParaPessoa(id) {
+  const email = prompt('E-mail da pessoa (usuário do portal):');
+  if (!email) return;
+  const fim = prompt('Válido até (AAAA-MM-DD). Vazio = sem prazo:', '') || '';
+  const res = await apiFetch(`${API_URL}/treinamentos/cursos/${id}/acessos`, { method: 'POST', body: JSON.stringify({ email: email.trim(), fim: fim.trim() || null }) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) verProgressoCurso(id);
+}
+
+async function revogarAcessoCurso(direitoId, cursoId) {
+  if (!confirm('Revogar este acesso? A pessoa deixa de abrir o curso; o progresso fica guardado.')) return;
+  const res = await apiFetch(`${API_URL}/treinamentos/acessos/${direitoId}`, { method: 'DELETE' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  verProgressoCurso(cursoId);
 }
 
 // ===== CHAMADOS =====

@@ -147,12 +147,19 @@ async function expirarConvitesConector() {
   }
 }
 
+// Rastro de acessos aos cursos: registra expirações por data (contrato vencido, liberação vencida)
+async function sincronizarAcessos() {
+  try { await require('./acessos').sincronizarTodos(); }
+  catch (err) { registrarAlerta({ chave: 'job:acessos', titulo: 'Rotina: falha ao sincronizar os acessos aos cursos', detalhe: err.message }); }
+}
+
 async function ciclo() {
   if (rodando) return;
   rodando = true;
   try {
     await gerarRascunhosAutomaticos();
     await expirarConvitesConector();
+    await sincronizarAcessos();
     await sincronizarNotasPendentes();
     await sincronizarPixPendentes(); // antes dos lembretes: quem já pagou não recebe cobrança
     await enviarLembretes();

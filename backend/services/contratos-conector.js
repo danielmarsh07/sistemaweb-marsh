@@ -20,25 +20,38 @@ const PERFIS = {
 const TRILHAS = { abap: 'IA no ABAP', funcional: 'IA para Funcionais', portal: 'Portal Marsh', conector: 'Conector SAP' };
 const MAX_VAGAS = 200;
 
-// Condição SQL: a vaga (alias v) dá acesso ao curso (alias c) — perfil cobre a trilha do curso
-const PERFIL_COBRE_TRILHA = '(' + Object.entries(PERFIS).map(([p, d]) =>
-  `(v.perfil = '${p}' AND c.trilha IN (${d.trilhas.map(t => `'${t}'`).join(', ')}))`).join(' OR ') + ')';
+// Condição SQL: o perfil da vaga (alias v) inclui o curso (alias c) — cadastro de benefícios (Cadastros → Benefícios
+// do Conector), editável; foi criado com a regra das trilhas (ABAP → IA no ABAP + Portal + Conector etc.)
+const PERFIL_COBRE_CURSO = `EXISTS (SELECT 1 FROM beneficios b WHERE b.produto = 'conector' AND b.perfil = v.perfil AND b.curso_id = c.id AND b.ativo)`;
 
 // Vaga ativa (convite aceito) de contrato vigente
 const VAGA_VIGENTE = `v.ativo AND v.estado = 'ativa' AND k.status = 'ativo' AND k.data_inicio <= CURRENT_DATE AND k.data_fim >= CURRENT_DATE`;
 
 /**
- * Condição SQL de curso liberado para um usuário do portal (alias c = cursos).
- * pCliente / pUsuario = placeholders ($1, $2...). Vale a liberação por empresa (como sempre, menos para aluno)
- * ou uma vaga vigente do usuário cujo perfil cobre a trilha do curso.
+ * Origens de acesso a um curso (alias c), conferidas AO VIVO a cada pedido — a revogação vale na hora:
+ *   liberacao  — curso liberado para a empresa do usuário (usuário de vaga, papel "aluno", não herda)
+ *   beneficio  — licença do Conector ativa, de contrato vigente, cujo perfil inclui o curso (gratuito enquanto durar)
+ *   compra     — direito próprio (compra individual ou concessão manual), com validade; não depende de licença
+ * pCliente / pUsuario = placeholders ($1, $2...).
  */
+function sqlViaLiberacao(pCliente, pUsuario) {
+  return `(EXISTS (SELECT 1 FROM cursos_liberacoes lb
+             WHERE lb.curso_id = c.id AND lb.cliente_id = ${pCliente} AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE))
+           AND COALESCE((SELECT portal_papel FROM usuarios WHERE id = ${pUsuario}), '') <> 'aluno')`;
+}
+function sqlViaBeneficio(pUsuario) {
+  return `EXISTS (SELECT 1 FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
+                  WHERE v.usuario_id = ${pUsuario} AND ${VAGA_VIGENTE} AND ${PERFIL_COBRE_CURSO})`;
+}
+function sqlViaCompra(pUsuario) {
+  return `EXISTS (SELECT 1 FROM direitos_acesso d WHERE d.usuario_id = ${pUsuario} AND d.curso_id = c.id
+                  AND d.origem IN ('compra', 'manual') AND d.status = 'ativo' AND (d.fim IS NULL OR d.fim >= CURRENT_DATE))`;
+}
+
+/** Condição SQL de curso liberado: publicado, ativo e com ao menos uma origem válida agora. */
 function sqlCursoLiberado(pCliente, pUsuario) {
   return `c.ativo = TRUE AND c.status = 'publicado' AND (
-    (EXISTS (SELECT 1 FROM cursos_liberacoes lb
-             WHERE lb.curso_id = c.id AND lb.cliente_id = ${pCliente} AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE))
-     AND COALESCE((SELECT portal_papel FROM usuarios WHERE id = ${pUsuario}), '') <> 'aluno')
-    OR EXISTS (SELECT 1 FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
-               WHERE v.usuario_id = ${pUsuario} AND ${VAGA_VIGENTE} AND ${PERFIL_COBRE_TRILHA}))`;
+    ${sqlViaLiberacao(pCliente, pUsuario)} OR ${sqlViaBeneficio(pUsuario)} OR ${sqlViaCompra(pUsuario)})`;
 }
 
 async function papelPortal(usuarioId) {
@@ -84,6 +97,16 @@ async function enviarConvite(usuario) {
   try { return (await senhas.enviarLink(usuario, 'convite')).enviado; } catch { return false; }
 }
 
+/** Títulos dos cursos publicados incluídos em cada perfil (cadastro de benefícios): { abap: [...], ... } */
+async function cursosDoBeneficio(db = pool) {
+  const r = await db.query(
+    `SELECT b.perfil, c.titulo FROM beneficios b JOIN cursos c ON c.id = b.curso_id
+     WHERE b.produto = 'conector' AND b.ativo AND c.ativo AND c.status = 'publicado' ORDER BY c.ordem, c.titulo`);
+  const porPerfil = {};
+  for (const x of r.rows) (porPerfil[x.perfil] = porPerfil[x.perfil] || []).push(x.titulo);
+  return porPerfil;
+}
+
 /** Contrato com vagas, ocupantes e progresso de cada um nos cursos do perfil. */
 async function detalharContrato(id) {
   const k = (await pool.query(
@@ -99,9 +122,9 @@ async function detalharContrato(id) {
   const vagas = (await pool.query(
     `SELECT v.id, v.perfil, v.usuario_id, v.data_atribuicao, v.estado, v.convidado_em, u.nome AS usuario_nome, u.email AS usuario_email,
             (SELECT COUNT(*)::int FROM cursos_aulas a JOIN cursos c ON c.id = a.curso_id
-              WHERE a.ativo AND c.ativo AND c.status = 'publicado' AND ${PERFIL_COBRE_TRILHA}) AS aulas_total,
+              WHERE a.ativo AND c.ativo AND c.status = 'publicado' AND ${PERFIL_COBRE_CURSO}) AS aulas_total,
             (SELECT COUNT(*)::int FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id JOIN cursos c ON c.id = a.curso_id
-              WHERE p.usuario_id = v.usuario_id AND a.ativo AND c.ativo AND c.status = 'publicado' AND ${PERFIL_COBRE_TRILHA}) AS aulas_concluidas
+              WHERE p.usuario_id = v.usuario_id AND a.ativo AND c.ativo AND c.status = 'publicado' AND ${PERFIL_COBRE_CURSO}) AS aulas_concluidas
      FROM contratos_conector_vagas v
      LEFT JOIN usuarios u ON u.id = v.usuario_id
      WHERE v.contrato_id = $1 AND v.ativo
@@ -115,12 +138,13 @@ async function detalharContrato(id) {
      LEFT JOIN certificados ce ON ce.vaga_id = v.id AND ce.usuario_id = v.usuario_id
      LEFT JOIN licencas l ON l.vaga_id = v.id AND l.usuario_id = v.usuario_id
      WHERE v.contrato_id = $1 AND v.ativo AND v.usuario_id IS NOT NULL`, [id])).rows;
+  const cursosPorPerfil = await cursosDoBeneficio();
   for (const v of vagas) {
     const x = extras.find(e => e.vaga_id === v.id) || {};
     v.certificado = x.codigo ? { codigo: x.codigo, emitido_em: x.emitido_em } : null;
     v.licenca = x.chave_prefixo ? { chave_prefixo: x.chave_prefixo, status: x.licenca_status, maquina_nome: x.maquina_nome || null } : null;
     v.perfil_nome = PERFIS[v.perfil] ? PERFIS[v.perfil].nome : v.perfil;
-    v.cursos = (PERFIS[v.perfil] ? PERFIS[v.perfil].trilhas : []).map(t => TRILHAS[t]);
+    v.cursos = cursosPorPerfil[v.perfil] || [];
     v.eh_gestor = v.usuario_id === k.gestor_usuario_id;
   }
   return { ...k, vagas };
@@ -401,8 +425,8 @@ async function criarCobrancaAnual(db, k, { valor, dia_vencimento, usuarioId }) {
 }
 
 module.exports = {
-  PERFIS, TRILHAS, PERFIL_COBRE_TRILHA, VAGA_VIGENTE, ErroRegra,
-  sqlCursoLiberado, papelPortal, acharOuCriarUsuario, enviarConvite, detalharContrato,
+  PERFIS, TRILHAS, PERFIL_COBRE_CURSO, VAGA_VIGENTE, ErroRegra, sqlViaLiberacao, sqlViaBeneficio, sqlViaCompra,
+  sqlCursoLiberado, papelPortal, acharOuCriarUsuario, enviarConvite, detalharContrato, cursosDoBeneficio,
   lerQuantidades, criarVagas, ocuparVaga, liberarVaga, ativarConvites, expirarConvites,
   ehAdminCorporativo, listarAdmins, adicionarAdmin, removerAdmin, historicoContrato,
   precoAnualSugerido, criarCobrancaAnual

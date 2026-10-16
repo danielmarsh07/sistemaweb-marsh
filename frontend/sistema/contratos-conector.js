@@ -299,9 +299,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const r = await acaoContrato('/vagas', 'POST', { abap: f.abap.value, funcional: f.funcional.value, ambos: f.ambos.value });
     if (r) { alert(r.mensagem); recarregarContrato(); }
   });
-  // Contratos do Conector são dos administradores: técnico não vê o item
+  sub('form-beneficios', salvarBeneficiosConector);
+  // Contratos e benefícios do Conector são dos administradores: técnico não vê os itens
   if (!usuario || !['admin_empresa', 'admin_sistema'].includes(usuario.tipo)) {
-    const l = document.querySelector('.nav-link[data-page="contratos-conector"]');
-    if (l) l.hidden = true;
+    for (const p of ['contratos-conector', 'beneficios-conector']) {
+      const l = document.querySelector(`.nav-link[data-page="${p}"]`);
+      if (l) l.hidden = true;
+    }
   }
 });
+
+// ===== Benefícios do Conector: cursos x perfis (Cadastros) =====
+let _beneficios = null;
+async function loadBeneficiosConector() {
+  const corpo = document.getElementById('beneficios-corpo');
+  const res = await apiFetch(`${API_URL}/treinamentos/beneficios`);
+  if (!res) return;
+  const d = await res.json();
+  if (!res.ok) { corpo.innerHTML = `<tr><td class="text-center">${escapeHtml(d.erro)}</td></tr>`; return; }
+  _beneficios = d;
+  const marcado = new Set(d.marcados.map(m => `${m.perfil}|${m.curso_id}`));
+  document.getElementById('beneficios-cabecalho').innerHTML =
+    `<tr><th>Curso</th>${d.perfis.map(p => `<th style="text-align:center">${escapeHtml(p.nome)}</th>`).join('')}</tr>`;
+  corpo.innerHTML = d.cursos.length ? d.cursos.map(c => `
+    <tr>
+      <td data-label="Curso"><strong>${escapeHtml(c.titulo)}</strong>${c.status !== 'publicado' ? ' <span class="fin-muted">(rascunho: ainda não aparece)</span>' : ''}</td>
+      ${d.perfis.map(p => `<td data-label="${escapeHtml(p.nome)}" style="text-align:center">
+        <input type="checkbox" aria-label="${escapeHtml(c.titulo)} no perfil ${escapeHtml(p.nome)}" data-perfil="${p.id}" data-curso="${c.id}"
+          ${marcado.has(`${p.id}|${c.id}`) ? 'checked' : ''}></td>`).join('')}
+    </tr>`).join('') : `<tr><td colspan="${d.perfis.length + 1}" class="text-center">Nenhum curso cadastrado.</td></tr>`;
+}
+
+async function salvarBeneficiosConector() {
+  const itens = [...document.querySelectorAll('#beneficios-corpo input[type="checkbox"]:checked')]
+    .map(i => ({ perfil: i.dataset.perfil, curso_id: Number(i.dataset.curso) }));
+  const res = await apiFetch(`${API_URL}/treinamentos/beneficios`, { method: 'PUT', body: JSON.stringify({ itens }) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) loadBeneficiosConector();
+}

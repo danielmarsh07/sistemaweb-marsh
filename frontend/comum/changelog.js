@@ -22,6 +22,15 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v3.8', data: '2026-10-16', destaques: [
+      'Nova página Cadastros → Benefícios do Conector: escolha quais cursos gratuitos vêm com cada licença (ABAP, Funcional, ABAP + Funcional); já vem com a regra atual',
+      'Curso gratuito vale só enquanto a licença estiver ativa: revogada, suspensa ou com o contrato vencido, o curso sai na hora; renovou, volta — com o progresso de onde parou',
+      'O sistema registra por que cada pessoa tem cada curso (licença do Conector, compra, empresa ou liberação individual), até quando e por que acabou',
+      'Quem tem o mesmo curso por dois caminhos (ex.: licença e compra) não perde o curso quando um deles acaba',
+      'Portal: cada curso mostra de onde vem o acesso ("Incluso na licença do Conector", "Liberado pela empresa", "Seu até...")',
+      'Painel: o progresso do curso mostra também quem já perdeu o acesso (o histórico fica), a origem de cada acesso e o botão "Liberar para uma pessoa"',
+      'O certificado do Conector passa a seguir os cursos marcados no benefício do perfil'
+    ] },
     { versao: 'v3.7', data: '2026-10-16', destaques: [
       'Portal: nova área "Licenças do Conector SAP da empresa" com o resumo de cada contrato (contratadas, em uso, convites pendentes e disponíveis)',
       'Convidar pessoa escolhendo só o tipo de licença: o sistema reserva a próxima disponível e nunca passa do total contratado, mesmo com vários convites ao mesmo tempo',

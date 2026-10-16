@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
+const { incluirNoBeneficioPelaTrilha } = require('../backend/services/acessos');
 const { ativarConvites } = require('../backend/services/contratos-conector'); // simula o aceite do convite
 const BASE = 'http://localhost:3000/api';
 
@@ -36,17 +37,21 @@ const ps = cmd => execFileSync('powershell', ['-NoProfile', '-Command', cmd], { 
     cursos[t] = (await pool.query(
       `INSERT INTO cursos (empresa_id, titulo, status, trilha, ordem, carga_horaria) VALUES (1, $1, 'publicado', $2, 998, '~1 h') RETURNING id`,
       [`TESTE cert ${t} ${sufixo}`, t])).rows[0].id;
+    await incluirNoBeneficioPelaTrilha(cursos[t], t); // como a tela faz ao criar curso com trilha
     aulas[t] = [];
     for (let i = 0; i < 2; i++) {
       aulas[t].push((await pool.query('INSERT INTO cursos_aulas (curso_id, titulo, ordem) VALUES ($1, $2, $3) RETURNING id',
         [cursos[t], `Aula ${i + 1}`, i])).rows[0].id);
     }
   }
-  // Outros cursos publicados do banco local também contam para o perfil: o teste conclui todos eles
-  const extras = (await pool.query(
-    `SELECT a.id, c.trilha FROM cursos_aulas a JOIN cursos c ON c.id = a.curso_id
-     WHERE a.ativo AND c.ativo AND c.status = 'publicado' AND c.trilha IS NOT NULL AND NOT (c.id = ANY($1))`, [Object.values(cursos)])).rows;
-  for (const e of extras) aulas[e.trilha].push(e.id);
+  // Outros cursos publicados do banco local incluídos no benefício também contam para o perfil: o teste conclui todos
+  const extras = {};
+  for (const p of ['abap', 'funcional']) {
+    extras[p] = (await pool.query(
+      `SELECT a.id FROM beneficios b JOIN cursos c ON c.id = b.curso_id JOIN cursos_aulas a ON a.curso_id = c.id
+       WHERE b.produto = 'conector' AND b.perfil = $2 AND b.ativo AND a.ativo AND c.ativo AND c.status = 'publicado'
+         AND NOT (c.id = ANY($1))`, [Object.values(cursos), p])).rows.map(r => r.id);
+  }
   const idsInstAntes = (await pool.query('SELECT COALESCE(MAX(id), 0) AS m FROM conector_instaladores')).rows[0].m;
 
   const tokAdmin = tok({ id: 1, tipo: 'admin_empresa' });
@@ -85,7 +90,7 @@ const ps = cmd => execFileSync('powershell', ['-NoProfile', '-Command', cmd], { 
     ok((await api(tokAna, `/contratos-conector/eu/vagas/${vAbap.id}/pacote`)).status === 403, 'sem licença: instalador bloqueado');
 
     // --- Conclui tudo menos a última aula: nada; a última emite ---
-    const todas = [...aulas.abap, ...aulas.portal, ...aulas.conector];
+    const todas = [...aulas.abap, ...aulas.portal, ...aulas.conector, ...extras.abap];
     for (const a of todas.slice(0, -1)) await concluir(tokAna, a);
     ok(!(await pool.query('SELECT 1 FROM certificados WHERE usuario_id = $1', [ana.id])).rows.length, 'faltando 1 aula: sem certificado');
     const ultima = await concluir(tokAna, todas[todas.length - 1]);
@@ -127,7 +132,7 @@ const ps = cmd => execFileSync('powershell', ['-NoProfile', '-Command', cmd], { 
     ok(a2.status === 403 && a2.body.motivo === 'maquinas', `recusa a 2ª máquina (${a2.body?.motivo})`);
 
     // Funcional: plano leitura
-    for (const a of [...aulas.funcional, ...aulas.portal, ...aulas.conector]) await concluir(tokFabio, a);
+    for (const a of [...aulas.funcional, ...aulas.portal, ...aulas.conector, ...extras.funcional]) await concluir(tokFabio, a);
     const licF = (await pool.query('SELECT plano FROM licencas WHERE usuario_id = $1', [fabio.id])).rows[0];
     ok(licF && licF.plano === 'leitura', 'perfil Funcional: licença Leitura');
 
