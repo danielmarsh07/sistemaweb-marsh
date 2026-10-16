@@ -432,6 +432,7 @@ async function abrirConfigFinanceiro() {
   form.cobranca_pix.checked = !!c.cobranca_pix;
   form.geracao_automatica.checked = c.geracao_automatica !== false;
   form.dia_geracao.value = c.dia_geracao || 1;
+  form.dias_suspensao.value = c.dias_suspensao || 30;
   RETENCOES.forEach(r => { form[r].value = c[r] ? c[r] : ''; });
   const item = (ok, txt) => `<div class="${ok ? 'ok' : 'off'}">${ok ? '●' : '○'} ${escapeHtml(txt)}</div>`;
   document.getElementById('fin-config-status').innerHTML = st ? [
@@ -460,6 +461,7 @@ async function salvarConfigFinanceiro() {
       cobranca_pix: form.cobranca_pix.checked,
       geracao_automatica: form.geracao_automatica.checked,
       dia_geracao: Number(form.dia_geracao.value || 1),
+      dias_suspensao: Number(form.dias_suspensao.value || 30),
       ...Object.fromEntries(RETENCOES.map(r => [r, form[r].value || 0]))
     })
   });
@@ -562,6 +564,7 @@ async function editarContrato(id) {
   form.aliquota_iss.value = c.aliquota_iss ?? '';
   form.emitir_nfse.checked = c.emitir_nfse;
   form.reter_iss.checked = c.reter_iss;
+  form.renovacao_automatica.checked = !!c.renovacao_automatica;
   RETENCOES.forEach(r => { form[r].value = c[r] ?? ''; });
   form.cliente_id.onchange = () => preencherConectorSelect(form);
   await preencherConectorSelect(form, c.contrato_conector_id);
@@ -583,9 +586,10 @@ const ROTULOS_CAMPO_CONTRATO = {
   valor: 'Valor', descricao: 'Nome', descricao_servico: 'Descrição na nota', dia_vencimento: 'Vencimento', data_inicio: 'Início',
   data_fim: 'Fim', status: 'Status', tipo: 'Tipo', periodicidade: 'Cobrança', mes_cobranca: 'Mês da cobrança',
   indice_reajuste: 'Índice de reajuste', mes_reajuste: 'Mês do reajuste', emitir_nfse: 'Emite NFS-e', codigo_servico: 'Código do serviço',
-  aliquota_iss: 'ISS', cliente_id: 'Cliente', contrato_conector_id: 'Contrato do Conector'
+  aliquota_iss: 'ISS', cliente_id: 'Cliente', contrato_conector_id: 'Contrato do Conector', renovacao_automatica: 'Renovação automática'
 };
-const ACOES_CONTRATO = { 'contrato.criado': 'Contrato criado', 'contrato.alterado': 'Alterado', 'contrato.reajustado': 'Reajuste aplicado', 'contrato.encerrado': 'Encerrado' };
+const ACOES_CONTRATO = { 'contrato.criado': 'Contrato criado', 'contrato.alterado': 'Alterado', 'contrato.reajustado': 'Reajuste aplicado',
+  'contrato.encerrado': 'Encerrado', 'contrato.renovado': 'Renovado por mais 12 meses', 'contrato.aviso_vencimento': 'Aviso de vencimento enviado' };
 
 async function carregarHistoricoContrato(id) {
   const box = document.getElementById('contrato-historico');
@@ -648,7 +652,8 @@ async function salvarContrato() {
     tipo: form.tipo.value,
     periodicidade: form.periodicidade.value,
     mes_cobranca: form.mes_cobranca.value,
-    contrato_conector_id: form.tipo.value === 'produto' ? form.contrato_conector_id.value : ''
+    contrato_conector_id: form.tipo.value === 'produto' ? form.contrato_conector_id.value : '',
+    renovacao_automatica: form.renovacao_automatica.checked
   };
   RETENCOES.forEach(r => { dados[r] = form[r].value; });
   const url = contratoEmEdicao ? `${API_URL}/financeiro/contratos/${contratoEmEdicao}` : `${API_URL}/financeiro/contratos`;

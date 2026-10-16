@@ -159,6 +159,12 @@ async function expirarPedidosLoja() {
   catch (err) { registrarAlerta({ chave: 'job:loja', titulo: 'Rotina: falha ao expirar pedidos da loja', detalhe: err.message }); }
 }
 
+// Inadimplência (alerta + suspensão das licenças após o prazo) e renovação/encerramento no fim da vigência
+async function verificarVigencias() {
+  try { await require('./vigencia').ciclo(); }
+  catch (err) { registrarAlerta({ chave: 'job:vigencia', titulo: 'Rotina: falha na inadimplência/renovação de contratos', detalhe: err.stack || err.message }); }
+}
+
 async function ciclo() {
   if (rodando) return;
   rodando = true;
@@ -167,6 +173,7 @@ async function ciclo() {
     await expirarConvitesConector();
     await sincronizarAcessos();
     await expirarPedidosLoja();
+    await verificarVigencias();
     await sincronizarNotasPendentes();
     await sincronizarPixPendentes(); // antes dos lembretes: quem já pagou não recebe cobrança
     await enviarLembretes();

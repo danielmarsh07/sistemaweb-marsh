@@ -969,62 +969,106 @@
           <h2>Roteiro de uso</h2>
         </div>
         <p class="pagina-descricao">
-          Os módulos se ligam pelo cliente, mas só <strong>contrato → fatura</strong> é automático: acesso ao portal, licença e cursos são liberados à mão, nesta ordem.
+          Tudo gira em torno do <strong>cliente</strong> (empresa ou pessoa). Cada cliente pode ter vários <strong>contratos independentes</strong>:
+          serviços com cobrança mensal e licenças do Conector com cobrança anual. A <strong>ficha do cliente</strong> (Clientes → nome) mostra e controla tudo dele.
         </p>
 
         <ol class="roteiro-trilha" aria-label="Jornada do cliente">
-          <li><span>1</span>Venda<small>opcional</small></li>
+          <li><span>1</span>Venda<small>funil ou loja</small></li>
           <li><span>2</span>Cliente</li>
-          <li><span>3</span>Acesso ao portal</li>
-          <li><span>4</span>Contrato</li>
-          <li><span>5</span>Licença e cursos<small>se vendidos</small></li>
-          <li><span>6</span>Faturamento mensal</li>
+          <li><span>3</span>Contrato<small>mensal ou anual</small></li>
+          <li><span>4</span>Licenças e convites<small>se for Conector</small></li>
+          <li><span>5</span>Faturas<small>rascunho → aprovar</small></li>
+          <li><span>6</span>Recebimento</li>
         </ol>
 
         <div class="roteiro-grid">
           <section class="rel-card roteiro-card">
             <h3>Cliente novo, passo a passo</h3>
             <ol>
-              <li><strong>Venda (opcional)</strong>: lead → proposta → cliente aceita pelo link → <em>Gerar contrato</em>. Isso já cadastra o cliente e cria o contrato; depois complete CNPJ e endereço.
+              <li><strong>Venda</strong>: lead → proposta → cliente aceita pelo link → <em>Gerar contrato</em>. Já cadastra o cliente, cria o contrato com os
+                itens da proposta e transforma o valor único em fatura avulsa (rascunho). Depois complete CPF/CNPJ e endereço.
                 <a href="#" class="roteiro-ir" onclick="showPage('funil'); return false;">Funil de vendas →</a></li>
-              <li><strong>Venda do Conector SAP</strong>: monte a oferta no simulador (usuários, plano, implantação, fábrica ABAP, desconto e ROI) e clique <em>Gerar proposta</em>: ela entra como rascunho na oportunidade e segue o mesmo fluxo.
-                <a href="#" class="roteiro-ir" onclick="showPage('simulador-conector'); return false;">Simulador Conector SAP →</a></li>
-              <li><strong>Cadastro do cliente</strong>: razão social, <strong>CNPJ</strong> (obrigatório para nota e PIX), endereço e <strong>e-mail financeiro</strong>. Na mesma ficha, vincule as tecnologias que ele usa.
+              <li><strong>Cadastro do cliente</strong>: razão social, <strong>CPF ou CNPJ</strong> (obrigatório para nota e cobrança), endereço e <strong>e-mail financeiro</strong>.
                 <a href="#" class="roteiro-ir" onclick="showPage('clientes'); return false;">Clientes →</a></li>
-              <li><strong>Acesso ao portal</strong>: novo usuário do tipo <em>Cliente</em>, ligado à empresa. Não há convite por e-mail: você define a senha e repassa. Um usuário por pessoa.
-                <a href="#" class="roteiro-ir" onclick="showPage('usuarios'); return false;">Usuários →</a></li>
-              <li><strong>Contrato</strong> (se não veio do funil): valor mensal, dia de vencimento, início, dados da nota e retenções.
+              <li><strong>Contrato de serviço</strong> (consultoria SAP, CPI, sustentação…): tipo <em>Serviço</em>, cobrança <em>Mensal</em>, valor, vencimento, vigência,
+                reajuste e se <em>renova automaticamente</em>. Um contrato por serviço.
                 <a href="#" class="roteiro-ir" onclick="showPage('contratos'); return false;">Contratos →</a></li>
-              <li><strong>Liberações</strong> do que foi vendido: licença do conector e/ou cursos (cartões ao lado).</li>
-              <li><strong>Avise o cliente</strong>: login do portal, chave da licença (se houver) e que as faturas chegam por e-mail.</li>
+              <li><strong>Licenças do Conector</strong>: crie o contrato de licenças (vagas por perfil) já com a <strong>cobrança anual</strong> (valor sugerido pela tabela).
+                Quem compra vira <strong>administrador da empresa</strong> no portal e convida as pessoas.
+                <a href="#" class="roteiro-ir" onclick="showPage('contratos-conector'); return false;">Contratos do Conector →</a></li>
+              <li><strong>Acesso ao portal</strong>: o administrador da empresa recebe convite por e-mail para criar a senha. Outros usuários: Usuários → novo usuário do tipo <em>Cliente</em> com convite.
+                <a href="#" class="roteiro-ir" onclick="showPage('usuarios'); return false;">Usuários →</a></li>
+              <li><strong>Cursos</strong>: os do Conector vêm com a licença (Benefícios); outros, libere para a empresa, para uma pessoa ou venda na Loja.</li>
             </ol>
           </section>
 
           <section class="rel-card roteiro-card">
-            <h3>Rotina mensal do faturamento</h3>
+            <h3>Faturamento: rascunho, aprovação e envio</h3>
             <ol>
-              <li>Escolha a competência e clique <strong>Gerar faturas do mês</strong>: cada contrato ativo vira um rascunho (nada vai ao cliente ainda).</li>
-              <li>Revise os rascunhos. Cobrança fora de contrato: <strong>+ Fatura avulsa</strong>.</li>
-              <li><strong>Aprovar</strong>: emite a NFS-e, gera o PIX (se ligado) e envia o e-mail ao financeiro do cliente.</li>
+              <li>A partir do dia configurado (padrão dia 1), o sistema gera sozinho os <strong>rascunhos</strong> do mês e avisa por e-mail. Mensais todo mês; anuais no mês da cobrança,
+                com o período na descrição. Também dá para clicar <strong>Gerar faturas do mês</strong>.</li>
+              <li>Revise os rascunhos. Cobrança fora de contrato: <strong>+ Fatura avulsa</strong>. Cancelou um rascunho? Ele não volta sozinho.</li>
+              <li><strong>Aprovar</strong>: emite a NFS-e, gera o PIX (se ligado) e envia o e-mail ao financeiro do cliente, sem você fazer mais nada.</li>
               <li>Recebimento: PIX dá baixa sozinho (a tarifa do Asaas entra em Contas a pagar); transferência = <strong>Registrar pagamento</strong>.</li>
-              <li>Vencidas recebem lembrete automático por e-mail.</li>
+              <li>Vencidas recebem lembrete por e-mail e geram alerta para você (veja "Atraso e renovação").</li>
             </ol>
-            <p class="fin-muted">Para corrigir uma fatura aprovada: Cancelar (cancela a nota e o PIX) e criar outra.</p>
+            <p class="fin-muted">Para corrigir uma fatura aprovada: Cancelar (cancela a nota e o PIX) e criar outra. Configuração: dia da geração, lembretes e dias para suspender.</p>
             <a href="#" class="roteiro-ir" onclick="showPage('faturamento'); return false;">Faturamento →</a>
           </section>
 
           <section class="rel-card roteiro-card">
-            <h3>Cursos</h3>
-            <p class="fin-muted">Aparece no portal só quando está <strong>publicado</strong> e <strong>liberado para a empresa</strong> do aluno. Não depende de contrato.</p>
+            <h3>Licenças do Conector por contrato</h3>
+            <p class="fin-muted">As licenças pertencem ao contrato; as pessoas recebem uma licença por convite. Nunca passa do total contratado.</p>
             <ol>
-              <li><strong>Criar</strong> o curso (nasce rascunho; já há rascunhos de ABAP e Funcional).</li>
-              <li><strong>Aulas</strong>: módulo, título, vídeo (YouTube, Vimeo, Panda ou Bunny) e material opcional.</li>
-              <li><strong>Publicar</strong> (status publicado).</li>
-              <li><strong>Liberar</strong> para os clientes: todos os usuários da empresa passam a ver; não há liberação por pessoa nem prazo de fim.</li>
-              <li><strong>Acompanhar</strong> o progresso por usuário. Com 100%, o aluno gera o certificado (página para imprimir/PDF, sem registro no sistema).</li>
+              <li><strong>Contrato</strong>: cliente, administrador (e-mail), vagas por perfil (ABAP, Funcional, ABAP + Funcional), vigência e a cobrança anual.</li>
+              <li><strong>Convites</strong>: o administrador da empresa (no portal) ou você (no contrato) convida pelo e-mail escolhendo o perfil. A licença fica <em>reservada</em>
+                até a pessoa criar a senha; o link vale 72 h (reenviar renova). Sem aceite, a licença volta sozinha.</li>
+              <li><strong>Cursos inclusos</strong>: os marcados em Benefícios do Conector para o perfil, enquanto a licença estiver ativa.
+                Concluídos todos, a pessoa ganha o <strong>certificado</strong> e a <strong>chave</strong> individual (1 máquina), com o instalador já configurado.</li>
+              <li><strong>Revogar</strong>: a pessoa perde o Conector e os cursos inclusos na hora; conta, progresso, certificado e cursos comprados ficam.</li>
+              <li><strong>Vários administradores</strong> por empresa (nunca zero); ser administrador não ocupa licença. Histórico de tudo no contrato.</li>
             </ol>
-            <p class="fin-muted">Curso vendido: cobre por fatura avulsa ou contrato e libere à parte.</p>
+            <a href="#" class="roteiro-ir" onclick="showPage('contratos-conector'); return false;">Contratos do Conector →</a>
+            <a href="#" class="roteiro-ir" onclick="showPage('beneficios-conector'); return false;">Benefícios do Conector →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Cursos e quem tem acesso</h3>
+            <p class="fin-muted">Aparece no portal quando está <strong>publicado</strong> e a pessoa tem um motivo de acesso. Cada curso mostra a origem.</p>
+            <ol>
+              <li><strong>Criar</strong> o curso, cadastrar as <strong>aulas</strong> (YouTube, Vimeo, Panda ou Bunny) e <strong>publicar</strong>.</li>
+              <li>Formas de acesso: <em>incluso na licença do Conector</em> (Benefícios), <em>liberado para a empresa</em>, <em>liberação individual</em> (com prazo) ou <em>compra na Loja</em>.</li>
+              <li>Quem tem por dois caminhos não perde o curso quando um deles acaba. Progresso e conclusão nunca são apagados.</li>
+              <li><strong>Progresso</strong> do curso: quem tem acesso agora, quem já perdeu (histórico) e a origem de cada acesso.</li>
+            </ol>
             <a href="#" class="roteiro-ir" onclick="showPage('treinamentos'); return false;">Treinamentos →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Loja de cursos</h3>
+            <p class="fin-muted">A pessoa compra sozinha pela página da oferta; o curso é liberado quando o pagamento é confirmado.</p>
+            <ol>
+              <li><strong>Nova oferta</strong>: curso, preço, promoção com prazo, período de venda e duração do acesso (padrão 12 meses). Comece em <strong>Teste</strong>.</li>
+              <li>Divulgue o <strong>link</strong> (WhatsApp, anúncio, site). A pessoa informa nome, e-mail e CPF/CNPJ e paga com PIX, boleto ou cartão no Asaas.</li>
+              <li>Pago: curso liberado, matrícula e e-mail com o acesso. Em <strong>Teste</strong> nada é cobrado; use <em>Simular pagamento</em> para homologar.</li>
+              <li>Pronto para vender: edite a oferta e mude para <strong>Produção</strong>. Vendas pagas entram como receita no Financeiro.</li>
+              <li><strong>Cupons</strong> (% ou R$, com validade e limite). Estorno ou contestação tiram o curso; pedido sem pagamento expira.</li>
+            </ol>
+            <a href="#" class="roteiro-ir" onclick="showPage('loja'); return false;">Loja de cursos →</a>
+          </section>
+
+          <section class="rel-card roteiro-card">
+            <h3>Atraso e renovação</h3>
+            <ol>
+              <li>Fatura vencida: <strong>alerta</strong> em Sistema → Alertas no dia seguinte, e lembrete ao cliente.</li>
+              <li>Fatura das licenças do Conector com <strong>30 dias</strong> de atraso (ajustável): licenças e cursos inclusos ficam <strong>suspensos</strong>.
+                Pagou, voltam sozinhos. Suspensão feita por você não é desfeita pelo sistema.</li>
+              <li>Fim da vigência: avisos <strong>30, 7 e 1 dia</strong> antes (para você e, no Conector, para os administradores da empresa).</li>
+              <li>No fim: com <em>renovar automaticamente</em>, mais 12 meses (o contrato do Conector acompanha e a nova anuidade entra no faturamento); sem, o contrato é encerrado.</li>
+              <li><strong>Reajuste</strong>: no mês do índice o contrato mostra <em>reajuste pendente</em>; abra e use <strong>Aplicar reajuste</strong>.</li>
+            </ol>
+            <a href="#" class="roteiro-ir" onclick="showPage('alertas'); return false;">Alertas →</a>
           </section>
 
           <section class="rel-card roteiro-card">
@@ -1042,8 +1086,8 @@
           </section>
 
           <section class="rel-card roteiro-card">
-            <h3>Licença do conector SAP</h3>
-            <p class="fin-muted">A chave aparece <strong>uma única vez</strong>, na criação: copie e envie na hora.</p>
+            <h3>Chave do Conector por empresa (modelo antigo)</h3>
+            <p class="fin-muted">Para clientes que já usam uma chave compartilhada. Clientes novos: use Licenças do Conector por contrato. A chave aparece <strong>uma única vez</strong>, na criação.</p>
             <ol>
               <li>Nova licença: cliente, titular, plano (leitura, desenvolvimento ou empresa), SIDs (ex.: DEV, QAS, PRD), limites de usuários e de máquinas, data de fim e as <strong>conexões SAP</strong> (SID, URL, mandante, idioma — nunca usuário/senha).</li>
               <li>Envie a chave <code>MRSH-XXXX-XXXX-XXXX</code> ao titular. Ele baixa o instalador no portal, executa e informa a chave: a máquina é ativada e as conexões vêm preenchidas. Perdeu? <strong>Nova chave</strong> (a antiga deixa de valer).</li>
@@ -1077,7 +1121,7 @@
             <p class="fin-muted">O consultor do cliente pede no Claude; o Claude analisa o Z, escreve a especificação e, com o OK dele, abre o chamado aqui.</p>
             <ol>
               <li>O chamado chega com o selo <strong>Conector SAP</strong>: SID, módulo, tipo, solicitante, objetos SAP, pedido original e a especificação em markdown (baixe o <code>.md</code> ou copie no detalhe).</li>
-              <li>Se a licença exige aprovação (padrão), ele fica <strong>Aguardando aprovação do cliente</strong>: o gestor aprova ou recusa no portal. Sem SLA enquanto espera; o prazo conta a partir da aprovação. Recusa fecha o chamado com o motivo.</li>
+              <li>Se a licença exige aprovação (padrão), ele fica <strong>Aguardando aprovação do cliente</strong>: o administrador da empresa aprova ou recusa no portal. Sem SLA enquanto espera; o prazo conta a partir da aprovação. Recusa fecha o chamado com o motivo.</li>
               <li>Cliente aprovou por e-mail ou telefone? No detalhe, <strong>Aprovar em nome do cliente</strong> (fica registrado que foi a Marsh).</li>
               <li>Fila da fábrica ABAP: filtro <em>Conector SAP: aprovados</em> (ou <code>GET /api/chamados/fila-conector</code>), mais antigos primeiro.</li>
               <li>Para não exigir aprovação: Licenças → editar → desmarque <em>Chamados do conector exigem aprovação</em>. Limite: 20 chamados por hora por licença.</li>
@@ -1117,11 +1161,12 @@
           <h3>Cuidados: o que ainda não está ligado</h3>
           <p class="fin-muted">Estes campos parecem controlar algo, mas hoje são só informativos. Confira à mão.</p>
           <ul>
-            <li><strong>Status “suspenso/inativo” do cliente</strong>: não bloqueia portal, licença nem cursos.</li>
+            <li><strong>Status “suspenso/inativo” do cliente</strong>: não bloqueia portal, licença nem cursos (quem suspende é o contrato).</li>
             <li><strong>Tier SLA</strong>: não muda o prazo dos chamados.</li>
             <li><strong>Datas de contrato no cadastro do cliente</strong>: não são usadas; valem as de Financeiro → Contratos.</li>
-            <li><strong>Fim do contrato</strong>: não encerra licença nem cursos liberados.</li>
-            <li><strong>Reajuste (IPCA/IGP-M)</strong>: não é aplicado sozinho; altere o valor do contrato no mês do reajuste.</li>
+            <li><strong>Contratos antigos</strong>: nascem sem renovação automática. Abra cada um e marque se deve renovar sozinho.</li>
+            <li><strong>Reajuste (IPCA/IGP-M)</strong>: o índice não é buscado sozinho; você informa o percentual em <em>Aplicar reajuste</em>.</li>
+            <li><strong>Loja em produção</strong>: a venda não emite nota sozinha; emita pela fatura quando quiser.</li>
             <li><strong>Portal</strong>: o formulário de chamado lista todas as tecnologias, não só as do cliente.</li>
           </ul>
         </section>
@@ -2393,6 +2438,8 @@
             <small class="form-hint">Vazio = sem prazo.</small>
           </div>
         </div>
+        <label class="check-linha"><input type="checkbox" name="renovacao_automatica"> Renovar automaticamente por mais 12 meses no fim da vigência</label>
+        <small class="form-hint" style="display:block;margin:-4px 0 10px">Sem marcar, o contrato é encerrado na data de fim. Avisos saem 30, 7 e 1 dia antes.</small>
         <div class="form-row">
           <div class="form-group">
             <label>Reajuste</label>
@@ -2654,6 +2701,11 @@
             <label>A partir do dia</label>
             <input type="number" name="dia_geracao" min="1" max="28" value="1">
           </div>
+        </div>
+        <div class="form-group">
+          <label>Suspender as licenças do Conector depois de quantos dias de atraso</label>
+          <input type="number" name="dias_suspensao" min="1" max="180" value="30">
+          <small class="form-hint">A fatura vencida gera alerta no dia seguinte; passado esse prazo, as licenças e os cursos inclusos ficam suspensos e voltam sozinhos quando ela é paga.</small>
         </div>
         <div class="form-group">
           <label>Cópia dos e-mails para</label>

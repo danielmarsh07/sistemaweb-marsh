@@ -1350,6 +1350,28 @@ async function iniciar() {
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_pedidos_pendente ON pedidos(usuario_id, oferta_id) WHERE status = 'pendente';`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_pedidos_asaas ON pedidos(asaas_payment_id);`);
 
+    // 35. Fluxo novo — fase 5: inadimplência, renovação e registro de e-mails
+    //     Fatura vencida: alerta no dia seguinte (alerta_atraso_em); com dias_suspensao (padrão 30) de atraso, as licenças
+    //     do Conector cobradas por ela ficam suspensas (suspenso_por_fatura_id) e voltam sozinhas quando é paga.
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS dias_suspensao INTEGER NOT NULL DEFAULT 30 CHECK (dias_suspensao BETWEEN 1 AND 180);`);
+    await pool.query(`ALTER TABLE faturas ADD COLUMN IF NOT EXISTS alerta_atraso_em TIMESTAMPTZ;`);
+    await pool.query(`ALTER TABLE contratos_conector ADD COLUMN IF NOT EXISTS suspenso_por_fatura_id INTEGER;`);
+    //     Renovação: no fim da vigência, contrato com renovacao_automatica ganha mais 12 meses (e o do Conector junto);
+    //     sem ela, é encerrado. Avisos 30, 7 e 1 dia antes.
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS renovacao_automatica BOOLEAN NOT NULL DEFAULT FALSE;`);
+    //     Todo e-mail que o sistema tenta enviar (para quem, assunto, se saiu)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS emails_enviados (
+        id BIGSERIAL PRIMARY KEY,
+        para TEXT NOT NULL,
+        assunto VARCHAR(300) NOT NULL,
+        ok BOOLEAN NOT NULL,
+        erro TEXT,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_emails_enviados_data ON emails_enviados(criado_em DESC);`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

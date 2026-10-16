@@ -20,7 +20,7 @@ const COLUNAS_CONTRATO = `
   ct.aliquota_iss::float AS aliquota_iss, ct.reter_iss, ct.status, ct.observacoes, ct.data_criacao,
   ct.ret_ir::float AS ret_ir, ct.ret_csll::float AS ret_csll, ct.ret_pis::float AS ret_pis,
   ct.ret_cofins::float AS ret_cofins, ct.ret_inss::float AS ret_inss,
-  ct.tipo, ct.periodicidade, ct.mes_cobranca, ct.contrato_conector_id, ct.itens, ct.proposta_id,
+  ct.tipo, ct.periodicidade, ct.mes_cobranca, ct.contrato_conector_id, ct.itens, ct.proposta_id, ct.renovacao_automatica,
   to_char(ct.ultimo_reajuste, 'YYYY-MM-DD') AS ultimo_reajuste,
   (ct.status = 'ativo' AND ct.indice_reajuste <> 'nenhum' AND ct.mes_reajuste IS NOT NULL
    AND ct.data_inicio <= CURRENT_DATE - INTERVAL '12 months'
@@ -109,13 +109,15 @@ router.put('/config', async (req, res) => {
   const dias = Number(b.dias_lembrete ?? 3);
   if (!Number.isInteger(dias) || dias < 0 || dias > 30) return res.status(400).json({ erro: 'Dias para lembrete: 0 a 30 (0 desliga).' });
   const diaGeracao = Number(b.dia_geracao ?? 1);
+  const diasSuspensao = Number(b.dias_suspensao ?? 30);
+  if (!Number.isInteger(diasSuspensao) || diasSuspensao < 1 || diasSuspensao > 180) return res.status(400).json({ erro: 'Dias para suspender por atraso: 1 a 180.' });
   if (!Number.isInteger(diaGeracao) || diaGeracao < 1 || diaGeracao > 28) return res.status(400).json({ erro: 'Dia da geração automática: 1 a 28.' });
   try {
     await pool.query(
       `INSERT INTO financeiro_config (empresa_id, instrucoes_pagamento, pix_chave, codigo_servico, nome_servico,
          aliquota_iss, email_copia, dias_lembrete, vencimento_mes_seguinte,
-         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, cobranca_pix, geracao_automatica, dia_geracao, data_atualizacao)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW())
+         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, cobranca_pix, geracao_automatica, dia_geracao, dias_suspensao, data_atualizacao)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
        ON CONFLICT (empresa_id) DO UPDATE SET
          instrucoes_pagamento = EXCLUDED.instrucoes_pagamento, pix_chave = EXCLUDED.pix_chave,
          codigo_servico = EXCLUDED.codigo_servico, nome_servico = EXCLUDED.nome_servico,
@@ -124,10 +126,10 @@ router.put('/config', async (req, res) => {
          ret_ir = EXCLUDED.ret_ir, ret_csll = EXCLUDED.ret_csll, ret_pis = EXCLUDED.ret_pis,
          ret_cofins = EXCLUDED.ret_cofins, ret_inss = EXCLUDED.ret_inss,
          cobranca_pix = EXCLUDED.cobranca_pix, geracao_automatica = EXCLUDED.geracao_automatica,
-         dia_geracao = EXCLUDED.dia_geracao, data_atualizacao = NOW()`,
+         dia_geracao = EXCLUDED.dia_geracao, dias_suspensao = EXCLUDED.dias_suspensao, data_atualizacao = NOW()`,
       [emp(req), vazioNulo(b.instrucoes_pagamento), vazioNulo(b.pix_chave), vazioNulo(b.codigo_servico),
        vazioNulo(b.nome_servico), aliquota, vazioNulo(b.email_copia), dias, b.vencimento_mes_seguinte !== false,
-       ...RET.map(r => Number(b[r] || 0)), !!b.cobranca_pix, b.geracao_automatica !== false, diaGeracao]);
+       ...RET.map(r => Number(b[r] || 0)), !!b.cobranca_pix, b.geracao_automatica !== false, diaGeracao, diasSuspensao]);
     res.json({ mensagem: 'Configuração salva!' });
   } catch (err) { erro500(res, 'Erro ao salvar configuração', err); }
 });
@@ -165,14 +167,15 @@ function paramsContrato(b) {
     b.tipo || 'servico', b.periodicidade || 'mensal',
     b.periodicidade === 'anual' && vazioNulo(b.mes_cobranca) !== null ? Number(b.mes_cobranca) : null,
     vazioNulo(b.contrato_conector_id) === null ? null : Number(b.contrato_conector_id),
-    Array.isArray(b.itens) ? JSON.stringify(b.itens) : null
+    Array.isArray(b.itens) ? JSON.stringify(b.itens) : null,
+    b.renovacao_automatica === true
   ];
 }
 const COLS_CONTRATO_PARAMS = `cliente_id, descricao, descricao_servico, valor, dia_vencimento, data_inicio, data_fim,
   indice_reajuste, mes_reajuste, emitir_nfse, codigo_servico, nome_servico, aliquota_iss, reter_iss,
   status, observacoes, ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss,
-  tipo, periodicidade, mes_cobranca, contrato_conector_id, itens`;
-const N_PARAMS_CONTRATO = 26;
+  tipo, periodicidade, mes_cobranca, contrato_conector_id, itens, renovacao_automatica`;
+const N_PARAMS_CONTRATO = 27;
 
 // Contrato do Conector vinculado: precisa ser do mesmo cliente e da mesma empresa
 async function validarVinculoConector(b, empresa_id) {
@@ -186,7 +189,7 @@ async function validarVinculoConector(b, empresa_id) {
 // Diferença entre o retrato antes/depois (só os campos que mudaram), para o histórico do contrato
 const CAMPOS_HISTORICO = ['cliente_id', 'descricao', 'descricao_servico', 'valor', 'dia_vencimento', 'data_inicio', 'data_fim',
   'indice_reajuste', 'mes_reajuste', 'emitir_nfse', 'codigo_servico', 'aliquota_iss', 'status', 'tipo', 'periodicidade',
-  'mes_cobranca', 'contrato_conector_id'];
+  'mes_cobranca', 'contrato_conector_id', 'renovacao_automatica'];
 const normal = v => (v instanceof Date ? v.toISOString().slice(0, 10) : v == null ? null : String(v));
 function diferenca(antes, depois) {
   const a = {}, d = {};
@@ -243,7 +246,7 @@ router.put('/contratos/:id', async (req, res) => {
     const sets = COLS_CONTRATO_PARAMS.split(',').map((c, i) => `${c.trim()}=$${i + 1}`).join(', ');
     // Itens: só mudam quando vêm no corpo (o formulário de contrato não os edita)
     const r = await pool.query(
-      `UPDATE contratos SET ${sets.replace(`itens=$${n}`, `itens=COALESCE($${n}::jsonb, itens)`)},
+      `UPDATE contratos SET ${sets.replace(`itens=$${n - 1}`, `itens=COALESCE($${n - 1}::jsonb, itens)`)},
          atualizado_por_usuario_id=$${n + 3}, data_atualizacao=NOW()
        WHERE id = $${n + 1} AND empresa_id = $${n + 2} RETURNING *`,
       [...paramsContrato(b), req.params.id, emp(req), req.usuario.id]);

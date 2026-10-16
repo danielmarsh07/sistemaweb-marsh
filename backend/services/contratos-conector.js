@@ -408,8 +408,8 @@ async function criarCobrancaAnual(db, k, { valor, dia_vencimento, usuarioId }) {
   try {
     const r = await db.query(
       `INSERT INTO contratos (empresa_id, cliente_id, descricao, descricao_servico, valor, dia_vencimento, data_inicio, data_fim,
-         tipo, periodicidade, mes_cobranca, contrato_conector_id, itens, emitir_nfse, status, observacoes, criado_por_usuario_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'produto', 'anual', $9, $10, $11, TRUE, 'ativo', $12, $13) RETURNING id`,
+         tipo, periodicidade, mes_cobranca, contrato_conector_id, itens, emitir_nfse, status, observacoes, criado_por_usuario_id, renovacao_automatica)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'produto', 'anual', $9, $10, $11, TRUE, 'ativo', $12, $13, TRUE) RETURNING id`,
       [k.empresa_id, k.cliente_id, `Conector SAP — ${total} licença(s)`,
        `Licenciamento anual do Conector SAP Marsh: ${partes}.`, v, dia, inicio, fim,
        Number(inicio.slice(5, 7)), k.id,

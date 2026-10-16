@@ -434,7 +434,9 @@ router.put('/:id', async (req, res) => {
     if (!Number.isInteger(maxSids) || maxSids < 1 || maxSids > 10) throw new cc.ErroRegra('Máximo de SIDs: 1 a 10.');
     if (maxSids < (k.conexoes || []).length) throw new cc.ErroRegra(`O contrato já tem ${k.conexoes.length} SIDs cadastrados; remova antes de baixar o limite.`);
     await pool.query(
-      `UPDATE contratos_conector SET status = $1, data_inicio = COALESCE($2::date, data_inicio), data_fim = $3, max_sids = $4, observacoes = $5,
+      // Mudou o status à mão: a suspensão automática por atraso deixa de valer (o admin decidiu)
+      `UPDATE contratos_conector SET status = $1::varchar, data_inicio = COALESCE($2::date, data_inicio), data_fim = $3, max_sids = $4, observacoes = $5,
+         suspenso_por_fatura_id = CASE WHEN status <> $1::varchar THEN NULL ELSE suspenso_por_fatura_id END,
          data_atualizacao = NOW() WHERE id = $6`,
       [b.status || k.status, inicio, fim, maxSids,
        b.observacoes !== undefined ? (String(b.observacoes).trim() || null) : k.observacoes, k.id]);

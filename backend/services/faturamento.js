@@ -35,7 +35,7 @@ async function carregarConfig(empresa_id) {
   return r.rows[0] || {
     empresa_id, instrucoes_pagamento: null, pix_chave: null, codigo_servico: null, nome_servico: null,
     aliquota_iss: 0, email_copia: null, dias_lembrete: 3, vencimento_mes_seguinte: true,
-    geracao_automatica: true, dia_geracao: 1,
+    geracao_automatica: true, dia_geracao: 1, dias_suspensao: 30,
     ret_ir: 0, ret_csll: 0, ret_pis: 0, ret_cofins: 0, ret_inss: 0
   };
 }
@@ -149,6 +149,8 @@ async function registrarPagamento(faturaId, empresa_id, usuario_id, { data_pagam
   if (!r.rows.length) return false;
   const f = await carregarFatura(faturaId, empresa_id);
   if (f.pix_status === 'pendente') await cancelarPix(f);
+  // Pagou a fatura que tinha suspendido as licenças do Conector: voltam na hora
+  await require('./vigencia').reativarPagos().catch(err => console.error('[vigencia] reativar:', err.message));
   return true;
 }
 
@@ -180,6 +182,7 @@ async function aplicarCobrancaNaFatura(faturaId, empresa_id, cobranca) {
          pix_status = 'pago', pix_taxa = $3, data_atualizacao = NOW()
        WHERE id = $4 AND status = 'aberta' RETURNING id`, [data, valor, taxa, f.id]);
     if (r.rows.length && taxa > 0) await lancarTarifaAsaas(f, taxa, data);
+    if (r.rows.length) await require('./vigencia').reativarPagos().catch(err => console.error('[vigencia] reativar:', err.message));
     return 'pago';
   }
   if (status !== f.pix_status) {

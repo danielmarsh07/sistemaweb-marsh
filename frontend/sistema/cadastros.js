@@ -74,7 +74,9 @@ const ACOES_ATIVIDADE = {
   'vaga.liberada': 'Licença revogada', 'vaga.convite_cancelado': 'Convite cancelado', 'vaga.convite_expirado': 'Convite expirou',
   'admin_corporativo.adicionado': 'Administrador adicionado', 'admin_corporativo.removido': 'Administrador removido',
   'usuario.alterado': 'Usuário alterado', 'usuario.desativado': 'Usuário desativado', 'usuario.senha_redefinida': 'Senha redefinida',
-  'usuario.senha_definida_convite': 'Convite aceito (senha criada)', 'usuario.senha_definida_redefinir': 'Senha trocada pelo link'
+  'usuario.senha_definida_convite': 'Convite aceito (senha criada)', 'usuario.senha_definida_redefinir': 'Senha trocada pelo link',
+  'contrato.renovado': 'Contrato renovado por mais 12 meses', 'contrato.aviso_vencimento': 'Aviso de vencimento enviado',
+  'conector.suspenso_inadimplencia': 'Licenças suspensas por atraso', 'conector.reativado_pagamento': 'Licenças reativadas (fatura paga)'
 };
 const PERFIL_FICHA = { abap: 'ABAP', funcional: 'Funcional', ambos: 'ABAP + Funcional' };
 
@@ -150,7 +152,8 @@ async function abrirFichaCliente(id) {
   if (d.admin) {
     const admins = d.usuarios.filter(u => u.admin_empresa);
     const contratosK = d.conector.length ? `<ul class="ficha-lista">${d.conector.map(k => {
-      const st = k.status === 'cancelado' ? pill('Cancelado', '#94a3b8') : k.status === 'suspenso' ? pill('Suspenso', '#b7791f')
+      const st = k.status === 'cancelado' ? pill('Cancelado', '#94a3b8')
+        : k.status === 'suspenso' ? pill(k.suspenso_por_fatura_id ? `Suspenso por atraso (fatura #${k.suspenso_por_fatura_id})` : 'Suspenso', k.suspenso_por_fatura_id ? '#b42318' : '#b7791f')
         : k.vigente ? pill(`Ativo até ${diaBr(k.data_fim)}`, '#2e7d4f') : pill(`Vencido ${diaBr(k.data_fim)}`, '#b42318');
       const perfis = [k.abap && `${k.abap} ABAP`, k.funcional && `${k.funcional} Funcional`, k.ambos && `${k.ambos} Ambos`].filter(Boolean).join(' · ');
       return `<li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato do Conector" onclick="fichaConector(${k.id})" onkeydown="if(event.key==='Enter')fichaConector(${k.id})">

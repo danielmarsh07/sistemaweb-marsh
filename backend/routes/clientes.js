@@ -127,7 +127,7 @@ router.get('/:id/ficha', async (req, res) => {
          FROM oportunidades WHERE cliente_id = $1 ORDER BY (etapa IN ('ganha','perdida')), data_atualizacao DESC LIMIT 8`, [id]) : vazio,
       // Licenças do Conector: cada contrato com o total, em uso, convites pendentes e disponíveis, e a cobrança
       admin ? pool.query(
-        `SELECT k.id, k.status, to_char(k.data_inicio, 'YYYY-MM-DD') AS data_inicio, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
+        `SELECT k.id, k.status, k.suspenso_por_fatura_id, to_char(k.data_inicio, 'YYYY-MM-DD') AS data_inicio, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
                 (k.status = 'ativo' AND k.data_inicio <= CURRENT_DATE AND k.data_fim >= CURRENT_DATE) AS vigente,
                 COUNT(v.id)::int AS total,
                 COUNT(v.id) FILTER (WHERE v.estado = 'ativa')::int AS em_uso,
@@ -155,6 +155,7 @@ router.get('/:id/ficha', async (req, res) => {
          FROM auditoria a LEFT JOIN usuarios u ON u.id = a.usuario_id
          WHERE (a.entidade = 'contrato' AND a.entidade_id IN (SELECT id FROM contratos WHERE cliente_id = $1))
             OR (a.entidade = 'cliente' AND a.entidade_id = $1)
+            OR (a.entidade = 'contrato_conector' AND a.entidade_id IN (SELECT id FROM contratos_conector WHERE cliente_id = $1))
             OR (a.entidade = 'vaga_conector' AND (COALESCE(a.depois, a.antes)->>'contrato_id')::int IN (SELECT id FROM contratos_conector WHERE cliente_id = $1))
             OR (a.entidade = 'usuario' AND a.entidade_id IN (SELECT id FROM usuarios WHERE cliente_id = $1))
          ORDER BY a.criado_em DESC, a.id DESC LIMIT 12`, [id]) : vazio

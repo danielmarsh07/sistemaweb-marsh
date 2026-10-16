@@ -22,6 +22,15 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.1', data: '2026-10-16', destaques: [
+      'Fatura vencida gera um alerta para você no dia seguinte (além do lembrete ao cliente)',
+      'Licenças do Conector com 30 dias de atraso (ajustável em Configuração) ficam suspensas sozinhas, com os cursos inclusos; pagou, voltam na hora',
+      'O motivo da suspensão aparece na ficha do cliente e no portal da empresa',
+      'Contrato com "Renovar automaticamente": no fim da vigência ganha mais 12 meses (o contrato do Conector acompanha); sem a opção, é encerrado',
+      'Avisos 30, 7 e 1 dia antes do fim da vigência, para você e, nas licenças do Conector, para os administradores da empresa',
+      'Todo e-mail que o sistema envia fica registrado (para quem, assunto e se saiu)',
+      'Roteiro de uso reescrito com o fluxo novo: cliente, contratos, licenças por convite, cursos, loja, faturamento, atraso e renovação'
+    ] },
     { versao: 'v4.0', data: '2026-10-16', destaques: [
       'Nova Loja de cursos (Comercial → Loja de cursos): ofertas com página própria para divulgar (WhatsApp, anúncio, site), preço promocional com prazo, período de venda e duração do acesso (padrão 12 meses)',
       'A pessoa se cadastra com nome, e-mail e CPF/CNPJ e paga com PIX, boleto ou cartão no Asaas; confirmado o pagamento, o curso é liberado na hora e ela recebe o acesso por e-mail',

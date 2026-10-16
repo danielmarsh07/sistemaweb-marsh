@@ -255,6 +255,7 @@ async function carregarContratosPortal() {
           <strong>Contrato nº ${k.id}</strong>
           <span class="chip" style="background:${st[1]}20; color:${st[1]}">${st[0]}</span>
           <p>Válido de ${br(k.data_inicio)} até <strong>${br(k.data_fim)}</strong></p>
+          ${k.suspenso_por_fatura_id ? '<p style="color:#b42318"><strong>Suspenso por pagamento em atraso.</strong> As licenças e os cursos inclusos voltam assim que a fatura for paga.</p>' : ''}
           <p><strong>${k.vagas.length}</strong> licença(s) contratada(s) · <strong>${ativas}</strong> em uso ·
              <strong>${convites}</strong> convite(s) pendente(s) · <strong>${livres}</strong> disponível(is)</p>
           <p class="sids">Sistemas SAP: <strong>${sids ? escapeHtml(sids) : 'nenhum cadastrado'}</strong> (até ${k.max_sids})</p>

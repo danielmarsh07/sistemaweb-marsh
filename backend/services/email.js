@@ -31,8 +31,22 @@ async function emailsCliente(cliente_id) {
 
 // --- Envio genérico com tratamento de erro silencioso ---
 
-// Retorna true só quando o Resend aceitou o envio
-async function enviar({ to, subject, html, cc, semAlerta }) {
+// Registro de cada envio (para quem, assunto, se saiu). Falhar ao registrar nunca impede o e-mail.
+function registrarEnvio(to, subject, ok, erro) {
+  const para = (Array.isArray(to) ? to.map(u => (typeof u === 'string' ? u : u.email)) : [to]).filter(Boolean).join(', ');
+  if (!para) return;
+  require('../db').query('INSERT INTO emails_enviados (para, assunto, ok, erro) VALUES ($1, $2, $3, $4)',
+    [para.slice(0, 2000), String(subject || '').slice(0, 300), ok, erro ? String(erro).slice(0, 1000) : null]).catch(() => {});
+}
+
+// Retorna true só quando o Resend aceitou o envio. Cada tentativa fica registrada em emails_enviados.
+async function enviar(opcoes) {
+  const { ok, erro } = await enviarSemRegistro(opcoes);
+  registrarEnvio(opcoes.to, opcoes.subject, ok, erro);
+  return ok;
+}
+
+async function enviarSemRegistro({ to, subject, html, cc, semAlerta }) {
   const resend = getResend();
   if (!resend) {
     // Fora do ar no servidor (Render define RENDER=true) é problema; no ambiente local é de propósito
@@ -42,14 +56,14 @@ async function enviar({ to, subject, html, cc, semAlerta }) {
         detalhe: `RESEND_API_KEY não está configurada no servidor. Não saiu: "${subject}".`
       });
     }
-    return false;
+    return { ok: false, erro: 'envio de e-mail desligado (sem RESEND_API_KEY)' };
   }
   try {
     const destinatarios = Array.isArray(to) ? to.map(u => (typeof u === 'string' ? u : u.email)) : [to];
-    if (!destinatarios.length) return false;
+    if (!destinatarios.length) return { ok: false, erro: 'sem destinatário' };
     const r = await resend.emails.send({ from: FROM, to: destinatarios, subject, html, ...(cc ? { cc } : {}) });
     if (r && r.error) throw new Error(r.error.message);
-    return true;
+    return { ok: true, erro: null };
   } catch (err) {
     console.error('[Email] Erro ao enviar:', err.message);
     // O próprio e-mail de alerta não gera alerta (evita laço quando o envio está fora do ar)
@@ -59,7 +73,7 @@ async function enviar({ to, subject, html, cc, semAlerta }) {
         detalhe: `"${subject}" para ${(Array.isArray(to) ? to.map(u => u.email || u) : [to]).join(', ')}: ${err.message}`
       });
     }
-    return false;
+    return { ok: false, erro: err.message };
   }
 }
 
@@ -500,6 +514,22 @@ async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, l
   return enviar({ to: admins, subject: `[Marsh] ${assunto}`, html });
 }
 
+/** Licenças do Conector perto do fim: aviso aos administradores da empresa. */
+async function enviarAvisoVencimentoLicencas({ para, cliente, fim, dias, renova }) {
+  const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
+  const data = String(fim).slice(0, 10).split('-').reverse().join('/');
+  const html = templateBase({
+    titulo: 'Licenças do Conector perto do vencimento', preheader: `As licenças vencem em ${dias} dia(s).`,
+    corpo: `
+      <h2 style="margin:0 0 12px;color:#0f172a;font-size:20px">Licenças do Conector SAP — ${esc(cliente)}</h2>
+      <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6">O contrato das licenças vence em <strong>${data}</strong> (${dias} dia(s)).
+        ${renova ? 'Ele será renovado automaticamente por mais 12 meses; a cobrança da nova anuidade segue pelo Financeiro.'
+          : 'Para continuar usando o Conector e os cursos inclusos, fale com a Marsh para renovar.'}</p>
+      <a href="${esc(base)}/login.html" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Abrir o portal →</a>`
+  });
+  return enviar({ to: para, subject: `Licenças do Conector vencem em ${dias} dia(s)`, html });
+}
+
 /** Loja: pagamento confirmado, curso liberado. linkSenha = criar a senha (primeiro acesso). */
 async function enviarCursoLiberado({ nome, email, curso, fim, linkSenha, teste }) {
   const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
@@ -520,6 +550,7 @@ async function enviarCursoLiberado({ nome, email, curso, fim, linkSenha, teste }
 
 module.exports = {
   enviarCursoLiberado,
+  enviarAvisoVencimentoLicencas,
   notificarNovoChamado,
   notificarAtualizacaoStatus,
   notificarNovoAtendimento,

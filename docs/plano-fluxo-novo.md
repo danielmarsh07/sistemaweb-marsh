@@ -21,7 +21,7 @@ Origem: [Fluxo Novo Marsh](Fluxo%20Novo%20Marsh/Fluxo%20Novo%20Marsh.txt). Anál
 | — Ficha do cliente (pedido do dono) | v3.9 | Ficha virou o painel de controle da empresa | feita |
 | 4. Venda de cursos | v4.0 | Ofertas, cupons, pedidos, checkout Asaas, webhook → matrícula; pendente/recusado/estorno/contestação; modo teste (homologação) | feita (testes/fluxo-fase4.js) |
 | 4b. Venda do Conector pelo site | — | Compra de licenças por perfil (preços da tabela) reaproveitando pedidos/checkout | a fazer |
-| 5. Automações | v4.1 | Renovação (avisos 30/7/1), inadimplência (alerta + suspensão em 30 dias), relatórios, log de e-mails; **Roteiro de uso atualizado** | |
+| 5. Automações | v4.1 | Renovação (avisos 30/7/1), inadimplência (alerta + suspensão em 30 dias), log de e-mails; **Roteiro de uso atualizado** (relatórios dedicados ficaram de fora — a ficha cobre) | feita (testes/fluxo-fase5.js) |
 
 ## Notas de implementação
 
