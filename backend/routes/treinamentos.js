@@ -10,6 +10,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const cc = require('../services/contratos-conector');
+const cert = require('../services/certificacao');
 
 const CAPAS = ['abap', 'func', 'fiori', 'cpi', 'geral'];
 const STATUS = ['rascunho', 'publicado'];
@@ -109,7 +110,10 @@ router.post('/aulas/:id/concluir', async (req, res) => {
       await pool.query(`INSERT INTO cursos_progresso (usuario_id, aula_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
         [req.usuario.id, req.params.id]);
     }
-    res.json({ ok: true });
+    // Última aula do perfil da vaga? Emite o certificado e a licença do Conector
+    const emitidos = req.body?.concluida === false ? [] : await cert.avaliarUsuario(req.usuario.id)
+      .catch(err => { console.error('[certificacao] concluir:', err.message); return []; });
+    res.json({ ok: true, certificados: emitidos.map(c => c.codigo) });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao registrar progresso', detalhe: err.message });
   }

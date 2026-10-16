@@ -14,8 +14,14 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const jwt = require('jsonwebtoken');
 const cc = require('../services/contratos-conector');
+const cert = require('../services/certificacao');
+const storage = require('../services/storage');
 const { validarConexoes } = require('../services/licenca');
+
+// Link do pacote do instalador: token de uso curto (o navegador baixa direto, sem o cabeçalho de login)
+const PACOTE_TTL = '10m';
 
 const ehAdmin = t => t === 'admin_empresa' || t === 'admin_sistema';
 const emp = req => req.usuario.empresa_id || 1;
@@ -23,6 +29,16 @@ const emp = req => req.usuario.empresa_id || 1;
 function responderErro(res, err, msg) {
   if (err instanceof cc.ErroRegra) return res.status(400).json({ erro: err.message });
   res.status(500).json({ erro: msg, detalhe: err.message });
+}
+
+// Depois de ocupar: se a pessoa já tinha concluído o perfil, a licença dela volta a valer
+async function depoisDeOcupar(r) {
+  await cert.avaliarUsuario(r.usuario.id).catch(err => console.error('[certificacao] ocupar:', err.message));
+}
+
+async function liberarComLicenca(k, vagaId) {
+  const usuarioId = await cc.liberarVaga(k, vagaId);
+  await cert.cancelarLicencaVaga(Number(vagaId), usuarioId);
 }
 
 function mensagemOcupacao(r) {
@@ -40,9 +56,11 @@ function lerConexoes(body, maxSids) {
 }
 
 // ============================== PORTAL ==============================
+// Vagas do usuário com progresso por trilha, certificado e licença (com a chave, que é dele)
 router.get('/eu', async (req, res) => {
   if (req.usuario.tipo !== 'cliente') return res.json({ papel: null, gestor: false, vagas: [] });
   try {
+    await cert.avaliarUsuario(req.usuario.id); // concluiu tudo e ainda não tinha certificado/licença? emite agora
     const papel = await cc.papelPortal(req.usuario.id);
     const gestor = (await pool.query(
       `SELECT 1 FROM contratos_conector WHERE gestor_usuario_id = $1 AND status <> 'cancelado' LIMIT 1`, [req.usuario.id])).rows.length > 0;
@@ -50,10 +68,41 @@ router.get('/eu', async (req, res) => {
       `SELECT v.id, v.perfil, k.id AS contrato_id, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
               (${cc.VAGA_VIGENTE}) AS vigente
        FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
-       WHERE v.usuario_id = $1 AND v.ativo AND k.status <> 'cancelado' ORDER BY v.id`, [req.usuario.id])).rows
-      .map(v => ({ ...v, perfil_nome: cc.PERFIS[v.perfil]?.nome || v.perfil }));
+       WHERE v.usuario_id = $1 AND v.ativo AND k.status <> 'cancelado' ORDER BY v.id`, [req.usuario.id])).rows;
+    for (const v of vagas) {
+      v.perfil_nome = cc.PERFIS[v.perfil]?.nome || v.perfil;
+      v.progresso = await cert.progressoPerfil(pool, v.perfil, req.usuario.id);
+      v.certificado = (await pool.query(
+        'SELECT codigo, emitido_em FROM certificados WHERE vaga_id = $1 AND usuario_id = $2', [v.id, req.usuario.id])).rows[0] || null;
+      const l = (await pool.query(
+        `SELECT l.*, to_char(l.data_fim, 'YYYY-MM-DD') AS data_fim, (l.data_fim >= CURRENT_DATE) AS vigente,
+                (SELECT COUNT(*)::int FROM licencas_ativacoes a WHERE a.licenca_id = l.id AND a.revogada = FALSE) AS maquinas_ativas,
+                (SELECT a.nome_maquina FROM licencas_ativacoes a WHERE a.licenca_id = l.id AND a.revogada = FALSE
+                  ORDER BY a.primeira_ativacao DESC LIMIT 1) AS maquina_nome
+         FROM licencas l WHERE l.vaga_id = $1 AND l.usuario_id = $2`, [v.id, req.usuario.id])).rows[0];
+      v.licenca = cert.licencaParaPortal(l);
+    }
     res.json({ papel, gestor, vagas });
   } catch (err) { responderErro(res, err, 'Erro ao buscar seu acesso'); }
+});
+
+// Link do instalador já configurado com a licença da pessoa (licença da vaga, valendo)
+router.get('/eu/vagas/:vid/pacote', async (req, res) => {
+  if (req.usuario.tipo !== 'cliente') return res.status(403).json({ erro: 'Somente usuários do portal.' });
+  try {
+    const l = (await pool.query(
+      `SELECT l.id FROM licencas l JOIN contratos_conector_vagas v ON v.id = l.vaga_id AND v.usuario_id = l.usuario_id AND v.ativo
+       WHERE l.vaga_id = $1 AND l.usuario_id = $2 AND l.ativo AND l.status = 'ativa' AND l.data_fim >= CURRENT_DATE`,
+      [req.params.vid, req.usuario.id])).rows[0];
+    if (!l) return res.status(403).json({ erro: 'O instalador fica disponível com a licença ativa (conclua os cursos do seu perfil).' });
+    const inst = (await pool.query('SELECT versao FROM conector_instaladores ORDER BY id DESC LIMIT 1')).rows[0];
+    if (inst && storage.disponivel) {
+      const token = jwt.sign({ uso: 'pacote', licenca_id: l.id, usuario_id: req.usuario.id }, process.env.JWT_SECRET, { expiresIn: PACOTE_TTL });
+      return res.json({ url: `/api/publico/pacote/${token}`, versao: inst.versao, configurado: true });
+    }
+    // Sem instalador publicado no storage: link fixo (sem a licença dentro; a pessoa digita a chave)
+    res.json({ url: process.env.CONECTOR_DOWNLOAD_URL || null, versao: process.env.CONECTOR_VERSAO || null, configurado: false });
+  } catch (err) { responderErro(res, err, 'Erro ao gerar o link do instalador'); }
 });
 
 async function contratoDoGestor(req) {
@@ -79,6 +128,7 @@ router.post('/meus/:id/vagas/:vid/ocupar', async (req, res) => {
     const k = await contratoDoGestor(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
     const r = await cc.ocuparVaga(k, req.params.vid, req.body || {}, req.usuario.id);
+    await depoisDeOcupar(r);
     res.json({ mensagem: mensagemOcupacao(r), convite_enviado: r.convite_enviado });
   } catch (err) { responderErro(res, err, 'Erro ao ocupar a vaga'); }
 });
@@ -87,7 +137,7 @@ router.post('/meus/:id/vagas/:vid/liberar', async (req, res) => {
   try {
     const k = await contratoDoGestor(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    await cc.liberarVaga(k, req.params.vid);
+    await liberarComLicenca(k, req.params.vid);
     res.json({ mensagem: 'Vaga liberada. A pessoa perde o acesso aos cursos desta vaga.' });
   } catch (err) { responderErro(res, err, 'Erro ao liberar a vaga'); }
 });
@@ -116,6 +166,7 @@ router.put('/meus/:id/conexoes', async (req, res) => {
     const lista = lerConexoes(req.body, k.max_sids);
     await pool.query('UPDATE contratos_conector SET conexoes = $1::jsonb, data_atualizacao = NOW() WHERE id = $2',
       [JSON.stringify(lista), k.id]);
+    await cert.sincronizarContrato(k.id); // as licenças das vagas passam a usar os sistemas novos
     res.json({ mensagem: 'Sistemas SAP salvos.', conexoes: lista });
   } catch (err) { responderErro(res, err, 'Erro ao salvar os sistemas SAP'); }
 });
@@ -235,6 +286,7 @@ router.put('/:id', async (req, res) => {
          data_atualizacao = NOW() WHERE id = $6`,
       [b.status || k.status, inicio, fim, maxSids,
        b.observacoes !== undefined ? (String(b.observacoes).trim() || null) : k.observacoes, k.id]);
+    await cert.sincronizarContrato(k.id);
     res.json({ mensagem: 'Contrato atualizado.' });
   } catch (err) { responderErro(res, err, 'Erro ao atualizar contrato'); }
 });
@@ -270,6 +322,7 @@ router.post('/:id/vagas/:vid/ocupar', async (req, res) => {
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
     const corpo = { ...(req.body || {}) };
     const r = await cc.ocuparVaga(k, req.params.vid, corpo, k.gestor_usuario_id); // "eu" = o gestor do contrato
+    await depoisDeOcupar(r);
     res.json({ mensagem: mensagemOcupacao(r), convite_enviado: r.convite_enviado });
   } catch (err) { responderErro(res, err, 'Erro ao ocupar a vaga'); }
 });
@@ -278,7 +331,7 @@ router.post('/:id/vagas/:vid/liberar', async (req, res) => {
   try {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    await cc.liberarVaga(k, req.params.vid);
+    await liberarComLicenca(k, req.params.vid);
     res.json({ mensagem: 'Vaga liberada.' });
   } catch (err) { responderErro(res, err, 'Erro ao liberar a vaga'); }
 });
@@ -298,6 +351,7 @@ router.put('/:id/conexoes', async (req, res) => {
     const lista = lerConexoes(req.body, k.max_sids);
     await pool.query('UPDATE contratos_conector SET conexoes = $1::jsonb, data_atualizacao = NOW() WHERE id = $2',
       [JSON.stringify(lista), k.id]);
+    await cert.sincronizarContrato(k.id); // as licenças das vagas passam a usar os sistemas novos
     res.json({ mensagem: 'Sistemas SAP salvos.', conexoes: lista });
   } catch (err) { responderErro(res, err, 'Erro ao salvar os sistemas SAP'); }
 });

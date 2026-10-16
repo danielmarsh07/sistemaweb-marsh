@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Certificado — Marsh Consultoria</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/img/logo-simbolo.png">
+  <style>
+    @page { size: A4 landscape; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, 'Segoe UI', Arial, sans-serif; color: #13233a; background: #e8eef6; }
+    .barra { max-width: 297mm; margin: 16px auto; padding: 0 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; font-size: 14px; }
+    .valido { color: #0f7a4f; font-weight: 600; }
+    .barra button { height: 40px; padding: 0 16px; border: 0; border-radius: 8px; background: #1d6fd8; color: #fff; font: 600 14px inherit; cursor: pointer; }
+    .moldura { overflow-x: auto; padding: 0 16px 24px; }
+    .folha { width: 297mm; height: 210mm; margin: 0 auto; padding: 20mm 24mm; position: relative; background: linear-gradient(135deg, #f2f6fb 0%, #ffffff 55%, #e3effc 100%); border: 10px solid #1d6fd8; }
+    .marca { display: flex; align-items: center; gap: 12px; }
+    .marca img { width: 52px; height: 52px; object-fit: contain; }
+    .marca strong { display: block; letter-spacing: .2em; font-size: 20px; }
+    .marca span { display: block; letter-spacing: .42em; font-size: 10px; color: #5f7088; }
+    h1 { font-size: 38px; margin: 14mm 0 5mm; letter-spacing: -.01em; }
+    .nome { font-size: 32px; font-weight: 700; color: #1d6fd8; margin: 3mm 0; }
+    p { font-size: 16px; line-height: 1.6; max-width: 230mm; margin: 0 0 3mm; }
+    ul { margin: 2mm 0 0; padding-left: 20px; font-size: 15px; line-height: 1.7; }
+    .rodape { position: absolute; bottom: 16mm; left: 24mm; right: 24mm; display: flex; justify-content: space-between; gap: 16px; font-size: 12px; color: #5f7088; }
+    .rodape strong { color: #13233a; }
+    .erro { max-width: 520px; margin: 80px auto; padding: 24px; background: #fff; border-radius: 12px; text-align: center; font-size: 15px; }
+    @media print {
+      body { background: #fff; }
+      .barra { display: none; }
+      .moldura { padding: 0; overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div id="conteudo"><p class="erro">Carregando certificado...</p></div>
+  <script>
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+    const codigo = new URLSearchParams(location.search).get('c') || '';
+    const alvo = document.getElementById('conteudo');
+    fetch(`/api/publico/certificado/${encodeURIComponent(codigo)}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(c => {
+        const data = new Date(c.emitido_em).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+        const link = `${location.origin}/certificado.html?c=${encodeURIComponent(c.codigo)}`;
+        document.title = `Certificado ${c.codigo} — ${c.nome}`;
+        alvo.innerHTML = `
+          <div class="barra">
+            <span class="valido">✓ Certificado válido, emitido pela Marsh Consultoria em ${esc(data)}.</span>
+            <button type="button" onclick="print()">Imprimir / salvar em PDF</button>
+          </div>
+          <div class="moldura"><div class="folha">
+            <div class="marca"><img src="/img/logo-simbolo.png" alt=""><div><strong>MARSH</strong><span>CONSULTORIA</span></div></div>
+            <h1>Certificado de conclusão</h1>
+            <p>Certificamos que</p>
+            <div class="nome">${esc(c.nome)}</div>
+            <p>concluiu a trilha <strong>Conector SAP — perfil ${esc(c.perfil_nome)}</strong>, com os cursos:</p>
+            <ul>${(c.cursos || []).map(x => `<li>${esc(x.titulo)}${x.carga_horaria ? ` <span style="color:#5f7088">(${esc(x.carga_horaria)})</span>` : ''}</li>`).join('')}</ul>
+            <div class="rodape">
+              <span>Emitido em <strong>${esc(data)}</strong> · Código <strong>${esc(c.codigo)}</strong></span>
+              <span>Valide em ${esc(link)}</span>
+            </div>
+          </div></div>`;
+      })
+      .catch(() => {
+        alvo.innerHTML = '<p class="erro">Certificado não encontrado. Confira o código.</p>';
+      });
+  </script>
+</body>
+</html>

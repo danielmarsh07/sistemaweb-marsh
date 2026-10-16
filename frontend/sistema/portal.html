@@ -1872,6 +1872,16 @@
     .sid-linha .btn-remover { height: 40px; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 1.1rem; }
     .btn-linha { margin: 4px 0 14px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text-main); border-radius: 8px; padding: 8px 12px; font: inherit; font-size: 0.85rem; cursor: pointer; }
     .so-aluno .welcome-bar .btn-novo-chamado { display: none; }
+    .minha-vaga { display: flex; flex-direction: column; gap: 4px; }
+    .minha-vaga .trilhas { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; font-size: 0.85rem; color: var(--text-secondary); }
+    .minha-vaga .trilhas li { display: flex; justify-content: space-between; gap: 10px; }
+    .minha-vaga .trilhas .ok { color: #10b981; font-weight: 600; }
+    .minha-vaga .ajuda { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
+    .chave-box { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+    .chave-box code { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; background: var(--bg-hover, rgba(127,127,127,.08)); font-size: 0.92rem; letter-spacing: .04em; overflow-wrap: anywhere; color: var(--text-main); }
+    .chave-box button { height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-main); font: inherit; font-size: 0.82rem; cursor: pointer; }
+    .minha-vaga .acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .portal-secao .licencas-portal.uma-coluna { grid-template-columns: minmax(0, 560px); }
 
     @media (max-width: 768px) {
       .sid-linha { grid-template-columns: 1fr 1fr; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
@@ -1964,6 +1974,12 @@
     <section id="secao-contrato" class="portal-secao" hidden>
       <div class="section-header"><h3>Meu contrato — Conector SAP</h3></div>
       <div id="lista-contratos"></div>
+    </section>
+
+    <!-- Minha licença do Conector (quem ocupa vaga): progresso do perfil, certificado, chave e instalador -->
+    <section id="secao-minha-licenca" class="portal-secao" hidden>
+      <div class="section-header"><h3>Minha licença do Conector SAP</h3></div>
+      <div id="lista-minhas-vagas" class="licencas-portal"></div>
     </section>
 
     <!-- Treinamentos (cursos liberados para a empresa ou pela vaga do Conector; some se não houver) -->

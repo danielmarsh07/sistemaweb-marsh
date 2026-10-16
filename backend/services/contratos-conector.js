@@ -105,7 +105,19 @@ async function detalharContrato(id) {
      LEFT JOIN usuarios u ON u.id = v.usuario_id
      WHERE v.contrato_id = $1 AND v.ativo
      ORDER BY CASE v.perfil WHEN 'abap' THEN 1 WHEN 'funcional' THEN 2 ELSE 3 END, v.id`, [id])).rows;
+  // Certificado e licença de quem ocupa cada vaga (a licença é da pessoa naquela vaga)
+  const extras = (await pool.query(
+    `SELECT v.id AS vaga_id, ce.codigo, ce.emitido_em, l.chave_prefixo, l.status AS licenca_status,
+            (SELECT a.nome_maquina FROM licencas_ativacoes a WHERE a.licenca_id = l.id AND a.revogada = FALSE
+              ORDER BY a.primeira_ativacao DESC LIMIT 1) AS maquina_nome
+     FROM contratos_conector_vagas v
+     LEFT JOIN certificados ce ON ce.vaga_id = v.id AND ce.usuario_id = v.usuario_id
+     LEFT JOIN licencas l ON l.vaga_id = v.id AND l.usuario_id = v.usuario_id
+     WHERE v.contrato_id = $1 AND v.ativo AND v.usuario_id IS NOT NULL`, [id])).rows;
   for (const v of vagas) {
+    const x = extras.find(e => e.vaga_id === v.id) || {};
+    v.certificado = x.codigo ? { codigo: x.codigo, emitido_em: x.emitido_em } : null;
+    v.licenca = x.chave_prefixo ? { chave_prefixo: x.chave_prefixo, status: x.licenca_status, maquina_nome: x.maquina_nome || null } : null;
     v.perfil_nome = PERFIS[v.perfil] ? PERFIS[v.perfil].nome : v.perfil;
     v.cursos = (PERFIS[v.perfil] ? PERFIS[v.perfil].trilhas : []).map(t => TRILHAS[t]);
     v.eh_gestor = v.usuario_id === k.gestor_usuario_id;
@@ -180,6 +192,7 @@ async function liberarVaga(contrato, vagaId) {
     `UPDATE usuarios u SET ativo = FALSE
      WHERE u.id = $1 AND u.portal_papel = 'aluno'
        AND NOT EXISTS (SELECT 1 FROM contratos_conector_vagas v WHERE v.usuario_id = u.id AND v.ativo)`, [vaga.usuario_id]);
+  return vaga.usuario_id;
 }
 
 module.exports = {

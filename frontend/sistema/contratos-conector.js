@@ -104,7 +104,9 @@ async function abrirContratoConector(id, manterAberto) {
       <tr>
         <td data-label="Perfil"><strong>${escapeHtml(v.perfil_nome)}</strong><small class="fin-muted" style="display:block">${escapeHtml(v.cursos.join(' · '))}</small></td>
         <td data-label="Pessoa">${pessoa}</td>
-        <td data-label="Progresso">${v.usuario_id ? `${v.aulas_concluidas} de ${v.aulas_total} aulas (${pct}%)` : '—'}</td>
+        <td data-label="Progresso">${v.usuario_id ? `${v.aulas_concluidas} de ${v.aulas_total} aulas (${pct}%)` : '—'}
+          ${v.certificado ? `<small class="fin-muted" style="display:block">Certificado <a href="/certificado.html?c=${encodeURIComponent(v.certificado.codigo)}" target="_blank" rel="noopener">${escapeHtml(v.certificado.codigo)}</a></small>` : ''}
+          ${v.licenca ? `<small class="fin-muted" style="display:block">Licença ${escapeHtml(v.licenca.chave_prefixo)} · ${escapeHtml(v.licenca.status)}${v.licenca.maquina_nome ? ` · ${escapeHtml(v.licenca.maquina_nome)}` : ''}</small>` : ''}</td>
         <td data-label="Ações" class="td-acoes">${acoes}</td>
       </tr>`;
   }).join('') : '<tr><td colspan="4" class="text-center">Nenhuma vaga.</td></tr>';

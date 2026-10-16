@@ -3,6 +3,8 @@
  *  POST /lead                         formulário de contato do site → oportunidade em "Lead" + aviso aos admins
  *  GET  /proposta/:token              proposta para o cliente ver (link enviado pela Marsh)
  *  POST /proposta/:token/responder    cliente aceita ou recusa
+ *  GET  /certificado/:codigo          valida um certificado do Conector (MC-XXXXXXXX)
+ *  GET  /pacote/:token                instalador do Conector com a licença da pessoa (token curto do portal)
  */
 const express = require('express');
 const rateLimit = require('express-rate-limit');
@@ -10,6 +12,11 @@ const router = express.Router();
 const pool = require('../db');
 const email = require('../services/email');
 const com = require('../services/comercial');
+const jwt = require('jsonwebtoken');
+const storage = require('../services/storage');
+const cifra = require('../services/cifra');
+const pacote = require('../services/pacote-instalador');
+const { PERFIS } = require('../services/contratos-conector');
 
 const EMPRESA_SITE = 1; // o site institucional é da Marsh
 const texto = (v, max) => (v === undefined || v === null || String(v).trim() === '' ? null : String(v).trim().slice(0, max));
@@ -125,6 +132,50 @@ router.post('/proposta/:token/responder', limiteProposta, async (req, res) => {
   } catch (err) {
     console.error('[publico] responder:', err.message);
     res.status(500).json({ erro: 'Não foi possível registrar a resposta.' });
+  }
+});
+
+// ===== Certificado do Conector: validação pública pelo código (quem recebe o certificado confere aqui) =====
+router.get('/certificado/:codigo', limiteProposta, async (req, res) => {
+  const codigo = String(req.params.codigo || '').trim().toUpperCase();
+  if (!/^MC-[A-Z0-9]{8}$/.test(codigo)) return res.status(404).json({ erro: 'Certificado não encontrado.' });
+  try {
+    const r = await pool.query(
+      `SELECT codigo, nome, perfil, cursos, emitido_em FROM certificados WHERE codigo = $1`, [codigo]);
+    if (!r.rows.length) return res.status(404).json({ erro: 'Certificado não encontrado.' });
+    const c = r.rows[0];
+    res.json({ ...c, perfil_nome: PERFIS[c.perfil] ? PERFIS[c.perfil].nome : c.perfil });
+  } catch (err) {
+    console.error('[publico] certificado:', err.message);
+    res.status(500).json({ erro: 'Erro ao consultar o certificado.' });
+  }
+});
+
+// ===== Instalador do Conector já configurado (link curto gerado no portal: /contratos-conector/eu/vagas/:id/pacote) =====
+// O zip publicado ganha um licenca.json com a chave da pessoa: o instalador a lê e pula a tela da chave.
+router.get('/pacote/:token', limiteProposta, async (req, res) => {
+  let dados;
+  try { dados = jwt.verify(String(req.params.token || ''), process.env.JWT_SECRET); } catch { dados = null; }
+  if (!dados || dados.uso !== 'pacote') return res.status(410).send('Link do instalador vencido. Volte ao portal e clique em "Baixar instalador" de novo.');
+  try {
+    const l = (await pool.query(
+      `SELECT * FROM licencas WHERE id = $1 AND usuario_id = $2 AND ativo AND status = 'ativa' AND data_fim >= CURRENT_DATE`,
+      [dados.licenca_id, dados.usuario_id])).rows[0];
+    const inst = (await pool.query('SELECT versao, storage_key, nome_arquivo FROM conector_instaladores ORDER BY id DESC LIMIT 1')).rows[0];
+    if (!l || !inst || !storage.disponivel) return res.status(404).send('Instalador indisponível. Fale com a Marsh.');
+    let chave = null;
+    if (l.chave_cifrada && cifra.configurada()) { try { chave = cifra.decifrar(l.chave_cifrada); } catch { chave = null; } }
+    // Sem a chave guardada não há o que embutir: entrega o pacote normal (a pessoa digita a chave)
+    if (!chave) return res.redirect(await storage.getDownloadUrl(inst.storage_key, inst.nome_arquivo));
+    const licenca = JSON.stringify({
+      chave, titular: l.titular_nome, plano: l.plano, sids: l.sids, gerado_em: new Date().toISOString()
+    }, null, 2);
+    await pacote.enviarPacote(res, {
+      key: inst.storage_key, nomeDownload: inst.nome_arquivo, nomeArquivo: 'licenca.json', conteudo: licenca });
+  } catch (err) {
+    console.error('[publico] pacote:', err.message);
+    if (!res.headersSent) res.status(500).send('Não foi possível montar o instalador. Tente de novo em instantes.');
+    else res.destroy(err);
   }
 });
 

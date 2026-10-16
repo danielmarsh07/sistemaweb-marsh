@@ -691,6 +691,32 @@ async function iniciar() {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_vagas_contrato ON contratos_conector_vagas(contrato_id);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_vagas_usuario ON contratos_conector_vagas(usuario_id) WHERE usuario_id IS NOT NULL;`);
+    // 21c. Certificado da vaga (concluiu todos os cursos do perfil) e licença individual que ele libera.
+    //      cursos = retrato dos cursos no dia (título e carga), para o certificado não mudar depois.
+    //      Licença da vaga: licencas.vaga_id + usuario_id; a chave fica também cifrada (chave_cifrada) para
+    //      aparecer no portal da pessoa e ir no pacote do instalador (o hash continua sendo o que valida).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS certificados (
+        id SERIAL PRIMARY KEY,
+        codigo VARCHAR(20) UNIQUE NOT NULL,
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+        vaga_id INTEGER REFERENCES contratos_conector_vagas(id),
+        contrato_id INTEGER REFERENCES contratos_conector(id),
+        perfil VARCHAR(20) NOT NULL,
+        nome VARCHAR(150) NOT NULL,
+        cursos JSONB NOT NULL DEFAULT '[]',
+        emitido_em TIMESTAMP DEFAULT NOW(),
+        UNIQUE (usuario_id, vaga_id)
+      );
+    `);
+    await pool.query(`
+      ALTER TABLE licencas
+        ADD COLUMN IF NOT EXISTS vaga_id INTEGER,
+        ADD COLUMN IF NOT EXISTS usuario_id INTEGER,
+        ADD COLUMN IF NOT EXISTS chave_cifrada TEXT;
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_licencas_vaga_usuario ON licencas(vaga_id, usuario_id) WHERE vaga_id IS NOT NULL;`);
+
     // Uma vez: trilha dos cursos que já existem, pelo título (o painel corrige se precisar)
     const migTrilhas = await pool.query(
       `INSERT INTO migracoes_app (nome) VALUES ('cursos_trilhas') ON CONFLICT DO NOTHING RETURNING nome;`);

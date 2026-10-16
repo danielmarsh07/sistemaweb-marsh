@@ -23,6 +23,16 @@
 (function (raiz) {
   const CHANGELOG = [
     {
+      versao: 'v3.4',
+      data: '2026-10-16',
+      destaques: [
+        'Quem conclui os cursos do perfil ganha na hora o certificado, com código que qualquer pessoa pode conferir no site',
+        'Junto com o certificado sai a licença do Conector só da pessoa (1 computador), com a chave visível no portal dela',
+        'O instalador baixado pelo portal já vem com a chave: na instalação a pessoa só informa usuário e senha do SAP',
+        'Gestor e Marsh acompanham certificado e licença de cada vaga',
+      ],
+    },
+    {
       versao: 'v3.3',
       data: '2026-10-15',
       destaques: [

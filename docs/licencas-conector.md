@@ -33,6 +33,16 @@ Conector            --(só contadores por ferramenta)---> /api/licencas-conector
 4. O instalador chama `/ativar`: a máquina fica registrada e as conexões (só dos SIDs da licença)
    chegam pré-preenchidas. Usuário e senha do SAP o titular digita na máquina dele.
 
+### Contratos por vagas (licença por pessoa)
+
+Nos contratos do Conector por vagas (Produtos SAP → Contratos por vagas) a licença é emitida sozinha, uma por
+pessoa, quando ela conclui os cursos do perfil (`backend/services/certificacao.js`): `licencas.vaga_id` e
+`usuario_id` preenchidos, `max_maquinas = 1`, plano `desenvolvimento` (ABAP/Ambos) ou `leitura` (Funcional),
+SIDs/conexões/fim/status sempre iguais aos do contrato. A chave fica também cifrada (`chave_cifrada`) e aparece
+no portal da própria pessoa. **Baixar instalador** entrega o zip publicado com um `licenca.json`
+(`{ chave, titular, plano, sids, gerado_em }`) na raiz; o `instalar.ps1` lê o arquivo, valida a chave sozinho e
+abre direto na tela de usuário/senha do SAP. Sem o arquivo (pacote baixado por fora), pede a chave como antes.
+
 ## Máquinas
 
 - Cada computador é identificado por `maquina_hash` (SHA-256 gerado no cliente, 64 hex minúsculos).

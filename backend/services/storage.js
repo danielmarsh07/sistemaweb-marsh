@@ -2,7 +2,7 @@
 // Inicialização lazy: se as env vars não estiverem configuradas, `disponivel` fica false
 // e os endpoints retornam 503 — o resto do app continua funcionando.
 
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CopyObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CopyObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 
@@ -93,4 +93,18 @@ async function remove(key) {
   await client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
-module.exports = { disponivel, upload, uploadNaKey, getDownloadUrl, copiar, remove, sanitizarNome };
+// Tamanho do objeto (bytes) e leitura de um trecho [inicio, fim] (inclusive) — o pacote do instalador
+// é montado em streaming a partir disso, sem carregar o zip inteiro na memória.
+async function tamanho(key) {
+  if (!disponivel) throw new Error('Storage não configurado');
+  const r = await client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+  return Number(r.ContentLength);
+}
+
+async function lerTrecho(key, inicio, fim) {
+  if (!disponivel) throw new Error('Storage não configurado');
+  const r = await client().send(new GetObjectCommand({ Bucket: BUCKET, Key: key, Range: `bytes=${inicio}-${fim}` }));
+  return r.Body; // stream (Readable no Node)
+}
+
+module.exports = { disponivel, upload, uploadNaKey, getDownloadUrl, copiar, remove, sanitizarNome, tamanho, lerTrecho };

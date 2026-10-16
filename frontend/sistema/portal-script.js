@@ -113,9 +113,14 @@ function sair() {
 // o gestor do contrato vê tudo da empresa e mais a seção do contrato (vagas e sistemas SAP).
 let acessoPortal = { papel: null, gestor: false, vagas: [] };
 
-async function carregarPortal() {
+async function carregarAcesso() {
   const r = await apiFetch(`${API}/contratos-conector/eu`);
   if (r && r.ok) acessoPortal = await r.json();
+  renderMinhasVagas();
+}
+
+async function carregarPortal() {
+  await carregarAcesso();
   if (acessoPortal.papel === 'aluno') {
     document.body.classList.add('so-aluno');
     // style (não hidden): o CSS dos blocos define display e venceria o atributo
@@ -141,6 +146,85 @@ async function carregarPortal() {
     carregarFinanceiroPortal(),
     acessoPortal.gestor ? carregarContratosPortal() : null
   ]);
+}
+
+// ===== MINHA LICENÇA DO CONECTOR (quem ocupa vaga) =====
+// Antes do certificado: o que falta por trilha. Depois: certificado, chave, máquina e o instalador já configurado.
+function renderMinhasVagas() {
+  const vagas = acessoPortal.vagas || [];
+  const secao = document.getElementById('secao-minha-licenca');
+  secao.hidden = !vagas.length;
+  if (!vagas.length) return;
+  const lista = document.getElementById('lista-minhas-vagas');
+  lista.classList.toggle('uma-coluna', vagas.length === 1);
+  const br = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
+  const planos = { leitura: 'Leitura (consulta)', desenvolvimento: 'Desenvolvimento (com gravação)' };
+  lista.innerHTML = vagas.map(v => {
+    const p = v.progresso || { trilhas: [], total: 0, feitas: 0 };
+    const pct = p.total ? Math.round(100 * p.feitas / p.total) : 0;
+    const titulo = `<h4>Perfil ${escapeHtml(v.perfil_nome)}
+      ${v.vigente ? '' : '<span class="chip" style="background:#ef444420; color:#ef4444">Contrato inativo</span>'}</h4>`;
+    if (!v.certificado) {
+      return `
+        <div class="licenca-card minha-vaga">
+          ${titulo}
+          <p class="ajuda" style="margin-top:0">Conclua todas as aulas destes cursos para receber o certificado, a sua licença e o instalador do Conector.</p>
+          <ul class="trilhas">${p.trilhas.map(t => {
+            const tot = t.cursos.reduce((s, c) => s + c.total, 0);
+            const fei = t.cursos.reduce((s, c) => s + Math.min(c.feitas, c.total), 0);
+            return `<li><span>${t.concluida ? '<span class="ok">✓</span> ' : ''}${escapeHtml(t.nome)}</span>
+              <strong>${t.cursos.length ? `${fei} de ${tot} aulas` : 'em breve'}</strong></li>`;
+          }).join('')}</ul>
+          <div class="barra-curso"><i style="width:${pct}%"></i></div>
+          <div class="linha"><span>Progresso geral</span><strong>${p.feitas} de ${p.total} aulas (${pct}%)</strong></div>
+        </div>`;
+    }
+    const l = v.licenca;
+    const st = !l ? ['Sem licença', '#64748b'] : l.status === 'ativa' && l.vigente ? ['Ativa', '#10b981']
+      : l.status === 'suspensa' ? ['Suspensa', '#f59e0b'] : ['Inativa', '#ef4444'];
+    return `
+      <div class="licenca-card minha-vaga">
+        ${titulo}
+        <div class="linha"><span>Certificado</span><strong>✓ ${escapeHtml(v.certificado.codigo)}</strong></div>
+        ${l ? `
+          <div class="linha"><span>Licença</span><strong><span class="chip" style="background:${st[1]}20; color:${st[1]}">${st[0]}</span></strong></div>
+          <div class="linha"><span>Plano</span><strong>${escapeHtml(planos[l.plano] || l.plano)}</strong></div>
+          <div class="linha"><span>Válida até</span><strong>${br(l.data_fim)}</strong></div>
+          <div class="linha"><span>Sistemas SAP</span><strong>${escapeHtml(String(l.sids || '').replace(/,/g, ', ') || 'a cadastrar pelo gestor')}</strong></div>
+          <div class="linha"><span>Máquina</span><strong>${l.maquina_nome ? escapeHtml(l.maquina_nome) : 'nenhuma ativada ainda'}</strong></div>
+          <div class="chave-box">
+            <code>${l.chave ? escapeHtml(l.chave) : `${escapeHtml(l.chave_prefixo)}-…`}</code>
+            ${l.chave ? `<button type="button" onclick="copiarChave(this, '${escapeHtml(l.chave)}')">Copiar</button>` : ''}
+          </div>
+          ${l.chave ? '' : '<p class="ajuda">A chave completa não está disponível aqui; peça à Marsh.</p>'}` : ''}
+        <div class="acoes">
+          <a class="btn-curso secundario" href="/certificado.html?c=${encodeURIComponent(v.certificado.codigo)}" target="_blank" rel="noopener">Ver certificado</a>
+          ${l && st[0] === 'Ativa' ? `<button type="button" class="btn-curso" onclick="baixarPacoteVaga(this, ${v.id})">Baixar instalador</button>` : ''}
+        </div>
+        ${l && st[0] === 'Ativa' ? `<p class="ajuda">Descompacte o zip e execute <strong>Instalar.cmd</strong>. A sua chave já vai dentro do instalador:
+          você só informa o seu usuário e senha do SAP. A licença vale para 1 computador; para trocar, fale com o responsável pelo contrato.</p>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function copiarChave(btn, chave) {
+  const ok = () => { btn.textContent = 'Copiada'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1800); };
+  if (navigator.clipboard) navigator.clipboard.writeText(chave).then(ok).catch(() => prompt('Copie a chave:', chave));
+  else prompt('Copie a chave:', chave);
+}
+
+async function baixarPacoteVaga(btn, vagaId) {
+  btn.disabled = true;
+  try {
+    const res = await apiFetch(`${API}/contratos-conector/eu/vagas/${vagaId}/pacote`);
+    if (!res) return;
+    const r = await res.json();
+    if (!res.ok || !r.url) { alert(r.erro || 'Instalador em preparação. Fale com a Marsh.'); return; }
+    if (!r.configurado) alert('Este instalador não traz a chave dentro: copie a sua chave e informe-a quando o instalador pedir.');
+    window.location.href = r.url;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ===== CONTRATO DO CONECTOR (gestor) =====
@@ -197,6 +281,8 @@ function cartaoVaga(k, v) {
       <div class="linha"><span>E-mail</span><strong>${escapeHtml(v.usuario_email)}</strong></div>
       <div class="linha"><span>Progresso</span><strong>${v.aulas_concluidas} de ${v.aulas_total} aulas (${pct}%)</strong></div>
       <div class="barra-curso"><i style="width:${pct}%"></i></div>
+      <div class="linha"><span>Certificado</span><strong>${v.certificado ? '✓ ' + escapeHtml(v.certificado.codigo) : 'ainda não'}</strong></div>
+      ${v.licenca ? `<div class="linha"><span>Licença</span><strong>${escapeHtml(v.licenca.chave_prefixo)}-… · ${v.licenca.maquina_nome ? escapeHtml(v.licenca.maquina_nome) : 'sem máquina'}</strong></div>` : ''}
       <div class="acoes">
         ${v.eh_gestor ? '' : `<button type="button" class="btn-curso secundario" onclick="reenviarConviteVaga(${k.id}, ${v.id})">Reenviar convite</button>`}
         <button type="button" class="btn-curso secundario" onclick="liberarVagaPortal(${k.id}, ${v.id})">Liberar vaga</button>
@@ -1005,7 +1091,14 @@ async function alternarConclusao() {
   const res = await apiFetch(`${API}/treinamentos/aulas/${a.id}/concluir`, {
     method: 'POST', body: JSON.stringify({ concluida: !a.concluida }) });
   if (!res || !res.ok) return;
+  const r = await res.json().catch(() => ({}));
   a.concluida = !a.concluida;
+  // Última aula do perfil: certificado e licença emitidos agora
+  if (r.certificados && r.certificados.length) {
+    alert('Parabéns! Você concluiu os cursos do seu perfil. Seu certificado e sua licença do Conector SAP já estão no portal, em "Minha licença do Conector SAP".');
+    carregarAcesso();
+    if (acessoPortal.gestor) carregarContratosPortal();
+  }
   // Concluiu: avança para a próxima pendente
   const proxima = cursoAberto.aulas.findIndex((x, i) => i > aulaAtual && !x.concluida);
   selecionarAula(a.concluida && proxima >= 0 ? proxima : aulaAtual);
