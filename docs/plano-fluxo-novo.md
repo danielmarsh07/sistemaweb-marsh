@@ -15,11 +15,17 @@ Origem: [Fluxo Novo Marsh](Fluxo%20Novo%20Marsh/Fluxo%20Novo%20Marsh.txt). Anál
 | Fase | Versão | Conteúdo | Situação |
 |---|---|---|---|
 | 0. Segurança e base | v3.5 | Chamados fail-closed; login revalidado no banco (revogação imediata); auditoria geral; eventos do webhook sem repetição; NFS-e sem duplicar; tipo de pessoa no cliente; mesma pessoa não ocupa 2 vagas do mesmo contrato; conversão oportunidade→contrato sem corrida | feita (testes/fluxo-fase0.js) |
-| 1. Contratos unificados | v3.6–3.7 | Tipo (serviço/produto) e periodicidade (mensal/anual); histórico e reajuste; contrato do Conector ligado ao financeiro (fatura anual); rascunho automático de faturas; proposta aceita → contrato com itens | |
+| 1. Contratos unificados | v3.6 | Tipo (serviço/produto) e periodicidade (mensal/anual); histórico e reajuste; contrato do Conector ligado ao financeiro (fatura anual); rascunho automático de faturas; proposta aceita → contrato com itens | feita (testes/fluxo-fase1.js) |
 | 2. Licenças e admin corporativo | v3.8 | Vários administradores por empresa; atribuição livre → convidado → ativo → revogado; cancelar/reenviar convite; histórico; expiração automática; quem perde a vaga mantém o login | |
 | 3. Direitos de acesso e benefícios | v4.0 | Matrículas + direitos de acesso com origem; cadastro de benefícios; migração das regras atuais; "Meus cursos" com origem | |
 | 4. Venda de cursos e Conector | v4.1–4.2 | Ofertas, cupons, pedidos, checkout Asaas, webhook → matrícula; pendente/recusado/estorno/contestação | |
 | 5. Automações | v4.3 | Renovação (avisos 30/7/1), inadimplência (alerta + suspensão em 30 dias), relatórios, log de e-mails; **Roteiro de uso atualizado** | |
+
+## Notas de implementação
+
+- Preço sugerido da cobrança do Conector: plano anual da tabela × 12 por vaga. **Perfil Ambos usa o preço de Desenvolvimento** até a tabela ganhar um preço próprio (pendência da venda online).
+- Contrato anual que vence no próprio mês de cobrança não gera nova anuidade: isso é renovação (fase 5).
+- Histórico de contratos usa a tabela `auditoria` (entidade `contrato`); começa na v3.6.
 
 ## Cenários de teste (seção 12 do documento)
 

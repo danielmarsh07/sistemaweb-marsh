@@ -49,9 +49,29 @@ async function abrirNovoContratoConector() {
   const umAno = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
   f.data_fim.value = umAno;
   f.max_sids.value = 3;
-  ['abap', 'funcional', 'ambos'].forEach(p => { f[p].value = 0; });
+  ['abap', 'funcional', 'ambos'].forEach(p => { f[p].value = 0; f[p].oninput = () => sugerirPrecoConector(); });
+  f.gerar_cobranca.checked = true;
+  f.dia_vencimento.value = 10;
+  f.valor_anual.value = '';
+  f.valor_anual.dataset.editado = '';
+  f.valor_anual.oninput = () => { f.valor_anual.dataset.editado = '1'; };
   await preencherClientesSelect(f.cliente_id);
   showModal('#modal-novo-contrato-conector');
+}
+
+// Valor anual sugerido pela tabela de preços (enquanto o admin não digitar outro)
+let _timerPreco = null;
+function sugerirPrecoConector() {
+  clearTimeout(_timerPreco);
+  _timerPreco = setTimeout(async () => {
+    const f = document.getElementById('form-novo-contrato-conector');
+    if (f.valor_anual.dataset.editado) return;
+    const q = `abap=${f.abap.value || 0}&funcional=${f.funcional.value || 0}&ambos=${f.ambos.value || 0}`;
+    const res = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?${q}`);
+    if (!res || !res.ok) return;
+    const { valor_anual } = await res.json();
+    f.valor_anual.value = valor_anual || '';
+  }, 300);
 }
 
 async function salvarNovoContratoConector() {
@@ -60,7 +80,8 @@ async function salvarNovoContratoConector() {
     cliente_id: f.cliente_id.value, gestor_nome: f.gestor_nome.value, gestor_email: f.gestor_email.value,
     vagas: { abap: f.abap.value, funcional: f.funcional.value, ambos: f.ambos.value },
     data_inicio: f.data_inicio.value || undefined, data_fim: f.data_fim.value, max_sids: f.max_sids.value,
-    observacoes: f.observacoes.value
+    observacoes: f.observacoes.value,
+    cobranca: { gerar: f.gerar_cobranca.checked, valor_anual: f.valor_anual.value, dia_vencimento: f.dia_vencimento.value }
   };
   const res = await apiFetch(`${API_URL}/contratos-conector`, { method: 'POST', body: JSON.stringify(corpo) });
   if (!res) return;
@@ -81,6 +102,10 @@ async function abrirContratoConector(id, manterAberto) {
   document.getElementById('contrato-conector-resumo').innerHTML =
     `${badgeContrato(k)} Gestor: <strong>${escapeHtml(k.gestor_nome)}</strong> (${escapeHtml(k.gestor_email)})` +
     `${k.cpf_cnpj ? ` · CPF/CNPJ ${escapeHtml(k.cpf_cnpj)}` : ''} · origem: ${k.origem === 'loja' ? 'compra pelo site' : 'manual'}`;
+  const mesesNome = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  document.getElementById('contrato-conector-cobranca').innerHTML = k.cobranca
+    ? `Cobrança: <strong>${formatMoeda(k.cobranca.valor)}/ano</strong> (em ${mesesNome[k.cobranca.mes_cobranca - 1]}, vencimento dia ${k.cobranca.dia_vencimento}) — contrato financeiro CT-${String(k.cobranca.id).padStart(4, '0')}${k.cobranca.status !== 'ativo' ? ` (${escapeHtml(k.cobranca.status)})` : ''}.`
+    : `<span style="color:#b7791f">Sem cobrança no Financeiro.</span> <button type="button" class="btn btn-secondary btn-sm" onclick="criarCobrancaConector()">Criar cobrança anual</button>`;
   const f = document.getElementById('form-contrato-conector');
   f.status.value = k.status;
   f.data_inicio.value = k.data_inicio;
@@ -115,6 +140,23 @@ async function abrirContratoConector(id, manterAberto) {
   box.innerHTML = '';
   (k.conexoes || []).forEach(c => adicionarSidAdmin(c));
   if (!manterAberto) showModal('#modal-contrato-conector');
+}
+
+async function criarCobrancaConector() {
+  const k = _contratoAberto;
+  const q = { abap: 0, funcional: 0, ambos: 0 };
+  (k.vagas || []).forEach(v => { q[v.perfil] = (q[v.perfil] || 0) + 1; });
+  const rs = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?abap=${q.abap}&funcional=${q.funcional}&ambos=${q.ambos}`);
+  const sugestao = rs && rs.ok ? (await rs.json()).valor_anual : '';
+  const valor = prompt(`Valor anual da cobrança das ${k.vagas.length} licença(s) (sugestão pela tabela de preços):`, sugestao ? String(sugestao).replace('.', ',') : '');
+  if (valor === null) return;
+  const res = await apiFetch(`${API_URL}/contratos-conector/${k.id}/cobranca`, {
+    method: 'POST', body: JSON.stringify({ valor_anual: Number(valor.replace(/\./g, '').replace(',', '.')) || undefined })
+  });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) { abrirContratoConector(k.id, true); loadContratosConector(); }
 }
 
 function adicionarSidAdmin(c = {}) {

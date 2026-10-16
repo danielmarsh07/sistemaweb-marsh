@@ -436,9 +436,11 @@ function abrirGerarContrato() {
   form.dia_vencimento.value = 10;
   const d = new Date(); d.setMonth(d.getMonth() + 1, 1);
   form.data_inicio.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-  document.getElementById('gc-aviso').textContent = o.cliente_id
+  document.getElementById('gc-aviso').textContent = (o.cliente_id
     ? `O contrato será criado para ${o.nome_exibicao}.`
-    : `"${o.empresa_nome || o.contato_nome}" ainda é prospect: será cadastrado como cliente com os dados de contato. Depois complete CNPJ e endereço em Clientes (a nota fiscal precisa).`;
+    : `"${o.empresa_nome || o.contato_nome}" ainda é prospect: será cadastrado como cliente com os dados de contato. Depois complete CNPJ e endereço em Clientes (a nota fiscal precisa).`) +
+    (aceita ? ` Os itens da proposta ${aceita.numero} vão para o contrato.` : '') +
+    (aceita && Number(aceita.total_unico) > 0 ? ` O valor único (${formatMoeda(aceita.total_unico)}) vira uma fatura avulsa em rascunho.` : '');
   showModal('#modal-gerar-contrato');
 }
 

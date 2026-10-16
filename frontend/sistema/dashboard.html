@@ -813,7 +813,8 @@
           <button type="button" class="btn btn-primary" onclick="abrirNovoContrato()">+ Novo contrato</button>
         </div>
         <p class="pagina-descricao">
-          Cada contrato ativo gera uma fatura por mês no fechamento. Mudanças aqui valem para as próximas faturas.
+          Cada cliente pode ter vários contratos independentes: serviços com cobrança mensal e produtos (como as licenças do Conector) com cobrança anual.
+          O contrato mensal gera uma fatura por mês; o anual, uma por ano no mês da cobrança. Mudanças aqui valem para as próximas faturas e ficam no histórico do contrato.
         </p>
         <div class="table-container">
           <table>
@@ -821,7 +822,7 @@
               <tr>
                 <th>Cliente</th>
                 <th>Contrato</th>
-                <th>Mensalidade</th>
+                <th>Valor</th>
                 <th>Vencimento</th>
                 <th>Vigência</th>
                 <th>Status</th>
@@ -2278,7 +2279,38 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Valor mensal (R$) <span class="obrig" title="Obrigatório">*</span></label>
+            <label>Tipo</label>
+            <select name="tipo" onchange="ajustarFormContrato()">
+              <option value="servico">Serviço</option>
+              <option value="produto">Produto (licenças)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Cobrança</label>
+            <select name="periodicidade" onchange="ajustarFormContrato()">
+              <option value="mensal">Mensal</option>
+              <option value="anual">Anual</option>
+            </select>
+          </div>
+          <div class="form-group" id="contrato-mes-cobranca-grupo">
+            <label>Mês da cobrança anual</label>
+            <select name="mes_cobranca">
+              <option value="">Mês do início</option>
+              <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+              <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+              <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+              <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" id="contrato-conector-grupo">
+          <label>Licenças cobradas por este contrato</label>
+          <select name="contrato_conector_id"><option value="">Nenhum contrato do Conector</option></select>
+          <small class="form-hint">Liga a cobrança às vagas do Conector do mesmo cliente.</small>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label><span id="contrato-valor-rotulo">Valor mensal</span> (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor" min="0.01" step="0.01" required>
           </div>
           <div class="form-group">
@@ -2361,8 +2393,14 @@
           <label>Observações internas</label>
           <textarea name="observacoes" rows="2"></textarea>
         </div>
+        <div id="contrato-extra" style="display:none">
+          <div id="contrato-itens"></div>
+          <div class="form-section-title">Histórico do contrato</div>
+          <div id="contrato-historico" class="fin-muted">—</div>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="button" class="btn btn-secondary" id="btn-reajustar-contrato" style="display:none" onclick="reajustarContrato()">Aplicar reajuste</button>
           <button type="submit" class="btn btn-primary">Salvar contrato</button>
         </div>
       </form>
@@ -2541,6 +2579,16 @@
             <label>Lembrete de vencida a cada (dias)</label>
             <input type="number" name="dias_lembrete" min="0" max="30">
             <small class="form-hint">0 = não enviar lembretes.</small>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="check-linha"><input type="checkbox" name="geracao_automatica"> Gerar os rascunhos do mês automaticamente</label>
+            <small class="form-hint">O sistema cria os rascunhos e avisa por e-mail; você revisa e aprova. Aprovada, a nota e o e-mail ao cliente seguem sozinhos.</small>
+          </div>
+          <div class="form-group">
+            <label>A partir do dia</label>
+            <input type="number" name="dia_geracao" min="1" max="28" value="1">
           </div>
         </div>
         <div class="form-group">
@@ -3154,6 +3202,16 @@
           <div class="form-group"><label>Fim <span class="obrig" title="Obrigatório">*</span></label><input type="date" name="data_fim" required></div>
           <div class="form-group"><label>Máx. de SIDs</label><input type="number" name="max_sids" min="1" max="10" value="3"></div>
         </div>
+        <div class="form-section-title">Cobrança</div>
+        <label class="check-linha"><input type="checkbox" name="gerar_cobranca" checked> Criar a cobrança anual no Financeiro</label>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor anual (R$)</label>
+            <input type="number" name="valor_anual" min="0.01" step="0.01">
+            <small class="form-hint" id="ncc-preco-hint">Sugestão pela tabela de Preços Conector SAP.</small>
+          </div>
+          <div class="form-group"><label>Dia do vencimento</label><input type="number" name="dia_vencimento" min="1" max="28" value="10"></div>
+        </div>
         <div class="form-group">
           <label>Observações</label>
           <textarea name="observacoes" rows="2"></textarea>
@@ -3175,6 +3233,7 @@
       </div>
       <div class="form">
         <p class="pagina-descricao" id="contrato-conector-resumo"></p>
+        <p class="pagina-descricao" id="contrato-conector-cobranca"></p>
         <form id="form-contrato-conector">
           <div class="form-row">
             <div class="form-group">

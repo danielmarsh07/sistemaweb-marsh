@@ -218,8 +218,60 @@ async function liberarVaga(contrato, vagaId, atorId = null) {
   }
 }
 
+// ===== Cobrança do contrato (fluxo novo, fase 1) =====
+// As licenças do Conector são cobradas por um contrato financeiro anual (tipo produto) ligado a este contrato.
+// Preço sugerido = tabela de Preços Conector SAP (Cadastros), plano anual: valor mensal × 12 por vaga.
+// Perfil Ambos usa o preço de Desenvolvimento até a tabela ter um preço próprio para ele.
+async function precoAnualSugerido(db, empresaId, q) {
+  const { normalizarPrecos } = require('./precificacao-conector');
+  const cfg = (await db.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = $1', [empresaId])).rows[0];
+  const { precos } = normalizarPrecos((cfg && cfg.prop_precos_conector) || {});
+  const mensal = (q.abap || 0) * precos.dev_anual + (q.ambos || 0) * precos.dev_anual + (q.funcional || 0) * precos.leitura_anual;
+  return Math.round(mensal * 12 * 100) / 100;
+}
+
+async function quantidadesDoContrato(db, contratoId) {
+  const r = await db.query(
+    `SELECT perfil, COUNT(*)::int AS n FROM contratos_conector_vagas WHERE contrato_id = $1 AND ativo GROUP BY perfil`, [contratoId]);
+  return Object.fromEntries(r.rows.map(x => [x.perfil, x.n]));
+}
+
+/**
+ * Cria o contrato financeiro anual que cobra as licenças deste contrato do Conector.
+ * k = linha de contratos_conector (data_inicio/data_fim). valor vazio = preço sugerido da tabela.
+ */
+async function criarCobrancaAnual(db, k, { valor, dia_vencimento, usuarioId }) {
+  const q = await quantidadesDoContrato(db, k.id);
+  const total = Object.values(q).reduce((s, n) => s + n, 0);
+  const v = valor !== undefined && valor !== null && String(valor).trim() !== '' ? Number(valor) : await precoAnualSugerido(db, k.empresa_id, q);
+  if (!(v > 0)) throw new ErroRegra('Informe o valor anual (a tabela de preços não gerou um valor).');
+  const dia = dia_vencimento ? Number(dia_vencimento) : 10;
+  if (!Number.isInteger(dia) || dia < 1 || dia > 28) throw new ErroRegra('Dia de vencimento: 1 a 28.');
+  const partes = [q.abap && `${q.abap} ABAP`, q.funcional && `${q.funcional} Funcional`, q.ambos && `${q.ambos} Ambos`].filter(Boolean).join(', ');
+  const inicio = String(k.data_inicio instanceof Date ? k.data_inicio.toISOString() : k.data_inicio).slice(0, 10);
+  const fim = String(k.data_fim instanceof Date ? k.data_fim.toISOString() : k.data_fim).slice(0, 10);
+  try {
+    const r = await db.query(
+      `INSERT INTO contratos (empresa_id, cliente_id, descricao, descricao_servico, valor, dia_vencimento, data_inicio, data_fim,
+         tipo, periodicidade, mes_cobranca, contrato_conector_id, itens, emitir_nfse, status, observacoes, criado_por_usuario_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'produto', 'anual', $9, $10, $11, TRUE, 'ativo', $12, $13) RETURNING id`,
+      [k.empresa_id, k.cliente_id, `Conector SAP — ${total} licença(s)`,
+       `Licenciamento anual do Conector SAP Marsh: ${partes}.`, v, dia, inicio, fim,
+       Number(inicio.slice(5, 7)), k.id,
+       JSON.stringify(Object.entries(q).map(([perfil, n]) => ({ descricao: `Licença Conector SAP — ${(PERFIS[perfil] || {}).nome || perfil}`, tipo: 'anual', quantidade: n }))),
+       `Cobrança do contrato do Conector nº ${k.id}.`, usuarioId]);
+    await auditoria.registrar({ empresa_id: k.empresa_id, usuario_id: usuarioId, acao: 'contrato.criado', entidade: 'contrato',
+      entidade_id: r.rows[0].id, depois: { tipo: 'produto', periodicidade: 'anual', valor: v, contrato_conector_id: k.id } }, db);
+    return { id: r.rows[0].id, valor: v };
+  } catch (err) {
+    if (err.code === '23505' && err.constraint === 'uq_contratos_conector_vinculo') throw new ErroRegra('Este contrato do Conector já tem cobrança.');
+    throw err;
+  }
+}
+
 module.exports = {
   PERFIS, TRILHAS, PERFIL_COBRE_TRILHA, VAGA_VIGENTE, ErroRegra,
   sqlCursoLiberado, papelPortal, acharOuCriarUsuario, enviarConvite, detalharContrato,
-  lerQuantidades, criarVagas, ocuparVaga, liberarVaga
+  lerQuantidades, criarVagas, ocuparVaga, liberarVaga,
+  precoAnualSugerido, criarCobrancaAnual
 };

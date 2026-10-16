@@ -430,6 +430,8 @@ async function abrirConfigFinanceiro() {
   form.dias_lembrete.value = c.dias_lembrete ?? 3;
   form.email_copia.value = c.email_copia || '';
   form.cobranca_pix.checked = !!c.cobranca_pix;
+  form.geracao_automatica.checked = c.geracao_automatica !== false;
+  form.dia_geracao.value = c.dia_geracao || 1;
   RETENCOES.forEach(r => { form[r].value = c[r] ? c[r] : ''; });
   const item = (ok, txt) => `<div class="${ok ? 'ok' : 'off'}">${ok ? '●' : '○'} ${escapeHtml(txt)}</div>`;
   document.getElementById('fin-config-status').innerHTML = st ? [
@@ -456,6 +458,8 @@ async function salvarConfigFinanceiro() {
       dias_lembrete: Number(form.dias_lembrete.value || 0),
       email_copia: form.email_copia.value,
       cobranca_pix: form.cobranca_pix.checked,
+      geracao_automatica: form.geracao_automatica.checked,
+      dia_geracao: Number(form.dia_geracao.value || 1),
       ...Object.fromEntries(RETENCOES.map(r => [r, form[r].value || 0]))
     })
   });
@@ -481,11 +485,15 @@ async function loadContratos() {
   }
   tbody.innerHTML = _contratosCache.map(c => {
     const [txt, cor] = STATUS_CONTRATO[c.status] || [c.status, '#64748b'];
+    const anual = c.periodicidade === 'anual';
+    const mesCob = MESES_NOME[(c.mes_cobranca || Number(String(c.data_inicio).slice(5, 7))) - 1];
     return `
     <tr>
       <td data-label="Cliente"><strong>${escapeHtml(c.cliente_nome)}</strong></td>
-      <td data-label="Contrato">${escapeHtml(c.descricao)}${c.emitir_nfse ? '' : ' <span class="fin-muted">(sem NFS-e)</span>'}</td>
-      <td data-label="Mensalidade" class="fin-num">${formatMoeda(c.valor)}</td>
+      <td data-label="Contrato"><span class="fin-muted">${numeroContrato(c.id)} · ${c.tipo === 'produto' ? 'Produto' : 'Serviço'}</span><br>${escapeHtml(c.descricao)}${c.emitir_nfse ? '' : ' <span class="fin-muted">(sem NFS-e)</span>'}
+        ${c.contrato_conector_id ? `<small class="fin-muted" style="display:block">Licenças do Conector nº ${c.contrato_conector_id}</small>` : ''}
+        ${c.reajuste_pendente ? ` ${pill(`Reajuste ${c.indice_reajuste} pendente`, '#b7791f')}` : ''}</td>
+      <td data-label="Valor" class="fin-num">${formatMoeda(c.valor)}<small class="fin-muted" style="display:block">${anual ? `por ano (${mesCob})` : 'por mês'}</small></td>
       <td data-label="Vencimento">Dia ${c.dia_vencimento}</td>
       <td data-label="Vigência">${diaBr(c.data_inicio)} → ${c.data_fim ? diaBr(c.data_fim) : 'sem prazo'}</td>
       <td data-label="Status">${pill(txt, cor)}</td>
@@ -498,6 +506,30 @@ async function loadContratos() {
   }).join('');
 }
 
+const MESES_NOME = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const numeroContrato = id => `CT-${String(id).padStart(4, '0')}`;
+
+// Mostra o que faz sentido para o tipo/cobrança escolhidos (mês da cobrança só no anual; Conector só em produto)
+function ajustarFormContrato() {
+  const form = document.getElementById('form-contrato');
+  const anual = form.periodicidade.value === 'anual';
+  document.getElementById('contrato-mes-cobranca-grupo').style.display = anual ? '' : 'none';
+  document.getElementById('contrato-conector-grupo').style.display = form.tipo.value === 'produto' ? '' : 'none';
+  document.getElementById('contrato-valor-rotulo').textContent = anual ? 'Valor anual' : 'Valor mensal';
+}
+
+// Contratos do Conector do cliente escolhido, para ligar a cobrança às licenças
+async function preencherConectorSelect(form, selecionado) {
+  const sel = form.contrato_conector_id;
+  sel.innerHTML = '<option value="">Nenhum contrato do Conector</option>';
+  const res = await apiFetch(`${API_URL}/contratos-conector`);
+  if (!res || !res.ok) return;
+  const lista = (await res.json()).filter(k => String(k.cliente_id) === String(form.cliente_id.value)
+    && (!k.contrato_financeiro_id || k.contrato_financeiro_id === contratoEmEdicao));
+  sel.innerHTML += lista.map(k => `<option value="${k.id}">Nº ${k.id} — ${k.vagas} vaga(s), até ${diaBr(k.data_fim)}</option>`).join('');
+  sel.value = selecionado || '';
+}
+
 async function abrirNovoContrato() {
   contratoEmEdicao = null;
   const form = document.getElementById('form-contrato');
@@ -506,7 +538,12 @@ async function abrirNovoContrato() {
   form.dia_vencimento.value = 10;
   form.emitir_nfse.checked = true;
   document.getElementById('contrato-status-row').style.display = 'none';
+  document.getElementById('contrato-extra').style.display = 'none';
+  document.getElementById('btn-reajustar-contrato').style.display = 'none';
   await preencherClientesSelect(form.cliente_id);
+  form.cliente_id.onchange = () => preencherConectorSelect(form);
+  await preencherConectorSelect(form);
+  ajustarFormContrato();
   document.getElementById('modal-contrato-titulo').textContent = 'Novo contrato';
   showModal('#modal-contrato');
 }
@@ -519,15 +556,74 @@ async function editarContrato(id) {
   form.reset();
   await preencherClientesSelect(form.cliente_id, c.cliente_id);
   ['descricao', 'descricao_servico', 'valor', 'dia_vencimento', 'data_inicio', 'data_fim', 'indice_reajuste',
-   'codigo_servico', 'nome_servico', 'status', 'observacoes'].forEach(k => { form[k].value = c[k] ?? ''; });
+   'codigo_servico', 'nome_servico', 'status', 'observacoes', 'tipo', 'periodicidade'].forEach(k => { form[k].value = c[k] ?? ''; });
   form.mes_reajuste.value = c.mes_reajuste || '';
+  form.mes_cobranca.value = c.mes_cobranca || '';
   form.aliquota_iss.value = c.aliquota_iss ?? '';
   form.emitir_nfse.checked = c.emitir_nfse;
   form.reter_iss.checked = c.reter_iss;
   RETENCOES.forEach(r => { form[r].value = c[r] ?? ''; });
+  form.cliente_id.onchange = () => preencherConectorSelect(form);
+  await preencherConectorSelect(form, c.contrato_conector_id);
+  ajustarFormContrato();
   document.getElementById('contrato-status-row').style.display = '';
-  document.getElementById('modal-contrato-titulo').textContent = `Contrato — ${c.cliente_nome}`;
+  document.getElementById('btn-reajustar-contrato').style.display = '';
+  document.getElementById('contrato-extra').style.display = '';
+  document.getElementById('contrato-itens').innerHTML = Array.isArray(c.itens) && c.itens.length
+    ? `<div class="form-section-title">Itens contratados</div><ul class="fin-lista-itens">${c.itens.map(i =>
+        `<li>${escapeHtml(i.descricao || '')}${i.quantidade ? ` × ${escapeHtml(String(i.quantidade))}` : ''}${i.valor_unitario ? ` — ${formatMoeda(i.valor_unitario)}` : ''}${i.tipo ? ` <span class="fin-muted">(${escapeHtml(i.tipo)})</span>` : ''}</li>`).join('')}</ul>`
+    : '';
+  document.getElementById('modal-contrato-titulo').textContent = `${numeroContrato(c.id)} — ${c.cliente_nome}`;
   showModal('#modal-contrato');
+  carregarHistoricoContrato(id);
+}
+
+// Histórico: criação, alterações (campo: antes → depois), reajustes e encerramento
+const ROTULOS_CAMPO_CONTRATO = {
+  valor: 'Valor', descricao: 'Nome', descricao_servico: 'Descrição na nota', dia_vencimento: 'Vencimento', data_inicio: 'Início',
+  data_fim: 'Fim', status: 'Status', tipo: 'Tipo', periodicidade: 'Cobrança', mes_cobranca: 'Mês da cobrança',
+  indice_reajuste: 'Índice de reajuste', mes_reajuste: 'Mês do reajuste', emitir_nfse: 'Emite NFS-e', codigo_servico: 'Código do serviço',
+  aliquota_iss: 'ISS', cliente_id: 'Cliente', contrato_conector_id: 'Contrato do Conector'
+};
+const ACOES_CONTRATO = { 'contrato.criado': 'Contrato criado', 'contrato.alterado': 'Alterado', 'contrato.reajustado': 'Reajuste aplicado', 'contrato.encerrado': 'Encerrado' };
+
+async function carregarHistoricoContrato(id) {
+  const box = document.getElementById('contrato-historico');
+  box.textContent = 'Carregando…';
+  const res = await apiFetch(`${API_URL}/financeiro/contratos/${id}/historico`);
+  if (!res || !res.ok) { box.textContent = 'Não foi possível carregar o histórico.'; return; }
+  const linhas = await res.json();
+  if (!linhas.length) { box.textContent = 'Sem alterações registradas (o histórico começou na versão 3.6).'; return; }
+  box.innerHTML = `<ul class="fin-lista-itens">${linhas.map(h => {
+    const quando = new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    let detalhe = '';
+    if (h.acao === 'contrato.reajustado' && h.depois) {
+      detalhe = `${formatMoeda(h.antes.valor)} → ${formatMoeda(h.depois.valor)} (${h.depois.percentual}%)`;
+    } else if (h.acao === 'contrato.alterado' && h.depois) {
+      detalhe = Object.keys(h.depois).map(k => `${ROTULOS_CAMPO_CONTRATO[k] || k}: ${escapeHtml(String(h.antes[k] ?? '—'))} → ${escapeHtml(String(h.depois[k] ?? '—'))}`).join('; ');
+    }
+    return `<li><strong>${ACOES_CONTRATO[h.acao] || escapeHtml(h.acao)}</strong> · ${quando}${h.usuario_nome ? ` · ${escapeHtml(h.usuario_nome)}` : ''}
+      ${detalhe ? `<small style="display:block">${detalhe}</small>` : ''}${h.detalhe ? `<small class="fin-muted" style="display:block">${escapeHtml(h.detalhe)}</small>` : ''}</li>`;
+  }).join('')}</ul>`;
+}
+
+async function reajustarContrato() {
+  const c = _contratosCache.find(x => x.id === contratoEmEdicao);
+  if (!c) return;
+  const entrada = prompt(`Reajuste de ${numeroContrato(c.id)} (valor atual ${formatMoeda(c.valor)}).\n\nInforme o percentual (ex.: 4,5) ou o novo valor com "R$" (ex.: R$ 10500):`, '');
+  if (entrada === null || !entrada.trim()) return;
+  const txt = entrada.trim();
+  const numero = Number(txt.replace(/R\$|\s|\./g, '').replace(',', '.').replace('%', ''));
+  if (!Number.isFinite(numero)) { alert('Valor inválido.'); return; }
+  const corpo = /R\$/.test(txt) ? { novo_valor: numero } : { percentual: numero };
+  corpo.observacao = c.indice_reajuste !== 'nenhum' ? `Reajuste anual ${c.indice_reajuste}` : '';
+  const res = await apiFetch(`${API_URL}/financeiro/contratos/${c.id}/reajuste`, { method: 'POST', body: JSON.stringify(corpo) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (!res.ok) return;
+  await loadContratos();
+  editarContrato(c.id);
 }
 
 async function salvarContrato() {
@@ -548,7 +644,11 @@ async function salvarContrato() {
     aliquota_iss: form.aliquota_iss.value,
     reter_iss: form.reter_iss.checked,
     status: contratoEmEdicao ? form.status.value : 'ativo',
-    observacoes: form.observacoes.value
+    observacoes: form.observacoes.value,
+    tipo: form.tipo.value,
+    periodicidade: form.periodicidade.value,
+    mes_cobranca: form.mes_cobranca.value,
+    contrato_conector_id: form.tipo.value === 'produto' ? form.contrato_conector_id.value : ''
   };
   RETENCOES.forEach(r => { dados[r] = form[r].value; });
   const url = contratoEmEdicao ? `${API_URL}/financeiro/contratos/${contratoEmEdicao}` : `${API_URL}/financeiro/contratos`;

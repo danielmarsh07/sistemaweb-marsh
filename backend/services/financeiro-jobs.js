@@ -1,4 +1,5 @@
 // Rotina periódica do financeiro (roda dentro do próprio servidor, a cada hora):
+//  0. Gera os rascunhos das faturas do mês a partir do dia configurado (o admin aprova)
 //  1. Consulta no Asaas as NFS-e ainda em processamento (caso o webhook não tenha chegado)
 //  2. Consulta as cobranças PIX pendentes (baixa automática se o webhook de pagamento falhou)
 //  3. Envia lembrete por e-mail de faturas vencidas e não pagas
@@ -102,10 +103,44 @@ async function enviarLembretes() {
   }
 }
 
+// Rascunhos automáticos: a partir do dia_geracao (horário de Brasília), gera os rascunhos da competência do mês
+// para os contratos que ainda não têm fatura nela. Idempotente: rodar de novo não duplica, e fatura cancelada
+// pelo admin não é recriada. Avisa os administradores por e-mail quando há rascunhos novos para aprovar.
+function hojeBrasilia() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }); // AAAA-MM-DD
+}
+
+async function gerarRascunhosAutomaticos() {
+  const hoje = hojeBrasilia();
+  const competencia = hoje.slice(0, 7), dia = Number(hoje.slice(8, 10));
+  const empresas = await pool.query(
+    `SELECT DISTINCT ct.empresa_id FROM contratos ct
+     LEFT JOIN financeiro_config cfg ON cfg.empresa_id = ct.empresa_id
+     WHERE ct.status = 'ativo' AND COALESCE(cfg.geracao_automatica, TRUE) AND COALESCE(cfg.dia_geracao, 1) <= $1`, [dia]);
+  for (const { empresa_id } of empresas.rows) {
+    try {
+      const geradas = await fat.gerarRascunhos({ empresa_id, competencia, automatico: true });
+      if (geradas) {
+        const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
+        await email.notificarAdminsComercial({
+          empresa_id, assunto: `${geradas} fatura(s) aguardando aprovação`,
+          titulo: 'Faturas do mês geradas como rascunho',
+          linhas: [['Competência', `${competencia.slice(5)}/${competencia.slice(0, 4)}`], ['Rascunhos novos', String(geradas)],
+                   ['Próximo passo', 'Revise e aprove. Ao aprovar, a nota fiscal e o e-mail ao cliente seguem sozinhos.']],
+          link: `${base}/dashboard.html#faturamento`
+        }).catch(() => false);
+      }
+    } catch (err) {
+      registrarAlerta({ chave: 'job:rascunhos', titulo: 'Rotina: falha ao gerar os rascunhos de faturas do mês', detalhe: `empresa ${empresa_id}: ${err.message}` });
+    }
+  }
+}
+
 async function ciclo() {
   if (rodando) return;
   rodando = true;
   try {
+    await gerarRascunhosAutomaticos();
     await sincronizarNotasPendentes();
     await sincronizarPixPendentes(); // antes dos lembretes: quem já pagou não recebe cobrança
     await enviarLembretes();
@@ -122,4 +157,4 @@ function iniciar() {
   setInterval(ciclo, UMA_HORA);
 }
 
-module.exports = { iniciar, ciclo, estenderRecorrentes };
+module.exports = { iniciar, ciclo, estenderRecorrentes, gerarRascunhosAutomaticos };

@@ -1160,6 +1160,26 @@ async function iniciar() {
       }
     }
 
+    // 31. Fluxo novo — fase 1: contratos unificados (serviço mensal e produto anual no mesmo cadastro)
+    //     tipo: servico | produto · periodicidade: mensal | anual (anual fatura só no mes_cobranca;
+    //     sem ele, no mês do início) · contrato_conector_id: licenças do Conector cobertas por este contrato
+    //     itens: o que foi contratado (vem da proposta) · ultimo_reajuste: data do último reajuste aplicado
+    //     Histórico de alterações: tabela auditoria (entidade 'contrato')
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS tipo VARCHAR(10) NOT NULL DEFAULT 'servico';`);
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS periodicidade VARCHAR(10) NOT NULL DEFAULT 'mensal';`);
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS mes_cobranca INTEGER CHECK (mes_cobranca BETWEEN 1 AND 12);`);
+    //     (ON DELETE SET NULL: apagar a oportunidade/proposta ou o contrato do Conector não trava; o contrato fica)
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS contrato_conector_id INTEGER REFERENCES contratos_conector(id) ON DELETE SET NULL;`);
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS itens JSONB;`);
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS proposta_id INTEGER REFERENCES propostas(id) ON DELETE SET NULL;`);
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS ultimo_reajuste DATE;`);
+    //     Um contrato do Conector é cobrado por um único contrato financeiro
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_contratos_conector_vinculo ON contratos(contrato_conector_id) WHERE contrato_conector_id IS NOT NULL;`);
+    //     Rascunhos automáticos: a partir do dia_geracao de cada mês a rotina gera os rascunhos da competência;
+    //     o admin aprova e o envio (NFS-e + e-mail) segue sozinho
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS geracao_automatica BOOLEAN NOT NULL DEFAULT TRUE;`);
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS dia_geracao INTEGER NOT NULL DEFAULT 1 CHECK (dia_geracao BETWEEN 1 AND 28);`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

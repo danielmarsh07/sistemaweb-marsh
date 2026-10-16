@@ -22,6 +22,16 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v3.6', data: '2026-10-16', destaques: [
+      'Contratos agora têm tipo (serviço ou produto) e cobrança mensal ou anual: o contrato anual gera uma fatura por ano, no mês escolhido, com o período coberto na descrição',
+      'As faturas do mês são geradas como rascunho automaticamente (a partir do dia escolhido em Configuração) e você recebe um e-mail para revisar; aprovada, a nota fiscal e o e-mail ao cliente seguem sozinhos',
+      'Fatura cancelada de propósito não é recriada pela geração automática',
+      'Cada contrato tem histórico: quem mudou o quê e quando (valor, vencimento, vigência, status…)',
+      'Botão "Aplicar reajuste" no contrato (percentual ou novo valor) e aviso de "reajuste pendente" no mês do índice',
+      'Contrato do Conector pode nascer com a cobrança anual no Financeiro, com o valor sugerido pela tabela de Preços Conector SAP; contratos antigos ganham o botão "Criar cobrança anual"',
+      'Gerar contrato a partir da oportunidade copia os itens da proposta aceita, e o valor único vira uma fatura avulsa em rascunho',
+      'Aprovar a mesma fatura duas vezes seguidas não emite nota nem envia e-mail em dobro'
+    ] },
     { versao: 'v3.5', data: '2026-10-16', destaques: [
       'Usuário desativado, com senha redefinida ou que mudou de empresa sai do sistema na hora (antes podia continuar logado por até 8 horas)',
       'Corrigido: usuário do portal sem empresa vinculada não vê mais chamados de outros clientes',

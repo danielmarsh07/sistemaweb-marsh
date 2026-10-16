@@ -10,6 +10,7 @@ const router = express.Router();
 const pool = require('../db');
 const email = require('../services/email');
 const com = require('../services/comercial');
+const auditoria = require('../services/auditoria');
 const conector = require('../services/precificacao-conector');
 
 const emp = req => req.usuario.empresa_id || 1;
@@ -222,20 +223,46 @@ router.post('/oportunidades/:id/gerar-contrato', async (req, res) => {
       clienteNovo = true;
       await client.query('UPDATE oportunidades SET cliente_id = $1 WHERE id = $2', [clienteId, o.id]);
     }
+    // Proposta aceita (a mais recente): os itens vão para o contrato e o valor único vira fatura avulsa em rascunho
+    const proposta = (await client.query(
+      `SELECT id, numero, versao, itens, total_unico::float AS total_unico FROM propostas
+       WHERE oportunidade_id = $1 AND empresa_id = $2 AND status = 'aceita' ORDER BY data_resposta DESC NULLS LAST, id DESC LIMIT 1`,
+      [o.id, emp(req)])).rows[0] || null;
     const ct = await client.query(
       `INSERT INTO contratos (empresa_id, cliente_id, descricao, descricao_servico, valor, dia_vencimento, data_inicio,
-         emitir_nfse, status, observacoes, criado_por_usuario_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 'ativo', $8, $9) RETURNING id`,
+         emitir_nfse, status, observacoes, criado_por_usuario_id, proposta_id, itens)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 'ativo', $8, $9, $10, $11) RETURNING id`,
       [emp(req), clienteId, texto(b.descricao, 255), String(b.descricao_servico).trim(), Number(b.valor), dia,
-       b.data_inicio, `Gerado da oportunidade #${o.id} (${o.titulo}).`, req.usuario.id]);
+       b.data_inicio, `Gerado da oportunidade #${o.id} (${o.titulo}).`, req.usuario.id,
+       proposta && proposta.id, proposta && JSON.stringify(proposta.itens)]);
+    let faturaUnica = null;
+    if (proposta && proposta.total_unico > 0) {
+      const cfg = (await client.query('SELECT * FROM financeiro_config WHERE empresa_id = $1', [emp(req)])).rows[0] || {};
+      const unicos = (proposta.itens || []).filter(i => i.tipo === 'unico').map(i => i.descricao).filter(Boolean);
+      faturaUnica = (await client.query(
+        `INSERT INTO faturas (empresa_id, cliente_id, competencia, descricao, valor, data_vencimento, status,
+           emitir_nfse, codigo_servico, nome_servico, aliquota_iss, ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, criado_por_usuario_id, observacoes)
+         VALUES ($1, $2, date_trunc('month', $3::date)::date, $4, $5,
+           (date_trunc('month', $3::date) + INTERVAL '1 month' + ($6::int - 1) * INTERVAL '1 day')::date, 'rascunho',
+           TRUE, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
+        [emp(req), clienteId, b.data_inicio, unicos.length ? unicos.join('; ') : `${texto(b.descricao, 200)} — valor único`,
+         proposta.total_unico, dia, cfg.codigo_servico || null, cfg.nome_servico || null, cfg.aliquota_iss || 0,
+         cfg.ret_ir || 0, cfg.ret_csll || 0, cfg.ret_pis || 0, cfg.ret_cofins || 0, cfg.ret_inss || 0, req.usuario.id,
+         `Valor único da proposta ${proposta.numero} v${proposta.versao}.`])).rows[0].id;
+    }
+    await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'contrato.criado', entidade: 'contrato',
+      entidade_id: ct.rows[0].id, depois: { valor: Number(b.valor), oportunidade_id: o.id, proposta_id: proposta && proposta.id },
+      detalhe: faturaUnica ? `Fatura avulsa #${faturaUnica} (valor único) criada como rascunho.` : null }, client);
     await client.query('UPDATE oportunidades SET contrato_id = $1 WHERE id = $2', [ct.rows[0].id, o.id]);
     await com.mudarEtapa(o.id, 'ganha', req.usuario.id, { client });
     await com.registrarHistorico(o.id, 'sistema',
       `Contrato #${ct.rows[0].id} gerado${clienteNovo ? ' e cliente cadastrado' : ''}.`, req.usuario.id, client);
     await client.query('COMMIT');
     res.status(201).json({
-      mensagem: `Contrato criado${clienteNovo ? ' e prospect cadastrado como cliente (complete CNPJ e endereço em Clientes)' : ''}.`,
-      contrato_id: ct.rows[0].id, cliente_id: clienteId, cliente_novo: clienteNovo
+      mensagem: `Contrato criado${clienteNovo ? ' e prospect cadastrado como cliente (complete CNPJ e endereço em Clientes)' : ''}.` +
+        (proposta ? ` Itens da proposta ${proposta.numero} copiados para o contrato.` : '') +
+        (faturaUnica ? ' O valor único virou uma fatura avulsa em rascunho no Faturamento.' : ''),
+      contrato_id: ct.rows[0].id, cliente_id: clienteId, cliente_novo: clienteNovo, fatura_unica_id: faturaUnica
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});

@@ -35,6 +35,7 @@ async function carregarConfig(empresa_id) {
   return r.rows[0] || {
     empresa_id, instrucoes_pagamento: null, pix_chave: null, codigo_servico: null, nome_servico: null,
     aliquota_iss: 0, email_copia: null, dias_lembrete: 3, vencimento_mes_seguinte: true,
+    geracao_automatica: true, dia_geracao: 1,
     ret_ir: 0, ret_csll: 0, ret_pis: 0, ret_cofins: 0, ret_inss: 0
   };
 }
@@ -197,9 +198,11 @@ async function sincronizarPix(fatura) {
 // Aprova um rascunho: vira "aberta", emite a NFS-e, gera o PIX (se ligado) e envia o e-mail
 // (com nota emitida na hora → e-mail já leva o PDF; se a prefeitura demorar, o e-mail sai quando a nota autorizar)
 async function aprovarFatura(fatura, usuario_id) {
-  await pool.query(
+  const aprovada = await pool.query(
     `UPDATE faturas SET status = 'aberta', data_aprovacao = NOW(), atualizado_por_usuario_id = $2, data_atualizacao = NOW()
      WHERE id = $1 AND status = 'rascunho'`, [fatura.id, usuario_id]);
+  // Dois cliques em "Aprovar": só o primeiro emite nota e envia e-mail
+  if (!aprovada.rowCount) return { id: fatura.id, ja_aprovada: true, nfse_status: fatura.nfse_status, email_enviado: false };
   const config = await carregarConfig(fatura.empresa_id);
   const pix = config.cobranca_pix ? await gerarPix(fatura) : null;
   const nfse = await emitirNfse(fatura);
@@ -211,7 +214,73 @@ async function aprovarFatura(fatura, usuario_id) {
   return { id: fatura.id, nfse_status: nfse, pix_status: pix, email_enviado: emailEnviado };
 }
 
+// ===== Geração de rascunhos (fechamento manual e rotina automática) =====
+// Contrato entra na competência se está ativo e vigente em algum dia do mês. Mensal: todo mês.
+// Anual: só no mês de cobrança (mes_cobranca; sem ele, o mês do início do contrato) e se o contrato ainda
+// passa do mês de cobrança — o que vence em out/2027 não gera nova anuidade em out/2027 (isso é renovação).
+const MES_COBRANCA = 'COALESCE(ct.mes_cobranca, EXTRACT(MONTH FROM ct.data_inicio)::int)';
+const SQL_CONTRATOS_DA_COMPETENCIA = `
+  FROM contratos ct JOIN clientes c ON c.id = ct.cliente_id
+  WHERE ct.empresa_id = $1 AND ct.status = 'ativo'
+    AND ct.data_inicio <= ($2::date + INTERVAL '1 month - 1 day')
+    AND (ct.data_fim IS NULL OR ct.data_fim >= CASE WHEN ct.periodicidade = 'anual' THEN $2::date + INTERVAL '1 month' ELSE $2::date END)
+    AND (ct.periodicidade = 'mensal' OR ${MES_COBRANCA} = EXTRACT(MONTH FROM $2::date))`;
+
+// Descrição da fatura: a do serviço; na anual, com o período coberto (12 meses a partir da competência)
+function descricaoFatura(c, inicio) {
+  if (c.periodicidade !== 'anual') return c.descricao_servico;
+  const [a, m] = inicio.split('-').map(Number);
+  const fimM = m === 1 ? 12 : m - 1, fimA = m === 1 ? a : a + 1;
+  return `${c.descricao_servico}\nAnuidade: ${String(m).padStart(2, '0')}/${a} a ${String(fimM).padStart(2, '0')}/${fimA}.`;
+}
+
+/**
+ * Gera os rascunhos da competência (AAAA-MM) para os contratos que ainda não têm fatura nela.
+ * automatico = true (rotina): também pula contrato cuja fatura do mês foi cancelada, para não recriar
+ * o que o admin cancelou de propósito. Devolve o número de faturas criadas.
+ */
+async function gerarRascunhos({ empresa_id, competencia, usuario_id = null, automatico = false }) {
+  const inicio = `${competencia}-01`;
+  const config = await carregarConfig(empresa_id);
+  const filtroFatura = automatico ? '' : `AND f.status <> 'cancelada'`;
+  const client = await pool.connect();
+  try {
+    const elegiveis = (await client.query(
+      `SELECT ct.*, ${MES_COBRANCA} AS mes_cobranca_efetivo
+       ${SQL_CONTRATOS_DA_COMPETENCIA}
+         AND NOT EXISTS (SELECT 1 FROM faturas f WHERE f.contrato_id = ct.id AND f.competencia = $2::date ${filtroFatura})`,
+      [empresa_id, inicio])).rows;
+    await client.query('BEGIN');
+    let geradas = 0;
+    for (const c of elegiveis) {
+      // Vencimento: dia do contrato no mês seguinte à competência (ou no próprio mês, conforme a configuração)
+      const r = await client.query(
+        `INSERT INTO faturas (empresa_id, cliente_id, contrato_id, competencia, descricao, valor, data_vencimento,
+           emitir_nfse, codigo_servico, nome_servico, aliquota_iss, reter_iss, criado_por_usuario_id,
+           ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss)
+         VALUES ($1, $2, $3, $4::date, $5, $6,
+           ($4::date + ($7::text || ' month')::interval + ($8::int - 1) * INTERVAL '1 day')::date,
+           $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+         ON CONFLICT DO NOTHING RETURNING id`,
+        [empresa_id, c.cliente_id, c.id, inicio, descricaoFatura(c, inicio), c.valor,
+         config.vencimento_mes_seguinte === false ? '0' : '1', c.dia_vencimento,
+         c.emitir_nfse, c.codigo_servico || config.codigo_servico, c.nome_servico || config.nome_servico,
+         c.aliquota_iss ?? config.aliquota_iss, c.reter_iss, usuario_id,
+         ...RETENCOES.map(r => c[r] ?? config[r] ?? 0)]);
+      geradas += r.rowCount;
+    }
+    await client.query('COMMIT');
+    return geradas;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
+  SQL_CONTRATOS_DA_COMPETENCIA, MES_COBRANCA, gerarRascunhos,
   RETENCOES, sqlValorLiquido, COLUNAS_FATURA, carregarConfig, carregarFatura, carregarCliente,
   enviarEmailFatura, emitirNfse, sincronizarNfse, aposAtualizarNota, aprovarFatura,
   gerarPix, cancelarPix, aplicarCobrancaNaFatura, sincronizarPix, registrarPagamento

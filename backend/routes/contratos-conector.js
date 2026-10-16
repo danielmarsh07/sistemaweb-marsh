@@ -209,7 +209,8 @@ router.get('/', async (req, res) => {
               (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.usuario_id IS NOT NULL) AS ocupadas,
               (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.perfil = 'abap') AS vagas_abap,
               (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.perfil = 'funcional') AS vagas_funcional,
-              (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.perfil = 'ambos') AS vagas_ambos
+              (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.perfil = 'ambos') AS vagas_ambos,
+              (SELECT ct.id FROM contratos ct WHERE ct.contrato_conector_id = k.id) AS contrato_financeiro_id
        FROM contratos_conector k
        JOIN clientes cl ON cl.id = k.cliente_id
        JOIN usuarios g ON g.id = k.gestor_usuario_id
@@ -219,12 +220,41 @@ router.get('/', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao listar contratos'); }
 });
 
+// GET /preco-sugerido?abap=&funcional=&ambos= — valor anual pela tabela de Preços Conector SAP (antes de /:id)
+router.get('/preco-sugerido', async (req, res) => {
+  try {
+    const { q } = cc.lerQuantidades({ abap: req.query.abap, funcional: req.query.funcional, ambos: req.query.ambos });
+    res.json({ valor_anual: await cc.precoAnualSugerido(pool, emp(req), q) });
+  } catch (err) { responderErro(res, err, 'Erro ao calcular o preço'); }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    res.json(await cc.detalharContrato(k.id));
+    const detalhe = await cc.detalharContrato(k.id);
+    const cob = (await pool.query(
+      `SELECT id, valor::float AS valor, status, dia_vencimento, COALESCE(mes_cobranca, EXTRACT(MONTH FROM data_inicio)::int) AS mes_cobranca
+       FROM contratos WHERE contrato_conector_id = $1`, [k.id])).rows[0] || null;
+    res.json({ ...detalhe, cobranca: cob });
   } catch (err) { responderErro(res, err, 'Erro ao buscar contrato'); }
+});
+
+// POST /:id/cobranca { valor_anual?, dia_vencimento? } — cria a cobrança anual de um contrato que ainda não tem
+router.post('/:id/cobranca', async (req, res) => {
+  const b = req.body || {};
+  const db = await pool.connect();
+  try {
+    const k = (await db.query('SELECT * FROM contratos_conector WHERE id = $1 AND empresa_id = $2', [req.params.id, emp(req)])).rows[0];
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    await db.query('BEGIN');
+    const c = await cc.criarCobrancaAnual(db, k, { valor: b.valor_anual, dia_vencimento: b.dia_vencimento, usuarioId: req.usuario.id });
+    await db.query('COMMIT');
+    res.status(201).json({ mensagem: `Cobrança anual de R$ ${c.valor.toFixed(2).replace('.', ',')} criada. Veja em Financeiro → Contratos.`, contrato_financeiro_id: c.id });
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    responderErro(res, err, 'Erro ao criar a cobrança');
+  } finally { db.release(); }
 });
 
 // POST / — { cliente_id, gestor_nome, gestor_email, vagas: { abap, funcional, ambos }, data_inicio?, data_fim, max_sids?, observacoes? }
@@ -250,15 +280,22 @@ router.post('/', async (req, res) => {
       // Sem início: hoje no horário de Brasília (o CURRENT_DATE do banco é UTC e viraria o dia às 21h)
       [emp(req), cliente.id, gestor.id, inicio || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }), fim, maxSids, String(b.observacoes || '').trim() || null, req.usuario.id])).rows[0];
     await cc.criarVagas(db, k.id, q);
+    // Cobrança anual no financeiro (opcional): { cobranca: { gerar: true, valor_anual?, dia_vencimento? } }
+    let cobranca = null;
+    if (b.cobranca && b.cobranca.gerar) {
+      const linha = (await db.query('SELECT * FROM contratos_conector WHERE id = $1', [k.id])).rows[0];
+      cobranca = await cc.criarCobrancaAnual(db, linha, { valor: b.cobranca.valor_anual, dia_vencimento: b.cobranca.dia_vencimento, usuarioId: req.usuario.id });
+    }
     await db.query('COMMIT');
 
     const enviado = criado ? await cc.enviarConvite(gestor) : false;
+    const txtCobranca = cobranca ? ` Cobrança anual de R$ ${cobranca.valor.toFixed(2).replace('.', ',')} criada em Financeiro → Contratos.` : '';
     res.status(201).json({
-      id: k.id, convite_enviado: enviado,
-      mensagem: criado
+      id: k.id, convite_enviado: enviado, contrato_financeiro_id: cobranca && cobranca.id,
+      mensagem: (criado
         ? (enviado ? `Contrato criado com ${total} vaga(s). Convite enviado ao gestor (${gestor.email}).`
           : `Contrato criado com ${total} vaga(s), mas o convite ao gestor não pôde ser enviado. Use "Reenviar convite".`)
-        : `Contrato criado com ${total} vaga(s). ${gestor.nome} já tinha acesso ao portal e agora é o gestor.`
+        : `Contrato criado com ${total} vaga(s). ${gestor.nome} já tinha acesso ao portal e agora é o gestor.`) + txtCobranca
     });
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
