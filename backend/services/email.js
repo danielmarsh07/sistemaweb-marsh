@@ -500,7 +500,26 @@ async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, l
   return enviar({ to: admins, subject: `[Marsh] ${assunto}`, html });
 }
 
+/** Loja: pagamento confirmado, curso liberado. linkSenha = criar a senha (primeiro acesso). */
+async function enviarCursoLiberado({ nome, email, curso, fim, linkSenha, teste }) {
+  const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
+  const ate = fim ? `até ${String(fim).slice(0, 10).split('-').reverse().join('/')}` : 'sem prazo de validade';
+  const html = templateBase({
+    titulo: 'Seu curso foi liberado', preheader: `${curso} já está disponível no portal.`,
+    corpo: `
+      ${teste ? '<p style="margin:0 0 12px;padding:8px 12px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:13px">Compra de TESTE (homologação): nenhum valor foi cobrado.</p>' : ''}
+      <h2 style="margin:0 0 12px;color:#0f172a;font-size:20px">Olá, ${esc(String(nome || '').split(' ')[0])}!</h2>
+      <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6">Recebemos o seu pagamento. O curso <strong>${esc(curso)}</strong> está liberado ${esc(ate)}.</p>
+      ${linkSenha
+        ? `<p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6">Para o primeiro acesso, crie a sua senha (o link vale 72 horas):</p>
+           <a href="${esc(linkSenha)}" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Criar minha senha →</a>`
+        : `<a href="${esc(base)}/login.html" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Entrar no portal →</a>`}`
+  });
+  return enviar({ to: email, subject: `${teste ? '[TESTE] ' : ''}Curso liberado: ${curso}`, html });
+}
+
 module.exports = {
+  enviarCursoLiberado,
   notificarNovoChamado,
   notificarAtualizacaoStatus,
   notificarNovoAtendimento,

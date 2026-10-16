@@ -33,9 +33,13 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/fluxo-fase1.js                     # fluxo novo fase 1: vários contratos por cliente, mensal × anual, rascunhos manuais/automáticos sem duplicar, histórico, reajuste, cobrança do Conector, proposta → contrato
    node testes/fluxo-fase2.js                     # fluxo novo fase 2: 100 licenças e a 101ª bloqueada (convites simultâneos), convite → senha → ativa, cancelar/expirar, revogar sem apagar a conta, vários administradores, isolamento
    node testes/fluxo-fase3.js                     # fluxo novo fase 3: curso gratuito pela licença, revogar/vencer/suspender bloqueia, renovar restabelece, compra e duas origens, benefícios, liberação individual
+   node testes/fluxo-fase4.js                     # loja de cursos com Asaas FALSO (porta 3998): promoção, cupom, pedido, webhook, estorno, teste × produção, falha e nova tentativa, expiração
    node testes/simulador-conector.js [saida.pdf]  # simulador de preço do Conector SAP: cálculo, validações, tabela de preços, gerar proposta + PDF A4 (Chrome headless)
    node testes/marketing.js                       # Instagram: conta cifrada, upload PNG→JPEG, posts, importar agenda, publicação num Graph falso, retentativa, limite, métricas, token
    ```
+
+   O da loja (`fluxo-fase4.js`) precisa do servidor apontando para o Asaas falso:
+   `LOJA_LIMITE_PEDIDOS=100 ASAAS_URL_TESTES=http://localhost:3998 ASAAS_SANDBOX_WEBHOOK_TOKEN=sbx-token-teste ASAAS_WEBHOOK_TOKEN=token-teste-local-123 npm run dev:local`.
 
    O de licenças precisa do servidor com `LICENCA_CHAVE_PRIVADA` (senão `/validar` dá 503). No Git Bash:
    `LICENCA_CHAVE_PRIVADA="$(cat .licenca_chave_privada.txt)" npm run dev:local`.

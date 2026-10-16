@@ -129,7 +129,7 @@ async function carregarPortal() {
     const perfis = [...new Set(acessoPortal.vagas.map(v => v.perfil_nome))].join(' e ');
     document.getElementById('welcome-empresa').textContent = perfis
       ? `Seus treinamentos do Conector SAP — perfil ${perfis}` : 'Seus treinamentos do Conector SAP';
-    await carregarTreinamentos();
+    await Promise.all([carregarTreinamentos(), carregarPedidosPortal()]);
     if (!cursosPortal.length) {
       const secao = document.getElementById('secao-treinamentos');
       secao.hidden = false;
@@ -144,7 +144,8 @@ async function carregarPortal() {
     carregarTreinamentos(),
     carregarLicencasPortal(),
     carregarFinanceiroPortal(),
-    acessoPortal.gestor ? carregarContratosPortal() : null
+    acessoPortal.gestor ? carregarContratosPortal() : null,
+    carregarPedidosPortal()
   ]);
 }
 
@@ -1124,6 +1125,29 @@ function origensCurso(c) {
   if (c.via_beneficio) chips.push(['#10b981', 'Incluso na licença do Conector']);
   if (c.via_liberacao) chips.push(['#64748b', 'Liberado pela empresa']);
   return chips.map(([cor, txt]) => `<span class="chip" style="background:${cor}1a; color:${cor}">${escapeHtml(txt)}</span>`).join(' ');
+}
+
+// Compras na loja de cursos: status, valor, validade do acesso e o link para pagar o que está pendente
+const STATUS_PEDIDO_PORTAL = { pendente: ['Aguardando pagamento', '#1d6fd8'], pago: ['Pago', '#10b981'], vencido: ['Vencido', '#f59e0b'],
+  cancelado: ['Cancelado', '#64748b'], expirado: ['Expirado', '#64748b'], recusado: ['Recusado', '#ef4444'],
+  estornado: ['Estornado', '#ef4444'], contestado: ['Contestado', '#ef4444'] };
+async function carregarPedidosPortal() {
+  const res = await apiFetch(`${API}/loja/meus-pedidos`);
+  if (!res || !res.ok) return;
+  const pedidos = await res.json();
+  const secao = document.getElementById('secao-pedidos');
+  secao.hidden = !pedidos.length;
+  const br = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
+  const moeda = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  document.getElementById('lista-pedidos').innerHTML = pedidos.map(p => {
+    const [txt, cor] = STATUS_PEDIDO_PORTAL[p.status] || [p.status, '#64748b'];
+    return `<div class="pedido-linha">
+      <div><strong>${escapeHtml(p.titulo)}</strong> · pedido #${p.id} · ${new Date(p.criado_em).toLocaleDateString('pt-BR')}
+        ${p.status === 'pago' ? ` · acesso ${p.acesso_fim ? 'até ' + br(p.acesso_fim) : 'sem prazo'}` : ''}${p.modo === 'teste' ? ' · teste' : ''}</div>
+      <div>${moeda(p.valor)} <span class="chip" style="background:${cor}20; color:${cor}">${txt}</span>
+        ${p.link_pagamento ? `<a class="btn-curso" href="${escapeHtml(p.link_pagamento)}" target="_blank" rel="noopener">Pagar</a>` : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 async function carregarTreinamentos() {

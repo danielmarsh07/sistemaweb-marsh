@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Curso — Marsh Consultoria</title>
+  <meta name="description" content="Cursos de IA aplicada ao SAP da Marsh Consultoria." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" href="/img/logo-simbolo.png" />
+  <meta name="theme-color" content="#0b2a55" />
+  <style>
+    :root {
+      --azul-profundo: #0b2a55; --azul: #1d6fd8; --azul-claro: #5aa9ec; --ciano: #13a8e0;
+      --fundo: #f2f6fb; --branco: #ffffff; --texto: #0f1e33; --texto-2: #4a5b73; --borda: #d9e3f0;
+      --sombra: 0 10px 30px rgba(11, 42, 85, 0.08); --raio: 16px;
+      --degrade-marca: radial-gradient(120% 120% at 70% 30%, #5aa9ec 0%, #1d6fd8 40%, #0b2a55 85%);
+      --ok: #157347; --erro: #b42318; --aviso-fundo: #fef3c7; --aviso-texto: #92400e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--texto); background: var(--fundo); line-height: 1.6; }
+    .faixa-teste { background: var(--aviso-fundo); color: var(--aviso-texto); text-align: center; font-size: 0.85rem; font-weight: 600; padding: 8px 16px; }
+    header.topo { display: flex; align-items: center; gap: 10px; padding: 16px 24px; max-width: 1080px; margin: 0 auto; }
+    header.topo a { display: flex; align-items: center; gap: 10px; color: var(--azul-profundo); text-decoration: none; font-weight: 700; }
+    header.topo img { width: 32px; height: 32px; }
+    .hero { background: var(--degrade-marca); color: #fff; padding: 48px 24px 64px; }
+    .hero-in { max-width: 1080px; margin: 0 auto; }
+    .hero .selo { display: inline-block; font-size: 0.78rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.16); padding: 4px 12px; border-radius: 999px; }
+    .hero h1 { font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.15; margin: 14px 0 10px; max-width: 760px; }
+    .hero p { color: rgba(255,255,255,.88); max-width: 680px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; font-size: 0.9rem; color: rgba(255,255,255,.9); }
+    main { max-width: 1080px; margin: -36px auto 48px; padding: 0 16px; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+    .cartao { background: var(--branco); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); padding: 24px; }
+    .descricao { white-space: pre-line; color: var(--texto-2); }
+    .descricao h2 { color: var(--texto); font-size: 1.1rem; margin-bottom: 8px; }
+    .preco-cheio { color: var(--texto-2); text-decoration: line-through; font-size: 0.95rem; }
+    .preco { font-size: 2rem; font-weight: 800; color: var(--azul-profundo); line-height: 1.2; }
+    .preco small { font-size: 0.85rem; font-weight: 500; color: var(--texto-2); }
+    .promo { display: inline-block; margin-top: 4px; font-size: 0.8rem; font-weight: 600; color: var(--ok); }
+    form { display: grid; gap: 12px; margin-top: 18px; }
+    label { display: grid; gap: 4px; font-size: 0.85rem; font-weight: 600; color: var(--texto); }
+    input { font: inherit; font-weight: 400; padding: 11px 12px; border: 1px solid var(--borda); border-radius: 10px; background: #fff; color: var(--texto); }
+    input:focus { outline: 2px solid var(--azul-claro); border-color: var(--azul); }
+    .cupom { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+    button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 13px 18px; cursor: pointer; background: var(--azul); color: #fff; min-height: 44px; }
+    button.secundario { background: #e8eff8; color: var(--azul-profundo); font-weight: 600; padding: 11px 14px; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .total { display: flex; justify-content: space-between; font-weight: 700; padding-top: 10px; border-top: 1px solid var(--borda); }
+    .ajuda { font-size: 0.8rem; color: var(--texto-2); }
+    .msg { font-size: 0.88rem; padding: 10px 12px; border-radius: 10px; }
+    .msg.erro { background: #fde8e8; color: var(--erro); }
+    .msg.ok { background: #e6f4ec; color: var(--ok); }
+    .escondido { position: absolute; left: -9999px; }
+    .status { text-align: center; padding: 32px 24px; }
+    .status h2 { margin-bottom: 8px; }
+    footer { text-align: center; font-size: 0.8rem; color: var(--texto-2); padding: 24px 16px 40px; }
+    main > *, .hero-in { min-width: 0; }
+    .hero h1, .descricao { overflow-wrap: anywhere; }
+    @media (max-width: 860px) { main { grid-template-columns: 1fr; margin-top: -28px; } .hero { padding: 32px 16px 52px; } header.topo { padding: 12px 16px; } }
+  </style>
+</head>
+<body>
+  <div class="faixa-teste" id="faixa-teste" hidden>AMBIENTE DE TESTE (homologação) — nenhum valor real é cobrado</div>
+  <header class="topo"><a href="/"><img src="/img/logo-simbolo.png" alt="" /> Marsh Consultoria</a></header>
+
+  <section class="hero">
+    <div class="hero-in">
+      <span class="selo">Curso online</span>
+      <h1 id="titulo">Carregando…</h1>
+      <p id="curso-nome"></p>
+      <div class="meta" id="meta"></div>
+    </div>
+  </section>
+
+  <main id="conteudo">
+    <article class="cartao descricao" id="descricao"></article>
+    <aside class="cartao" id="compra">
+      <div id="bloco-preco"></div>
+      <form id="form-pedido" novalidate>
+        <label>Nome completo <input name="nome" autocomplete="name" required maxlength="150" /></label>
+        <label>E-mail <input name="email" type="email" autocomplete="email" required maxlength="150" /></label>
+        <label>CPF ou CNPJ <input name="documento" inputmode="numeric" autocomplete="off" required maxlength="20" /></label>
+        <label>Telefone (opcional) <input name="telefone" type="tel" autocomplete="tel" maxlength="30" /></label>
+        <div class="cupom">
+          <label>Cupom <input name="cupom" maxlength="40" autocomplete="off" /></label>
+          <button type="button" class="secundario" id="btn-cupom">Aplicar</button>
+        </div>
+        <input class="escondido" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <div class="total"><span>Total</span><span id="total"></span></div>
+        <div id="msg" role="status" aria-live="polite"></div>
+        <button type="submit" id="btn-comprar">Ir para o pagamento</button>
+        <p class="ajuda">Você paga com PIX, boleto ou cartão na página segura do Asaas. Com o pagamento confirmado, o curso é liberado
+          e você recebe por e-mail o acesso ao portal.</p>
+      </form>
+    </aside>
+  </main>
+
+  <footer>Marsh Consultoria e Desenvolvimento de Sistema LTDA · <a href="/">marshconsultoria.com.br</a></footer>
+  <script src="curso.js"></script>
+</body>
+</html>

@@ -59,6 +59,7 @@ const apenasEquipe = require('./backend/middleware/apenas-equipe');
 const alertasRoutes = require('./backend/routes/alertas');
 const contratosConectorRoutes = require('./backend/routes/contratos-conector');
 const bloquearAluno = require('./backend/middleware/bloquear-aluno');
+const lojaRoutes = require('./backend/routes/loja');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
@@ -85,6 +86,7 @@ app.use('/api/contratos-conector', autenticar, contratosConectorRoutes);
 app.use('/api/financeiro', autenticar, bloquearAluno, financeiroRoutes);
 app.use('/api/comercial', autenticar, comercialRoutes);
 app.use('/api/alertas', autenticar, alertasRoutes);
+app.use('/api/loja', autenticar, lojaRoutes); // loja de cursos: aluno vê os próprios pedidos; o resto é admin
 app.use('/api/marketing', autenticar, marketingRoutes); // só administradores (o router confere)
 
 // Saúde: para monitor externo (UptimeRobot etc.). 200 = servidor e banco respondendo; 503 = banco fora.
@@ -1271,6 +1273,82 @@ async function iniciar() {
       }
       console.log('Migração fase3_beneficios_iniciais: benefícios do Conector criados a partir das trilhas');
     }
+
+    // 34. Fluxo novo — fase 4: loja de cursos (ofertas, cupons e pedidos)
+    //     ofertas: o que se vende e por quanto. modo 'teste' = homologação no sandbox do Asaas (nada é cobrado; só abre
+    //     pelo link); 'producao' = cobrança real. duracao_meses NULL = acesso sem prazo.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ofertas (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        slug VARCHAR(80) NOT NULL UNIQUE,
+        curso_id INTEGER NOT NULL REFERENCES cursos(id),
+        titulo VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        preco NUMERIC(12,2) NOT NULL CHECK (preco >= 0),
+        preco_promocional NUMERIC(12,2) CHECK (preco_promocional >= 0),
+        promo_inicio DATE,
+        promo_fim DATE,
+        venda_inicio DATE,
+        venda_fim DATE,
+        duracao_meses INTEGER CHECK (duracao_meses BETWEEN 1 AND 120),
+        modo VARCHAR(10) NOT NULL DEFAULT 'teste' CHECK (modo IN ('teste', 'producao')),
+        ativa BOOLEAN NOT NULL DEFAULT TRUE,
+        criado_por_usuario_id INTEGER,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    //     cupons: desconto percentual ou em reais, opcionalmente só para uma oferta; usos reservados no pedido
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cupons (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        codigo VARCHAR(40) NOT NULL UNIQUE,
+        tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('percentual', 'valor')),
+        valor NUMERIC(12,2) NOT NULL CHECK (valor > 0),
+        oferta_id INTEGER REFERENCES ofertas(id) ON DELETE CASCADE,
+        inicio DATE,
+        fim DATE,
+        usos_max INTEGER CHECK (usos_max > 0),
+        usos INTEGER NOT NULL DEFAULT 0,
+        ativo BOOLEAN NOT NULL DEFAULT TRUE,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    //     pedidos: pendente → pago | recusado | vencido | cancelado | expirado; pago → estornado | contestado.
+    //     Um pedido pendente por pessoa e oferta (clique duplo não cria dois). token: consulta pública do status.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pedidos (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        oferta_id INTEGER NOT NULL REFERENCES ofertas(id),
+        curso_id INTEGER NOT NULL REFERENCES cursos(id),
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        cupom_id INTEGER REFERENCES cupons(id),
+        valor_original NUMERIC(12,2) NOT NULL,
+        desconto NUMERIC(12,2) NOT NULL DEFAULT 0,
+        valor NUMERIC(12,2) NOT NULL CHECK (valor >= 0),
+        status VARCHAR(12) NOT NULL DEFAULT 'pendente'
+          CHECK (status IN ('pendente', 'pago', 'recusado', 'vencido', 'cancelado', 'expirado', 'estornado', 'contestado')),
+        modo VARCHAR(10) NOT NULL CHECK (modo IN ('teste', 'producao')),
+        origem VARCHAR(80),
+        token VARCHAR(64) NOT NULL UNIQUE,
+        asaas_payment_id VARCHAR(50),
+        link_pagamento TEXT,
+        forma_pagamento VARCHAR(20),
+        vencimento DATE,
+        pago_em TIMESTAMPTZ,
+        acesso_fim DATE,
+        fatura_id INTEGER REFERENCES faturas(id),
+        erro TEXT,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_pedidos_pendente ON pedidos(usuario_id, oferta_id) WHERE status = 'pendente';`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pedidos_asaas ON pedidos(asaas_payment_id);`);
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

@@ -482,6 +482,7 @@ function showPage(page, opcoes = {}) {
     dre: 'DRE gerencial',
     funil: 'Funil de vendas',
     'simulador-conector': 'Simulador Conector SAP',
+    loja: 'Loja de cursos',
     'precos-conector': 'Preços Conector SAP',
     'beneficios-conector': 'Benefícios do Conector',
     'contratos-conector': 'Contratos do Conector',
@@ -519,6 +520,7 @@ function showPage(page, opcoes = {}) {
   if (page === 'simulador-conector') loadSimuladorConector();
   if (page === 'precos-conector') loadPaginaPrecosConector();
   if (page === 'beneficios-conector') loadBeneficiosConector();
+  if (page === 'loja') loadLoja();
   if (page === 'contratos-conector') loadContratosConector();
   if (page === 'relatorios') loadRelatorios();
   if (page === 'visao-mensal') loadVisaoMensal();

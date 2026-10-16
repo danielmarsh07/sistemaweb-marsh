@@ -22,6 +22,16 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.0', data: '2026-10-16', destaques: [
+      'Nova Loja de cursos (Comercial → Loja de cursos): ofertas com página própria para divulgar (WhatsApp, anúncio, site), preço promocional com prazo, período de venda e duração do acesso (padrão 12 meses)',
+      'A pessoa se cadastra com nome, e-mail e CPF/CNPJ e paga com PIX, boleto ou cartão no Asaas; confirmado o pagamento, o curso é liberado na hora e ela recebe o acesso por e-mail',
+      'Modo teste (homologação): a oferta usa o ambiente de testes do Asaas, nada é cobrado, não gera fatura, e o botão "Simular pagamento" libera o curso para conferir o fluxo inteiro',
+      'Cupons de desconto (percentual ou em reais), por oferta ou geral, com validade e limite de usos',
+      'Estorno ou contestação tiram o curso comprado (o progresso fica); pedido não pago expira sozinho e devolve o cupom; clique duplo não cria dois pedidos',
+      'Quem já tem conta (inclusive de uma empresa) compra com a mesma conta; o portal mostra "Meus pedidos"',
+      'Venda em produção paga vira receita no Financeiro (fatura paga, sem nota automática)',
+      'Corrigido: a ficha do cliente não rola mais para o lado e os textos não saem das caixas'
+    ] },
     { versao: 'v3.9', data: '2026-10-16', destaques: [
       'Ficha do cliente virou o painel de controle da empresa: contratos, faturas, licenças do Conector, administradores, usuários, cursos e atividade recente num lugar só',
       'Clique num contrato, contrato do Conector ou usuário dentro da ficha para abrir e editar; ao salvar ou fechar, a ficha volta sozinha já atualizada',

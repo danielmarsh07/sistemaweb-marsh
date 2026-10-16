@@ -3902,7 +3902,14 @@ svg.icon {
 .ficha-subtitulo { margin: 12px 0 6px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
 .ficha-botoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .ficha-acao { margin-top: 10px; }
-.ficha-dir { flex-wrap: wrap; justify-content: flex-end; }
+/* Nada sai da caixa: o lado direito quebra linha e encolhe; a ficha nunca rola para o lado */
+.modal-content.modal-ficha { overflow-x: hidden; }
+.ficha-grade > * { min-width: 0; }
+.ficha-lista li { flex-wrap: wrap; }
+.ficha-lista li > div:first-child { flex: 1 1 220px; }
+.ficha-lista strong { white-space: normal; overflow-wrap: anywhere; }
+.ficha-dir { flex-wrap: wrap; justify-content: flex-end; flex-shrink: 1; min-width: 0; max-width: 100%; white-space: normal; }
+.ficha-dir .fin-pill, .ficha-dir span { white-space: nowrap; }
 .ficha-lista { list-style: none; margin: 0; padding: 0; display: grid; }
 .ficha-lista li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
 .ficha-lista li:first-child { border-top: 0; padding-top: 0; }
@@ -4360,3 +4367,8 @@ tr:hover .vm-mais, .vm-btn:focus-visible .vm-mais { opacity: 1; }
 @media (max-width: 768px) and (prefers-reduced-motion: reduce) {
   .menu-mobile-painel, .menu-mobile-fundo { transition: none; }
 }
+
+/* Loja de cursos (painel) */
+.loja-sub { display: block; font-size: 0.78rem; color: var(--text-muted); overflow-wrap: anywhere; }
+a.loja-sub { color: var(--primary); text-decoration: none; }
+a.loja-sub:hover { text-decoration: underline; }

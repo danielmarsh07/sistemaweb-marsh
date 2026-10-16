@@ -18,14 +18,27 @@ function configurado() {
   return !!process.env.ASAAS_API_KEY;
 }
 
-async function chamar(metodo, caminho, corpo) {
-  if (!configurado()) throw new Error('Asaas não configurado (defina ASAAS_API_KEY).');
-  const res = await fetch(BASES[ambiente()] + caminho, {
+// Loja (fluxo novo, fase 4): cada oferta tem modo 'teste' (homologação no sandbox, nada é cobrado) ou 'producao'.
+// Teste usa ASAAS_SANDBOX_API_KEY; sem ela, a chave principal se ela já for do sandbox (ambiente local).
+// ASAAS_URL_TESTES troca o endereço do Asaas por um servidor falso nos testes automáticos.
+function credenciais(modo) {
+  if (modo === 'teste') {
+    const chave = process.env.ASAAS_SANDBOX_API_KEY || (ambiente() === 'sandbox' ? process.env.ASAAS_API_KEY : null);
+    return { base: process.env.ASAAS_URL_TESTES || BASES.sandbox, chave };
+  }
+  return { base: process.env.ASAAS_URL_TESTES || BASES[ambiente()], chave: process.env.ASAAS_API_KEY };
+}
+const modoConfigurado = modo => !!credenciais(modo).chave;
+
+async function chamar(metodo, caminho, corpo, modo = 'producao') {
+  const { base, chave } = credenciais(modo);
+  if (!chave) throw new Error(modo === 'teste' ? 'Asaas de teste não configurado (defina ASAAS_SANDBOX_API_KEY).' : 'Asaas não configurado (defina ASAAS_API_KEY).');
+  const res = await fetch(base + caminho, {
     method: metodo,
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': 'sistemaweb-marsh',
-      access_token: process.env.ASAAS_API_KEY
+      access_token: chave
     },
     body: corpo ? JSON.stringify(corpo) : undefined
   });
@@ -269,7 +282,50 @@ const STATUS_PIX = {
   DELETED: 'cancelado'
 };
 
+// ===== Loja: cobrança do pedido (o comprador escolhe PIX, boleto ou cartão na página do Asaas) =====
+// No modo teste o cliente é procurado/criado no sandbox a cada pedido (o id gravado em clientes é da conta real).
+async function clienteDoPedido(cliente, modo) {
+  const dados = dadosCliente(cliente);
+  if (!dados.cpfCnpj) throw new Error('CPF/CNPJ obrigatório para cobrar.');
+  if (modo === 'producao' && cliente.asaas_customer_id) return cliente.asaas_customer_id;
+  const busca = await chamar('GET', `/customers?cpfCnpj=${dados.cpfCnpj}`, null, modo);
+  let id = busca && busca.data && busca.data[0] && busca.data[0].id;
+  if (!id) id = (await chamar('POST', '/customers', dados, modo)).id;
+  if (modo === 'producao') await pool.query('UPDATE clientes SET asaas_customer_id = $1 WHERE id = $2', [id, cliente.id]);
+  return id;
+}
+
+// À vista (parcelamento fica para quando for decidido)
+async function criarCobrancaPedido({ pedido, cliente, descricao, vencimento }) {
+  const customer = await clienteDoPedido(cliente, pedido.modo);
+  return chamar('POST', '/payments', {
+    customer,
+    billingType: 'UNDEFINED', // PIX, boleto ou cartão: escolha do comprador
+    value: Number(pedido.valor),
+    dueDate: vencimento,
+    description: String(descricao || '').slice(0, 500),
+    externalReference: `pedido-${pedido.id}`
+  }, pedido.modo);
+}
+
+const consultarCobrancaModo = (id, modo) => chamar('GET', `/payments/${id}`, null, modo);
+const cancelarCobrancaModo = (id, modo) => chamar('DELETE', `/payments/${id}`, null, modo);
+// Homologação: marca a cobrança de teste como recebida (só no sandbox); o Asaas avisa pelo webhook
+const confirmarPagamentoTeste = (id, valor) => chamar('POST', `/payments/${id}/receiveInCash`,
+  { paymentDate: new Date().toISOString().slice(0, 10), value: Number(valor), notifyCustomer: false }, 'teste');
+
+// Status do Asaas → status do pedido
+const STATUS_PEDIDO = {
+  PENDING: 'pendente', AWAITING_RISK_ANALYSIS: 'pendente', OVERDUE: 'vencido',
+  RECEIVED: 'pago', CONFIRMED: 'pago', RECEIVED_IN_CASH: 'pago',
+  REFUNDED: 'estornado', REFUND_REQUESTED: 'estornado', REFUND_IN_PROGRESS: 'estornado',
+  CHARGEBACK_REQUESTED: 'contestado', CHARGEBACK_DISPUTE: 'contestado', AWAITING_CHARGEBACK_REVERSAL: 'contestado',
+  DELETED: 'cancelado'
+};
+
 module.exports = {
+  credenciais, modoConfigurado, clienteDoPedido, criarCobrancaPedido, consultarCobrancaModo, cancelarCobrancaModo,
+  confirmarPagamentoTeste, STATUS_PEDIDO,
   ambiente, configurado, fiscalConfigurado, garantirCliente, emitirNotaFatura,
   consultarNota, cancelarNota, aplicarNotaNaFatura, STATUS_NFSE,
   criarCobrancaPix, consultarCobranca, cancelarCobranca, alterarVencimentoCobranca, STATUS_PIX

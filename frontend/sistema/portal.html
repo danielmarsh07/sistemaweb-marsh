@@ -1788,6 +1788,10 @@
     .curso-corpo { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
     .curso-corpo h4 { font-size: 1rem; font-weight: 600; }
     .curso-origens { display: flex; flex-wrap: wrap; gap: 4px; }
+    .lista-pedidos { display: grid; gap: 8px; }
+    .pedido-linha { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 16px;
+      border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); font-size: 0.88rem; color: var(--text-secondary); }
+    .pedido-linha strong { color: var(--text-main); }
     .curso-origens .chip { font-size: 0.72rem; }
     .curso-corpo p { font-size: 0.85rem; color: var(--text-muted); }
     .curso-meta { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); margin-top: auto; padding-top: 6px; }
@@ -2001,6 +2005,12 @@
     <section id="secao-minha-licenca" class="portal-secao" hidden>
       <div class="section-header"><h3>Minha licença do Conector SAP</h3></div>
       <div id="lista-minhas-vagas" class="licencas-portal"></div>
+    </section>
+
+    <!-- Meus pedidos (compras na loja de cursos; some se não houver) -->
+    <section id="secao-pedidos" class="portal-secao" hidden>
+      <div class="section-header"><h3>Meus pedidos</h3></div>
+      <div id="lista-pedidos" class="lista-pedidos"></div>
     </section>
 
     <!-- Treinamentos (cursos liberados para a empresa ou pela vaga do Conector; some se não houver) -->

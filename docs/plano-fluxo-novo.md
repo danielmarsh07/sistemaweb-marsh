@@ -18,7 +18,9 @@ Origem: [Fluxo Novo Marsh](Fluxo%20Novo%20Marsh/Fluxo%20Novo%20Marsh.txt). Anál
 | 1. Contratos unificados | v3.6 | Tipo (serviço/produto) e periodicidade (mensal/anual); histórico e reajuste; contrato do Conector ligado ao financeiro (fatura anual); rascunho automático de faturas; proposta aceita → contrato com itens | feita (testes/fluxo-fase1.js) |
 | 2. Licenças e admin corporativo | v3.7 | Vários administradores por empresa; atribuição livre → convidado → ativo → revogado; cancelar/reenviar convite; histórico; expiração automática; quem perde a vaga mantém o login | feita (testes/fluxo-fase2.js) |
 | 3. Direitos de acesso e benefícios | v3.8 | Matrículas + direitos de acesso com origem; cadastro de benefícios; migração das regras atuais; "Meus cursos" com origem | feita (testes/fluxo-fase3.js) |
-| 4. Venda de cursos e Conector | v3.9–4.0 | Ofertas, cupons, pedidos, checkout Asaas, webhook → matrícula; pendente/recusado/estorno/contestação | |
+| — Ficha do cliente (pedido do dono) | v3.9 | Ficha virou o painel de controle da empresa | feita |
+| 4. Venda de cursos | v4.0 | Ofertas, cupons, pedidos, checkout Asaas, webhook → matrícula; pendente/recusado/estorno/contestação; modo teste (homologação) | feita (testes/fluxo-fase4.js) |
+| 4b. Venda do Conector pelo site | — | Compra de licenças por perfil (preços da tabela) reaproveitando pedidos/checkout | a fazer |
 | 5. Automações | v4.1 | Renovação (avisos 30/7/1), inadimplência (alerta + suspensão em 30 dias), relatórios, log de e-mails; **Roteiro de uso atualizado** | |
 
 ## Notas de implementação
@@ -32,6 +34,18 @@ Origem: [Fluxo Novo Marsh](Fluxo%20Novo%20Marsh/Fluxo%20Novo%20Marsh.txt). Anál
 - Acesso a curso (fase 3) é decidido **ao vivo** por `contratos-conector.sqlCursoLiberado`: liberação da empresa OU benefício (licença ativa + contrato vigente + curso marcado em `beneficios`) OU direito próprio (`direitos_acesso` compra/manual, com validade). `direitos_acesso` também rastreia benefício/liberação (sincronizado por `services/acessos.js` a cada mudança e na rotina horária). `matriculas` guarda o histórico acadêmico e nunca é apagada.
 - Fase 4 grava a compra com `acessos.conceder({ origem: 'compra', origemId: pedido })` e o estorno com `acessos.revogarDireito`.
 - Certificado = concluir todos os cursos publicados marcados no benefício do perfil (antes: um curso por trilha). Em produção os 4 cursos já existiam, então a regra ficou igual.
+
+## Homologação da loja (modo teste)
+
+Decisões (2026-10-16): PIX, boleto e cartão (o comprador escolhe na página do Asaas); acesso configurável por oferta, padrão 12 meses; à vista (parcelamento a decidir). O dono quer homologar antes de cobrar/emitir de verdade.
+
+Para homologar em produção sem cobrar nada:
+1. No **sandbox** do Asaas (conta de testes): copiar a chave de API e criar um webhook apontando para `https://marshconsultoria.com.br/api/asaas/webhook` com um token próprio (eventos de cobrança).
+2. No Render: `ASAAS_SANDBOX_API_KEY` = chave do sandbox e `ASAAS_SANDBOX_WEBHOOK_TOKEN` = token do webhook do sandbox.
+3. Criar a oferta em **modo Teste**, abrir o link, comprar com dados fictícios (CPF válido) e pagar no sandbox (ou usar "Simular pagamento" no painel).
+4. Para vender de verdade: editar a oferta e mudar para **Produção** (o sistema pede confirmação).
+
+Pedido de teste não gera fatura; evento da conta de testes nunca mexe em pedido de produção (e vice-versa).
 
 ## Cenários de teste (seção 12 do documento)
 

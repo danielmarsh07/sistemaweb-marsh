@@ -118,6 +118,9 @@
           <a href="#" data-page="simulador-conector" class="nav-link">
             <svg class="icon"><use href="#i-sliders"/></svg> Simulador Conector SAP
           </a>
+          <a href="#" data-page="loja" class="nav-link">
+            <svg class="icon"><use href="#i-doc"/></svg> Loja de cursos
+          </a>
           </div>
         </div>
       </div>
@@ -1236,6 +1239,46 @@
       </section>
 
       <!-- ========== CADASTROS: tabela de preços do Conector SAP (comercial.js; a mesma do simulador) ========== -->
+      <!-- ========== LOJA DE CURSOS (loja.js): ofertas, cupons e pedidos ========== -->
+      <section id="loja-page" class="page">
+        <div class="page-header">
+          <h2>Loja de cursos</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirCupom()">+ Cupom</button>
+            <button type="button" class="btn btn-primary" onclick="abrirOferta()">+ Nova oferta</button>
+          </div>
+        </div>
+        <p class="pagina-descricao">Cada oferta tem uma página pública (curso.html) onde a pessoa se cadastra e paga com PIX, boleto ou cartão.
+          Pago, o curso é liberado na hora e ela recebe o acesso por e-mail. Oferta em <strong>teste</strong> usa o ambiente de homologação do Asaas:
+          nada é cobrado, não gera fatura e você confirma o pagamento pelo botão "Simular pagamento".</p>
+        <div id="loja-status" class="fin-muted" style="margin-bottom:10px"></div>
+        <div class="form-section-title">Ofertas</div>
+        <div class="table-container"><table>
+          <thead><tr><th>Oferta</th><th>Preço</th><th>Acesso</th><th>Modo</th><th>Vendas</th><th>Ações</th></tr></thead>
+          <tbody id="loja-ofertas"><tr><td colspan="6" class="text-center">Carregando…</td></tr></tbody>
+        </table></div>
+        <div class="form-section-title">Pedidos</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <select id="loja-filtro-status" class="filtro-select" onchange="loadPedidosLoja()" aria-label="Status do pedido">
+            <option value="">Todos os status</option><option value="pendente">Aguardando pagamento</option><option value="pago">Pagos</option>
+            <option value="cancelado">Cancelados</option><option value="expirado">Expirados</option><option value="estornado">Estornados</option>
+            <option value="contestado">Contestados</option><option value="recusado">Recusados</option>
+          </select>
+          <select id="loja-filtro-modo" class="filtro-select" onchange="loadPedidosLoja()" aria-label="Modo">
+            <option value="">Teste e produção</option><option value="producao">Produção</option><option value="teste">Teste</option>
+          </select>
+        </div>
+        <div class="table-container"><table>
+          <thead><tr><th>Pedido</th><th>Comprador</th><th>Oferta</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="loja-pedidos"><tr><td colspan="6" class="text-center">Carregando…</td></tr></tbody>
+        </table></div>
+        <div class="form-section-title">Cupons</div>
+        <div class="table-container"><table>
+          <thead><tr><th>Código</th><th>Desconto</th><th>Vale para</th><th>Usos</th><th>Validade</th><th>Ações</th></tr></thead>
+          <tbody id="loja-cupons"><tr><td colspan="6" class="text-center">Carregando…</td></tr></tbody>
+        </table></div>
+      </section>
+
       <section id="beneficios-conector-page" class="page">
         <div class="page-header">
           <h2>Benefícios do Conector</h2>
@@ -3188,6 +3231,74 @@
     </div>
   </div>
 
+  <!-- Oferta da loja de cursos (loja.js) -->
+  <div id="modal-oferta" class="modal">
+    <div class="modal-content">
+      <div class="modal-header"><h3 id="modal-oferta-titulo">Nova oferta</h3><button class="btn-close">&times;</button></div>
+      <form id="form-oferta" class="form">
+        <div class="form-group"><label>Curso <span class="obrig" title="Obrigatório">*</span></label><select name="curso_id" required></select></div>
+        <div class="form-row">
+          <div class="form-group"><label>Título da página <span class="obrig" title="Obrigatório">*</span></label><input name="titulo" required maxlength="255"></div>
+          <div class="form-group"><label>Endereço (slug) <span class="obrig" title="Obrigatório">*</span></label><input name="slug" required maxlength="80" placeholder="curso-sap-cpi">
+            <small class="form-hint">Fica marshconsultoria.com.br/curso.html?o=<em>endereço</em></small></div>
+        </div>
+        <div class="form-group"><label>Descrição (o que a pessoa aprende)</label><textarea name="descricao" rows="5"></textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>Preço (R$) <span class="obrig" title="Obrigatório">*</span></label><input name="preco" type="number" min="0" step="0.01" required>
+            <small class="form-hint">0 = gratuito (libera sem pagamento).</small></div>
+          <div class="form-group"><label>Acesso por (meses)</label><input name="duracao_meses" type="number" min="1" max="120" value="12">
+            <small class="form-hint">Vazio = sem prazo.</small></div>
+        </div>
+        <div class="form-section-sub">Promoção (opcional)</div>
+        <div class="form-row">
+          <div class="form-group"><label>Preço promocional (R$)</label><input name="preco_promocional" type="number" min="0" step="0.01"></div>
+          <div class="form-group"><label>De</label><input name="promo_inicio" type="date"></div>
+          <div class="form-group"><label>Até</label><input name="promo_fim" type="date"></div>
+        </div>
+        <div class="form-section-sub">Período de venda (opcional: campanha)</div>
+        <div class="form-row">
+          <div class="form-group"><label>Abre em</label><input name="venda_inicio" type="date"></div>
+          <div class="form-group"><label>Fecha em</label><input name="venda_fim" type="date"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Modo</label>
+            <select name="modo"><option value="teste">Teste (homologação, nada é cobrado)</option><option value="producao">Produção (cobra de verdade)</option></select></div>
+          <div class="form-group"><label class="check-linha" style="margin-top:28px"><input type="checkbox" name="ativa" checked> Oferta ativa</label></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar oferta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Cupom da loja (loja.js) -->
+  <div id="modal-cupom" class="modal">
+    <div class="modal-content">
+      <div class="modal-header"><h3>Novo cupom</h3><button class="btn-close">&times;</button></div>
+      <form id="form-cupom" class="form">
+        <div class="form-row">
+          <div class="form-group"><label>Código <span class="obrig" title="Obrigatório">*</span></label><input name="codigo" required maxlength="40" placeholder="LANCAMENTO20"></div>
+          <div class="form-group"><label>Tipo</label><select name="tipo"><option value="percentual">Percentual (%)</option><option value="valor">Valor (R$)</option></select></div>
+          <div class="form-group"><label>Desconto <span class="obrig" title="Obrigatório">*</span></label><input name="valor" type="number" min="0.01" step="0.01" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Só para a oferta</label><select name="oferta_id"><option value="">Todas</option></select></div>
+          <div class="form-group"><label>Limite de usos</label><input name="usos_max" type="number" min="1"><small class="form-hint">Vazio = sem limite.</small></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Válido de</label><input name="inicio" type="date"></div>
+          <div class="form-group"><label>Até</label><input name="fim" type="date"></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Criar cupom</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Novo contrato do Conector por vagas (contratos-conector.js) -->
   <div id="modal-novo-contrato-conector" class="modal">
     <div class="modal-content">
@@ -4112,6 +4223,7 @@
   <script src="visao-mensal.js"></script>
   <script src="marketing.js"></script>
   <script src="cadastros.js"></script>
+  <script src="loja.js"></script>
   <script src="tabela-ordenavel.js"></script>
   <script src="assistente-voz.js"></script>
   <script>

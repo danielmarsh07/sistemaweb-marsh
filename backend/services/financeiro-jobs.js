@@ -153,6 +153,12 @@ async function sincronizarAcessos() {
   catch (err) { registrarAlerta({ chave: 'job:acessos', titulo: 'Rotina: falha ao sincronizar os acessos aos cursos', detalhe: err.message }); }
 }
 
+// Loja: pedido não pago depois do prazo expira (cobrança cancelada, cupom devolvido)
+async function expirarPedidosLoja() {
+  try { await require('./loja').expirarPedidos(); }
+  catch (err) { registrarAlerta({ chave: 'job:loja', titulo: 'Rotina: falha ao expirar pedidos da loja', detalhe: err.message }); }
+}
+
 async function ciclo() {
   if (rodando) return;
   rodando = true;
@@ -160,6 +166,7 @@ async function ciclo() {
     await gerarRascunhosAutomaticos();
     await expirarConvitesConector();
     await sincronizarAcessos();
+    await expirarPedidosLoja();
     await sincronizarNotasPendentes();
     await sincronizarPixPendentes(); // antes dos lembretes: quem já pagou não recebe cobrança
     await enviarLembretes();

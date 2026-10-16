@@ -179,4 +179,64 @@ router.get('/pacote/:token', limiteProposta, async (req, res) => {
   }
 });
 
+// ===== Loja de cursos (fluxo novo, fase 4) =====
+const loja = require('../services/loja');
+// 10 pedidos por IP a cada 15 min (LOJA_LIMITE_PEDIDOS só para o teste automático local, que faz mais que isso)
+const limitePedido = rateLimit({ windowMs: 15 * 60 * 1000, max: Number(process.env.LOJA_LIMITE_PEDIDOS) || 10, standardHeaders: true, legacyHeaders: false,
+  message: { erro: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos.' } });
+
+// GET /ofertas/:slug — dados da página da oferta (preço de agora, promoção, duração, modo teste)
+router.get('/ofertas/:slug', limiteProposta, async (req, res) => {
+  try {
+    const o = await loja.ofertaPorSlug(req.params.slug);
+    if (!o || !o.curso_ativo) return res.status(404).json({ erro: 'Oferta não encontrada.' });
+    const p = loja.precoAtual(o);
+    res.json({
+      slug: o.slug, titulo: o.titulo, descricao: o.descricao, curso: o.curso_titulo, aulas: o.aulas, carga_horaria: o.carga_horaria,
+      preco: p.preco, preco_cheio: p.cheio, promocional: p.promocional, promo_fim: o.promo_fim,
+      duracao_meses: o.duracao_meses, teste: o.modo === 'teste', disponivel: loja.emVenda(o)
+    });
+  } catch (err) { res.status(500).json({ erro: 'Erro ao carregar a oferta.' }); }
+});
+
+// POST /ofertas/:slug/cupom { cupom } — confere o cupom e mostra o desconto (não reserva)
+router.post('/ofertas/:slug/cupom', limiteProposta, async (req, res) => {
+  try {
+    const o = await loja.ofertaPorSlug(req.params.slug);
+    if (!o || !loja.emVenda(o)) return res.status(404).json({ erro: 'Oferta não encontrada.' });
+    const { preco } = loja.precoAtual(o);
+    const { desconto } = await loja.avaliarCupom(pool, (req.body || {}).cupom || '', o, preco);
+    res.json({ desconto, total: Math.max(0, Math.round((preco - desconto) * 100) / 100) });
+  } catch (err) {
+    if (err instanceof loja.ErroLoja) return res.status(400).json({ erro: err.message });
+    res.status(500).json({ erro: 'Erro ao conferir o cupom.' });
+  }
+});
+
+// POST /ofertas/:slug/pedido { nome, email, documento, telefone?, cupom?, origem?, website (honeypot) }
+router.post('/ofertas/:slug/pedido', limitePedido, async (req, res) => {
+  const b = req.body || {};
+  if (texto(b.website, 10)) return res.status(400).json({ erro: 'Pedido inválido.' });
+  try {
+    const r = await loja.criarPedido({ slug: req.params.slug, nome: b.nome, email: b.email, documento: b.documento,
+      telefone: texto(b.telefone, 30), cupom: b.cupom, origem: texto(b.origem, 80) });
+    res.status(r.existente ? 200 : 201).json({ link: r.link, pedido: r.pedido.token, valor: Number(r.pedido.valor), existente: !!r.existente });
+  } catch (err) {
+    if (err instanceof loja.ErroLoja) return res.status(400).json({ erro: err.message });
+    console.error('[loja] pedido:', err.message);
+    res.status(500).json({ erro: 'Não foi possível registrar o pedido agora.' });
+  }
+});
+
+// GET /pedidos/:token — status do pedido para a página de retorno (sem dados pessoais)
+router.get('/pedidos/:token', limiteProposta, async (req, res) => {
+  try {
+    const p = (await pool.query(
+      `SELECT p.status, p.valor::float AS valor, p.modo, p.link_pagamento, to_char(p.acesso_fim, 'YYYY-MM-DD') AS acesso_fim, o.titulo
+       FROM pedidos p JOIN ofertas o ON o.id = p.oferta_id WHERE p.token = $1`, [String(req.params.token || '').slice(0, 64)])).rows[0];
+    if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+    res.json(p);
+  } catch (err) { res.status(500).json({ erro: 'Erro ao consultar o pedido.' }); }
+});
+
 module.exports = router;
