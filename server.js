@@ -1372,6 +1372,16 @@ async function iniciar() {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_emails_enviados_data ON emails_enviados(criado_em DESC);`);
 
+    // 36. Fluxo novo — fase 4b: venda das licenças do Conector pela loja
+    //     oferta tipo 'conector': o comprador escolhe as vagas por perfil; preço = tabela de Preços Conector SAP (anual).
+    //     Pago: nasce o contrato do Conector (origem 'loja'), quem comprou vira administrador e (produção) a cobrança anual.
+    await pool.query(`ALTER TABLE ofertas ADD COLUMN IF NOT EXISTS tipo VARCHAR(10) NOT NULL DEFAULT 'curso';`);
+    await pool.query(`ALTER TABLE ofertas ALTER COLUMN curso_id DROP NOT NULL;`);
+    await pool.query(`ALTER TABLE pedidos ALTER COLUMN curso_id DROP NOT NULL;`);
+    await pool.query(`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS itens JSONB;`);
+    await pool.query(`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS eu_perfil VARCHAR(20);`);
+    await pool.query(`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS contrato_conector_id INTEGER;`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

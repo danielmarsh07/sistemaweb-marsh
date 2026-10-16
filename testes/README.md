@@ -34,6 +34,7 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/fluxo-fase2.js                     # fluxo novo fase 2: 100 licenças e a 101ª bloqueada (convites simultâneos), convite → senha → ativa, cancelar/expirar, revogar sem apagar a conta, vários administradores, isolamento
    node testes/fluxo-fase3.js                     # fluxo novo fase 3: curso gratuito pela licença, revogar/vencer/suspender bloqueia, renovar restabelece, compra e duas origens, benefícios, liberação individual
    node testes/fluxo-fase4.js                     # loja de cursos com Asaas FALSO (porta 3998): promoção, cupom, pedido, webhook, estorno, teste × produção, falha e nova tentativa, expiração
+   node testes/fluxo-fase4b.js                    # venda das licenças do Conector (mesmo servidor do fase4): preço da tabela, contrato e administrador, 1ª anuidade paga, estorno
    node testes/fluxo-fase5.js                     # inadimplência (alerta, suspensão em 30 dias, volta ao pagar), avisos de vencimento, renovação/encerramento, registro de e-mails
    node testes/simulador-conector.js [saida.pdf]  # simulador de preço do Conector SAP: cálculo, validações, tabela de preços, gerar proposta + PDF A4 (Chrome headless)
    node testes/marketing.js                       # Instagram: conta cifrada, upload PNG→JPEG, posts, importar agenda, publicação num Graph falso, retentativa, limite, métricas, token

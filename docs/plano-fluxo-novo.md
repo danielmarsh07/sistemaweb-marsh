@@ -20,12 +20,13 @@ Origem: [Fluxo Novo Marsh](Fluxo%20Novo%20Marsh/Fluxo%20Novo%20Marsh.txt). Anál
 | 3. Direitos de acesso e benefícios | v3.8 | Matrículas + direitos de acesso com origem; cadastro de benefícios; migração das regras atuais; "Meus cursos" com origem | feita (testes/fluxo-fase3.js) |
 | — Ficha do cliente (pedido do dono) | v3.9 | Ficha virou o painel de controle da empresa | feita |
 | 4. Venda de cursos | v4.0 | Ofertas, cupons, pedidos, checkout Asaas, webhook → matrícula; pendente/recusado/estorno/contestação; modo teste (homologação) | feita (testes/fluxo-fase4.js) |
-| 4b. Venda do Conector pelo site | — | Compra de licenças por perfil (preços da tabela) reaproveitando pedidos/checkout | a fazer |
+| 4b. Venda do Conector pelo site | v4.2 | Compra de licenças por perfil (preços da tabela) reaproveitando pedidos/checkout | feita (testes/fluxo-fase4b.js) |
 | 5. Automações | v4.1 | Renovação (avisos 30/7/1), inadimplência (alerta + suspensão em 30 dias), log de e-mails; **Roteiro de uso atualizado** (relatórios dedicados ficaram de fora — a ficha cobre) | feita (testes/fluxo-fase5.js) |
 
 ## Notas de implementação
 
-- Preço sugerido da cobrança do Conector: plano anual da tabela × 12 por vaga. **Perfil Ambos usa o preço de Desenvolvimento** até a tabela ganhar um preço próprio (pendência da venda online).
+- Preço da cobrança/venda do Conector: plano anual da tabela × 12 por vaga. Perfil Ambos tem o campo próprio `ambos_anual` (começa igual ao de Desenvolvimento).
+- Venda pelo site (v4.2), padrões adotados sem resposta do dono — confirmar: **à vista** (sem parcelamento), **vigência a partir do pagamento** (12 meses do contrato; não do certificado), preço Ambos = Desenvolvimento até ser ajustado na tabela.
 - Contrato anual que vence no próprio mês de cobrança não gera nova anuidade: isso é renovação (fase 5).
 - Histórico de contratos usa a tabela `auditoria` (entidade `contrato`); começa na v3.6.
 - Administrador corporativo = tabela `clientes_admins` (o "gestor" do portal). `contratos_conector.gestor_usuario_id` fica só como o comprador/contato.

@@ -32,9 +32,9 @@ async function loadOfertasLoja() {
   _ofertas = d;
   tbody.innerHTML = d.length ? d.map(o => `
     <tr>
-      <td data-label="Oferta"><strong>${escapeHtml(o.titulo)}</strong><span class="loja-sub">${escapeHtml(o.curso_titulo)}${o.curso_status !== 'publicado' ? ' (curso em rascunho)' : ''}</span>
+      <td data-label="Oferta"><strong>${escapeHtml(o.titulo)}</strong><span class="loja-sub">${o.tipo === 'conector' ? 'Licenças do Conector SAP' : escapeHtml(o.curso_titulo) + (o.curso_status !== 'publicado' ? ' (curso em rascunho)' : '')}</span>
         <a href="${linkOferta(o.slug)}" target="_blank" rel="noopener" class="loja-sub">${escapeHtml(linkOferta(o.slug))}</a></td>
-      <td data-label="Preço" class="fin-num">${o.preco_atual > 0 ? formatMoeda(o.preco_atual) : 'Gratuito'}${o.preco_atual < o.preco ? `<span class="loja-sub">de ${formatMoeda(o.preco)}</span>` : ''}</td>
+      <td data-label="Preço" class="fin-num">${o.tipo === 'conector' ? 'Tabela de preços' : o.preco_atual > 0 ? formatMoeda(o.preco_atual) : 'Gratuito'}${o.preco_atual < o.preco ? `<span class="loja-sub">de ${formatMoeda(o.preco)}</span>` : ''}</td>
       <td data-label="Acesso">${o.duracao_meses ? `${o.duracao_meses} meses` : 'Sem prazo'}</td>
       <td data-label="Modo">${o.modo === 'teste' ? pill('Teste', '#b7791f') : pill('Produção', '#2e7d4f')} ${o.em_venda ? '' : pill('Fora de venda', '#94a3b8')}</td>
       <td data-label="Vendas">${o.vendidos} · ${formatMoeda(o.receita)}</td>
@@ -51,6 +51,13 @@ function copiarLinkOferta(slug) {
   else prompt('Copie o link:', link);
 }
 
+function ajustarFormOferta() {
+  const conector = document.getElementById('form-oferta').tipo.value === 'conector';
+  // style (não hidden): o CSS de .form-row define display e venceria o atributo
+  document.querySelectorAll('#form-oferta .oferta-curso').forEach(el => { el.style.display = conector ? 'none' : ''; });
+  document.querySelectorAll('#form-oferta .oferta-conector').forEach(el => { el.hidden = false; el.style.display = conector ? '' : 'none'; });
+}
+
 async function abrirOferta(id) {
   _ofertaEmEdicao = id || null;
   const o = id ? _ofertas.find(x => x.id === id) : null;
@@ -60,7 +67,7 @@ async function abrirOferta(id) {
   const cursos = rc && rc.ok ? await rc.json() : [];
   f.curso_id.innerHTML = '<option value="">Selecione…</option>' + cursos.map(c => `<option value="${c.id}">${escapeHtml(c.titulo)}${c.status !== 'publicado' ? ' (rascunho)' : ''}</option>`).join('');
   if (o) {
-    ['curso_id', 'titulo', 'slug', 'descricao', 'preco', 'preco_promocional', 'promo_inicio', 'promo_fim', 'venda_inicio', 'venda_fim', 'modo']
+    ['tipo', 'curso_id', 'titulo', 'slug', 'descricao', 'preco', 'preco_promocional', 'promo_inicio', 'promo_fim', 'venda_inicio', 'venda_fim', 'modo']
       .forEach(k => { f[k].value = o[k] ?? ''; });
     f.duracao_meses.value = o.duracao_meses ?? '';
     f.ativa.checked = o.ativa;
@@ -74,13 +81,15 @@ async function abrirOferta(id) {
       if (c && !f.slug.value) f.slug.value = c.titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
     };
   }
+  if (!o) f.tipo.value = 'curso';
+  ajustarFormOferta();
   document.getElementById('modal-oferta-titulo').textContent = o ? `Oferta — ${o.titulo}` : 'Nova oferta';
   showModal('#modal-oferta');
 }
 
 async function salvarOferta() {
   const f = document.getElementById('form-oferta');
-  const dados = Object.fromEntries(['curso_id', 'titulo', 'slug', 'descricao', 'preco', 'preco_promocional', 'duracao_meses',
+  const dados = Object.fromEntries(['tipo', 'curso_id', 'titulo', 'slug', 'descricao', 'preco', 'preco_promocional', 'duracao_meses',
     'promo_inicio', 'promo_fim', 'venda_inicio', 'venda_fim', 'modo'].map(k => [k, f[k].value]));
   dados.ativa = f.ativa.checked;
   const antes = _ofertaEmEdicao && _ofertas.find(x => x.id === _ofertaEmEdicao);
@@ -117,7 +126,9 @@ async function loadPedidosLoja() {
     return `<tr>
       <td data-label="Pedido"><strong>#${p.id}</strong><span class="loja-sub">${new Date(p.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${p.origem ? ' · ' + escapeHtml(p.origem) : ''}</span></td>
       <td data-label="Comprador"><strong>${escapeHtml(p.nome)}</strong><span class="loja-sub">${escapeHtml(p.email)} · ${escapeHtml(p.cpf_cnpj || '')}</span></td>
-      <td data-label="Oferta">${escapeHtml(p.oferta)}${p.cupom ? `<span class="loja-sub">cupom ${escapeHtml(p.cupom)}</span>` : ''}</td>
+      <td data-label="Oferta">${escapeHtml(p.oferta)}${p.cupom ? `<span class="loja-sub">cupom ${escapeHtml(p.cupom)}</span>` : ''}
+        ${p.itens ? `<span class="loja-sub">${Object.entries(p.itens).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${{ abap: 'ABAP', funcional: 'Funcional', ambos: 'Ambos' }[k] || k}`).join(' · ')}</span>` : ''}
+        ${p.contrato_conector_id ? `<a href="#" class="loja-sub" onclick="showPage('contratos-conector'); abrirContratoConector(${p.contrato_conector_id}); return false;">Contrato do Conector nº ${p.contrato_conector_id}</a>` : ''}</td>
       <td data-label="Valor" class="fin-num">${formatMoeda(p.valor)}${p.desconto > 0 ? `<span class="loja-sub">−${formatMoeda(p.desconto)}</span>` : ''}</td>
       <td data-label="Status">${pill(txt, cor)} ${p.modo === 'teste' ? pill('Teste', '#b7791f') : ''}
         ${p.status === 'pago' && p.acesso_fim ? `<span class="loja-sub">acesso até ${diaBr(p.acesso_fim)}</span>` : ''}

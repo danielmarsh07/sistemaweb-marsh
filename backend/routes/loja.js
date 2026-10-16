@@ -51,17 +51,22 @@ router.get('/status', (req, res) => {
 function validarOferta(b) {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(b.slug || '')) || String(b.slug).length > 80) return 'Endereço (slug): letras minúsculas, números e hífens. Ex.: curso-sap-cpi';
   if (vazio(b.titulo)) return 'Informe o título da oferta.';
-  if (!Number.isInteger(Number(b.curso_id))) return 'Escolha o curso.';
-  if (!(Number(b.preco) >= 0)) return 'Preço inválido.';
+  if (!['curso', 'conector'].includes(b.tipo || 'curso')) return 'Tipo inválido.';
+  if ((b.tipo || 'curso') === 'curso' && !Number.isInteger(Number(b.curso_id))) return 'Escolha o curso.';
+  if ((b.tipo || 'curso') === 'curso' && !(Number(b.preco) >= 0)) return 'Preço inválido.';
   if (!vazio(b.preco_promocional) && !(Number(b.preco_promocional) >= 0 && Number(b.preco_promocional) <= Number(b.preco))) return 'Preço promocional deve ficar entre 0 e o preço cheio.';
   if (!['promo_inicio', 'promo_fim', 'venda_inicio', 'venda_fim'].every(k => dataOk(b[k]))) return 'Datas no formato AAAA-MM-DD.';
   if (!vazio(b.duracao_meses) && !(Number.isInteger(Number(b.duracao_meses)) && b.duracao_meses >= 1 && b.duracao_meses <= 120)) return 'Duração do acesso: 1 a 120 meses (vazio = sem prazo).';
   if (!['teste', 'producao'].includes(b.modo || 'teste')) return 'Modo inválido.';
   return null;
 }
-const paramsOferta = b => [String(b.slug), String(b.titulo).trim().slice(0, 255), vazio(b.descricao) ? null : String(b.descricao), Number(b.curso_id),
-  Number(b.preco), vazio(b.preco_promocional) ? null : Number(b.preco_promocional), b.promo_inicio || null, b.promo_fim || null,
-  b.venda_inicio || null, b.venda_fim || null, vazio(b.duracao_meses) ? null : Number(b.duracao_meses), b.modo || 'teste', b.ativa !== false];
+// Licenças do Conector: preço vem da tabela (preco 0 aqui), sem promoção fixa (use cupom) e vigência de 12 meses
+const ehConector = b => b.tipo === 'conector';
+const paramsOferta = b => [String(b.slug), String(b.titulo).trim().slice(0, 255), vazio(b.descricao) ? null : String(b.descricao),
+  ehConector(b) ? null : Number(b.curso_id), ehConector(b) ? 0 : Number(b.preco),
+  ehConector(b) || vazio(b.preco_promocional) ? null : Number(b.preco_promocional), ehConector(b) ? null : b.promo_inicio || null, ehConector(b) ? null : b.promo_fim || null,
+  b.venda_inicio || null, b.venda_fim || null, ehConector(b) ? 12 : (vazio(b.duracao_meses) ? null : Number(b.duracao_meses)), b.modo || 'teste', b.ativa !== false,
+  ehConector(b) ? 'conector' : 'curso'];
 
 router.get('/ofertas', async (req, res) => {
   try {
@@ -72,7 +77,7 @@ router.get('/ofertas', async (req, res) => {
               c.titulo AS curso_titulo, c.status AS curso_status,
               (SELECT COUNT(*)::int FROM pedidos p WHERE p.oferta_id = o.id AND p.status = 'pago') AS vendidos,
               (SELECT COALESCE(SUM(valor), 0)::float FROM pedidos p WHERE p.oferta_id = o.id AND p.status = 'pago') AS receita
-       FROM ofertas o JOIN cursos c ON c.id = o.curso_id WHERE o.empresa_id = $1 ORDER BY o.ativa DESC, o.criado_em DESC`, [emp(req)]);
+       FROM ofertas o LEFT JOIN cursos c ON c.id = o.curso_id WHERE o.empresa_id = $1 ORDER BY o.ativa DESC, o.criado_em DESC`, [emp(req)]);
     res.json(r.rows.map(o => ({ ...o, preco_atual: loja.precoAtual(o).preco, em_venda: loja.emVenda(o) })));
   } catch (err) { erro(res, err, 'Erro ao buscar ofertas'); }
 });
@@ -82,12 +87,14 @@ router.post('/ofertas', async (req, res) => {
   const e = validarOferta(b);
   if (e) return res.status(400).json({ erro: e });
   try {
-    const c = await pool.query('SELECT 1 FROM cursos WHERE id = $1 AND empresa_id = $2 AND ativo', [b.curso_id, emp(req)]);
-    if (!c.rows.length) return res.status(400).json({ erro: 'Curso não encontrado.' });
+    if (!ehConector(b)) {
+      const c = await pool.query('SELECT 1 FROM cursos WHERE id = $1 AND empresa_id = $2 AND ativo', [b.curso_id, emp(req)]);
+      if (!c.rows.length) return res.status(400).json({ erro: 'Curso não encontrado.' });
+    }
     const r = await pool.query(
       `INSERT INTO ofertas (slug, titulo, descricao, curso_id, preco, preco_promocional, promo_inicio, promo_fim, venda_inicio, venda_fim,
-         duracao_meses, modo, ativa, empresa_id, criado_por_usuario_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`, [...paramsOferta(b), emp(req), req.usuario.id]);
+         duracao_meses, modo, ativa, tipo, empresa_id, criado_por_usuario_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`, [...paramsOferta(b), emp(req), req.usuario.id]);
     await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'oferta.criada', entidade: 'oferta', entidade_id: r.rows[0].id,
       depois: { slug: b.slug, preco: Number(b.preco), modo: b.modo || 'teste' } });
     res.status(201).json({ mensagem: 'Oferta criada.', id: r.rows[0].id });
@@ -106,7 +113,7 @@ router.put('/ofertas/:id', async (req, res) => {
     if (!antes) return res.status(404).json({ erro: 'Oferta não encontrada.' });
     await pool.query(
       `UPDATE ofertas SET slug=$1, titulo=$2, descricao=$3, curso_id=$4, preco=$5, preco_promocional=$6, promo_inicio=$7, promo_fim=$8,
-         venda_inicio=$9, venda_fim=$10, duracao_meses=$11, modo=$12, ativa=$13, atualizado_em=NOW() WHERE id=$14`, [...paramsOferta(b), req.params.id]);
+         venda_inicio=$9, venda_fim=$10, duracao_meses=$11, modo=$12, ativa=$13, tipo=$14, atualizado_em=NOW() WHERE id=$15`, [...paramsOferta(b), req.params.id]);
     await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'oferta.alterada', entidade: 'oferta', entidade_id: Number(req.params.id),
       antes, depois: { modo: b.modo, preco: Number(b.preco), ativa: b.ativa !== false } });
     res.json({ mensagem: b.modo === 'producao' && antes.modo === 'teste' ? 'Oferta salva e colocada em PRODUÇÃO: os próximos pedidos cobram de verdade.' : 'Oferta salva.' });
@@ -165,7 +172,7 @@ router.get('/pedidos', async (req, res) => {
     const r = await pool.query(
       `SELECT p.id, p.status, p.modo, p.valor::float AS valor, p.desconto::float AS desconto, p.forma_pagamento, p.origem, p.erro,
               p.criado_em, p.pago_em, to_char(p.vencimento, 'YYYY-MM-DD') AS vencimento, to_char(p.acesso_fim, 'YYYY-MM-DD') AS acesso_fim,
-              p.link_pagamento, p.fatura_id, o.titulo AS oferta, u.nome, u.email, k.codigo AS cupom,
+              p.link_pagamento, p.fatura_id, p.itens, p.contrato_conector_id, o.titulo AS oferta, o.tipo AS oferta_tipo, u.nome, u.email, k.codigo AS cupom,
               COALESCE(cl.razao_social, cl.nome) AS cliente, cl.cpf_cnpj, p.cliente_id
        FROM pedidos p JOIN ofertas o ON o.id = p.oferta_id JOIN usuarios u ON u.id = p.usuario_id
        JOIN clientes cl ON cl.id = p.cliente_id LEFT JOIN cupons k ON k.id = p.cupom_id

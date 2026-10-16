@@ -191,9 +191,17 @@ router.get('/ofertas/:slug', limiteProposta, async (req, res) => {
     const o = await loja.ofertaPorSlug(req.params.slug);
     if (!o || !o.curso_ativo) return res.status(404).json({ erro: 'Oferta não encontrada.' });
     const p = loja.precoAtual(o);
+    // Licenças do Conector: preço anual de UMA licença de cada perfil (a página soma conforme a quantidade escolhida)
+    let perfis = null;
+    if (o.tipo === 'conector') {
+      perfis = [];
+      for (const [id, nome] of [['abap', 'ABAP (Desenvolvimento)'], ['funcional', 'Funcional (Leitura)'], ['ambos', 'ABAP + Funcional']]) {
+        perfis.push({ id, nome, preco_anual: await loja.precoLicencas(o, { [id]: 1 }) });
+      }
+    }
     res.json({
-      slug: o.slug, titulo: o.titulo, descricao: o.descricao, curso: o.curso_titulo, aulas: o.aulas, carga_horaria: o.carga_horaria,
-      preco: p.preco, preco_cheio: p.cheio, promocional: p.promocional, promo_fim: o.promo_fim,
+      slug: o.slug, tipo: o.tipo, titulo: o.titulo, descricao: o.descricao, curso: o.curso_titulo, aulas: o.aulas, carga_horaria: o.carga_horaria,
+      preco: p.preco, preco_cheio: p.cheio, promocional: p.promocional, promo_fim: o.promo_fim, perfis,
       duracao_meses: o.duracao_meses, teste: o.modo === 'teste', disponivel: loja.emVenda(o)
     });
   } catch (err) { res.status(500).json({ erro: 'Erro ao carregar a oferta.' }); }
@@ -204,7 +212,7 @@ router.post('/ofertas/:slug/cupom', limiteProposta, async (req, res) => {
   try {
     const o = await loja.ofertaPorSlug(req.params.slug);
     if (!o || !loja.emVenda(o)) return res.status(404).json({ erro: 'Oferta não encontrada.' });
-    const { preco } = loja.precoAtual(o);
+    const preco = o.tipo === 'conector' ? await loja.precoLicencas(o, loja.lerVagasPedido((req.body || {}).vagas).q) : loja.precoAtual(o).preco;
     const { desconto } = await loja.avaliarCupom(pool, (req.body || {}).cupom || '', o, preco);
     res.json({ desconto, total: Math.max(0, Math.round((preco - desconto) * 100) / 100) });
   } catch (err) {
@@ -219,7 +227,7 @@ router.post('/ofertas/:slug/pedido', limitePedido, async (req, res) => {
   if (texto(b.website, 10)) return res.status(400).json({ erro: 'Pedido inválido.' });
   try {
     const r = await loja.criarPedido({ slug: req.params.slug, nome: b.nome, email: b.email, documento: b.documento,
-      telefone: texto(b.telefone, 30), cupom: b.cupom, origem: texto(b.origem, 80) });
+      telefone: texto(b.telefone, 30), cupom: b.cupom, origem: texto(b.origem, 80), vagas: b.vagas, eu_perfil: texto(b.eu_perfil, 20) });
     res.status(r.existente ? 200 : 201).json({ link: r.link, pedido: r.pedido.token, valor: Number(r.pedido.valor), existente: !!r.existente });
   } catch (err) {
     if (err instanceof loja.ErroLoja) return res.status(400).json({ erro: err.message });
@@ -232,7 +240,7 @@ router.post('/ofertas/:slug/pedido', limitePedido, async (req, res) => {
 router.get('/pedidos/:token', limiteProposta, async (req, res) => {
   try {
     const p = (await pool.query(
-      `SELECT p.status, p.valor::float AS valor, p.modo, p.link_pagamento, to_char(p.acesso_fim, 'YYYY-MM-DD') AS acesso_fim, o.titulo
+      `SELECT p.status, p.valor::float AS valor, p.modo, p.link_pagamento, to_char(p.acesso_fim, 'YYYY-MM-DD') AS acesso_fim, o.titulo, o.tipo
        FROM pedidos p JOIN ofertas o ON o.id = p.oferta_id WHERE p.token = $1`, [String(req.params.token || '').slice(0, 64)])).rows[0];
     if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
     res.json(p);

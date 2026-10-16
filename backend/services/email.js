@@ -530,6 +530,28 @@ async function enviarAvisoVencimentoLicencas({ para, cliente, fim, dias, renova 
   return enviar({ to: para, subject: `Licenças do Conector vencem em ${dias} dia(s)`, html });
 }
 
+/** Loja: licenças do Conector pagas. Quem comprou administra: convida a equipe pelo portal. */
+async function enviarLicencasLiberadas({ nome, email, q, fim, linkSenha, teste }) {
+  const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
+  const nomes = { abap: 'ABAP', funcional: 'Funcional', ambos: 'ABAP + Funcional' };
+  const lista = Object.entries(q || {}).filter(([, n]) => n > 0).map(([p, n]) => `${n} ${nomes[p] || p}`).join(', ');
+  const ate = String(fim).slice(0, 10).split('-').reverse().join('/');
+  const html = templateBase({
+    titulo: 'Suas licenças do Conector SAP', preheader: `Licenças liberadas até ${ate}.`,
+    corpo: `
+      ${teste ? '<p style="margin:0 0 12px;padding:8px 12px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:13px">Compra de TESTE (homologação): nenhum valor foi cobrado.</p>' : ''}
+      <h2 style="margin:0 0 12px;color:#0f172a;font-size:20px">Olá, ${esc(String(nome || '').split(' ')[0])}!</h2>
+      <p style="margin:0 0 12px;color:#334155;font-size:15px;line-height:1.6">Recebemos o pagamento. Suas licenças do Conector SAP (<strong>${esc(lista)}</strong>) valem até <strong>${ate}</strong>.</p>
+      <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6">No portal, em <strong>Licenças do Conector SAP da empresa</strong>, convide cada pessoa pelo e-mail.
+        Ela faz os cursos do perfil e, ao concluir, recebe o certificado e o instalador já configurado.</p>
+      ${linkSenha
+        ? `<a href="${esc(linkSenha)}" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Criar minha senha →</a>
+           <p style="margin:10px 0 0;color:#64748b;font-size:12px">O link vale 72 horas.</p>`
+        : `<a href="${esc(base)}/login.html" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Entrar no portal →</a>`}`
+  });
+  return enviar({ to: email, subject: `${teste ? '[TESTE] ' : ''}Licenças do Conector SAP liberadas`, html });
+}
+
 /** Loja: pagamento confirmado, curso liberado. linkSenha = criar a senha (primeiro acesso). */
 async function enviarCursoLiberado({ nome, email, curso, fim, linkSenha, teste }) {
   const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
@@ -550,6 +572,7 @@ async function enviarCursoLiberado({ nome, email, curso, fim, linkSenha, teste }
 
 module.exports = {
   enviarCursoLiberado,
+  enviarLicencasLiberadas,
   enviarAvisoVencimentoLicencas,
   notificarNovoChamado,
   notificarAtualizacaoStatus,

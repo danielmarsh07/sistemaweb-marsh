@@ -22,6 +22,13 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.2', data: '2026-10-16', destaques: [
+      'Venda das licenças do Conector pelo site: na Loja, crie uma oferta "Licenças do Conector SAP" e divulgue o link',
+      'O comprador escolhe quantas licenças de cada perfil (ABAP, Funcional, ABAP + Funcional) e vê o total na hora, com o preço da tabela Preços Conector SAP',
+      'Pago: nasce o contrato do Conector por 12 meses, quem comprou vira administrador da empresa no portal (e pode usar uma licença) e recebe o acesso por e-mail',
+      'Em produção a cobrança anual entra no Financeiro já com a 1ª anuidade paga e renovação automática; estorno cancela as licenças',
+      'Tabela de preços ganhou o preço próprio do perfil ABAP + Funcional (começa igual ao de Desenvolvimento)'
+    ] },
     { versao: 'v4.1', data: '2026-10-16', destaques: [
       'Fatura vencida gera um alerta para você no dia seguinte (além do lembrete ao cliente)',
       'Licenças do Conector com 30 dias de atraso (ajustável em Configuração) ficam suspensas sozinhas, com os cursos inclusos; pagou, voltam na hora',

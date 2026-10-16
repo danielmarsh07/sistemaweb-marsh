@@ -1054,6 +1054,8 @@
               <li>Pago: curso liberado, matrícula e e-mail com o acesso. Em <strong>Teste</strong> nada é cobrado; use <em>Simular pagamento</em> para homologar.</li>
               <li>Pronto para vender: edite a oferta e mude para <strong>Produção</strong>. Vendas pagas entram como receita no Financeiro.</li>
               <li><strong>Cupons</strong> (% ou R$, com validade e limite). Estorno ou contestação tiram o curso; pedido sem pagamento expira.</li>
+              <li><strong>Licenças do Conector</strong>: oferta do tipo <em>Licenças do Conector SAP</em>. O comprador escolhe quantas de cada perfil (preço da tabela, anual);
+                pago, nasce o contrato do Conector com ele como administrador e, em produção, a cobrança anual (1ª anuidade já paga, renovação automática).</li>
             </ol>
             <a href="#" class="roteiro-ir" onclick="showPage('loja'); return false;">Loja de cursos →</a>
           </section>
@@ -3288,21 +3290,28 @@
     <div class="modal-content">
       <div class="modal-header"><h3 id="modal-oferta-titulo">Nova oferta</h3><button class="btn-close">&times;</button></div>
       <form id="form-oferta" class="form">
-        <div class="form-group"><label>Curso <span class="obrig" title="Obrigatório">*</span></label><select name="curso_id" required></select></div>
+        <div class="form-group"><label>O que vende</label>
+          <select name="tipo" onchange="ajustarFormOferta()">
+            <option value="curso">Um curso</option>
+            <option value="conector">Licenças do Conector SAP (preço pela tabela, vigência de 12 meses)</option>
+          </select></div>
+        <div class="form-group oferta-curso"><label>Curso <span class="obrig" title="Obrigatório">*</span></label><select name="curso_id"></select></div>
         <div class="form-row">
           <div class="form-group"><label>Título da página <span class="obrig" title="Obrigatório">*</span></label><input name="titulo" required maxlength="255"></div>
           <div class="form-group"><label>Endereço (slug) <span class="obrig" title="Obrigatório">*</span></label><input name="slug" required maxlength="80" placeholder="curso-sap-cpi">
             <small class="form-hint">Fica marshconsultoria.com.br/curso.html?o=<em>endereço</em></small></div>
         </div>
         <div class="form-group"><label>Descrição (o que a pessoa aprende)</label><textarea name="descricao" rows="5"></textarea></div>
-        <div class="form-row">
-          <div class="form-group"><label>Preço (R$) <span class="obrig" title="Obrigatório">*</span></label><input name="preco" type="number" min="0" step="0.01" required>
+        <p class="form-hint oferta-conector" hidden>O comprador escolhe as licenças por perfil; o preço vem de Cadastros → Preços Conector SAP (plano anual).
+          Pago, nasce o contrato do Conector e ele vira o administrador da empresa. Em produção, a cobrança anual entra no Financeiro (1ª anuidade já paga).</p>
+        <div class="form-row oferta-curso">
+          <div class="form-group"><label>Preço (R$) <span class="obrig" title="Obrigatório">*</span></label><input name="preco" type="number" min="0" step="0.01">
             <small class="form-hint">0 = gratuito (libera sem pagamento).</small></div>
           <div class="form-group"><label>Acesso por (meses)</label><input name="duracao_meses" type="number" min="1" max="120" value="12">
             <small class="form-hint">Vazio = sem prazo.</small></div>
         </div>
-        <div class="form-section-sub">Promoção (opcional)</div>
-        <div class="form-row">
+        <div class="form-section-sub oferta-curso">Promoção (opcional)</div>
+        <div class="form-row oferta-curso">
           <div class="form-group"><label>Preço promocional (R$)</label><input name="preco_promocional" type="number" min="0" step="0.01"></div>
           <div class="form-group"><label>De</label><input name="promo_inicio" type="date"></div>
           <div class="form-group"><label>Até</label><input name="promo_fim" type="date"></div>

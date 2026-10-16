@@ -376,12 +376,12 @@ async function historicoContrato(contratoId) {
 // ===== Cobrança do contrato (fluxo novo, fase 1) =====
 // As licenças do Conector são cobradas por um contrato financeiro anual (tipo produto) ligado a este contrato.
 // Preço sugerido = tabela de Preços Conector SAP (Cadastros), plano anual: valor mensal × 12 por vaga.
-// Perfil Ambos usa o preço de Desenvolvimento até a tabela ter um preço próprio para ele.
+// Perfil Ambos tem preço próprio na tabela (ambos_anual), que começa igual ao de Desenvolvimento.
 async function precoAnualSugerido(db, empresaId, q) {
   const { normalizarPrecos } = require('./precificacao-conector');
   const cfg = (await db.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = $1', [empresaId])).rows[0];
   const { precos } = normalizarPrecos((cfg && cfg.prop_precos_conector) || {});
-  const mensal = (q.abap || 0) * precos.dev_anual + (q.ambos || 0) * precos.dev_anual + (q.funcional || 0) * precos.leitura_anual;
+  const mensal = (q.abap || 0) * precos.dev_anual + (q.ambos || 0) * precos.ambos_anual + (q.funcional || 0) * precos.leitura_anual;
   return Math.round(mensal * 12 * 100) / 100;
 }
 

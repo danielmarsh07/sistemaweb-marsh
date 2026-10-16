@@ -11,6 +11,8 @@ const PRECOS_PADRAO = {
   // Licença por usuário (R$/mês). "anual" = valor mensal no plano anual
   leitura_mensal: 490, leitura_anual: 390,
   dev_mensal: 990, dev_anual: 790,
+  // Perfil ABAP + Funcional nas licenças por contrato (venda pelo site e cobrança anual). Começa igual ao Desenvolvimento
+  ambos_anual: 790,
   // Pacote Empresa (R$/mês): até 5, até 10, e por usuário acima de 10
   empresa_ate5: 3500, empresa_ate10: 6000, empresa_excedente: 450,
   // O preço Empresa já é o do anual; no ciclo mensal pode ter acréscimo (%). 0 = mesmo preço
@@ -27,6 +29,7 @@ const PRECOS_PADRAO = {
 const ROTULOS_PRECOS = {
   leitura_mensal: 'Leitura (funcional) — mensal', leitura_anual: 'Leitura (funcional) — anual, por mês',
   dev_mensal: 'Desenvolvimento (ABAP) — mensal', dev_anual: 'Desenvolvimento (ABAP) — anual, por mês',
+  ambos_anual: 'ABAP + Funcional — anual, por mês (licenças por contrato)',
   empresa_ate5: 'Empresa — até 5 usuários', empresa_ate10: 'Empresa — até 10 usuários',
   empresa_excedente: 'Empresa — por usuário acima de 10', empresa_acrescimo_mensal_pct: 'Empresa — acréscimo no ciclo mensal (%)',
   impl_pequeno: 'Implantação — legado Z pequeno', impl_medio: 'Implantação — legado Z médio',

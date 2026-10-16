@@ -660,7 +660,7 @@ async function gerarPropostaConector() {
 // Aparece no modal do simulador e na página Cadastros → Preços Conector SAP.
 function montarCamposPrecos(container, c) {
   const grupos = [
-    ['Licença por usuário (R$/mês)', ['leitura_mensal', 'leitura_anual', 'dev_mensal', 'dev_anual']],
+    ['Licença por usuário (R$/mês)', ['leitura_mensal', 'leitura_anual', 'dev_mensal', 'dev_anual', 'ambos_anual']],
     ['Plano Empresa (R$/mês)', ['empresa_ate5', 'empresa_ate10', 'empresa_excedente', 'empresa_acrescimo_mensal_pct']],
     ['Implantação (valor único)', ['impl_pequeno', 'impl_medio', 'impl_grande', 'impl_sistema_adicional']],
     ['Fábrica ABAP', ['chamado_p', 'chamado_m', 'chamado_g', 'pacote_horas', 'pacote_valor']],
