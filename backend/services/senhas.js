@@ -55,7 +55,7 @@ async function definirSenhaPorToken(token, senha) {
   await pool.query('UPDATE usuarios SET senha = $1, sessao_versao = sessao_versao + 1 WHERE id = $2', [await bcrypt.hash(senha, 10), t.usuario_id]);
   await pool.query('UPDATE usuarios_tokens SET usado_em = NOW() WHERE usuario_id = $1 AND usado_em IS NULL', [t.usuario_id]);
   await auditoria.registrar({ usuario_id: t.usuario_id, acao: `usuario.senha_definida_${t.tipo}`, entidade: 'usuario', entidade_id: t.usuario_id });
-  return { ok: true, email: t.email };
+  return { ok: true, email: t.email, usuario_id: t.usuario_id, tipo: t.tipo };
 }
 
 // Senha impossível de adivinhar para quem ainda vai criar a sua pelo convite

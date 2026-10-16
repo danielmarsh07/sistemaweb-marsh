@@ -1,15 +1,18 @@
 /**
  * /api/contratos-conector — contratos do Conector SAP por vagas (requer login). Regras em services/contratos-conector.js.
  *
- * Portal (cliente):
+ * Portal (cliente; "gestor" = administrador corporativo do cliente, tabela clientes_admins):
  *   GET  /eu                                   papel no portal + vagas do próprio usuário (o portal decide o que mostra)
- *   GET  /meus                                 contratos em que o usuário é gestor (vagas, ocupantes, progresso, SIDs)
+ *   GET  /meus                                 contratos do cliente, para quem é administrador (vagas, ocupantes, progresso, SIDs)
+ *   GET|POST /meus-admins, DELETE /meus-admins/:uid   administradores da empresa
+ *   POST /meus/:id/convidar                    { perfil, nome, email } ou { perfil, eu: true } — reserva a próxima licença livre
+ *   GET  /meus/:id/historico                   quem recebeu, convites, revogações, expirações
  *   POST /meus/:id/vagas/:vid/ocupar           { eu: true } ou { nome, email } (convite por e-mail)
- *   POST /meus/:id/vagas/:vid/liberar
+ *   POST /meus/:id/vagas/:vid/liberar          revoga a licença ou cancela o convite
  *   POST /meus/:id/vagas/:vid/convite          reenvia o convite ao ocupante
  *   PUT  /meus/:id/conexoes                    { conexoes: [{ sid, descricao, url, mandante, idioma }] } até max_sids
- * Admin: GET /, GET /:id, POST /, PUT /:id, POST /:id/vagas, DELETE /:id/vagas/:vid,
- *        POST /:id/vagas/:vid/ocupar|liberar, PUT /:id/conexoes, POST /:id/gestor/convite
+ * Admin: GET /, GET /:id, POST /, PUT /:id, POST /:id/vagas, DELETE /:id/vagas/:vid, POST /:id/convidar, GET /:id/historico,
+ *        POST /:id/vagas/:vid/ocupar|liberar, PUT /:id/conexoes, POST /:id/gestor/convite, GET|POST|DELETE /clientes/:cid/admins
  */
 const express = require('express');
 const router = express.Router();
@@ -62,8 +65,8 @@ router.get('/eu', async (req, res) => {
   try {
     await cert.avaliarUsuario(req.usuario.id); // concluiu tudo e ainda não tinha certificado/licença? emite agora
     const papel = await cc.papelPortal(req.usuario.id);
-    const gestor = (await pool.query(
-      `SELECT 1 FROM contratos_conector WHERE gestor_usuario_id = $1 AND status <> 'cancelado' LIMIT 1`, [req.usuario.id])).rows.length > 0;
+    // "gestor" = administrador corporativo do cliente (vê e distribui as licenças de todos os contratos do cliente)
+    const gestor = await cc.ehAdminCorporativo(req.usuario.id, req.usuario.cliente_id);
     const vagas = (await pool.query(
       `SELECT v.id, v.perfil, k.id AS contrato_id, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
               (${cc.VAGA_VIGENTE}) AS vigente
@@ -105,29 +108,84 @@ router.get('/eu/vagas/:vid/pacote', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao gerar o link do instalador'); }
 });
 
+// Contrato do cliente do usuário, desde que ele seja administrador corporativo desse cliente
+// (o isolamento entre empresas vem daqui: o cliente_id é o do login, nunca o do pedido)
 async function contratoDoGestor(req) {
-  if (req.usuario.tipo !== 'cliente') return null;
+  if (req.usuario.tipo !== 'cliente' || !req.usuario.cliente_id) return null;
+  if (!await cc.ehAdminCorporativo(req.usuario.id, req.usuario.cliente_id)) return null;
   const r = await pool.query(
-    `SELECT * FROM contratos_conector WHERE id = $1 AND gestor_usuario_id = $2 AND status <> 'cancelado'`,
-    [req.params.id, req.usuario.id]);
+    `SELECT * FROM contratos_conector WHERE id = $1 AND cliente_id = $2 AND status <> 'cancelado'`,
+    [req.params.id, req.usuario.cliente_id]);
   return r.rows[0] || null;
+}
+
+async function exigirAdminCorporativo(req, res) {
+  if (req.usuario.tipo === 'cliente' && await cc.ehAdminCorporativo(req.usuario.id, req.usuario.cliente_id)) return true;
+  res.status(403).json({ erro: 'Somente administradores da empresa.' });
+  return false;
 }
 
 router.get('/meus', async (req, res) => {
   if (req.usuario.tipo !== 'cliente') return res.json([]);
   try {
+    if (!await cc.ehAdminCorporativo(req.usuario.id, req.usuario.cliente_id)) return res.json([]);
     const ids = (await pool.query(
-      `SELECT id FROM contratos_conector WHERE gestor_usuario_id = $1 AND status <> 'cancelado' ORDER BY data_fim DESC, id DESC`,
-      [req.usuario.id])).rows;
+      `SELECT id FROM contratos_conector WHERE cliente_id = $1 AND status <> 'cancelado' ORDER BY data_fim DESC, id DESC`,
+      [req.usuario.cliente_id])).rows;
     res.json(await Promise.all(ids.map(r => cc.detalharContrato(r.id))));
   } catch (err) { responderErro(res, err, 'Erro ao buscar contratos'); }
+});
+
+// Administradores da empresa (portal): listar, convidar outro, remover (nunca o último)
+router.get('/meus-admins', async (req, res) => {
+  try {
+    if (!await exigirAdminCorporativo(req, res)) return;
+    res.json(await cc.listarAdmins(req.usuario.cliente_id));
+  } catch (err) { responderErro(res, err, 'Erro ao buscar administradores'); }
+});
+
+router.post('/meus-admins', async (req, res) => {
+  try {
+    if (!await exigirAdminCorporativo(req, res)) return;
+    const b = req.body || {};
+    const r = await cc.adicionarAdmin({ clienteId: req.usuario.cliente_id, empresaId: emp(req), nome: b.nome, email: b.email, atorId: req.usuario.id });
+    res.status(201).json({ mensagem: `${r.usuario.nome} agora é administrador da empresa.${r.criado ? (r.convite_enviado ? ` Convite enviado para ${r.usuario.email}.` : ' O convite não pôde ser enviado agora.') : ''}` });
+  } catch (err) { responderErro(res, err, 'Erro ao adicionar administrador'); }
+});
+
+router.delete('/meus-admins/:uid', async (req, res) => {
+  try {
+    if (!await exigirAdminCorporativo(req, res)) return;
+    await cc.removerAdmin({ clienteId: req.usuario.cliente_id, empresaId: emp(req), usuarioId: req.params.uid, atorId: req.usuario.id });
+    res.json({ mensagem: 'Administrador removido.' });
+  } catch (err) { responderErro(res, err, 'Erro ao remover administrador'); }
+});
+
+// Convidar escolhendo só o perfil: o sistema reserva a próxima licença livre (nunca passa do contratado)
+router.post('/meus/:id/convidar', async (req, res) => {
+  try {
+    const k = await contratoDoGestor(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    const b = req.body || {};
+    const r = await cc.ocuparVaga(k, { perfil: b.perfil }, b, req.usuario.id);
+    await depoisDeOcupar(r);
+    res.json({ mensagem: mensagemOcupacao(r), convite_enviado: r.convite_enviado, vaga_id: r.vaga_id, estado: r.estado });
+  } catch (err) { responderErro(res, err, 'Erro ao convidar'); }
+});
+
+router.get('/meus/:id/historico', async (req, res) => {
+  try {
+    const k = await contratoDoGestor(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    res.json(await cc.historicoContrato(k.id));
+  } catch (err) { responderErro(res, err, 'Erro ao buscar o histórico'); }
 });
 
 router.post('/meus/:id/vagas/:vid/ocupar', async (req, res) => {
   try {
     const k = await contratoDoGestor(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    const r = await cc.ocuparVaga(k, req.params.vid, req.body || {}, req.usuario.id);
+    const r = await cc.ocuparVaga(k, { vagaId: req.params.vid }, req.body || {}, req.usuario.id);
     await depoisDeOcupar(r);
     res.json({ mensagem: mensagemOcupacao(r), convite_enviado: r.convite_enviado });
   } catch (err) { responderErro(res, err, 'Erro ao ocupar a vaga'); }
@@ -138,7 +196,7 @@ router.post('/meus/:id/vagas/:vid/liberar', async (req, res) => {
     const k = await contratoDoGestor(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
     await liberarComLicenca(k, req.params.vid, req.usuario.id);
-    res.json({ mensagem: 'Vaga liberada. A pessoa perde o acesso aos cursos desta vaga.' });
+    res.json({ mensagem: 'Licença liberada. A pessoa perde o Conector e os cursos desta licença, mas continua com a conta, o progresso e o que comprou.' });
   } catch (err) { responderErro(res, err, 'Erro ao liberar a vaga'); }
 });
 
@@ -240,6 +298,55 @@ router.get('/:id', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao buscar contrato'); }
 });
 
+// Histórico das licenças do contrato e convite por perfil (admin Marsh)
+router.get('/:id/historico', async (req, res) => {
+  try {
+    const k = await contratoDaEmpresa(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    res.json(await cc.historicoContrato(k.id));
+  } catch (err) { responderErro(res, err, 'Erro ao buscar o histórico'); }
+});
+
+router.post('/:id/convidar', async (req, res) => {
+  try {
+    const k = await contratoDaEmpresa(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    const b = req.body || {};
+    const r = await cc.ocuparVaga(k, { perfil: b.perfil }, b, k.gestor_usuario_id, req.usuario.id);
+    await depoisDeOcupar(r);
+    res.json({ mensagem: mensagemOcupacao(r), convite_enviado: r.convite_enviado, vaga_id: r.vaga_id, estado: r.estado });
+  } catch (err) { responderErro(res, err, 'Erro ao convidar'); }
+});
+
+// Administradores corporativos de um cliente (admin Marsh)
+async function clienteDaEmpresa(req) {
+  return (await pool.query('SELECT id FROM clientes WHERE id = $1 AND empresa_id = $2', [req.params.cid, emp(req)])).rows[0] || null;
+}
+
+router.get('/clientes/:cid/admins', async (req, res) => {
+  try {
+    if (!await clienteDaEmpresa(req)) return res.status(404).json({ erro: 'Cliente não encontrado.' });
+    res.json(await cc.listarAdmins(req.params.cid));
+  } catch (err) { responderErro(res, err, 'Erro ao buscar administradores'); }
+});
+
+router.post('/clientes/:cid/admins', async (req, res) => {
+  try {
+    if (!await clienteDaEmpresa(req)) return res.status(404).json({ erro: 'Cliente não encontrado.' });
+    const b = req.body || {};
+    const r = await cc.adicionarAdmin({ clienteId: req.params.cid, empresaId: emp(req), nome: b.nome, email: b.email, atorId: req.usuario.id });
+    res.status(201).json({ mensagem: `${r.usuario.nome} agora é administrador da empresa.${r.criado ? (r.convite_enviado ? ` Convite enviado para ${r.usuario.email}.` : ' O convite não pôde ser enviado agora.') : ''}` });
+  } catch (err) { responderErro(res, err, 'Erro ao adicionar administrador'); }
+});
+
+router.delete('/clientes/:cid/admins/:uid', async (req, res) => {
+  try {
+    if (!await clienteDaEmpresa(req)) return res.status(404).json({ erro: 'Cliente não encontrado.' });
+    await cc.removerAdmin({ clienteId: req.params.cid, empresaId: emp(req), usuarioId: req.params.uid, atorId: req.usuario.id });
+    res.json({ mensagem: 'Administrador removido.' });
+  } catch (err) { responderErro(res, err, 'Erro ao remover administrador'); }
+});
+
 // POST /:id/cobranca { valor_anual?, dia_vencimento? } — cria a cobrança anual de um contrato que ainda não tem
 router.post('/:id/cobranca', async (req, res) => {
   const b = req.body || {};
@@ -280,6 +387,9 @@ router.post('/', async (req, res) => {
       // Sem início: hoje no horário de Brasília (o CURRENT_DATE do banco é UTC e viraria o dia às 21h)
       [emp(req), cliente.id, gestor.id, inicio || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }), fim, maxSids, String(b.observacoes || '').trim() || null, req.usuario.id])).rows[0];
     await cc.criarVagas(db, k.id, q);
+    // Quem compra vira administrador da empresa no portal (não ocupa licença por isso)
+    await db.query(`INSERT INTO clientes_admins (cliente_id, usuario_id, criado_por_usuario_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [cliente.id, gestor.id, req.usuario.id]);
     // Cobrança anual no financeiro (opcional): { cobranca: { gerar: true, valor_anual?, dia_vencimento? } }
     let cobranca = null;
     if (b.cobranca && b.cobranca.gerar) {
@@ -358,7 +468,7 @@ router.post('/:id/vagas/:vid/ocupar', async (req, res) => {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
     const corpo = { ...(req.body || {}) };
-    const r = await cc.ocuparVaga(k, req.params.vid, corpo, k.gestor_usuario_id, req.usuario.id); // "eu" = o gestor do contrato
+    const r = await cc.ocuparVaga(k, { vagaId: req.params.vid }, corpo, k.gestor_usuario_id, req.usuario.id); // "eu" = o gestor do contrato
     await depoisDeOcupar(r);
     res.json({ mensagem: mensagemOcupacao(r), convite_enviado: r.convite_enviado });
   } catch (err) { responderErro(res, err, 'Erro ao ocupar a vaga'); }

@@ -3272,6 +3272,14 @@
           <div class="form-group"><button type="submit" class="btn btn-secondary">Acrescentar vagas</button></div>
         </form>
 
+        <div class="form-section-title">Administradores da empresa (veem e distribuem as licenças no portal)</div>
+        <ul id="contrato-conector-admins" class="fin-lista-itens"></ul>
+        <div class="form-actions" style="justify-content:flex-start">
+          <button type="button" class="btn btn-secondary" onclick="adicionarAdminCliente()">+ Adicionar administrador</button>
+          <button type="button" class="btn btn-secondary" onclick="verHistoricoContratoConector()">Ver histórico das licenças</button>
+        </div>
+        <div id="contrato-conector-historico"></div>
+
         <div class="form-section-title">Sistemas SAP (o gestor também edita no portal)</div>
         <div id="contrato-conector-sids"></div>
         <div class="form-actions">

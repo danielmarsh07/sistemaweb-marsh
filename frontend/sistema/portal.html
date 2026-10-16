@@ -1858,6 +1858,12 @@
     .contrato-resumo strong { color: var(--text-main); }
     .contrato-resumo .sids { margin-top: 4px; }
     .contrato-resumo .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .lista-admins { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+    .lista-admins li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+    .lista-historico { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 0.88rem; color: var(--text-secondary); }
+    .lista-historico li { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .lista-historico strong { color: var(--text-main); }
+    .lista-historico small { display: block; color: var(--text-muted); margin-top: 2px; }
     .vaga-card .linha span { white-space: nowrap; }
     .vaga-card .linha strong { min-width: 0; overflow-wrap: anywhere; text-align: right; }
     .vaga-card .vaga-cursos { font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 8px; }
@@ -1876,7 +1882,8 @@
     .minha-vaga .trilhas { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; font-size: 0.85rem; color: var(--text-secondary); }
     .minha-vaga .trilhas li { display: flex; justify-content: space-between; gap: 10px; }
     .minha-vaga .trilhas .ok { color: #10b981; font-weight: 600; }
-    .minha-vaga .ajuda { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
+    .minha-vaga .ajuda, .vaga-card .ajuda { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
+    #secao-contrato > .ajuda { font-size: 0.88rem; color: var(--text-secondary); margin: -4px 0 12px; }
     .chave-box { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
     .chave-box code { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; background: var(--bg-hover, rgba(127,127,127,.08)); font-size: 0.92rem; letter-spacing: .04em; overflow-wrap: anywhere; color: var(--text-main); }
     .chave-box button { height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-main); font: inherit; font-size: 0.82rem; cursor: pointer; }
@@ -1970,10 +1977,22 @@
       </div>
     </div>
 
-    <!-- Contrato do Conector (só o gestor): vagas, quem ocupa, progresso e sistemas SAP -->
+    <!-- Licenças do Conector da empresa (só administradores da empresa): contratos, licenças, convites, histórico e SAP -->
     <section id="secao-contrato" class="portal-secao" hidden>
-      <div class="section-header"><h3>Meu contrato — Conector SAP</h3></div>
+      <div class="section-header"><h3>Licenças do Conector SAP da empresa</h3></div>
+      <p class="ajuda">Convide as pessoas pelo e-mail: cada convite reserva uma licença até a pessoa aceitar. Ser administrador não ocupa licença;
+        se você também for usar o Conector, convide a si mesmo.</p>
       <div id="lista-contratos"></div>
+      <div class="contrato-resumo" style="margin-top:18px">
+        <div>
+          <strong>Administradores da empresa</strong>
+          <p>Veem todos os contratos e distribuem as licenças.</p>
+          <ul id="lista-admins" class="lista-admins"></ul>
+        </div>
+        <div class="acoes">
+          <button type="button" class="btn-curso secundario" onclick="adicionarAdminPortal()">Adicionar administrador</button>
+        </div>
+      </div>
     </section>
 
     <!-- Minha licença do Conector (quem ocupa vaga): progresso do perfil, certificado, chave e instalador -->
@@ -2147,6 +2166,10 @@
       <div class="modal-body">
         <p class="modal-ajuda" id="ocupar-vaga-ajuda"></p>
         <form id="form-ocupar-vaga" onsubmit="salvarOcuparVaga(event)">
+          <div class="form-group" id="ocupar-vaga-perfil-grupo">
+            <label>Licença *</label>
+            <select name="perfil"></select>
+          </div>
           <div class="form-group">
             <label>Nome *</label>
             <input type="text" name="nome" maxlength="150" placeholder="Nome da pessoa">
@@ -2156,8 +2179,21 @@
             <input type="email" name="email" required maxlength="150" placeholder="email@empresa.com.br">
           </div>
           <button type="submit" class="btn-salvar">Enviar convite</button>
-          <button type="button" class="btn-linha" style="width:100%; margin-top:10px" onclick="ocuparVagaEuMesmo()">Ocupar esta vaga eu mesmo</button>
+          <button type="button" class="btn-linha" style="width:100%; margin-top:10px" onclick="ocuparVagaEuMesmo()">Usar esta licença eu mesmo</button>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: HISTÓRICO DAS LICENÇAS DE UM CONTRATO (administrador da empresa) -->
+  <div class="modal-overlay" id="modal-historico-licencas">
+    <div class="modal-box" style="max-width:640px;">
+      <div class="modal-top">
+        <h3 id="historico-licencas-titulo">Histórico das licenças</h3>
+        <button class="btn-fechar" type="button" onclick="fecharModal('modal-historico-licencas')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <ul id="historico-licencas-lista" class="lista-historico"></ul>
       </div>
     </div>
   </div>

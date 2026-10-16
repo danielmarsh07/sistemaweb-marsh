@@ -137,7 +137,8 @@ const webhook = body => api(null, '/asaas/webhook', 'POST', body, { 'asaas-acces
     const lib = await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vagaOcupada}/liberar`, 'POST');
     ok(lib.status === 200, 'vaga liberada');
     const audVaga = (await pool.query(`SELECT acao, usuario_id FROM auditoria WHERE entidade = 'vaga_conector' AND entidade_id = $1 ORDER BY id`, [vagaOcupada])).rows;
-    ok(audVaga.map(a => a.acao).join(',') === 'vaga.ocupada,vaga.liberada' && audVaga.every(a => a.usuario_id === 1),
+    // A pessoa era nova (convite ainda não aceito): liberar = cancelar o convite (fase 2)
+    ok(audVaga.map(a => a.acao).join(',') === 'vaga.ocupada,vaga.convite_cancelado' && audVaga.every(a => a.usuario_id === 1),
       `auditoria da vaga com quem fez (${audVaga.map(a => a.acao).join(', ')})`);
 
     // --- Oportunidade → contrato: dois cliques simultâneos geram um contrato só ---

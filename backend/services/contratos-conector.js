@@ -24,8 +24,8 @@ const MAX_VAGAS = 200;
 const PERFIL_COBRE_TRILHA = '(' + Object.entries(PERFIS).map(([p, d]) =>
   `(v.perfil = '${p}' AND c.trilha IN (${d.trilhas.map(t => `'${t}'`).join(', ')}))`).join(' OR ') + ')';
 
-// Vaga ativa de contrato vigente
-const VAGA_VIGENTE = `v.ativo AND k.status = 'ativo' AND k.data_inicio <= CURRENT_DATE AND k.data_fim >= CURRENT_DATE`;
+// Vaga ativa (convite aceito) de contrato vigente
+const VAGA_VIGENTE = `v.ativo AND v.estado = 'ativa' AND k.status = 'ativo' AND k.data_inicio <= CURRENT_DATE AND k.data_fim >= CURRENT_DATE`;
 
 /**
  * Condição SQL de curso liberado para um usuário do portal (alias c = cursos).
@@ -97,7 +97,7 @@ async function detalharContrato(id) {
      WHERE k.id = $1`, [id])).rows[0];
   if (!k) return null;
   const vagas = (await pool.query(
-    `SELECT v.id, v.perfil, v.usuario_id, v.data_atribuicao, u.nome AS usuario_nome, u.email AS usuario_email,
+    `SELECT v.id, v.perfil, v.usuario_id, v.data_atribuicao, v.estado, v.convidado_em, u.nome AS usuario_nome, u.email AS usuario_email,
             (SELECT COUNT(*)::int FROM cursos_aulas a JOIN cursos c ON c.id = a.curso_id
               WHERE a.ativo AND c.ativo AND c.status = 'publicado' AND ${PERFIL_COBRE_TRILHA}) AS aulas_total,
             (SELECT COUNT(*)::int FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id JOIN cursos c ON c.id = a.curso_id
@@ -148,19 +148,32 @@ async function criarVagas(db, contratoId, q) {
 }
 
 /**
- * Ocupa a vaga: { eu: true } (o gestor) ou { nome, email } (convite).
- * contrato = linha de contratos_conector. Devolve { usuario, convite_enviado }.
+ * Ocupa uma vaga: { eu: true } (quem administra ocupa para si) ou { nome, email } (convite).
+ * alvo = { vagaId } (vaga escolhida) ou { perfil } (o sistema reserva a próxima vaga livre do perfil).
+ * Estado da atribuição: pessoa nova = 'convidada' (reserva a vaga até aceitar o convite);
+ * quem já tem acesso ao portal = 'ativa'. contrato = linha de contratos_conector.
+ * Devolve { usuario, criado, convite_enviado, vaga_id, estado }.
  */
-async function ocuparVaga(contrato, vagaId, { eu, nome, email }, gestorId, atorId = gestorId) {
+async function ocuparVaga(contrato, alvo, { eu, nome, email }, gestorId, atorId = gestorId) {
   if (contrato.status !== 'ativo') throw new ErroRegra('Contrato não está ativo.');
+  if (typeof alvo !== 'object' || alvo === null) alvo = { vagaId: alvo };
   const db = await pool.connect();
-  let usuario, criado = false;
+  let usuario, criado = false, vaga, estado;
   try {
     await db.query('BEGIN');
-    const vaga = (await db.query(
-      'SELECT * FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo FOR UPDATE', [vagaId, contrato.id])).rows[0];
-    if (!vaga) throw new ErroRegra('Vaga não encontrada.');
-    if (vaga.usuario_id) throw new ErroRegra('Esta vaga já está ocupada. Libere-a antes de passar para outra pessoa.');
+    if (alvo.perfil) {
+      if (!PERFIS[alvo.perfil]) throw new ErroRegra('Perfil inválido.');
+      // SKIP LOCKED: convites simultâneos pegam vagas diferentes; sem vaga livre, recusa (nunca passa do contratado)
+      vaga = (await db.query(
+        `SELECT * FROM contratos_conector_vagas WHERE contrato_id = $1 AND perfil = $2 AND ativo AND usuario_id IS NULL
+         ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED`, [contrato.id, alvo.perfil])).rows[0];
+      if (!vaga) throw new ErroRegra(`Não há licença ${PERFIS[alvo.perfil].nome} disponível neste contrato. Libere uma ou contrate mais.`);
+    } else {
+      vaga = (await db.query(
+        'SELECT * FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo FOR UPDATE', [alvo.vagaId, contrato.id])).rows[0];
+      if (!vaga) throw new ErroRegra('Vaga não encontrada.');
+      if (vaga.usuario_id) throw new ErroRegra('Esta vaga já está ocupada. Libere-a antes de passar para outra pessoa.');
+    }
     if (eu) {
       usuario = (await db.query('SELECT id, nome, email, portal_papel FROM usuarios WHERE id = $1', [gestorId])).rows[0];
     } else {
@@ -170,9 +183,12 @@ async function ocuparVaga(contrato, vagaId, { eu, nome, email }, gestorId, atorI
     const outra = await db.query(
       'SELECT 1 FROM contratos_conector_vagas WHERE contrato_id = $1 AND usuario_id = $2 AND ativo', [contrato.id, usuario.id]);
     if (outra.rows.length) throw new ErroRegra(`${usuario.nome} já ocupa uma vaga deste contrato.`);
-    await db.query('UPDATE contratos_conector_vagas SET usuario_id = $1, data_atribuicao = NOW() WHERE id = $2', [usuario.id, vaga.id]);
+    estado = criado ? 'convidada' : 'ativa';
+    await db.query(
+      `UPDATE contratos_conector_vagas SET usuario_id = $1, data_atribuicao = NOW(), estado = $2::varchar,
+         convidado_em = CASE WHEN $2::varchar = 'convidada' THEN NOW() END WHERE id = $3`, [usuario.id, estado, vaga.id]);
     await auditoria.registrar({ empresa_id: contrato.empresa_id, usuario_id: atorId, acao: 'vaga.ocupada', entidade: 'vaga_conector',
-      entidade_id: vaga.id, depois: { contrato_id: contrato.id, perfil: vaga.perfil, usuario_id: usuario.id, email: usuario.email } }, db);
+      entidade_id: vaga.id, depois: { contrato_id: contrato.id, perfil: vaga.perfil, usuario_id: usuario.id, email: usuario.email, estado } }, db);
     await db.query('COMMIT');
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
@@ -189,11 +205,15 @@ async function ocuparVaga(contrato, vagaId, { eu, nome, email }, gestorId, atorI
     db.release();
   }
   const convite_enviado = criado ? await enviarConvite(usuario) : false;
-  return { usuario, criado, convite_enviado };
+  return { usuario, criado, convite_enviado, vaga_id: vaga.id, estado };
 }
 
-/** Libera a vaga. Aluno sem nenhuma outra vaga fica desativado (o progresso dele é guardado). */
-async function liberarVaga(contrato, vagaId, atorId = null) {
+/**
+ * Libera a vaga (revoga a licença ou cancela o convite). A pessoa continua com a conta: perde só o que vinha
+ * desta vaga (licença e cursos do perfil); progresso, certificado e compras próprias ficam.
+ * Convite ainda não aceito: o link deixa de valer. acao: 'vaga.liberada' | 'vaga.convite_cancelado' | 'vaga.convite_expirado'.
+ */
+async function liberarVaga(contrato, vagaId, atorId = null, { acao } = {}) {
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
@@ -201,13 +221,17 @@ async function liberarVaga(contrato, vagaId, atorId = null) {
       'SELECT * FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo FOR UPDATE', [vagaId, contrato.id])).rows[0];
     if (!vaga) throw new ErroRegra('Vaga não encontrada.');
     if (!vaga.usuario_id) throw new ErroRegra('A vaga já está livre.');
-    await db.query('UPDATE contratos_conector_vagas SET usuario_id = NULL, data_atribuicao = NULL WHERE id = $1', [vaga.id]);
-    await db.query(
-      `UPDATE usuarios u SET ativo = FALSE
-       WHERE u.id = $1 AND u.portal_papel = 'aluno'
-         AND NOT EXISTS (SELECT 1 FROM contratos_conector_vagas v WHERE v.usuario_id = u.id AND v.ativo)`, [vaga.usuario_id]);
-    await auditoria.registrar({ empresa_id: contrato.empresa_id, usuario_id: atorId, acao: 'vaga.liberada', entidade: 'vaga_conector',
-      entidade_id: vaga.id, antes: { contrato_id: contrato.id, perfil: vaga.perfil, usuario_id: vaga.usuario_id, desde: vaga.data_atribuicao } }, db);
+    await db.query(`UPDATE contratos_conector_vagas SET usuario_id = NULL, data_atribuicao = NULL, estado = 'livre', convidado_em = NULL WHERE id = $1`, [vaga.id]);
+    if (vaga.estado === 'convidada') {
+      // Sem outra vaga esperando aceite, o link de convite pendente deixa de valer
+      await db.query(
+        `UPDATE usuarios_tokens t SET usado_em = NOW() WHERE t.usuario_id = $1 AND t.tipo = 'convite' AND t.usado_em IS NULL
+           AND NOT EXISTS (SELECT 1 FROM contratos_conector_vagas v WHERE v.usuario_id = $1 AND v.ativo AND v.estado = 'convidada')`,
+        [vaga.usuario_id]);
+    }
+    await auditoria.registrar({ empresa_id: contrato.empresa_id, usuario_id: atorId,
+      acao: acao || (vaga.estado === 'convidada' ? 'vaga.convite_cancelado' : 'vaga.liberada'), entidade: 'vaga_conector',
+      entidade_id: vaga.id, antes: { contrato_id: contrato.id, perfil: vaga.perfil, usuario_id: vaga.usuario_id, estado: vaga.estado, desde: vaga.data_atribuicao } }, db);
     await db.query('COMMIT');
     return vaga.usuario_id;
   } catch (err) {
@@ -216,6 +240,113 @@ async function liberarVaga(contrato, vagaId, atorId = null) {
   } finally {
     db.release();
   }
+}
+
+/** A pessoa aceitou o convite (criou a senha) ou entrou no portal: as vagas reservadas para ela passam a valer. */
+async function ativarConvites(usuarioId) {
+  const r = await pool.query(
+    `UPDATE contratos_conector_vagas v SET estado = 'ativa', convidado_em = NULL
+     FROM contratos_conector k WHERE k.id = v.contrato_id AND v.usuario_id = $1 AND v.ativo AND v.estado = 'convidada'
+     RETURNING v.id, v.contrato_id, v.perfil, k.empresa_id`, [usuarioId]);
+  for (const v of r.rows) {
+    await auditoria.registrar({ empresa_id: v.empresa_id, usuario_id: usuarioId, acao: 'vaga.convite_aceito', entidade: 'vaga_conector',
+      entidade_id: v.id, depois: { contrato_id: v.contrato_id, perfil: v.perfil, usuario_id: usuarioId, estado: 'ativa' } });
+  }
+  return r.rowCount;
+}
+
+/**
+ * Convites que expiraram sem aceite: a vaga reservada volta a ficar livre.
+ * Expira quando a pessoa não tem mais nenhum link de convite válido (72 h; reenviar renova) e já passou o prazo.
+ */
+async function expirarConvites() {
+  const r = await pool.query(
+    `SELECT v.id AS vaga_id, v.contrato_id FROM contratos_conector_vagas v
+     WHERE v.ativo AND v.estado = 'convidada' AND v.convidado_em < NOW() - make_interval(hours => $1)
+       AND NOT EXISTS (SELECT 1 FROM usuarios_tokens t WHERE t.usuario_id = v.usuario_id AND t.tipo = 'convite'
+                         AND t.usado_em IS NULL AND t.expira_em > NOW())
+     LIMIT 200`, [senhas.PRAZO_H.convite]);
+  let n = 0;
+  for (const { vaga_id, contrato_id } of r.rows) {
+    const k = (await pool.query('SELECT * FROM contratos_conector WHERE id = $1', [contrato_id])).rows[0];
+    try { await liberarVaga(k, vaga_id, null, { acao: 'vaga.convite_expirado' }); n++; } catch (err) {
+      if (!(err instanceof ErroRegra)) throw err; // já liberada por alguém: segue
+    }
+  }
+  return n;
+}
+
+// ===== Administradores corporativos =====
+// Cada cliente (empresa ou pessoa compradora) tem um ou mais administradores no portal: veem os contratos do Conector
+// do cliente, convidam pessoas, revogam e redistribuem licenças. Ser administrador NÃO ocupa licença.
+async function ehAdminCorporativo(usuarioId, clienteId, db = pool) {
+  if (!usuarioId || !clienteId) return false;
+  const r = await db.query('SELECT 1 FROM clientes_admins WHERE usuario_id = $1 AND cliente_id = $2', [usuarioId, clienteId]);
+  return r.rows.length > 0;
+}
+
+async function listarAdmins(clienteId) {
+  return (await pool.query(
+    `SELECT u.id, u.nome, u.email, u.ativo, a.criado_em,
+            EXISTS (SELECT 1 FROM usuarios_tokens t WHERE t.usuario_id = u.id AND t.tipo = 'convite' AND t.usado_em IS NULL AND t.expira_em > NOW()) AS convite_pendente
+     FROM clientes_admins a JOIN usuarios u ON u.id = a.usuario_id
+     WHERE a.cliente_id = $1 ORDER BY u.nome`, [clienteId])).rows;
+}
+
+/** Torna a pessoa (achada ou criada pelo e-mail) administradora do cliente. Devolve { usuario, criado, convite_enviado }. */
+async function adicionarAdmin({ clienteId, empresaId, nome, email, atorId }) {
+  const db = await pool.connect();
+  let usuario, criado;
+  try {
+    await db.query('BEGIN');
+    ({ usuario, criado } = await acharOuCriarUsuario(db, { clienteId, empresaId, nome, email, papel: 'gestor' }));
+    const ins = await db.query(
+      `INSERT INTO clientes_admins (cliente_id, usuario_id, criado_por_usuario_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [clienteId, usuario.id, atorId]);
+    if (!ins.rowCount) throw new ErroRegra(`${usuario.nome} já é administrador.`);
+    await auditoria.registrar({ empresa_id: empresaId, usuario_id: atorId, acao: 'admin_corporativo.adicionado', entidade: 'cliente',
+      entidade_id: Number(clienteId), depois: { usuario_id: usuario.id, email: usuario.email } }, db);
+    await db.query('COMMIT');
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally { db.release(); }
+  const convite_enviado = criado ? await enviarConvite(usuario) : false;
+  return { usuario, criado, convite_enviado };
+}
+
+/** Tira a função de administrador (a conta continua; se ocupa licença, segue como usuário da licença). */
+async function removerAdmin({ clienteId, empresaId, usuarioId, atorId }) {
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    // Trava os admins do cliente: duas remoções simultâneas não deixam a empresa sem nenhum
+    const admins = (await db.query('SELECT usuario_id FROM clientes_admins WHERE cliente_id = $1 FOR UPDATE', [clienteId])).rows;
+    if (!admins.some(a => Number(a.usuario_id) === Number(usuarioId))) throw new ErroRegra('Esta pessoa não é administradora.');
+    if (admins.length <= 1) throw new ErroRegra('A empresa precisa de pelo menos um administrador. Adicione outro antes de remover este.');
+    await db.query('DELETE FROM clientes_admins WHERE cliente_id = $1 AND usuario_id = $2', [clienteId, usuarioId]);
+    // Sem a função, o acesso amplo ao portal acaba: fica só o que é dele (licença e cursos)
+    await db.query(`UPDATE usuarios SET portal_papel = 'aluno' WHERE id = $1 AND portal_papel = 'gestor'
+      AND NOT EXISTS (SELECT 1 FROM clientes_admins WHERE usuario_id = $1)`, [usuarioId]);
+    await auditoria.registrar({ empresa_id: empresaId, usuario_id: atorId, acao: 'admin_corporativo.removido', entidade: 'cliente',
+      entidade_id: Number(clienteId), antes: { usuario_id: Number(usuarioId) } }, db);
+    await db.query('COMMIT');
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally { db.release(); }
+}
+
+/** Histórico das licenças de um contrato: quem recebeu, quem foi convidado, revogações e expirações. */
+async function historicoContrato(contratoId) {
+  return (await pool.query(
+    `SELECT a.acao, a.criado_em, a.entidade_id AS vaga_id, COALESCE(a.depois, a.antes) AS dados,
+            ator.nome AS feito_por, p.nome AS pessoa_nome, p.email AS pessoa_email
+     FROM auditoria a
+     LEFT JOIN usuarios ator ON ator.id = a.usuario_id
+     LEFT JOIN usuarios p ON p.id = (COALESCE(a.depois, a.antes)->>'usuario_id')::int
+     WHERE a.entidade = 'vaga_conector' AND (COALESCE(a.depois, a.antes)->>'contrato_id')::int = $1
+     ORDER BY a.criado_em DESC, a.id DESC LIMIT 300`, [contratoId])).rows;
 }
 
 // ===== Cobrança do contrato (fluxo novo, fase 1) =====
@@ -272,6 +403,7 @@ async function criarCobrancaAnual(db, k, { valor, dia_vencimento, usuarioId }) {
 module.exports = {
   PERFIS, TRILHAS, PERFIL_COBRE_TRILHA, VAGA_VIGENTE, ErroRegra,
   sqlCursoLiberado, papelPortal, acharOuCriarUsuario, enviarConvite, detalharContrato,
-  lerQuantidades, criarVagas, ocuparVaga, liberarVaga,
+  lerQuantidades, criarVagas, ocuparVaga, liberarVaga, ativarConvites, expirarConvites,
+  ehAdminCorporativo, listarAdmins, adicionarAdmin, removerAdmin, historicoContrato,
   precoAnualSugerido, criarCobrancaAnual
 };

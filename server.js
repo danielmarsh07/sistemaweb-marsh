@@ -1180,6 +1180,33 @@ async function iniciar() {
     await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS geracao_automatica BOOLEAN NOT NULL DEFAULT TRUE;`);
     await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS dia_geracao INTEGER NOT NULL DEFAULT 1 CHECK (dia_geracao BETWEEN 1 AND 28);`);
 
+    // 32. Fluxo novo — fase 2: administradores corporativos e estado das licenças
+    //     clientes_admins: um ou mais administradores por cliente; veem os contratos do Conector do cliente e distribuem
+    //     as licenças. Ser administrador não ocupa licença.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS clientes_admins (
+        id SERIAL PRIMARY KEY,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        criado_por_usuario_id INTEGER,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (cliente_id, usuario_id)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_clientes_admins_usuario ON clientes_admins(usuario_id);`);
+    //     estado da vaga: livre → convidada (reservada até o convite ser aceito) → ativa; liberar volta a livre
+    await pool.query(`ALTER TABLE contratos_conector_vagas ADD COLUMN IF NOT EXISTS estado VARCHAR(10) NOT NULL DEFAULT 'livre';`);
+    await pool.query(`ALTER TABLE contratos_conector_vagas ADD COLUMN IF NOT EXISTS convidado_em TIMESTAMPTZ;`);
+    //     Uma vez: o gestor de cada contrato vira administrador do cliente; vagas ocupadas passam a "ativa"
+    const migAdmins = await pool.query(
+      `INSERT INTO migracoes_app (nome) VALUES ('fase2_admins_e_estado_vagas') ON CONFLICT DO NOTHING RETURNING nome;`);
+    if (migAdmins.rowCount) {
+      await pool.query(`INSERT INTO clientes_admins (cliente_id, usuario_id)
+        SELECT DISTINCT cliente_id, gestor_usuario_id FROM contratos_conector ON CONFLICT DO NOTHING;`);
+      await pool.query(`UPDATE contratos_conector_vagas SET estado = 'ativa' WHERE usuario_id IS NOT NULL AND estado = 'livre';`);
+      console.log('Migração fase2_admins_e_estado_vagas: gestores viraram administradores; vagas ocupadas = ativa');
+    }
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

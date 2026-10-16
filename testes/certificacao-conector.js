@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
+const { ativarConvites } = require('../backend/services/contratos-conector'); // simula o aceite do convite
 const BASE = 'http://localhost:3000/api';
 
 let falhas = 0;
@@ -72,6 +73,7 @@ const ps = cmd => execFileSync('powershell', ['-NoProfile', '-Command', cmd], { 
     await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vAbap.id}/ocupar`, 'POST', { nome: 'Ana ABAP', email: `ana-${sufixo}@teste.com` });
     await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vFunc.id}/ocupar`, 'POST', { nome: 'Fabio Func', email: `fabio-${sufixo}@teste.com` });
     const ana = await usuario(`ana-${sufixo}@teste.com`), fabio = await usuario(`fabio-${sufixo}@teste.com`);
+    await ativarConvites(ana.id); await ativarConvites(fabio.id);
     const tokAna = tok({ id: ana.id, tipo: 'cliente', cliente_id: cli });
     const tokFabio = tok({ id: fabio.id, tipo: 'cliente', cliente_id: cli });
 

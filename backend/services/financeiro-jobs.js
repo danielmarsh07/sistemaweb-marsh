@@ -1,5 +1,6 @@
 // Rotina periódica do financeiro (roda dentro do próprio servidor, a cada hora):
 //  0. Gera os rascunhos das faturas do mês a partir do dia configurado (o admin aprova)
+//     e libera as licenças do Conector cujo convite expirou sem aceite
 //  1. Consulta no Asaas as NFS-e ainda em processamento (caso o webhook não tenha chegado)
 //  2. Consulta as cobranças PIX pendentes (baixa automática se o webhook de pagamento falhou)
 //  3. Envia lembrete por e-mail de faturas vencidas e não pagas
@@ -136,11 +137,22 @@ async function gerarRascunhosAutomaticos() {
   }
 }
 
+// Convites de licença do Conector que expiraram sem aceite: a licença reservada volta a ficar livre
+async function expirarConvitesConector() {
+  try {
+    const n = await require('./contratos-conector').expirarConvites();
+    if (n) console.log(`[rotina] ${n} convite(s) do Conector expirado(s): licenças liberadas`);
+  } catch (err) {
+    registrarAlerta({ chave: 'job:convites', titulo: 'Rotina: falha ao expirar convites do Conector', detalhe: err.message });
+  }
+}
+
 async function ciclo() {
   if (rodando) return;
   rodando = true;
   try {
     await gerarRascunhosAutomaticos();
+    await expirarConvitesConector();
     await sincronizarNotasPendentes();
     await sincronizarPixPendentes(); // antes dos lembretes: quem já pagou não recebe cobrança
     await enviarLembretes();

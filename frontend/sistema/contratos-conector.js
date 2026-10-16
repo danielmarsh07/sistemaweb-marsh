@@ -117,7 +117,7 @@ async function abrirContratoConector(id, manterAberto) {
   document.getElementById('contrato-conector-vagas').innerHTML = k.vagas.length ? k.vagas.map(v => {
     const pct = v.aulas_total ? Math.round(100 * v.aulas_concluidas / v.aulas_total) : 0;
     const pessoa = v.usuario_id
-      ? `<strong>${escapeHtml(v.usuario_nome)}</strong>${v.eh_gestor ? ' (gestor)' : ''}<small class="fin-muted" style="display:block">${escapeHtml(v.usuario_email)}</small>`
+      ? `<strong>${escapeHtml(v.usuario_nome)}</strong>${v.eh_gestor ? ' (gestor)' : ''}${v.estado === 'convidada' ? ' <span style="color:#b7791f">(convite pendente)</span>' : ''}<small class="fin-muted" style="display:block">${escapeHtml(v.usuario_email)}</small>`
       : '<span class="fin-muted">Livre</span>';
     const acoes = v.usuario_id
       ? `${v.eh_gestor ? '' : `<button class="btn btn-secondary btn-sm" onclick="conviteVagaAdmin(${v.id})">Reenviar convite</button>`}
@@ -139,7 +139,59 @@ async function abrirContratoConector(id, manterAberto) {
   const box = document.getElementById('contrato-conector-sids');
   box.innerHTML = '';
   (k.conexoes || []).forEach(c => adicionarSidAdmin(c));
+  carregarAdminsCliente(k.cliente_id);
+  document.getElementById('contrato-conector-historico').innerHTML = '';
   if (!manterAberto) showModal('#modal-contrato-conector');
+}
+
+// Administradores da empresa do cliente (veem e distribuem as licenças no portal)
+async function carregarAdminsCliente(clienteId) {
+  const ul = document.getElementById('contrato-conector-admins');
+  const res = await apiFetch(`${API_URL}/contratos-conector/clientes/${clienteId}/admins`);
+  if (!res || !res.ok) { ul.innerHTML = ''; return; }
+  const admins = await res.json();
+  ul.innerHTML = admins.length ? admins.map(a => `
+    <li>${escapeHtml(a.nome)} · ${escapeHtml(a.email)}${a.convite_pendente ? ' <span class="fin-muted">(convite pendente)</span>' : ''}
+      ${admins.length > 1 ? `<button type="button" class="btn btn-secondary btn-sm" onclick="removerAdminCliente(${clienteId}, ${a.id})">Remover</button>` : ''}</li>`).join('')
+    : '<li class="fin-muted">Nenhum administrador.</li>';
+}
+
+async function adicionarAdminCliente() {
+  const k = _contratoAberto;
+  const email = prompt('E-mail do administrador da empresa:');
+  if (!email) return;
+  const nome = prompt('Nome (para quem ainda não tem acesso ao portal):', '') || '';
+  const res = await apiFetch(`${API_URL}/contratos-conector/clientes/${k.cliente_id}/admins`, { method: 'POST', body: JSON.stringify({ email: email.trim(), nome: nome.trim() }) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) carregarAdminsCliente(k.cliente_id);
+}
+
+async function removerAdminCliente(clienteId, usuarioId) {
+  if (!confirm('Remover este administrador? A conta continua; ele só deixa de ver e distribuir as licenças.')) return;
+  const res = await apiFetch(`${API_URL}/contratos-conector/clientes/${clienteId}/admins/${usuarioId}`, { method: 'DELETE' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  carregarAdminsCliente(clienteId);
+}
+
+const ACOES_LICENCA_ADMIN = {
+  'vaga.ocupada': 'Licença atribuída', 'vaga.convite_aceito': 'Convite aceito', 'vaga.liberada': 'Licença revogada',
+  'vaga.convite_cancelado': 'Convite cancelado', 'vaga.convite_expirado': 'Convite expirou'
+};
+async function verHistoricoContratoConector() {
+  const box = document.getElementById('contrato-conector-historico');
+  box.textContent = 'Carregando…';
+  const res = await apiFetch(`${API_URL}/contratos-conector/${_contratoAberto.id}/historico`);
+  if (!res || !res.ok) { box.textContent = 'Não foi possível carregar.'; return; }
+  const itens = await res.json();
+  box.innerHTML = itens.length ? `<ul class="fin-lista-itens">${itens.map(h => {
+    const acao = h.acao === 'vaga.ocupada' && h.dados && h.dados.estado === 'convidada' ? 'Convite enviado' : (ACOES_LICENCA_ADMIN[h.acao] || h.acao);
+    return `<li><strong>${escapeHtml(acao)}</strong> · ${escapeHtml(h.pessoa_nome || (h.dados && h.dados.email) || '')}${h.dados && h.dados.perfil ? ` (${escapeHtml(h.dados.perfil)})` : ''}
+      <small class="fin-muted" style="display:block">${new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${h.feito_por ? ` · ${escapeHtml(h.feito_por)}` : ' · automático'}</small></li>`;
+  }).join('')}</ul>` : '<span class="fin-muted">Nada registrado ainda.</span>';
 }
 
 async function criarCobrancaConector() {

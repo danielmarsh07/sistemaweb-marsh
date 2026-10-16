@@ -240,7 +240,9 @@ async function carregarContratosPortal() {
   secao.hidden = !contratosPortal.length;
   const br = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
   document.getElementById('lista-contratos').innerHTML = contratosPortal.map(k => {
-    const ocupadas = k.vagas.filter(v => v.usuario_id).length;
+    const ativas = k.vagas.filter(v => v.usuario_id && v.estado !== 'convidada').length;
+    const convites = k.vagas.filter(v => v.estado === 'convidada').length;
+    const livres = k.vagas.filter(v => !v.usuario_id).length;
     const st = k.status === 'suspenso' ? ['Suspenso', '#f59e0b'] : k.status === 'cancelado' ? ['Cancelado', '#ef4444']
       : k.vigente ? ['Ativo', '#10b981'] : ['Vencido', '#ef4444'];
     const sids = (k.conexoes || []).map(c => c.sid).join(', ');
@@ -249,15 +251,20 @@ async function carregarContratosPortal() {
         <div>
           <strong>Contrato nº ${k.id}</strong>
           <span class="chip" style="background:${st[1]}20; color:${st[1]}">${st[0]}</span>
-          <p>Válido de ${br(k.data_inicio)} até <strong>${br(k.data_fim)}</strong> · ${ocupadas} de ${k.vagas.length} vagas ocupadas</p>
+          <p>Válido de ${br(k.data_inicio)} até <strong>${br(k.data_fim)}</strong></p>
+          <p><strong>${k.vagas.length}</strong> licença(s) contratada(s) · <strong>${ativas}</strong> em uso ·
+             <strong>${convites}</strong> convite(s) pendente(s) · <strong>${livres}</strong> disponível(is)</p>
           <p class="sids">Sistemas SAP: <strong>${sids ? escapeHtml(sids) : 'nenhum cadastrado'}</strong> (até ${k.max_sids})</p>
         </div>
         <div class="acoes">
+          ${livres && k.vigente ? `<button type="button" class="btn-curso" onclick="abrirConvidar(${k.id})">Convidar pessoa</button>` : ''}
           <button type="button" class="btn-curso secundario" onclick="abrirSids(${k.id})">${sids ? 'Editar' : 'Cadastrar'} sistemas SAP</button>
+          <button type="button" class="btn-curso secundario" onclick="abrirHistoricoLicencas(${k.id})">Histórico</button>
         </div>
       </div>
       <div class="licencas-portal">${k.vagas.map(v => cartaoVaga(k, v)).join('')}</div>`;
   }).join('<div style="height:18px"></div>');
+  carregarAdminsPortal();
 }
 
 function cartaoVaga(k, v) {
@@ -266,46 +273,88 @@ function cartaoVaga(k, v) {
   if (!v.usuario_id) {
     return `
       <div class="licenca-card vaga-card livre">
-        <h4>Vaga ${escapeHtml(v.perfil_nome)} <span class="chip" style="background:#64748b20; color:#64748b">Livre</span></h4>
+        <h4>Licença ${escapeHtml(v.perfil_nome)} <span class="chip" style="background:#64748b20; color:#64748b">Disponível</span></h4>
         ${cursos}
         <div class="acoes">
-          <button type="button" class="btn-curso" onclick="abrirOcuparVaga(${k.id}, ${v.id})">Passar para alguém</button>
+          <button type="button" class="btn-curso" onclick="abrirOcuparVaga(${k.id}, ${v.id})">Convidar para esta licença</button>
+        </div>
+      </div>`;
+  }
+  if (v.estado === 'convidada') {
+    const desde = v.convidado_em ? new Date(v.convidado_em).toLocaleDateString('pt-BR') : '';
+    return `
+      <div class="licenca-card vaga-card">
+        <h4>Licença ${escapeHtml(v.perfil_nome)} <span class="chip" style="background:#f59e0b20; color:#b7791f">Convite pendente</span></h4>
+        ${cursos}
+        <div class="linha"><span>Convidado</span><strong>${escapeHtml(v.usuario_nome)}</strong></div>
+        <div class="linha"><span>E-mail</span><strong>${escapeHtml(v.usuario_email)}</strong></div>
+        <p class="ajuda">Convite enviado${desde ? ` em ${desde}` : ''}. A licença fica reservada até a pessoa criar a senha; o link vale 72 horas.</p>
+        <div class="acoes">
+          <button type="button" class="btn-curso secundario" onclick="reenviarConviteVaga(${k.id}, ${v.id})">Reenviar convite</button>
+          <button type="button" class="btn-curso secundario" onclick="liberarVagaPortal(${k.id}, ${v.id}, true)">Cancelar convite</button>
         </div>
       </div>`;
   }
   return `
     <div class="licenca-card vaga-card">
-      <h4>Vaga ${escapeHtml(v.perfil_nome)} <span class="chip" style="background:#10b98120; color:#10b981">${v.eh_gestor ? 'Você' : 'Ocupada'}</span></h4>
+      <h4>Licença ${escapeHtml(v.perfil_nome)} <span class="chip" style="background:#10b98120; color:#10b981">${v.usuario_id === meuId() ? 'Você' : 'Em uso'}</span></h4>
       ${cursos}
       <div class="linha"><span>Pessoa</span><strong>${escapeHtml(v.usuario_nome)}</strong></div>
       <div class="linha"><span>E-mail</span><strong>${escapeHtml(v.usuario_email)}</strong></div>
       <div class="linha"><span>Progresso</span><strong>${v.aulas_concluidas} de ${v.aulas_total} aulas (${pct}%)</strong></div>
       <div class="barra-curso"><i style="width:${pct}%"></i></div>
       <div class="linha"><span>Certificado</span><strong>${v.certificado ? '✓ ' + escapeHtml(v.certificado.codigo) : 'ainda não'}</strong></div>
-      ${v.licenca ? `<div class="linha"><span>Licença</span><strong>${escapeHtml(v.licenca.chave_prefixo)}-… · ${v.licenca.maquina_nome ? escapeHtml(v.licenca.maquina_nome) : 'sem máquina'}</strong></div>` : ''}
+      ${v.licenca ? `<div class="linha"><span>Chave</span><strong>${escapeHtml(v.licenca.chave_prefixo)}-… · ${v.licenca.maquina_nome ? escapeHtml(v.licenca.maquina_nome) : 'sem máquina'}</strong></div>` : ''}
       <div class="acoes">
-        ${v.eh_gestor ? '' : `<button type="button" class="btn-curso secundario" onclick="reenviarConviteVaga(${k.id}, ${v.id})">Reenviar convite</button>`}
-        <button type="button" class="btn-curso secundario" onclick="liberarVagaPortal(${k.id}, ${v.id})">Liberar vaga</button>
+        <button type="button" class="btn-curso secundario" onclick="liberarVagaPortal(${k.id}, ${v.id})">Revogar licença</button>
       </div>
     </div>`;
+}
+
+const meuId = () => (usuario ? usuario.id : null);
+
+// Convite pela licença escolhida (vagaId) ou só pelo perfil (o sistema reserva a próxima livre)
+function prepararModalConvite(k, { vagaId, perfil }) {
+  vagaEmEdicao = { contratoId: k.id, vagaId: vagaId || null };
+  const f = document.getElementById('form-ocupar-vaga');
+  f.reset();
+  const livres = {};
+  k.vagas.filter(v => !v.usuario_id).forEach(v => { livres[v.perfil] = livres[v.perfil] || { nome: v.perfil_nome, n: 0, cursos: v.cursos }; livres[v.perfil].n++; });
+  f.perfil.innerHTML = Object.entries(livres).map(([p, x]) => `<option value="${p}">${escapeHtml(x.nome)} — ${x.n} disponível(is)</option>`).join('');
+  if (perfil) f.perfil.value = perfil;
+  document.getElementById('ocupar-vaga-perfil-grupo').style.display = vagaId ? 'none' : '';
+  const cursosDe = p => (livres[p] ? livres[p].cursos : []).join(', ');
+  const ajuda = () => {
+    document.getElementById('ocupar-vaga-ajuda').textContent =
+      `A pessoa recebe um convite por e-mail para criar a senha. A licença fica reservada até ela aceitar. Cursos inclusos: ${cursosDe(f.perfil.value)}.`;
+  };
+  f.perfil.onchange = ajuda;
+  ajuda();
+  abrirModal('modal-ocupar-vaga');
+}
+
+function abrirConvidar(contratoId) {
+  const k = contratosPortal.find(x => x.id === contratoId);
+  if (!k) return;
+  document.getElementById('ocupar-vaga-titulo').textContent = 'Convidar pessoa';
+  prepararModalConvite(k, {});
 }
 
 function abrirOcuparVaga(contratoId, vagaId) {
   const k = contratosPortal.find(x => x.id === contratoId);
   const v = k && k.vagas.find(x => x.id === vagaId);
   if (!v) return;
-  vagaEmEdicao = { contratoId, vagaId };
-  document.getElementById('form-ocupar-vaga').reset();
-  document.getElementById('ocupar-vaga-titulo').textContent = `Passar vaga ${v.perfil_nome}`;
-  document.getElementById('ocupar-vaga-ajuda').textContent =
-    `A pessoa recebe um convite por e-mail para criar a senha e vai ver só os cursos desta vaga: ${v.cursos.join(', ')}.`;
-  abrirModal('modal-ocupar-vaga');
+  document.getElementById('ocupar-vaga-titulo').textContent = `Convidar para a licença ${v.perfil_nome}`;
+  prepararModalConvite(k, { vagaId, perfil: v.perfil });
 }
 
 async function enviarOcupacao(corpo) {
   const { contratoId, vagaId } = vagaEmEdicao || {};
   if (!contratoId) return;
-  const res = await apiFetch(`${API}/contratos-conector/meus/${contratoId}/vagas/${vagaId}/ocupar`, {
+  const f = document.getElementById('form-ocupar-vaga');
+  const url = vagaId ? `${API}/contratos-conector/meus/${contratoId}/vagas/${vagaId}/ocupar` : `${API}/contratos-conector/meus/${contratoId}/convidar`;
+  if (!vagaId) corpo.perfil = f.perfil.value;
+  const res = await apiFetch(url, {
     method: 'POST', body: JSON.stringify(corpo) });
   if (!res) return;
   const r = await res.json();
@@ -325,12 +374,14 @@ function salvarOcuparVaga(e) {
 }
 
 function ocuparVagaEuMesmo() {
-  if (!confirm('Ocupar esta vaga com o seu usuário? Você passa a ver os cursos dela.')) return;
+  if (!confirm('Usar esta licença com o seu usuário? Você passa a ver os cursos dela e recebe o Conector ao concluí-los.')) return;
   enviarOcupacao({ eu: true });
 }
 
-async function liberarVagaPortal(contratoId, vagaId) {
-  if (!confirm('Liberar esta vaga? A pessoa perde o acesso aos cursos dela (o progresso fica guardado se ela voltar).')) return;
+async function liberarVagaPortal(contratoId, vagaId, convite) {
+  if (!confirm(convite
+    ? 'Cancelar este convite? O link deixa de valer e a licença volta a ficar disponível.'
+    : 'Revogar esta licença? A pessoa perde o Conector e os cursos desta licença na hora. A conta, o progresso e o certificado ficam guardados (e voltam a valer se ela receber a licença de novo).')) return;
   const res = await apiFetch(`${API}/contratos-conector/meus/${contratoId}/vagas/${vagaId}/liberar`, { method: 'POST' });
   if (!res) return;
   const r = await res.json();
@@ -344,6 +395,61 @@ async function reenviarConviteVaga(contratoId, vagaId) {
   if (!res) return;
   const r = await res.json();
   alert(r.mensagem || r.erro);
+}
+
+// Histórico das licenças: convites, aceites, revogações e expirações (quem fez e quando)
+const ACOES_LICENCA = {
+  'vaga.ocupada': 'Licença atribuída', 'vaga.convite_aceito': 'Convite aceito', 'vaga.liberada': 'Licença revogada',
+  'vaga.convite_cancelado': 'Convite cancelado', 'vaga.convite_expirado': 'Convite expirou (licença liberada)'
+};
+async function abrirHistoricoLicencas(contratoId) {
+  const lista = document.getElementById('historico-licencas-lista');
+  document.getElementById('historico-licencas-titulo').textContent = `Histórico das licenças — contrato nº ${contratoId}`;
+  lista.innerHTML = '<li>Carregando…</li>';
+  abrirModal('modal-historico-licencas');
+  const res = await apiFetch(`${API}/contratos-conector/meus/${contratoId}/historico`);
+  if (!res || !res.ok) { lista.innerHTML = '<li>Não foi possível carregar.</li>'; return; }
+  const itens = await res.json();
+  lista.innerHTML = itens.length ? itens.map(h => {
+    const quando = new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    const perfil = h.dados && h.dados.perfil ? ` (${escapeHtml(h.dados.perfil)})` : '';
+    const acao = h.acao === 'vaga.ocupada' && h.dados && h.dados.estado === 'convidada' ? 'Convite enviado' : (ACOES_LICENCA[h.acao] || h.acao);
+    return `<li><strong>${escapeHtml(acao)}</strong>${perfil} · ${escapeHtml(h.pessoa_nome || h.dados?.email || '')}
+      <small>${quando}${h.feito_por ? ` · por ${escapeHtml(h.feito_por)}` : ' · automático'}</small></li>`;
+  }).join('') : '<li>Nada registrado ainda (o histórico começou na versão 3.5).</li>';
+}
+
+// Administradores da empresa
+async function carregarAdminsPortal() {
+  const ul = document.getElementById('lista-admins');
+  const res = await apiFetch(`${API}/contratos-conector/meus-admins`);
+  if (!res || !res.ok) { ul.innerHTML = ''; return; }
+  const admins = await res.json();
+  const eu = meuId();
+  ul.innerHTML = admins.map(a => `
+    <li><span><strong>${escapeHtml(a.nome)}</strong> · ${escapeHtml(a.email)}${a.convite_pendente ? ' <em>(convite pendente)</em>' : ''}${a.id === eu ? ' <em>(você)</em>' : ''}</span>
+      ${admins.length > 1 ? `<button type="button" class="btn-linha" onclick="removerAdminPortal(${a.id}, '${escapeHtml(a.nome).replace(/'/g, '&#39;')}')">Remover</button>` : ''}</li>`).join('');
+}
+
+async function adicionarAdminPortal() {
+  const email = prompt('E-mail do novo administrador da empresa:');
+  if (!email) return;
+  const nome = prompt('Nome (para quem ainda não tem acesso ao portal):', '') || '';
+  const res = await apiFetch(`${API}/contratos-conector/meus-admins`, { method: 'POST', body: JSON.stringify({ email: email.trim(), nome: nome.trim() }) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) carregarAdminsPortal();
+}
+
+async function removerAdminPortal(id, nome) {
+  if (!confirm(`Remover ${nome} dos administradores? A pessoa continua com a conta e com a própria licença, se tiver.`)) return;
+  const res = await apiFetch(`${API}/contratos-conector/meus-admins/${id}`, { method: 'DELETE' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  if (id === meuId()) { location.reload(); return; }
+  carregarAdminsPortal();
 }
 
 // Sistemas SAP do contrato: SID, descrição, URL, mandante e idioma (nunca usuário/senha do SAP)

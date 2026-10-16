@@ -59,6 +59,10 @@ router.post('/login', loginLimiter, async (req, res) => {
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+    // Entrou no portal (ex.: redefiniu a senha em vez de usar o convite): reservas pendentes passam a valer
+    if (usuario.tipo === 'cliente') {
+      await require('../services/contratos-conector').ativarConvites(usuario.id).catch(err => console.error('[convite] ativar:', err.message));
+    }
 
     res.json({
       mensagem: 'Login realizado com sucesso!',
@@ -120,6 +124,8 @@ router.post('/definir-senha', limiteSenha, async (req, res) => {
   try {
     const r = await senhas.definirSenhaPorToken(token, senha);
     if (r.erro) return res.status(400).json({ erro: r.erro });
+    // Convite aceito: as licenças reservadas para a pessoa passam a valer
+    await require('../services/contratos-conector').ativarConvites(r.usuario_id).catch(err => console.error('[convite] ativar:', err.message));
     res.json({ mensagem: 'Senha criada! Faça login com seu e-mail e a nova senha.', email: r.email });
   } catch (err) { res.status(500).json({ erro: 'Erro ao definir a senha.', detalhe: err.message }); }
 });

@@ -5,6 +5,7 @@ require('./_ambiente-local');
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
 const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
+const { ativarConvites } = require('../backend/services/contratos-conector'); // simula a pessoa aceitando o convite
 const BASE = 'http://localhost:3000/api';
 
 let falhas = 0;
@@ -90,6 +91,9 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     ok(r.status === 200, `gestor passa a vaga ABAP (${r.body?.mensagem || r.body?.erro})`);
     const aluno = await usuarioPorEmail(emailAluno);
     ok(aluno && aluno.portal_papel === 'aluno' && aluno.cliente_id === cliA, 'aluno criado com papel aluno');
+    ok((await pool.query('SELECT estado FROM contratos_conector_vagas WHERE id = $1', [vaga('abap').id])).rows[0].estado === 'convidada', 'pessoa nova: licença reservada como convite pendente');
+    ok((await meusCursos(tok({ id: aluno.id, tipo: 'cliente', cliente_id: cliA }))).length === 0, 'convite pendente ainda não libera os cursos');
+    await ativarConvites(aluno.id);
     const tokAluno = tok({ id: aluno.id, tipo: 'cliente', cliente_id: cliA });
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/vagas/${vaga('abap').id}/ocupar`, 'POST', { nome: 'Outro', email: 'outro@x.com' });
     ok(r.status === 400, `! vaga já ocupada (${r.body?.erro})`);
@@ -149,10 +153,10 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/vagas/${vaga('abap').id}/liberar`, 'POST');
     ok(r.status === 200, 'gestor libera a vaga ABAP');
     ok((await meusCursos(tokAluno)).length === 0, 'aluno sem vaga não vê cursos');
-    ok((await usuarioPorEmail(emailAluno)).ativo === false, 'aluno sem nenhuma vaga fica desativado');
+    ok((await usuarioPorEmail(emailAluno)).ativo === true, 'aluno sem vaga mantém a conta (só perde o que vinha da vaga)');
     // Volta para a mesma pessoa: reativa e o progresso continua
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/vagas/${vaga('abap').id}/ocupar`, 'POST', { email: emailAluno });
-    ok(r.status === 200 && (await usuarioPorEmail(emailAluno)).ativo === true, 'pessoa volta para a vaga e é reativada');
+    ok(r.status === 200 && (await pool.query('SELECT estado FROM contratos_conector_vagas WHERE id = $1', [vaga('abap').id])).rows[0].estado === 'ativa', 'pessoa que já tem conta volta direto como ativa');
     const det2 = (await api(tokAdmin, `/contratos-conector/${kid}`)).body;
     ok(det2.vagas.find(v => v.id === vaga('abap').id).aulas_concluidas === 1, 'progresso guardado ao voltar');
 
@@ -160,6 +164,7 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     r = await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vaga('funcional').id}/ocupar`, 'POST', { nome: 'Aluno Func', email: emailAluno2 });
     ok(r.status === 200, 'admin passa a vaga Funcional');
     const aluno2 = await usuarioPorEmail(emailAluno2);
+    await ativarConvites(aluno2.id);
     const tokAluno2 = tok({ id: aluno2.id, tipo: 'cliente', cliente_id: cliA });
     ids = await meusCursos(tokAluno2);
     ok(ids.includes(cursos.funcional) && !ids.includes(cursos.abap), 'aluno Funcional vê Funcional, não ABAP');

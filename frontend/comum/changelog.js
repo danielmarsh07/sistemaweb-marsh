@@ -22,6 +22,15 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v3.7', data: '2026-10-16', destaques: [
+      'Portal: nova área "Licenças do Conector SAP da empresa" com o resumo de cada contrato (contratadas, em uso, convites pendentes e disponíveis)',
+      'Convidar pessoa escolhendo só o tipo de licença: o sistema reserva a próxima disponível e nunca passa do total contratado, mesmo com vários convites ao mesmo tempo',
+      'Convite pendente reserva a licença até a pessoa criar a senha; dá para reenviar ou cancelar, e o convite que expira sem aceite libera a licença sozinho',
+      'A empresa pode ter vários administradores no portal (nunca fica sem nenhum); ser administrador não ocupa licença',
+      'Revogar a licença tira o Conector e os cursos dela na hora, mas a pessoa continua com a conta, o progresso e o certificado',
+      'Histórico das licenças de cada contrato: convites, aceites, revogações e expirações, com quem fez e quando (no portal e no painel)',
+      'Painel: administradores da empresa do cliente direto no contrato do Conector'
+    ] },
     { versao: 'v3.6', data: '2026-10-16', destaques: [
       'Contratos agora têm tipo (serviço ou produto) e cobrança mensal ou anual: o contrato anual gera uma fatura por ano, no mês escolhido, com o período coberto na descrição',
       'As faturas do mês são geradas como rascunho automaticamente (a partir do dia escolhido em Configuração) e você recebe um e-mail para revisar; aprovada, a nota fiscal e o e-mail ao cliente seguem sozinhos',
