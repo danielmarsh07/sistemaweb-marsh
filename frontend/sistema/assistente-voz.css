@@ -923,13 +923,6 @@
 }
 @keyframes ivy-piscando { 50% { opacity: 0.25; } }
 
-.voz-robotica-btn {
-  border: 1px solid var(--border, rgba(255,255,255,0.10));
-  height: 30px;
-  width: 30px;
-}
-.voz-robotica-btn.is-active { border-color: transparent; }
-
 @media (max-width: 768px) {
   .assistente-ivy { --ivy-tam: min(64vw, 300px); }
   .assistente-modal.modo-ivy-on .assistente-hint { display: none; }

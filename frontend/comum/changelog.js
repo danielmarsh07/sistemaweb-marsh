@@ -23,6 +23,13 @@
 (function (raiz) {
   const CHANGELOG = [
     {
+      versao: 'v3.1',
+      data: '2026-10-15',
+      destaques: [
+        'Removida a voz robótica da Ivy: ela fala sempre com a voz natural',
+      ],
+    },
+    {
       versao: 'v3.0',
       data: '2026-10-14',
       destaques: [

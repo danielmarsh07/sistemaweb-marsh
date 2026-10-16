@@ -46,7 +46,6 @@
   const ivyWrap = document.getElementById('assistente-ivy');
   const ivyPalco = document.getElementById('ivy-palco');
   const canvasIvy = document.getElementById('assistente-ivy-canvas');
-  const btnVozRobotica = document.getElementById('btn-voz-robotica');
   const statusEl = document.getElementById('assistente-status');
   const transcriptEl = document.getElementById('assistente-transcript');
   const respostaEl = document.getElementById('assistente-resposta');
@@ -62,12 +61,8 @@
   let modoSalvo = localStorage.getItem(MODO_KEY);
   let modoAtual = MODOS_VALIDOS.includes(modoSalvo) ? modoSalvo : 'ivy';
 
-  // Efeito de voz robótica (aplicado no áudio da OpenAI): desligado por padrão (ficou forte demais);
-  // o botão do cabeçalho ainda liga para testes. v2: zera a escolha de quem já tinha ligado.
-  const VOZ_KEY = 'assistente_voz_robotica_v2';
-  let vozRobotica = localStorage.getItem(VOZ_KEY) === 'on';
-  const EFEITO_ROBO = { ringHz: 48, ring: 0.4, seco: 0.75, metal: 0.28, metalAtraso: 0.006, metalRetorno: 0.35 };
-  let nosEfeito = [];
+  // O efeito de voz robótica foi removido: limpa a escolha antiga de quem tinha ligado
+  try { localStorage.removeItem('assistente_voz_robotica_v2'); localStorage.removeItem('assistente_voz_robotica'); } catch {}
 
   let particulas = [];
 
@@ -354,8 +349,7 @@
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.75;
-        if (vozRobotica) ligarEfeitoRobo(audioSourceNode, analyser);
-        else audioSourceNode.connect(analyser);
+        audioSourceNode.connect(analyser);
         analyser.connect(audioCtx.destination);
 
         iniciarVisualizerPorModo();
@@ -370,51 +364,6 @@
     });
   }
 
-  // Voz "meio robótica": parte do sinal passa por um modulador em anel (timbre metálico)
-  // e por um atraso curto com retorno (ressonância de lata); o resto segue limpo para manter a clareza.
-  function ligarEfeitoRobo(origem, destino) {
-    const seco = audioCtx.createGain();
-    seco.gain.value = EFEITO_ROBO.seco;
-    origem.connect(seco).connect(destino);
-
-    const anel = audioCtx.createGain();
-    anel.gain.value = 0;
-    const osc = audioCtx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = EFEITO_ROBO.ringHz;
-    osc.connect(anel.gain);
-    osc.start();
-    const anelSaida = audioCtx.createGain();
-    anelSaida.gain.value = EFEITO_ROBO.ring;
-    origem.connect(anel).connect(anelSaida).connect(destino);
-
-    const atraso = audioCtx.createDelay(0.05);
-    atraso.delayTime.value = EFEITO_ROBO.metalAtraso;
-    const retorno = audioCtx.createGain();
-    retorno.gain.value = EFEITO_ROBO.metalRetorno;
-    atraso.connect(retorno).connect(atraso);
-    const metal = audioCtx.createGain();
-    metal.gain.value = EFEITO_ROBO.metal;
-    origem.connect(atraso).connect(metal).connect(destino);
-
-    nosEfeito = [seco, anel, osc, anelSaida, atraso, retorno, metal];
-  }
-
-  function desligarEfeitoRobo() {
-    nosEfeito.forEach(n => {
-      try { if (n.stop) n.stop(); } catch {}
-      try { n.disconnect(); } catch {}
-    });
-    nosEfeito = [];
-  }
-
-  function aplicarVozRobotica() {
-    if (!btnVozRobotica) return;
-    btnVozRobotica.classList.toggle('is-active', vozRobotica);
-    btnVozRobotica.setAttribute('aria-pressed', String(vozRobotica));
-    btnVozRobotica.title = vozRobotica ? 'Voz robótica: ligada' : 'Voz robótica: desligada';
-  }
-
   function iniciarVisualizerPorModo() {
     if (modoAtual === 'ivy') return; // o loop da Ivy lê o analyser sozinho
     if (modoAtual === 'nebulosa') iniciarVisualizerNebulosa();
@@ -425,7 +374,6 @@
   function pararAudio() {
     if (audioEl) { try { audioEl.pause(); } catch {} audioEl = null; }
     if (audioSourceNode) { try { audioSourceNode.disconnect(); } catch {} audioSourceNode = null; }
-    desligarEfeitoRobo();
     analyser = null;
   }
 
@@ -1112,15 +1060,6 @@
       if (modoAtual !== 'ivy') return;
       e.stopPropagation();
       toggleFalar();
-    });
-  }
-  if (btnVozRobotica) {
-    aplicarVozRobotica();
-    btnVozRobotica.addEventListener('click', (e) => {
-      e.stopPropagation();
-      vozRobotica = !vozRobotica;
-      localStorage.setItem(VOZ_KEY, vozRobotica ? 'on' : 'off');
-      aplicarVozRobotica();
     });
   }
   window.addEventListener('resize', () => {

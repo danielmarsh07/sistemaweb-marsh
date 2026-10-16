@@ -1,7 +1,7 @@
 // ============================================================================
 // Serviço de TTS via OpenAI (Audio API) — voz da Ivy.
 // Recebe texto → devolve Buffer de áudio MP3 (a rota faz o stream pro cliente).
-// Voz natural; o efeito robótico do navegador existe, mas vem desligado (botão no cabeçalho da Ivy).
+// Voz natural, sem efeitos no navegador.
 //
 // Configuração via env vars (as antigas OPENAI_TTS_VOICE/MODEL do JARVIS são ignoradas de propósito:
 // no Render elas ainda apontavam para a voz masculina onyx):
