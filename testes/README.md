@@ -29,6 +29,7 @@ Roteiros que exercitam a API de ponta a ponta contra o **banco local (Docker)**.
    node testes/contratos-conector.js              # contratos por vagas: gestor, perfis/trilhas, aluno restrito, SIDs, liberar/suspender
    node testes/certificacao-conector.js           # certificado + licença por pessoa + instalador com licenca.json (cifra, chave de licença e s3mock)
    node testes/chamados-conector.js               # chamados abertos pelo conector: abrir/listar, recusas, limite/h, aprovação do gestor, .md, fila
+   node testes/fluxo-fase0.js                     # fluxo novo fase 0: isolamento, sessão revogada na hora, webhook repetido, NFS-e sem regredir, vagas/contrato sem corrida, CPF/CNPJ único, auditoria
    node testes/simulador-conector.js [saida.pdf]  # simulador de preço do Conector SAP: cálculo, validações, tabela de preços, gerar proposta + PDF A4 (Chrome headless)
    node testes/marketing.js                       # Instagram: conta cifrada, upload PNG→JPEG, posts, importar agenda, publicação num Graph falso, retentativa, limite, métricas, token
    ```

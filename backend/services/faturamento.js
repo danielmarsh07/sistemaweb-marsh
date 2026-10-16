@@ -87,7 +87,12 @@ async function emitirNfse(fatura) {
 async function aposAtualizarNota(faturaId, empresa_id) {
   const f = await carregarFatura(faturaId, empresa_id);
   if (f && f.status === 'aberta' && f.nfse_status === 'emitida' && !f.email_enviado_em) {
-    await enviarEmailFatura(f);
+    // Webhook e rotina horária podem chegar juntos: reserva o envio antes, para o cliente receber um e-mail só
+    const reserva = await pool.query('UPDATE faturas SET email_enviado_em = NOW() WHERE id = $1 AND email_enviado_em IS NULL', [f.id]);
+    if (reserva.rowCount) {
+      const ok = await enviarEmailFatura(f).catch(() => false);
+      if (!ok) await pool.query('UPDATE faturas SET email_enviado_em = NULL WHERE id = $1', [f.id]);
+    }
   }
   return f;
 }

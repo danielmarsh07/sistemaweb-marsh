@@ -116,9 +116,26 @@ async function resolverServico(codigo) {
   return res;
 }
 
+// Nota já criada no Asaas para esta fatura e ainda válida (ex.: a criação deu certo mas a resposta se perdeu).
+// Reemitir depois de um timeout reaproveita essa nota em vez de gerar uma segunda.
+async function notaExistente(faturaId) {
+  try {
+    const r = await chamar('GET', `/invoices?externalReference=fatura-${faturaId}&limit=20`);
+    return (r && r.data || []).find(n => n.externalReference === `fatura-${faturaId}` && !['CANCELED', 'ERROR'].includes(n.status)) || null;
+  } catch (err) {
+    console.error('[Asaas] consultar nota existente:', err.message);
+    return null;
+  }
+}
+
 // Agenda a NFS-e avulsa (sem cobrança vinculada) para hoje e pede a emissão imediata
 async function emitirNotaFatura(fatura, cliente) {
   validarClienteParaNota(cliente);
+  const existente = await notaExistente(fatura.id);
+  if (existente) {
+    if (existente.status !== 'SCHEDULED') return existente;
+    return chamar('POST', `/invoices/${existente.id}/authorize`).catch(() => existente);
+  }
   const customer = await garantirCliente(cliente);
   const servico = await resolverServico(fatura.codigo_servico);
   const hoje = new Date().toISOString().slice(0, 10);
@@ -194,7 +211,8 @@ const STATUS_NFSE = {
   ERROR: 'erro'
 };
 
-// Grava na fatura o retrato atual da nota no Asaas
+// Grava na fatura o retrato atual da nota no Asaas.
+// Evento atrasado da MESMA nota não faz o status voltar (emitida → processando, cancelada → emitida).
 async function aplicarNotaNaFatura(faturaId, nota) {
   const status = STATUS_NFSE[nota.status] || 'processando';
   await pool.query(
@@ -202,7 +220,10 @@ async function aplicarNotaNaFatura(faturaId, nota) {
        nfse_status = $1, nfse_asaas_id = $2, nfse_numero = $3, nfse_codigo_verificacao = $4,
        nfse_pdf_url = $5, nfse_xml_url = $6,
        nfse_erro = $7, data_atualizacao = NOW()
-     WHERE id = $8`,
+     WHERE id = $8
+       AND NOT (nfse_asaas_id = $2 AND (
+             (nfse_status IN ('emitida', 'cancelando', 'cancelada') AND $1::varchar = 'processando')
+          OR (nfse_status = 'cancelada' AND $1::varchar IN ('emitida', 'cancelando'))))`,
     [status, nota.id, nota.number || null, nota.validationCode || null,
      nota.pdfUrl || null, nota.xmlUrl || null,
      status === 'erro' ? (nota.statusDescription || 'Erro na emissão') : null,

@@ -4,6 +4,7 @@ require('./_ambiente-local');
 // SIDs do contrato até o limite; liberar vaga e suspender contrato cortam o acesso.
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
+const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
 const BASE = 'http://localhost:3000/api';
 
 let falhas = 0;
@@ -77,7 +78,7 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     const vaga = p => meus.body[0].vagas.find(v => v.perfil === p);
     ok(vaga('abap').cursos.includes('IA no ABAP') && !vaga('abap').cursos.includes('IA para Funcionais'), 'vaga ABAP lista os cursos do perfil');
 
-    const tokOutro = tok({ id: 999990, tipo: 'cliente', cliente_id: cliB });
+    const tokOutro = tok({ id: await usuarioTeste(pool, { cliente_id: cliB }), tipo: 'cliente', cliente_id: cliB });
     ok((await api(tokOutro, '/contratos-conector/meus')).body.length === 0, 'outro cliente não vê o contrato');
     ok((await api(tokOutro, `/contratos-conector/meus/${kid}/vagas/${vaga('abap').id}/ocupar`, 'POST', { nome: 'X', email: 'x@x.com' })).status === 404,
       'outro cliente não ocupa vaga do contrato (404)');
@@ -181,6 +182,7 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     await pool.query('DELETE FROM usuarios WHERE id = ANY($1)', [users]);
     await pool.query('DELETE FROM cursos_aulas WHERE curso_id = ANY($1)', [cids]);
     await pool.query('DELETE FROM cursos WHERE id = ANY($1)', [cids]);
+    await apagarUsuariosTeste(pool);
     await pool.query('DELETE FROM clientes WHERE id IN ($1, $2)', [cliA, cliB]);
     await pool.end();
   }

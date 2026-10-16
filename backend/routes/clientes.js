@@ -168,7 +168,7 @@ router.post('/', async (req, res) => {
     // Verificar CNPJ duplicado dentro da empresa
     if (cpf_cnpj) {
       const dup = await pool.query(
-        'SELECT id FROM clientes WHERE cpf_cnpj = $1 AND empresa_id = $2 AND ativo = TRUE',
+        "SELECT id FROM clientes WHERE regexp_replace(cpf_cnpj, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g') AND empresa_id = $2 AND ativo = TRUE",
         [cpf_cnpj, empresa_id]
       );
       if (dup.rows.length > 0) {
@@ -260,7 +260,7 @@ router.put('/:id', async (req, res) => {
     const novoCnpj = v(cpf_cnpj);
     if (novoCnpj && novoCnpj !== c.cpf_cnpj) {
       const dup = await pool.query(
-        'SELECT id FROM clientes WHERE cpf_cnpj = $1 AND empresa_id = $2 AND ativo IS NOT FALSE AND id != $3',
+        "SELECT id FROM clientes WHERE regexp_replace(cpf_cnpj, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g') AND empresa_id = $2 AND ativo IS NOT FALSE AND id != $3",
         [novoCnpj, empresa_id, req.params.id]
       );
       if (dup.rows.length > 0) {

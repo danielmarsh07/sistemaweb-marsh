@@ -22,6 +22,16 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v3.5', data: '2026-10-16', destaques: [
+      'Usuário desativado, com senha redefinida ou que mudou de empresa sai do sistema na hora (antes podia continuar logado por até 8 horas)',
+      'Corrigido: usuário do portal sem empresa vinculada não vê mais chamados de outros clientes',
+      'Corrigido: reativar um usuário do portal não apaga mais a empresa dele',
+      'A mesma pessoa não ocupa duas vagas do mesmo contrato do Conector, mesmo com cliques simultâneos',
+      'Gerar contrato da oportunidade com dois cliques não cria mais dois contratos',
+      'Cliente com o mesmo CPF/CNPJ é recusado mesmo digitado com ou sem pontuação',
+      'Notas fiscais e pagamentos do Asaas: aviso repetido não é processado de novo, a nota não é emitida em dobro após uma falha de conexão e o cliente recebe a fatura por e-mail uma vez só',
+      'Mudanças em usuários e nas vagas do Conector ficam registradas (quem fez, quando, antes e depois)'
+    ] },
     {
       versao: 'v3.4',
       data: '2026-10-16',

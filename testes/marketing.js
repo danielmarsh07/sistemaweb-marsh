@@ -26,6 +26,7 @@ for (const [k, v] of Object.entries({ S3_BUCKET: 'marsh-teste', S3_ENDPOINT: 'ht
 
 const sharp = require('sharp');
 const pool = require('../backend/db');
+const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
 const storage = require('../backend/services/storage');
 const mk = require('../backend/services/marketing');
 const jobs = require('../backend/services/marketing-jobs');
@@ -126,7 +127,7 @@ const servidorGraph = http.createServer((req, res) => {
 const tok = p => jwt.sign(p, process.env.JWT_SECRET, { expiresIn: '10m' });
 const tokAdmin = tok({ id: 1, tipo: 'admin_empresa', empresa_id: 1 });
 const tokTecnico = tok({ id: 1, tipo: 'tecnico', empresa_id: 1 });
-const tokCliente = tok({ id: 999990, tipo: 'cliente', empresa_id: 1, cliente_id: 1 });
+let tokCliente; // criado no início do teste com um usuário real (o login é conferido no banco)
 
 async function api(metodo, caminho, corpo, t = tokAdmin) {
   const r = await fetch(BASE + caminho, {
@@ -154,6 +155,7 @@ const perto = (data, minutos) => Math.abs(new Date(data) - Date.now() - minutos 
 
 (async () => {
   await new Promise((r, rej) => servidorGraph.listen(PORTA_GRAPH, r).on('error', rej));
+  tokCliente = tok({ id: await usuarioTeste(pool, { cliente_id: 1 }), tipo: 'cliente', empresa_id: 1, cliente_id: 1 });
   const criados = new Set();
   const contaAntes = (await pool.query('SELECT * FROM marketing_conta WHERE empresa_id = 1')).rows[0] || null;
   const seguidoresAntes = (await pool.query('SELECT data, seguidores FROM marketing_seguidores WHERE empresa_id = 1')).rows;
@@ -440,6 +442,7 @@ const perto = (data, minutos) => Math.abs(new Date(data) - Date.now() - minutos 
     for (const s of seguidoresAntes) await pool.query('INSERT INTO marketing_seguidores (empresa_id, data, seguidores) VALUES (1, $1, $2)', [s.data, s.seguidores]);
     await pool.query(`DELETE FROM alertas_sistema WHERE id > $1 AND (chave LIKE 'marketing:%' OR chave LIKE 'http:%marketing%')`, [alertaAntes]);
     console.log(`\n${falhas ? `${falhas} FALHA(S)` : 'Tudo OK'} · ${ids.length} post(s) de teste e ${keys.length} imagem(ns) removidos`);
+    await apagarUsuariosTeste(pool);
     await pool.end();
     servidorGraph.close();
     process.exit(falhas ? 1 : 0);

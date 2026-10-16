@@ -202,8 +202,13 @@ router.post('/oportunidades/:id/gerar-contrato', async (req, res) => {
   try {
     const o = await carregarOportunidade(req.params.id, emp(req));
     if (!o) return res.status(404).json({ erro: 'Oportunidade não encontrada.' });
-    if (o.contrato_id) return res.status(400).json({ erro: 'Esta oportunidade já gerou um contrato.' });
     await client.query('BEGIN');
+    // Trava a oportunidade: dois cliques simultâneos não geram dois contratos
+    const trava = await client.query('SELECT contrato_id FROM oportunidades WHERE id = $1 FOR UPDATE', [o.id]);
+    if (trava.rows[0].contrato_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: 'Esta oportunidade já gerou um contrato.' });
+    }
     let clienteId = o.cliente_id;
     let clienteNovo = false;
     if (!clienteId) {

@@ -1,0 +1,580 @@
+# MARSH CONSULTORIA — REVISÃO COMPLETA DA ARQUITETURA COMERCIAL, CONTRATUAL, FINANCEIRA E DE LICENCIAMENTO
+
+## PAPEL DA IA
+
+Atue como Arquiteto de Software Sênior, Engenheiro Full Stack, Especialista em Banco de Dados, Segurança, SaaS Multitenant, Sistemas Financeiros e Plataformas de Ensino Online.
+
+Sua missão é analisar profundamente o código-fonte do meu sistema atual e propor uma reorganização completa dos fluxos comerciais e operacionais, preservando as funcionalidades existentes.
+
+O objetivo é transformar o sistema em uma plataforma integrada de gestão de clientes, contratos, serviços recorrentes, produtos licenciados, cursos online, pagamentos, faturamento e controle de acesso.
+
+**REGRA PRINCIPAL: comece somente pela análise e pelo planejamento. Não altere o código antes de apresentar a proposta e receber minha aprovação.**
+
+---
+
+# 1. VISÃO GERAL DO NEGÓCIO
+
+A Marsh Consultoria comercializa diferentes modalidades de serviços e produtos.
+
+### Serviços de consultoria
+
+Exemplos:
+
+- Consultoria SAP.
+- Consultoria SAP CPI / Cloud Integration.
+- Cloud Computing.
+- Desenvolvimento de sistemas.
+- Sustentação e manutenção de tecnologias.
+
+Esses serviços normalmente possuem contratos individuais, valores mensais e faturamento recorrente.
+
+### Produtos licenciados
+
+Exemplo:
+
+- Conector desenvolvido pela Marsh Consultoria.
+
+O cliente contrata determinada quantidade de licenças, normalmente com cobrança anual.
+
+O administrador corporativo distribui essas licenças aos usuários da sua empresa.
+
+### Cursos digitais
+
+A Marsh Consultoria também comercializará cursos online.
+
+Os cursos poderão ser:
+
+- Comprados individualmente por pessoas físicas ou jurídicas.
+- Vendidos por meio de landing pages.
+- Adquiridos mediante campanhas promocionais.
+- Concedidos gratuitamente como benefício para usuários corporativos que possuam licenças ativas de produtos específicos.
+
+---
+
+# 2. ESTRUTURA DE CLIENTES E CONTRATOS
+
+A entidade CLIENTE deverá centralizar os relacionamentos comerciais.
+
+O cliente poderá ser uma pessoa jurídica ou física, conforme o tipo de contratação.
+
+Uma empresa poderá possuir múltiplos contratos independentes.
+
+Exemplo:
+
+Cliente: Cloud CCM.
+
+Contrato 001:
+- Tipo: Serviço.
+- Produto/serviço: Consultoria SAP.
+- Valor: mensal.
+- Vigência própria.
+
+Contrato 002:
+- Tipo: Serviço.
+- Produto/serviço: Consultoria CPI / Cloud.
+- Valor: mensal.
+- Vigência própria.
+
+Contrato 003:
+- Tipo: Produto.
+- Produto: Conector Marsh.
+- Quantidade: 100 licenças.
+- Cobrança: anual.
+- Vigência própria.
+
+Cada contrato deverá possuir:
+
+- Identificador.
+- Cliente.
+- Número.
+- Tipo.
+- Itens contratados.
+- Valor.
+- Periodicidade.
+- Data inicial.
+- Data final, quando aplicável.
+- Situação.
+- Condições comerciais.
+- Regras de renovação.
+- Histórico de alterações.
+
+Embora a arquitetura possa suportar contratos mistos, o modelo comercial prioritário utiliza contratos separados por tecnologia, serviço ou produto.
+
+A suspensão ou o encerramento de um contrato não poderá afetar automaticamente os demais contratos da empresa.
+
+---
+
+# 3. CONTRATOS DE SERVIÇOS E FATURAMENTO MENSAL
+
+Quando um contrato de serviço for ativado, o sistema deverá gerar as cobranças conforme a periodicidade definida.
+
+Fluxo:
+
+Cadastro do cliente
+→ Criação do contrato
+→ Definição do serviço
+→ Valor mensal
+→ Data de vencimento
+→ Ativação
+→ Geração mensal de cobrança
+→ Contas a Receber
+→ Fatura
+→ Nota fiscal
+→ Envio por e-mail
+→ Recebimento.
+
+Regras obrigatórias:
+
+1. Gerar cobranças sem duplicidade.
+2. Respeitar vigência e situação contratual.
+3. Permitir reajustes.
+4. Manter histórico financeiro.
+5. Permitir faturamento manual ou automatizado.
+6. Integrar emissão fiscal conforme os serviços disponíveis.
+7. Registrar envio de documentos por e-mail.
+8. Permitir conciliação e baixa financeira.
+9. Controlar cobranças vencidas.
+10. Garantir idempotência em processamentos automáticos.
+
+Não confundir Contas a Receber com Contas a Pagar.
+
+Também não confundir cobrança gerada, fatura emitida, nota fiscal autorizada e pagamento recebido.
+
+---
+
+# 4. CONTRATOS DE PRODUTOS E LICENCIAMENTO
+
+O produto Conector será comercializado por contrato.
+
+Exemplo:
+
+- Empresa: Cloud CCM.
+- Produto: Conector Marsh.
+- Quantidade: 100 licenças.
+- Periodicidade de cobrança: anual.
+- Vigência: conforme contrato.
+
+As licenças pertencem ao contrato, não diretamente aos usuários.
+
+Os usuários recebem atribuições de utilização dessas licenças.
+
+O sistema deverá controlar:
+
+- Licenças contratadas.
+- Licenças ativas.
+- Licenças reservadas.
+- Licenças disponíveis.
+- Usuários vinculados.
+- Data de ativação.
+- Data de expiração.
+- Histórico de atribuições.
+- Revogações.
+- Renovações.
+
+O administrador corporativo poderá reservar uma licença para si e distribuir as demais aos usuários.
+
+Uma empresa com 100 licenças não poderá possuir mais de 100 posições ocupadas simultaneamente, considerando atribuições ativas e reservas de convites pendentes.
+
+Implementar proteção contra concorrência para impedir distribuição acima do limite.
+
+---
+
+# 5. ADMINISTRADOR CORPORATIVO E CONVITES
+
+Cada empresa deverá possuir um ou mais administradores corporativos autorizados.
+
+Esses administradores poderão:
+
+- Consultar contratos da empresa.
+- Visualizar produtos licenciados.
+- Consultar licenças contratadas.
+- Consultar licenças utilizadas.
+- Visualizar licenças disponíveis.
+- Convidar usuários por e-mail.
+- Reenviar convites.
+- Cancelar convites.
+- Revogar atribuições.
+- Redistribuir licenças.
+- Consultar usuários autorizados.
+
+Fluxo do convite:
+
+Administrador seleciona o produto
+→ Informa o e-mail
+→ Sistema valida disponibilidade
+→ Reserva licença
+→ Gera convite seguro
+→ Envia e-mail
+→ Usuário aceita convite
+→ Realiza cadastro ou login
+→ Sistema valida identidade
+→ Ativa atribuição
+→ Libera produto.
+
+O administrador corporativo não deverá consumir automaticamente uma licença apenas por exercer a função de administrador.
+
+O convite deverá possuir token seguro, prazo de validade, proteção contra reutilização e registro de auditoria.
+
+---
+
+# 6. VENDA DIRETA DE CURSOS
+
+O sistema deverá permitir comercializar cursos digitais para clientes individuais.
+
+A compra poderá começar em uma landing page, campanha de WhatsApp, anúncio ou acesso direto ao portal.
+
+Fluxo:
+
+Landing Page
+→ Oferta
+→ Cadastro ou identificação
+→ Checkout
+→ Pagamento
+→ Confirmação
+→ Registro comercial/contrato
+→ Matrícula
+→ Direito de acesso
+→ Portal do aluno.
+
+Cada oferta deverá permitir definir:
+
+- Curso.
+- Preço original.
+- Preço promocional.
+- Condições de pagamento.
+- Período da campanha.
+- Duração do acesso.
+- Origem da venda.
+- Cupom promocional, quando aplicável.
+
+O acesso ao curso só deverá ser liberado após confirmação válida do pagamento, exceto nas ofertas expressamente gratuitas.
+
+A confirmação deverá ser processada pelo backend, com validação dos eventos do gateway de pagamento.
+
+Evitar duplicação de pedidos, contratos, matrículas e cobranças.
+
+O sistema deverá tratar pagamentos pendentes, recusados, cancelados, estornados e contestados.
+
+---
+
+# 7. CURSOS GRATUITOS COMO BENEFÍCIO CORPORATIVO
+
+Esta seção contém uma regra de negócio definitiva e obrigatória.
+
+A Marsh Consultoria poderá disponibilizar cursos gratuitamente aos usuários que possuírem licenças corporativas ativas do Conector ou de outros produtos elegíveis.
+
+Exemplo:
+
+A Cloud CCM possui um contrato de 100 licenças do Conector.
+
+O administrador distribui as licenças.
+
+Os usuários autorizados poderão receber acesso gratuito a cursos definidos pela Marsh Consultoria.
+
+## REGRA DEFINITIVA DE VIGÊNCIA
+
+**O acesso gratuito ao curso deverá permanecer disponível exclusivamente enquanto a licença corporativa do usuário estiver ativa e o benefício contratual continuar válido.**
+
+O acesso gratuito não é permanente.
+
+Se a licença corporativa for revogada, suspensa, expirada ou perder sua validade, o usuário deverá perder automaticamente o direito de acesso aos cursos concedidos exclusivamente por essa licença.
+
+O mesmo deverá ocorrer se o contrato corporativo perder a condição que sustenta o benefício.
+
+### Exemplo prático
+
+João possui:
+
+- Uma licença corporativa do Conector.
+- Acesso gratuito ao Curso SAP CPI.
+- Acesso gratuito ao Curso Integrações Cloud.
+
+Enquanto a licença estiver ativa, João poderá acessar os dois cursos.
+
+Se o administrador revogar sua licença do Conector:
+
+- João perde acesso ao Conector.
+- João perde acesso gratuito ao Curso SAP CPI.
+- João perde acesso gratuito ao Curso Integrações Cloud.
+
+O sistema deverá preservar o cadastro de João, seu histórico acadêmico, progresso e registros de conclusão.
+
+Não excluir matrículas ou dados históricos apenas porque o benefício expirou.
+
+## EXCEÇÃO: CURSOS COMPRADOS INDIVIDUALMENTE
+
+Se João também comprou individualmente o Curso ABAP Avançado, esse curso deverá continuar disponível conforme as condições da compra, mesmo após a revogação de sua licença corporativa.
+
+O sistema deverá diferenciar claramente:
+
+- Acesso por compra individual.
+- Acesso por benefício corporativo.
+- Acesso por outra autorização válida.
+
+Caso o usuário possua mais de uma origem de acesso ao mesmo curso, a revogação de uma origem não poderá remover outra autorização ainda válida.
+
+### Regras técnicas
+
+1. O direito de acesso deverá possuir uma origem identificável.
+2. Benefícios deverão estar associados ao contrato, produto e licença elegível.
+3. O backend deverá validar a licença e o benefício antes de autorizar o acesso.
+4. A revogação deverá produzir efeito nas autorizações de acesso, inclusive nas sessões existentes conforme a estratégia de invalidação adotada.
+5. A expiração deverá ser tratada automaticamente.
+6. O progresso acadêmico deverá ser preservado.
+7. A concessão gratuita não deverá gerar cobrança individual.
+8. A matrícula gratuita não deverá consumir uma licença adicional do Conector.
+9. A renovação da licença poderá restabelecer o acesso ao curso, conforme as regras do benefício.
+10. Todas as concessões e revogações deverão possuir rastreabilidade.
+
+Não utilizar somente o status da matrícula para determinar se o usuário pode acessar um curso.
+
+---
+
+# 8. PORTAL UNIFICADO
+
+O sistema deverá permitir que um mesmo usuário utilize diferentes funcionalidades conforme suas permissões e direitos comerciais.
+
+### Administrador Marsh
+
+- Gerencia clientes.
+- Gerencia contratos.
+- Gerencia produtos.
+- Gerencia serviços.
+- Gerencia cursos.
+- Gerencia cobranças.
+- Gerencia licenças.
+- Gerencia benefícios.
+- Consulta relatórios.
+
+### Administrador corporativo
+
+- Consulta contratos da empresa.
+- Gerencia usuários e convites.
+- Distribui licenças.
+- Consulta benefícios.
+- Acessa produtos para os quais possua licença própria.
+
+### Usuário corporativo
+
+- Acessa conectores licenciados.
+- Acessa cursos gratuitos elegíveis.
+- Consulta seus cursos.
+- Consulta suas autorizações.
+
+### Aluno individual
+
+- Compra cursos.
+- Consulta pedidos.
+- Consulta pagamentos.
+- Acessa cursos adquiridos.
+- Acompanha progresso acadêmico.
+
+Um mesmo usuário poderá ser aluno individual e usuário corporativo simultaneamente.
+
+Não criar contas duplicadas desnecessariamente.
+
+---
+
+# 9. MODELO DE DADOS E DIREITOS DE ACESSO
+
+Analise as entidades existentes e proponha uma modelagem que contemple:
+
+- Cliente.
+- Empresa.
+- Usuário.
+- Vínculo usuário-empresa.
+- Contrato.
+- Item contratual.
+- Serviço.
+- Produto.
+- Plano comercial.
+- Assinatura.
+- Recorrência financeira.
+- Cobrança.
+- Fatura.
+- Documento fiscal.
+- Pagamento.
+- Licença contratada.
+- Atribuição de licença.
+- Convite.
+- Curso.
+- Oferta comercial.
+- Pedido.
+- Matrícula.
+- Benefício corporativo.
+- Direito de acesso.
+- Histórico de auditoria.
+
+Esses nomes são conceitos de domínio, não uma exigência de criar uma tabela para cada item.
+
+Reutilize as estruturas existentes sempre que adequado.
+
+Separe obrigatoriamente:
+
+- O que o cliente comprou.
+- O que o contrato autoriza.
+- Quem está autorizado.
+- Por quanto tempo.
+- Qual é a origem do direito.
+- Qual é a situação financeira.
+- Qual é a situação do acesso.
+
+O controle de acesso deverá ser validado no backend, não apenas no frontend.
+
+---
+
+# 10. AUTOMAÇÕES
+
+Avalie a implementação de rotinas para:
+
+- Geração mensal de cobranças.
+- Geração anual de cobranças.
+- Renovação de assinaturas.
+- Identificação de inadimplência.
+- Expiração de contratos.
+- Expiração de licenças.
+- Expiração de convites.
+- Concessão de benefícios.
+- Revogação automática de benefícios.
+- Processamento de pagamentos.
+- Envio de e-mails.
+- Emissão de documentos fiscais.
+
+Todas as rotinas deverão ser seguras para reprocessamento e possuir logs e tratamento de falhas.
+
+---
+
+# 11. SEGURANÇA E ISOLAMENTO ENTRE EMPRESAS
+
+O sistema deverá impedir que usuários de uma empresa acessem informações de outra.
+
+Avalie:
+
+- Isolamento multitenant.
+- Autenticação.
+- Autorização por função.
+- Autorização por contrato e licença.
+- Tokens de convite.
+- Validação de webhooks.
+- Concorrência de licenças.
+- Auditoria.
+- Proteção de dados pessoais.
+- Integridade referencial.
+- Invalidação de autorizações revogadas.
+
+Considere os requisitos aplicáveis da LGPD.
+
+---
+
+# 12. CENÁRIOS DE VALIDAÇÃO
+
+O planejamento deverá contemplar testes para:
+
+1. Empresa com múltiplos contratos de consultoria.
+2. Cobranças mensais independentes por contrato.
+3. Contrato anual de Conector.
+4. Distribuição de 100 licenças.
+5. Bloqueio da 101ª atribuição.
+6. Convite e cadastro de usuário.
+7. Compra individual de curso.
+8. Confirmação de pagamento.
+9. Matrícula automática.
+10. Concessão de curso gratuito por licença corporativa.
+11. Revogação da licença e bloqueio do curso gratuito.
+12. Preservação do histórico acadêmico.
+13. Preservação de cursos comprados individualmente.
+14. Renovação da licença e eventual restabelecimento do benefício.
+15. Expiração do contrato corporativo.
+16. Isolamento de dados entre empresas.
+17. Pagamentos duplicados ou webhooks repetidos.
+18. Revogação concorrente com tentativa de acesso.
+19. Acesso ao mesmo curso por múltiplas origens válidas.
+20. Falhas e reprocessamento de cobranças, documentos fiscais e e-mails.
+
+---
+
+# 13. ENTREGÁVEIS OBRIGATÓRIOS
+
+Antes de qualquer implementação, produza:
+
+## A. Diagnóstico atual
+
+Identifique a arquitetura real do projeto, tecnologias, banco de dados, controllers, services, entidades, APIs e telas.
+
+## B. Mapeamento funcional
+
+Documente o fluxo atual de clientes, contratos, produtos, serviços, usuários, financeiro e cursos.
+
+## C. Análise de lacunas
+
+Compare a implementação existente com os requisitos deste documento.
+
+Classifique cada funcionalidade como existente, parcial ou inexistente.
+
+## D. Arquitetura proposta
+
+Desenhe os módulos e os relacionamentos, incluindo os mecanismos de autorização e concessão de benefícios.
+
+## E. Modelo de banco de dados
+
+Apresente entidades, relacionamentos, restrições e estratégia de migração.
+
+## F. Plano de implementação
+
+Divida o desenvolvimento em fases, priorizando dependências e preservação do funcionamento atual.
+
+## G. Riscos e impactos
+
+Liste riscos técnicos, financeiros, de segurança e de migração.
+
+## H. Plano de testes
+
+Defina testes unitários, integração, concorrência, segurança e regressão.
+
+## I. Questões pendentes
+
+Identifique somente decisões que realmente precisam de validação antes de implementar.
+
+Não reabra decisões comerciais já definidas neste documento.
+
+---
+
+# 14. ESTRATÉGIA DE EXECUÇÃO
+
+ETAPA 1 — ANÁLISE
+
+Inspecione todo o repositório e apresente o diagnóstico.
+
+ETAPA 2 — PROPOSTA
+
+Apresente a arquitetura e o plano de implementação, indicando arquivos e componentes afetados.
+
+ETAPA 3 — APROVAÇÃO
+
+Aguarde minha autorização explícita.
+
+ETAPA 4 — IMPLEMENTAÇÃO
+
+Após aprovação, implemente de forma incremental, com testes e documentação.
+
+Não execute alterações destrutivas, migrations em produção ou modificações irreversíveis sem autorização específica.
+
+# RESULTADO FINAL
+
+A Marsh Consultoria deverá possuir uma plataforma comercial e operacional integrada, capaz de gerenciar:
+
+- Clientes corporativos e individuais.
+- Contratos independentes.
+- Serviços mensais.
+- Produtos com licenciamento anual.
+- Distribuição de licenças por convites.
+- Cursos vendidos individualmente.
+- Cursos gratuitos vinculados a licenças corporativas ativas.
+- Cobranças recorrentes.
+- Pagamentos online.
+- Faturamento e documentos fiscais.
+- Portais corporativos e de alunos.
+
+O sistema deverá preservar os dados e funcionalidades atuais, evitar duplicações e permitir crescimento futuro.
+
+**INICIE EXCLUSIVAMENTE PELA ANÁLISE DO SISTEMA EXISTENTE. NÃO ALTERE CÓDIGO ATÉ MINHA APROVAÇÃO.**

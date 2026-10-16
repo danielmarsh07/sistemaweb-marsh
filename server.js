@@ -1105,6 +1105,61 @@ async function iniciar() {
       );
     `);
 
+    // 30. Fluxo novo — fase 0 (docs/plano-fluxo-novo.md): base de segurança e rastreabilidade
+    //     sessao_versao: vai no token (sv); trocar senha/tipo/empresa incrementa e derruba as sessões abertas
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sessao_versao INTEGER NOT NULL DEFAULT 0;`);
+    //     Auditoria geral: quem fez o quê, em qual registro (antes/depois). services/auditoria.js
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auditoria (
+        id BIGSERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        usuario_id INTEGER,
+        acao VARCHAR(60) NOT NULL,
+        entidade VARCHAR(40) NOT NULL,
+        entidade_id INTEGER,
+        antes JSONB,
+        depois JSONB,
+        detalhe TEXT,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade, entidade_id, criado_em DESC);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria(usuario_id, criado_em DESC);`);
+    //     Eventos do webhook do Asaas (id do evento): o mesmo evento reenviado não é processado duas vezes
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS asaas_eventos (
+        id VARCHAR(100) PRIMARY KEY,
+        evento VARCHAR(60),
+        resultado VARCHAR(20),
+        tentativas INTEGER NOT NULL DEFAULT 1,
+        recebido_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        ultima_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        processado_em TIMESTAMPTZ
+      );
+    `);
+    //     Tipo de pessoa calculado do documento (11 dígitos = PF, 14 = PJ); sem documento = NULL
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tipo_pessoa VARCHAR(2)
+      GENERATED ALWAYS AS (CASE length(regexp_replace(COALESCE(cpf_cnpj, ''), '[^0-9]', '', 'g'))
+                           WHEN 11 THEN 'PF' WHEN 14 THEN 'PJ' END) STORED;`);
+    //     Índices únicos sobre dados já existentes: se houver duplicidade em produção, o índice não é criado,
+    //     o resto da migração segue e um alerta mostra o que corrigir
+    const indicesUnicos = [
+      ['uq_vagas_contrato_usuario', `CREATE UNIQUE INDEX IF NOT EXISTS uq_vagas_contrato_usuario
+         ON contratos_conector_vagas(contrato_id, usuario_id) WHERE usuario_id IS NOT NULL AND ativo`,
+       'a mesma pessoa ocupa duas vagas do mesmo contrato do Conector'],
+      ['uq_clientes_documento', `CREATE UNIQUE INDEX IF NOT EXISTS uq_clientes_documento
+         ON clientes(empresa_id, (regexp_replace(cpf_cnpj, '[^0-9]', '', 'g')))
+         WHERE ativo AND regexp_replace(COALESCE(cpf_cnpj, ''), '[^0-9]', '', 'g') <> ''`,
+       'há clientes ativos com o mesmo CPF/CNPJ']
+    ];
+    for (const [nome, sql, motivo] of indicesUnicos) {
+      try { await pool.query(sql); }
+      catch (err) {
+        registrarAlerta({ chave: `migracao:${nome}`, nivel: 'aviso', titulo: `Regra de unicidade não aplicada: ${motivo}`,
+          detalhe: `Corrija os registros duplicados; o índice ${nome} será criado no próximo deploy. ${err.message}` });
+      }
+    }
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

@@ -36,8 +36,8 @@ async function depoisDeOcupar(r) {
   await cert.avaliarUsuario(r.usuario.id).catch(err => console.error('[certificacao] ocupar:', err.message));
 }
 
-async function liberarComLicenca(k, vagaId) {
-  const usuarioId = await cc.liberarVaga(k, vagaId);
+async function liberarComLicenca(k, vagaId, atorId) {
+  const usuarioId = await cc.liberarVaga(k, vagaId, atorId);
   await cert.cancelarLicencaVaga(Number(vagaId), usuarioId);
 }
 
@@ -137,7 +137,7 @@ router.post('/meus/:id/vagas/:vid/liberar', async (req, res) => {
   try {
     const k = await contratoDoGestor(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    await liberarComLicenca(k, req.params.vid);
+    await liberarComLicenca(k, req.params.vid, req.usuario.id);
     res.json({ mensagem: 'Vaga liberada. A pessoa perde o acesso aos cursos desta vaga.' });
   } catch (err) { responderErro(res, err, 'Erro ao liberar a vaga'); }
 });
@@ -321,7 +321,7 @@ router.post('/:id/vagas/:vid/ocupar', async (req, res) => {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
     const corpo = { ...(req.body || {}) };
-    const r = await cc.ocuparVaga(k, req.params.vid, corpo, k.gestor_usuario_id); // "eu" = o gestor do contrato
+    const r = await cc.ocuparVaga(k, req.params.vid, corpo, k.gestor_usuario_id, req.usuario.id); // "eu" = o gestor do contrato
     await depoisDeOcupar(r);
     res.json({ mensagem: mensagemOcupacao(r), convite_enviado: r.convite_enviado });
   } catch (err) { responderErro(res, err, 'Erro ao ocupar a vaga'); }
@@ -331,7 +331,7 @@ router.post('/:id/vagas/:vid/liberar', async (req, res) => {
   try {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    await liberarComLicenca(k, req.params.vid);
+    await liberarComLicenca(k, req.params.vid, req.usuario.id);
     res.json({ mensagem: 'Vaga liberada.' });
   } catch (err) { responderErro(res, err, 'Erro ao liberar a vaga'); }
 });

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const email = require('./email');
+const auditoria = require('./auditoria');
 
 const BASE_URL = process.env.APP_URL || 'https://marshconsultoria.com.br';
 const PRAZO_H = { convite: 72, redefinir: 2 };
@@ -47,8 +48,13 @@ async function definirSenhaPorToken(token, senha) {
   if (erro) return { erro };
   const t = await lerToken(token);
   if (!t) return { erro: 'Link inválido ou expirado. Peça um novo.' };
-  await pool.query('UPDATE usuarios SET senha = $1 WHERE id = $2', [await bcrypt.hash(senha, 10), t.usuario_id]);
+  // Consome o link de forma atômica: dois envios simultâneos do mesmo link, só um passa
+  const consumido = await pool.query('UPDATE usuarios_tokens SET usado_em = NOW() WHERE id = $1 AND usado_em IS NULL', [t.id]);
+  if (!consumido.rowCount) return { erro: 'Link inválido ou expirado. Peça um novo.' };
+  // Senha nova encerra as sessões abertas (quem pediu o link pode estar recuperando uma conta invadida)
+  await pool.query('UPDATE usuarios SET senha = $1, sessao_versao = sessao_versao + 1 WHERE id = $2', [await bcrypt.hash(senha, 10), t.usuario_id]);
   await pool.query('UPDATE usuarios_tokens SET usado_em = NOW() WHERE usuario_id = $1 AND usado_em IS NULL', [t.usuario_id]);
+  await auditoria.registrar({ usuario_id: t.usuario_id, acao: `usuario.senha_definida_${t.tipo}`, entidade: 'usuario', entidade_id: t.usuario_id });
   return { ok: true, email: t.email };
 }
 

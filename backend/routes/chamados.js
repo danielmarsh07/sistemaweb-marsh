@@ -112,9 +112,10 @@ router.get('/', async (req, res) => {
     let where = 'WHERE ch.empresa_id = $1 AND ch.ativo = TRUE';
     let idx = 2;
 
-    if (isCliente && req.usuario.cliente_id) {
+    // Cliente sem empresa vinculada não vê nada (cliente_id NULL nunca casa com chamado)
+    if (isCliente) {
       where += ` AND ch.cliente_id = $${idx++}`;
-      whereParams.push(req.usuario.cliente_id);
+      whereParams.push(req.usuario.cliente_id || null);
     }
     if (status) { where += ` AND ch.status = $${idx++}`; whereParams.push(status); }
     if (prioridade) { where += ` AND ch.prioridade = $${idx++}`; whereParams.push(prioridade); }

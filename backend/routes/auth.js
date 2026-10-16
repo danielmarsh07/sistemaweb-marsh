@@ -54,7 +54,8 @@ router.post('/login', loginLimiter, async (req, res) => {
       email: usuario.email,
       empresa_id: usuario.empresa_id || 1,
       tipo: usuario.tipo || 'admin_empresa',
-      cliente_id: usuario.cliente_id || null
+      cliente_id: usuario.cliente_id || null,
+      sv: usuario.sessao_versao || 0 // conferido pelo middleware autenticar a cada requisição
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });

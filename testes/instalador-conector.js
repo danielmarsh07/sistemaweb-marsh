@@ -12,6 +12,7 @@ const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
+const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
 const BASE = 'http://localhost:3000/api';
 
 const ok = (c, msg) => console.log(c ? 'OK  ' : 'FAIL', msg);
@@ -50,8 +51,8 @@ function zipMinimo() {
   const tok = p => jwt.sign(p, process.env.JWT_SECRET, { expiresIn: '5m' });
   const tokAdmin = tok({ id: 1, tipo: 'admin_empresa', empresa_id: 1 });
   const tokTecnico = tok({ id: 1, tipo: 'tecnico', empresa_id: 1 });
-  const tokCom = tok({ id: 999996, tipo: 'cliente', empresa_id: 1, cliente_id: cliCom });
-  const tokSem = tok({ id: 999995, tipo: 'cliente', empresa_id: 1, cliente_id: cliSem });
+  const tokCom = tok({ id: await usuarioTeste(pool, { cliente_id: cliCom }), tipo: 'cliente', empresa_id: 1, cliente_id: cliCom });
+  const tokSem = tok({ id: await usuarioTeste(pool, { cliente_id: cliSem }), tipo: 'cliente', empresa_id: 1, cliente_id: cliSem });
 
   const enviar = async (t, buffer, nome) => {
     const form = new FormData();
@@ -99,6 +100,7 @@ function zipMinimo() {
   } finally {
     await pool.query('DELETE FROM conector_instaladores WHERE id > $1', [idsAntes]);
     await pool.query('DELETE FROM licencas WHERE cliente_id IN ($1, $2)', [cliCom, cliSem]);
+    await apagarUsuariosTeste(pool);
     await pool.query('DELETE FROM clientes WHERE id IN ($1, $2)', [cliCom, cliSem]);
     await pool.end();
   }

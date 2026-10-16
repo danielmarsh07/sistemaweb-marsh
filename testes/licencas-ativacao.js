@@ -5,6 +5,7 @@ require('./_ambiente-local');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
+const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
 const BASE = 'http://localhost:3000/api';
 
 const ok = (c, msg) => console.log(c ? 'OK  ' : 'FAIL', msg);
@@ -22,8 +23,8 @@ const hash = s => crypto.createHash('sha256').update(s).digest('hex');
 
   const tokAdmin = jwt.sign({ id: 1, tipo: 'admin_empresa', empresa_id: 1 }, process.env.JWT_SECRET, { expiresIn: '5m' });
   const tokTecnico = jwt.sign({ id: 1, tipo: 'tecnico', empresa_id: 1 }, process.env.JWT_SECRET, { expiresIn: '5m' });
-  const tokCliA = jwt.sign({ id: 999998, tipo: 'cliente', empresa_id: 1, cliente_id: cliA }, process.env.JWT_SECRET, { expiresIn: '5m' });
-  const tokCliB = jwt.sign({ id: 999997, tipo: 'cliente', empresa_id: 1, cliente_id: cliB }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  const tokCliA = jwt.sign({ id: await usuarioTeste(pool, { cliente_id: cliA }), tipo: 'cliente', empresa_id: 1, cliente_id: cliA }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  const tokCliB = jwt.sign({ id: await usuarioTeste(pool, { cliente_id: cliB }), tipo: 'cliente', empresa_id: 1, cliente_id: cliB }, process.env.JWT_SECRET, { expiresIn: '5m' });
 
   const api = async (tok, p, m = 'GET', body) => {
     const headers = { 'Content-Type': 'application/json' };
@@ -215,6 +216,7 @@ const hash = s => crypto.createHash('sha256').update(s).digest('hex');
       await pool.query('DELETE FROM licencas_uso WHERE licenca_id = ANY($1)', [licIds]);
     }
     await pool.query('DELETE FROM licencas WHERE cliente_id IN ($1, $2)', [cliA, cliB]);
+    await apagarUsuariosTeste(pool);
     await pool.query('DELETE FROM clientes WHERE id IN ($1, $2)', [cliA, cliB]);
     await pool.end();
   }

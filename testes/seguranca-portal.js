@@ -2,11 +2,13 @@ require('./_ambiente-local');
 // Segurança do portal: um usuário do tipo 'cliente' só enxerga o que é dele; a equipe segue enxergando tudo.
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
+const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
 const BASE = 'http://localhost:3000/api';
 
 (async () => {
   const cli = (await pool.query(`SELECT id FROM clientes WHERE ativo ORDER BY id LIMIT 1`)).rows[0].id;
-  const tokCliente = jwt.sign({ id: 999999, tipo: 'cliente', empresa_id: 1, cliente_id: cli }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  const idCliente = await usuarioTeste(pool, { cliente_id: cli });
+  const tokCliente = jwt.sign({ id: idCliente, tipo: 'cliente', empresa_id: 1, cliente_id: cli }, process.env.JWT_SECRET, { expiresIn: '5m' });
   const tokAdmin = jwt.sign({ id: 1, tipo: 'admin_empresa', empresa_id: 1 }, process.env.JWT_SECRET, { expiresIn: '5m' });
   const tokTecnico = jwt.sign({ id: 1, tipo: 'tecnico', empresa_id: 1 }, process.env.JWT_SECRET, { expiresIn: '5m' });
   const get = async (tok, p, m = 'GET', body) => {
@@ -46,5 +48,6 @@ const BASE = 'http://localhost:3000/api';
 
   await pool.query(`DELETE FROM cliente_tecnologias WHERE tecnologia_id IN ($1, $2)`, [tec, tec2]);
   await pool.query(`DELETE FROM tecnologias WHERE id IN ($1, $2)`, [tec, tec2]);
+  await apagarUsuariosTeste(pool);
   await pool.end();
 })().catch(e => { console.error(e); process.exit(1); });

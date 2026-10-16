@@ -10,6 +10,7 @@
  */
 const pool = require('../db');
 const senhas = require('./senhas');
+const auditoria = require('./auditoria');
 
 const PERFIS = {
   abap:      { nome: 'ABAP',          trilhas: ['abap', 'portal', 'conector'],              plano: 'desenvolvimento' },
@@ -150,7 +151,7 @@ async function criarVagas(db, contratoId, q) {
  * Ocupa a vaga: { eu: true } (o gestor) ou { nome, email } (convite).
  * contrato = linha de contratos_conector. Devolve { usuario, convite_enviado }.
  */
-async function ocuparVaga(contrato, vagaId, { eu, nome, email }, gestorId) {
+async function ocuparVaga(contrato, vagaId, { eu, nome, email }, gestorId, atorId = gestorId) {
   if (contrato.status !== 'ativo') throw new ErroRegra('Contrato não está ativo.');
   const db = await pool.connect();
   let usuario, criado = false;
@@ -170,9 +171,19 @@ async function ocuparVaga(contrato, vagaId, { eu, nome, email }, gestorId) {
       'SELECT 1 FROM contratos_conector_vagas WHERE contrato_id = $1 AND usuario_id = $2 AND ativo', [contrato.id, usuario.id]);
     if (outra.rows.length) throw new ErroRegra(`${usuario.nome} já ocupa uma vaga deste contrato.`);
     await db.query('UPDATE contratos_conector_vagas SET usuario_id = $1, data_atribuicao = NOW() WHERE id = $2', [usuario.id, vaga.id]);
+    await auditoria.registrar({ empresa_id: contrato.empresa_id, usuario_id: atorId, acao: 'vaga.ocupada', entidade: 'vaga_conector',
+      entidade_id: vaga.id, depois: { contrato_id: contrato.id, perfil: vaga.perfil, usuario_id: usuario.id, email: usuario.email } }, db);
     await db.query('COMMIT');
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
+    // Índice único (contrato, pessoa): pedido simultâneo para a mesma pessoa em outra vaga
+    if (err.code === '23505' && err.constraint === 'uq_vagas_contrato_usuario') {
+      throw new ErroRegra(`${usuario.nome} já ocupa uma vaga deste contrato.`);
+    }
+    // Mesmo e-mail novo convidado em dois pedidos simultâneos: o outro pedido já criou a pessoa
+    if (err.code === '23505' && err.constraint === 'usuarios_email_key') {
+      throw new ErroRegra(`${email} acabou de ser convidado em outro pedido. Atualize a página.`);
+    }
     throw err;
   } finally {
     db.release();
@@ -182,17 +193,29 @@ async function ocuparVaga(contrato, vagaId, { eu, nome, email }, gestorId) {
 }
 
 /** Libera a vaga. Aluno sem nenhuma outra vaga fica desativado (o progresso dele é guardado). */
-async function liberarVaga(contrato, vagaId) {
-  const vaga = (await pool.query(
-    'SELECT * FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo', [vagaId, contrato.id])).rows[0];
-  if (!vaga) throw new ErroRegra('Vaga não encontrada.');
-  if (!vaga.usuario_id) throw new ErroRegra('A vaga já está livre.');
-  await pool.query('UPDATE contratos_conector_vagas SET usuario_id = NULL, data_atribuicao = NULL WHERE id = $1', [vaga.id]);
-  await pool.query(
-    `UPDATE usuarios u SET ativo = FALSE
-     WHERE u.id = $1 AND u.portal_papel = 'aluno'
-       AND NOT EXISTS (SELECT 1 FROM contratos_conector_vagas v WHERE v.usuario_id = u.id AND v.ativo)`, [vaga.usuario_id]);
-  return vaga.usuario_id;
+async function liberarVaga(contrato, vagaId, atorId = null) {
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    const vaga = (await db.query(
+      'SELECT * FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo FOR UPDATE', [vagaId, contrato.id])).rows[0];
+    if (!vaga) throw new ErroRegra('Vaga não encontrada.');
+    if (!vaga.usuario_id) throw new ErroRegra('A vaga já está livre.');
+    await db.query('UPDATE contratos_conector_vagas SET usuario_id = NULL, data_atribuicao = NULL WHERE id = $1', [vaga.id]);
+    await db.query(
+      `UPDATE usuarios u SET ativo = FALSE
+       WHERE u.id = $1 AND u.portal_papel = 'aluno'
+         AND NOT EXISTS (SELECT 1 FROM contratos_conector_vagas v WHERE v.usuario_id = u.id AND v.ativo)`, [vaga.usuario_id]);
+    await auditoria.registrar({ empresa_id: contrato.empresa_id, usuario_id: atorId, acao: 'vaga.liberada', entidade: 'vaga_conector',
+      entidade_id: vaga.id, antes: { contrato_id: contrato.id, perfil: vaga.perfil, usuario_id: vaga.usuario_id, desde: vaga.data_atribuicao } }, db);
+    await db.query('COMMIT');
+    return vaga.usuario_id;
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    db.release();
+  }
 }
 
 module.exports = {

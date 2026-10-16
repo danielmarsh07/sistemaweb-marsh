@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const pool = require('../db');
 const senhas = require('../services/senhas');
 const emailSvc = require('../services/email');
+const auditoria = require('../services/auditoria');
 
 // Middleware: apenas admin_empresa e admin_sistema podem gerenciar usuários
 // Se tipo não veio no JWT (token antigo), assume admin_empresa
@@ -175,19 +176,28 @@ router.put('/:id', apenasAdmin, async (req, res) => {
       return res.status(400).json({ erro: 'Você não pode desativar sua própria conta' });
     }
 
+    // Mudou tipo ou empresa: encerra as sessões abertas (o token antigo carregava os dados velhos)
     const result = await pool.query(
-      `UPDATE usuarios SET nome=$1, tipo=$2, cliente_id=$3, ativo=$4
+      `UPDATE usuarios SET nome=$1, tipo=$2::varchar, cliente_id=$3::int, ativo=$4,
+              sessao_versao = sessao_versao + CASE WHEN tipo IS DISTINCT FROM $2::varchar OR cliente_id IS DISTINCT FROM $3::int THEN 1 ELSE 0 END
        WHERE id=$5 AND empresa_id=$6
        RETURNING id, nome, email, tipo, cliente_id, ativo`,
       [
         nome || u.nome,
         tipo || u.tipo,
-        tipo === 'cliente' ? (cliente_id || u.cliente_id) : null,
+        // Sem "tipo" no corpo (ex.: só reativar), mantém a empresa vinculada
+        (tipo || u.tipo) === 'cliente' ? (cliente_id || u.cliente_id) : null,
         ativo !== undefined ? ativo : u.ativo,
         req.params.id,
         empresa_id
       ]
     );
+    const novo = result.rows[0];
+    await auditoria.registrar({
+      empresa_id, usuario_id: req.usuario.id, acao: 'usuario.alterado', entidade: 'usuario', entidade_id: novo.id,
+      antes: { nome: u.nome, tipo: u.tipo, cliente_id: u.cliente_id, ativo: u.ativo },
+      depois: { nome: novo.nome, tipo: novo.tipo, cliente_id: novo.cliente_id, ativo: novo.ativo }
+    });
 
     res.json({ mensagem: 'Usuário atualizado!', usuario: result.rows[0] });
   } catch (err) {
@@ -213,7 +223,9 @@ router.put('/:id/senha', apenasAdmin, async (req, res) => {
     }
 
     const hash = await bcrypt.hash(nova_senha, 10);
-    await pool.query('UPDATE usuarios SET senha = $1 WHERE id = $2', [hash, req.params.id]);
+    // Senha redefinida pelo admin: derruba as sessões abertas do usuário
+    await pool.query('UPDATE usuarios SET senha = $1, sessao_versao = sessao_versao + 1 WHERE id = $2', [hash, req.params.id]);
+    await auditoria.registrar({ empresa_id, usuario_id: req.usuario.id, acao: 'usuario.senha_redefinida', entidade: 'usuario', entidade_id: Number(req.params.id) });
 
     res.json({ mensagem: 'Senha redefinida com sucesso!' });
   } catch (err) {
@@ -285,6 +297,7 @@ router.delete('/:id/definitivo', apenasAdmin, async (req, res) => {
     await client.query('DELETE FROM atendimentos_lidos WHERE usuario_id = $1', [id]);
     await client.query('DELETE FROM usuarios WHERE id = $1', [id]);
     await client.query('COMMIT');
+    await auditoria.registrar({ empresa_id, usuario_id: req.usuario.id, acao: 'usuario.excluido', entidade: 'usuario', entidade_id: id, antes: { nome: alvo.nome, tipo: alvo.tipo } });
     res.json({ mensagem: `Usuário ${alvo.nome} excluído.` });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -310,6 +323,7 @@ router.delete('/:id', apenasAdmin, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ erro: 'Usuário não encontrado' });
     }
+    await auditoria.registrar({ empresa_id, usuario_id: req.usuario.id, acao: 'usuario.desativado', entidade: 'usuario', entidade_id: result.rows[0].id });
     res.json({ mensagem: `Usuário ${result.rows[0].nome} desativado.` });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao desativar usuário', detalhe: err.message });

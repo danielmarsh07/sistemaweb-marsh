@@ -648,7 +648,7 @@ const criar_cliente = {
     }
     if (args.cpf_cnpj) {
       const dup = await pool.query(
-        'SELECT id FROM clientes WHERE cpf_cnpj = $1 AND empresa_id = $2 AND ativo = TRUE',
+        "SELECT id FROM clientes WHERE regexp_replace(cpf_cnpj, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g') AND empresa_id = $2 AND ativo = TRUE",
         [args.cpf_cnpj, ctx.empresa_id]
       );
       if (dup.rows.length > 0) return { erro: 'CPF/CNPJ já cadastrado para outro cliente.' };
