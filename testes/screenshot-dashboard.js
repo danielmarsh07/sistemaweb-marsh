@@ -3,7 +3,7 @@ require('./_ambiente-local');
 // Uso: node testes/screenshot-dashboard.js <pagina> <largura> <tema> <saida.png> [js-depois]
 //      ex.: relatorios 390 sereno rel.png        |  clientes 1366 sereno ficha.png "abrirFichaCliente(2)"
 // Portal do cliente: pagina = portal (entra como usuário cliente; SCREENSHOT_CLIENTE_ID escolhe a empresa,
-//      senão o primeiro usuário cliente ativo). ex.: portal 390 sereno portal.png "abrirDetalhe(12)"
+//      senão o primeiro usuário cliente ativo; SCREENSHOT_USUARIO_ID escolhe o usuário). ex.: portal 390 sereno portal.png "abrirDetalhe(12)"
 const { spawn } = require('child_process');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
@@ -18,8 +18,9 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   const portal = pagina === 'portal';
   const u = portal
     ? (await pool.query(`SELECT id, nome, email, tipo, empresa_id, cliente_id FROM usuarios
-                         WHERE tipo = 'cliente' AND ativo = TRUE AND ($1::int IS NULL OR cliente_id = $1) ORDER BY id LIMIT 1`,
-                        [process.env.SCREENSHOT_CLIENTE_ID || null])).rows[0]
+                         WHERE tipo = 'cliente' AND ativo = TRUE AND ($1::int IS NULL OR cliente_id = $1)
+                           AND ($2::int IS NULL OR id = $2) ORDER BY id LIMIT 1`,
+                        [process.env.SCREENSHOT_CLIENTE_ID || null, process.env.SCREENSHOT_USUARIO_ID || null])).rows[0]
     : (await pool.query(`SELECT id, nome, email, tipo, empresa_id FROM usuarios WHERE tipo IN ('admin_sistema','admin_empresa') ORDER BY id LIMIT 1`)).rows[0];
   await pool.end();
   const token = jwt.sign({ id: u.id, tipo: u.tipo, empresa_id: u.empresa_id, ...(portal ? { cliente_id: u.cliente_id } : {}) },

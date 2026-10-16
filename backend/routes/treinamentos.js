@@ -9,9 +9,11 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const cc = require('../services/contratos-conector');
 
 const CAPAS = ['abap', 'func', 'fiori', 'cpi', 'geral'];
 const STATUS = ['rascunho', 'publicado'];
+const TRILHAS = Object.keys(cc.TRILHAS); // perfil da vaga do Conector → trilhas que o aluno vê
 
 function normalizarVideo(url) {
   const bruto = String(url || '').trim();
@@ -51,18 +53,16 @@ function normalizarMaterial(url) {
   return u.toString();
 }
 
-// Curso liberado para o cliente: publicado, ativo e liberação vigente
-const LIBERADO = `
-  c.ativo = TRUE AND c.status = 'publicado' AND EXISTS (
-    SELECT 1 FROM cursos_liberacoes lb
-    WHERE lb.curso_id = c.id AND lb.cliente_id = $1 AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE))`;
+// Curso liberado para o usuário: publicado, ativo e (liberação vigente da empresa ou vaga do Conector
+// cujo perfil cobre a trilha). $1 = cliente, $2 = usuário em todas as consultas do cliente.
+const LIBERADO = cc.sqlCursoLiberado('$1', '$2');
 
 // ============================== CLIENTE ==============================
 router.get('/meus', async (req, res) => {
   if (req.usuario.tipo !== 'cliente' || !req.usuario.cliente_id) return res.json([]);
   try {
     const r = await pool.query(
-      `SELECT c.id, c.titulo, c.descricao, c.capa, c.carga_horaria,
+      `SELECT c.id, c.titulo, c.descricao, c.capa, c.carga_horaria, c.trilha,
          (SELECT COUNT(*)::int FROM cursos_aulas a WHERE a.curso_id = c.id AND a.ativo) AS total_aulas,
          (SELECT COUNT(*)::int FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
            WHERE a.curso_id = c.id AND a.ativo AND p.usuario_id = $2) AS concluidas,
@@ -82,7 +82,7 @@ router.get('/meus/:id', async (req, res) => {
   try {
     const c = await pool.query(
       `SELECT c.id, c.titulo, c.descricao, c.capa, c.carga_horaria FROM cursos c
-       WHERE ${LIBERADO} AND c.id = $2`, [req.usuario.cliente_id, req.params.id]);
+       WHERE ${LIBERADO} AND c.id = $3`, [req.usuario.cliente_id, req.usuario.id, req.params.id]);
     if (!c.rows.length) return res.status(404).json({ erro: 'Curso não encontrado ou não liberado.' });
     const aulas = await pool.query(
       `SELECT a.id, a.modulo, a.titulo, a.descricao, a.video_url, a.material_url, a.duracao_min,
@@ -101,7 +101,7 @@ router.post('/aulas/:id/concluir', async (req, res) => {
   try {
     const ok = await pool.query(
       `SELECT a.id FROM cursos_aulas a JOIN cursos c ON c.id = a.curso_id
-       WHERE a.id = $2 AND a.ativo AND ${LIBERADO}`, [req.usuario.cliente_id, req.params.id]);
+       WHERE a.id = $3 AND a.ativo AND ${LIBERADO}`, [req.usuario.cliente_id, req.usuario.id, req.params.id]);
     if (!ok.rows.length) return res.status(404).json({ erro: 'Aula não encontrada.' });
     if (req.body?.concluida === false) {
       await pool.query('DELETE FROM cursos_progresso WHERE usuario_id = $1 AND aula_id = $2', [req.usuario.id, req.params.id]);
@@ -137,6 +137,9 @@ function validarCurso(b, parcial) {
   }
   if (b.capa !== undefined && !CAPAS.includes(b.capa)) return 'Capa inválida.';
   if (b.status !== undefined && !STATUS.includes(b.status)) return 'Status inválido (rascunho ou publicado).';
+  if (b.trilha !== undefined && b.trilha !== '' && b.trilha !== null && !TRILHAS.includes(b.trilha)) {
+    return `Trilha inválida (${TRILHAS.join(', ')} ou vazio).`;
+  }
   return null;
 }
 
@@ -170,13 +173,14 @@ router.get('/cursos/:id', async (req, res) => {
 router.post('/cursos', async (req, res) => {
   const erro = validarCurso(req.body, false);
   if (erro) return res.status(400).json({ erro });
-  const { titulo, descricao, capa, carga_horaria, status } = req.body;
+  const { titulo, descricao, capa, carga_horaria, status, trilha } = req.body;
   try {
     const r = await pool.query(
       `INSERT INTO cursos (empresa_id, titulo, descricao, capa, carga_horaria, status, criado_por_usuario_id,
-         ordem) VALUES ($1, $2, $3, $4, $5, $6, $7,
-         (SELECT COALESCE(MAX(ordem), 0) + 1 FROM cursos WHERE empresa_id = $1)) RETURNING id`,
-      [emp(req), titulo.trim(), descricao || null, capa || 'geral', carga_horaria || null, status || 'rascunho', req.usuario.id]);
+         ordem, trilha) VALUES ($1, $2, $3, $4, $5, $6, $7,
+         (SELECT COALESCE(MAX(ordem), 0) + 1 FROM cursos WHERE empresa_id = $1), $8) RETURNING id`,
+      [emp(req), titulo.trim(), descricao || null, capa || 'geral', carga_horaria || null, status || 'rascunho', req.usuario.id,
+       trilha || null]);
     res.status(201).json({ mensagem: 'Curso criado!', id: r.rows[0].id });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao criar curso', detalhe: err.message });
@@ -191,10 +195,11 @@ router.put('/cursos/:id', async (req, res) => {
     if (!c) return res.status(404).json({ erro: 'Curso não encontrado' });
     const b = req.body;
     await pool.query(
-      `UPDATE cursos SET titulo = $1, descricao = $2, capa = $3, carga_horaria = $4, status = $5,
-         data_atualizacao = NOW() WHERE id = $6`,
+      `UPDATE cursos SET titulo = $1, descricao = $2, capa = $3, carga_horaria = $4, status = $5, trilha = $6,
+         data_atualizacao = NOW() WHERE id = $7`,
       [b.titulo ?? c.titulo, b.descricao ?? c.descricao, b.capa ?? c.capa,
-       b.carga_horaria ?? c.carga_horaria, b.status ?? c.status, c.id]);
+       b.carga_horaria ?? c.carga_horaria, b.status ?? c.status,
+       b.trilha !== undefined ? (b.trilha || null) : c.trilha, c.id]);
     res.json({ mensagem: 'Curso atualizado!' });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao atualizar curso', detalhe: err.message });
@@ -289,7 +294,7 @@ router.put('/cursos/:id/liberacoes', async (req, res) => {
   }
 });
 
-// Progresso dos alunos (usuários cliente das empresas liberadas)
+// Progresso dos alunos (usuários das empresas liberadas e ocupantes de vagas do Conector que cobrem o curso)
 router.get('/cursos/:id/progresso', async (req, res) => {
   try {
     const c = await cursoDaEmpresa(req, req.params.id);
@@ -299,10 +304,14 @@ router.get('/cursos/:id/progresso', async (req, res) => {
          (SELECT COUNT(*)::int FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
            WHERE p.usuario_id = u.id AND a.curso_id = $1 AND a.ativo) AS concluidas,
          (SELECT COUNT(*)::int FROM cursos_aulas a WHERE a.curso_id = $1 AND a.ativo) AS total
-       FROM cursos_liberacoes lb
-       JOIN clientes cl ON cl.id = lb.cliente_id
-       JOIN usuarios u ON u.cliente_id = lb.cliente_id AND u.tipo = 'cliente' AND u.ativo IS NOT FALSE
-       WHERE lb.curso_id = $1
+       FROM usuarios u
+       JOIN clientes cl ON cl.id = u.cliente_id
+       WHERE u.tipo = 'cliente' AND u.ativo IS NOT FALSE AND (
+         (EXISTS (SELECT 1 FROM cursos_liberacoes lb WHERE lb.curso_id = $1 AND lb.cliente_id = u.cliente_id)
+          AND COALESCE(u.portal_papel, '') <> 'aluno')
+         OR EXISTS (SELECT 1 FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
+                    JOIN cursos c ON c.id = $1
+                    WHERE v.usuario_id = u.id AND v.ativo AND k.status <> 'cancelado' AND ${cc.PERFIL_COBRE_TRILHA}))
        ORDER BY cliente, u.nome`, [c.id]);
     res.json(r.rows);
   } catch (err) {

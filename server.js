@@ -57,6 +57,8 @@ const marketingJobs = require('./backend/services/marketing-jobs');
 const autenticar = require('./backend/middleware/autenticar');
 const apenasEquipe = require('./backend/middleware/apenas-equipe');
 const alertasRoutes = require('./backend/routes/alertas');
+const contratosConectorRoutes = require('./backend/routes/contratos-conector');
+const bloquearAluno = require('./backend/middleware/bloquear-aluno');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
@@ -71,14 +73,16 @@ app.use('/api/fornecedores', autenticar, apenasEquipe, fornecedoresRoutes); // p
 app.use('/api/transacoes', autenticar, apenasEquipe, transacoesRoutes); // portal do cliente não acessa
 app.use('/api/categorias-transacao', autenticar, apenasEquipe, categoriasTransacaoRoutes); // portal do cliente não acessa
 app.use('/api/tecnologias', autenticar, tecnologiasRoutes);
-app.use('/api/chamados', autenticar, chamadosRoutes);
-app.use('/api/chamados', autenticar, anexosRoutes); // anexos sob /api/chamados/:id/anexos
-app.use('/api/atendimentos', autenticar, atendimentosRoutes);
+// bloquearAluno: usuário de vaga do Conector só usa os próprios treinamentos
+app.use('/api/chamados', autenticar, bloquearAluno, chamadosRoutes);
+app.use('/api/chamados', autenticar, bloquearAluno, anexosRoutes); // anexos sob /api/chamados/:id/anexos
+app.use('/api/atendimentos', autenticar, bloquearAluno, atendimentosRoutes);
 app.use('/api/usuarios', autenticar, usuariosRoutes);
-app.use('/api/assistente', autenticar, assistenteRoutes);
-app.use('/api/licencas', autenticar, licencasRoutes);
+app.use('/api/assistente', autenticar, bloquearAluno, assistenteRoutes);
+app.use('/api/licencas', autenticar, bloquearAluno, licencasRoutes);
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
-app.use('/api/financeiro', autenticar, financeiroRoutes);
+app.use('/api/contratos-conector', autenticar, contratosConectorRoutes);
+app.use('/api/financeiro', autenticar, bloquearAluno, financeiroRoutes);
 app.use('/api/comercial', autenticar, comercialRoutes);
 app.use('/api/alertas', autenticar, alertasRoutes);
 app.use('/api/marketing', autenticar, marketingRoutes); // só administradores (o router confere)
@@ -647,6 +651,58 @@ async function iniciar() {
         }
       }
       console.log('Migração cursos_iniciais: cursos ABAP e Funcional criados como rascunho');
+    }
+
+    // 21b. Contratos do Conector por vagas (comprador = gestor; cada vaga tem um perfil e, ocupada, um usuário).
+    //      trilha do curso: abap | funcional | portal | conector — o perfil da vaga diz quais trilhas o aluno vê.
+    //      portal_papel: NULL = acesso de sempre ao portal da empresa; gestor = idem + gerencia o contrato;
+    //      aluno = só os próprios treinamentos (nada do contrato, financeiro ou chamados).
+    await pool.query(`ALTER TABLE cursos ADD COLUMN IF NOT EXISTS trilha VARCHAR(20);`);
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS portal_papel VARCHAR(20);`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contratos_conector (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        gestor_usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+        status VARCHAR(20) NOT NULL DEFAULT 'ativo',
+        data_inicio DATE NOT NULL DEFAULT CURRENT_DATE,
+        data_fim DATE NOT NULL,
+        conexoes JSONB NOT NULL DEFAULT '[]',
+        max_sids INTEGER NOT NULL DEFAULT 3,
+        origem VARCHAR(20) NOT NULL DEFAULT 'manual',
+        observacoes TEXT,
+        criado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMP DEFAULT NOW(),
+        data_atualizacao TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_conector_cliente ON contratos_conector(cliente_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_conector_gestor ON contratos_conector(gestor_usuario_id);`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contratos_conector_vagas (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER NOT NULL REFERENCES contratos_conector(id),
+        perfil VARCHAR(20) NOT NULL,
+        usuario_id INTEGER REFERENCES usuarios(id),
+        data_atribuicao TIMESTAMP,
+        ativo BOOLEAN NOT NULL DEFAULT TRUE
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_vagas_contrato ON contratos_conector_vagas(contrato_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_vagas_usuario ON contratos_conector_vagas(usuario_id) WHERE usuario_id IS NOT NULL;`);
+    // Uma vez: trilha dos cursos que já existem, pelo título (o painel corrige se precisar)
+    const migTrilhas = await pool.query(
+      `INSERT INTO migracoes_app (nome) VALUES ('cursos_trilhas') ON CONFLICT DO NOTHING RETURNING nome;`);
+    if (migTrilhas.rowCount) {
+      await pool.query(`
+        UPDATE cursos SET trilha = CASE
+          WHEN titulo ILIKE '%conector%' THEN 'conector'
+          WHEN titulo ILIKE '%portal%' THEN 'portal'
+          WHEN titulo ILIKE '%funcion%' THEN 'funcional'
+          WHEN titulo ILIKE '%abap%' THEN 'abap' END
+        WHERE trilha IS NULL AND ativo`);
+      console.log('Migração cursos_trilhas: trilha preenchida pelo título dos cursos');
     }
 
     // 22. Faturamento mensal: contratos recorrentes → faturas → NFS-e (Asaas, padrão nacional)

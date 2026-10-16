@@ -23,6 +23,16 @@
 (function (raiz) {
   const CHANGELOG = [
     {
+      versao: 'v3.3',
+      data: '2026-10-15',
+      destaques: [
+        'Novo: contratos do Conector SAP por vagas (Produtos SAP → Contratos por vagas), com vagas ABAP, Funcional ou Ambos',
+        'O gestor do contrato passa cada vaga para uma pessoa pelo portal, acompanha o progresso e cadastra os sistemas SAP',
+        'Quem ocupa uma vaga vê no portal só os cursos do seu perfil',
+        'Cursos ganharam o campo Trilha, que define quais vagas veem cada curso',
+      ],
+    },
+    {
       versao: 'v3.2',
       data: '2026-10-15',
       destaques: [

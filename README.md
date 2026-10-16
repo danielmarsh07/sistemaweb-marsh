@@ -106,6 +106,13 @@ Exclusiva do **super usuário** (`usuarios.super_usuario`, o dono do sistema): a
 - Abrir novos chamados
 - Enviar comentários na timeline
 
+### Contratos do Conector por vagas (Produtos SAP → Contratos por vagas)
+
+- Quem compra (CPF ou CNPJ) é o **gestor** (`usuarios.portal_papel = 'gestor'`): no portal vê o contrato, passa cada vaga para uma pessoa (convite por e-mail), pode ocupar uma vaga ele mesmo e cadastra os sistemas SAP (até `max_sids`).
+- Vagas por perfil (`contratos_conector_vagas.perfil`): **abap** (IA no ABAP + Portal + Conector), **funcional** (IA para Funcionais + Portal + Conector), **ambos** (os quatro). Os cursos seguem `cursos.trilha` (abap | funcional | portal | conector), marcada no modal do curso.
+- Quem ocupa uma vaga (`portal_papel = 'aluno'`) vê só os próprios cursos: chamados, financeiro, licenças e assistente respondem 403 (`middleware/bloquear-aluno.js`). Liberar a vaga desativa o aluno sem outra vaga (o progresso fica guardado).
+- Contrato suspenso, cancelado ou fora da validade corta os cursos das vagas. Regras em `backend/services/contratos-conector.js`; rotas em `/api/contratos-conector` (portal: `/eu`, `/meus/...`; admin: o resto).
+
 ---
 
 ## Perfis de Usuário

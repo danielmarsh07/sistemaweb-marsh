@@ -181,6 +181,9 @@
           <a href="#" data-page="licencas" class="nav-link">
             <svg class="icon"><use href="#i-shield"/></svg> Licenças
           </a>
+          <a href="#" data-page="contratos-conector" class="nav-link">
+            <svg class="icon"><use href="#i-users"/></svg> Contratos por vagas
+          </a>
           <a href="#" data-page="treinamentos" class="nav-link">
             <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
           </a>
@@ -540,6 +543,39 @@
             </thead>
             <tbody id="licencas-tbody">
               <tr><td colspan="10" class="text-center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========== CONTRATOS DO CONECTOR POR VAGAS (contratos-conector.js) ========== -->
+      <section id="contratos-conector-page" class="page">
+        <div class="page-header">
+          <h2>Contratos do Conector por vagas</h2>
+          <button type="button" class="btn btn-primary" onclick="abrirNovoContratoConector()">+ Novo contrato</button>
+        </div>
+        <p class="pagina-descricao">
+          Quem compra (CPF ou CNPJ) é o <strong>gestor</strong>: no portal ele vê o contrato, passa cada vaga para uma pessoa e cadastra os sistemas SAP.
+          Cada vaga tem um perfil — <strong>ABAP</strong> (IA no ABAP + Portal + Conector), <strong>Funcional</strong> (IA para Funcionais + Portal + Conector)
+          ou <strong>Ambos</strong> (os quatro) — e a pessoa da vaga vê só os próprios cursos. Os cursos seguem a <em>Trilha</em> marcada em Treinamentos.
+        </p>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Nº</th>
+                <th>Cliente</th>
+                <th>Gestor</th>
+                <th>Vagas</th>
+                <th>Ocupadas</th>
+                <th>Sistemas</th>
+                <th>Validade</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="contratos-conector-tbody">
+              <tr><td colspan="9" class="text-center">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -3083,6 +3119,110 @@
     </div>
   </div>
 
+  <!-- Novo contrato do Conector por vagas (contratos-conector.js) -->
+  <div id="modal-novo-contrato-conector" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Novo contrato do Conector</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-novo-contrato-conector" class="form">
+        <div class="form-group">
+          <label>Cliente (comprador — CPF ou CNPJ) <span class="obrig" title="Obrigatório">*</span></label>
+          <select name="cliente_id" required></select>
+        </div>
+        <div class="form-section-title">Gestor (vê o contrato inteiro no portal)</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome</label>
+            <input type="text" name="gestor_nome" maxlength="150">
+          </div>
+          <div class="form-group">
+            <label>E-mail <span class="obrig" title="Obrigatório">*</span></label>
+            <input type="email" name="gestor_email" required maxlength="150">
+            <small class="form-hint">E-mail novo recebe convite para criar a senha.</small>
+          </div>
+        </div>
+        <div class="form-section-title">Vagas por perfil</div>
+        <div class="form-row">
+          <div class="form-group"><label>ABAP</label><input type="number" name="abap" min="0" max="200" value="0"></div>
+          <div class="form-group"><label>Funcional</label><input type="number" name="funcional" min="0" max="200" value="0"></div>
+          <div class="form-group"><label>Ambos</label><input type="number" name="ambos" min="0" max="200" value="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
+          <div class="form-group"><label>Fim <span class="obrig" title="Obrigatório">*</span></label><input type="date" name="data_fim" required></div>
+          <div class="form-group"><label>Máx. de SIDs</label><input type="number" name="max_sids" min="1" max="10" value="3"></div>
+        </div>
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea name="observacoes" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Criar contrato</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detalhe do contrato do Conector: dados, vagas e sistemas SAP (contratos-conector.js) -->
+  <div id="modal-contrato-conector" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="contrato-conector-titulo">Contrato</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <div class="form">
+        <p class="pagina-descricao" id="contrato-conector-resumo"></p>
+        <form id="form-contrato-conector">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Status</label>
+              <select name="status">
+                <option value="ativo">Ativo</option>
+                <option value="suspenso">Suspenso</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
+            <div class="form-group"><label>Fim</label><input type="date" name="data_fim" required></div>
+            <div class="form-group"><label>Máx. de SIDs</label><input type="number" name="max_sids" min="1" max="10"></div>
+          </div>
+          <div class="form-group">
+            <label>Observações</label>
+            <textarea name="observacoes" rows="2"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="reenviarConviteGestor()">Reenviar convite ao gestor</button>
+            <button type="submit" class="btn btn-primary">Salvar dados</button>
+          </div>
+        </form>
+
+        <div class="form-section-title">Vagas</div>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Perfil</th><th>Pessoa</th><th>Progresso</th><th>Ações</th></tr></thead>
+            <tbody id="contrato-conector-vagas"></tbody>
+          </table>
+        </div>
+        <form id="form-contrato-mais-vagas" class="form-row" style="align-items:end; margin-top:10px">
+          <div class="form-group"><label>+ ABAP</label><input type="number" name="abap" min="0" max="200" value="0"></div>
+          <div class="form-group"><label>+ Funcional</label><input type="number" name="funcional" min="0" max="200" value="0"></div>
+          <div class="form-group"><label>+ Ambos</label><input type="number" name="ambos" min="0" max="200" value="0"></div>
+          <div class="form-group"><button type="submit" class="btn btn-secondary">Acrescentar vagas</button></div>
+        </form>
+
+        <div class="form-section-title">Sistemas SAP (o gestor também edita no portal)</div>
+        <div id="contrato-conector-sids"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="adicionarSidAdmin()">+ Adicionar sistema</button>
+          <button type="button" class="btn btn-primary" onclick="salvarSidsAdmin()">Salvar sistemas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Tabela de preços do simulador do Conector SAP (campos montados pelo comercial.js a partir do backend) -->
   <div id="modal-precos-conector" class="modal">
     <div class="modal-content modal-lg">
@@ -3252,6 +3392,17 @@
             <label>Carga horária</label>
             <input type="text" name="carga_horaria" placeholder="Ex.: ~20 h">
           </div>
+        </div>
+        <div class="form-group">
+          <label>Trilha do Conector</label>
+          <select name="trilha">
+            <option value="">Nenhuma (só liberação por cliente)</option>
+            <option value="abap">IA no ABAP — vagas ABAP e Ambos</option>
+            <option value="funcional">IA para Funcionais — vagas Funcional e Ambos</option>
+            <option value="portal">Portal Marsh — todas as vagas</option>
+            <option value="conector">Conector SAP — todas as vagas</option>
+          </select>
+          <small class="form-hint">Define quais vagas dos contratos do Conector veem este curso.</small>
         </div>
         <div class="form-group">
           <label>Status</label>
@@ -3868,6 +4019,7 @@
   <script src="script.js"></script>
   <script src="financeiro.js"></script>
   <script src="comercial.js"></script>
+  <script src="contratos-conector.js"></script>
   <script src="relatorios.js"></script>
   <script src="visao-mensal.js"></script>
   <script src="marketing.js"></script>

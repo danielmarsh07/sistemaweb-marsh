@@ -109,14 +109,203 @@ function sair() {
 }
 
 // ===== CARREGAR PORTAL =====
+// Usuário de vaga do Conector (papel "aluno") vê só os próprios treinamentos;
+// o gestor do contrato vê tudo da empresa e mais a seção do contrato (vagas e sistemas SAP).
+let acessoPortal = { papel: null, gestor: false, vagas: [] };
+
 async function carregarPortal() {
+  const r = await apiFetch(`${API}/contratos-conector/eu`);
+  if (r && r.ok) acessoPortal = await r.json();
+  if (acessoPortal.papel === 'aluno') {
+    document.body.classList.add('so-aluno');
+    // style (não hidden): o CSS dos blocos define display e venceria o atributo
+    document.getElementById('stats-chamados').style.display = 'none';
+    document.getElementById('bloco-chamados').style.display = 'none';
+    const perfis = [...new Set(acessoPortal.vagas.map(v => v.perfil_nome))].join(' e ');
+    document.getElementById('welcome-empresa').textContent = perfis
+      ? `Seus treinamentos do Conector SAP — perfil ${perfis}` : 'Seus treinamentos do Conector SAP';
+    await carregarTreinamentos();
+    if (!cursosPortal.length) {
+      const secao = document.getElementById('secao-treinamentos');
+      secao.hidden = false;
+      document.getElementById('lista-cursos').innerHTML =
+        '<div class="empty-state"><p>Nenhum curso liberado no momento. Fale com o responsável pelo contrato.</p></div>';
+    }
+    return;
+  }
   await Promise.all([
     carregarChamados(),
     carregarTecnologias(),
     carregarTreinamentos(),
     carregarLicencasPortal(),
-    carregarFinanceiroPortal()
+    carregarFinanceiroPortal(),
+    acessoPortal.gestor ? carregarContratosPortal() : null
   ]);
+}
+
+// ===== CONTRATO DO CONECTOR (gestor) =====
+let contratosPortal = [];
+let vagaEmEdicao = null;   // { contratoId, vagaId }
+let contratoSids = null;   // contrato aberto no modal de sistemas SAP
+
+async function carregarContratosPortal() {
+  const res = await apiFetch(`${API}/contratos-conector/meus`);
+  if (!res || !res.ok) return;
+  contratosPortal = await res.json();
+  const secao = document.getElementById('secao-contrato');
+  secao.hidden = !contratosPortal.length;
+  const br = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
+  document.getElementById('lista-contratos').innerHTML = contratosPortal.map(k => {
+    const ocupadas = k.vagas.filter(v => v.usuario_id).length;
+    const st = k.status === 'suspenso' ? ['Suspenso', '#f59e0b'] : k.status === 'cancelado' ? ['Cancelado', '#ef4444']
+      : k.vigente ? ['Ativo', '#10b981'] : ['Vencido', '#ef4444'];
+    const sids = (k.conexoes || []).map(c => c.sid).join(', ');
+    return `
+      <div class="contrato-resumo">
+        <div>
+          <strong>Contrato nº ${k.id}</strong>
+          <span class="chip" style="background:${st[1]}20; color:${st[1]}">${st[0]}</span>
+          <p>Válido de ${br(k.data_inicio)} até <strong>${br(k.data_fim)}</strong> · ${ocupadas} de ${k.vagas.length} vagas ocupadas</p>
+          <p class="sids">Sistemas SAP: <strong>${sids ? escapeHtml(sids) : 'nenhum cadastrado'}</strong> (até ${k.max_sids})</p>
+        </div>
+        <div class="acoes">
+          <button type="button" class="btn-curso secundario" onclick="abrirSids(${k.id})">${sids ? 'Editar' : 'Cadastrar'} sistemas SAP</button>
+        </div>
+      </div>
+      <div class="licencas-portal">${k.vagas.map(v => cartaoVaga(k, v)).join('')}</div>`;
+  }).join('<div style="height:18px"></div>');
+}
+
+function cartaoVaga(k, v) {
+  const pct = v.aulas_total ? Math.round(100 * v.aulas_concluidas / v.aulas_total) : 0;
+  const cursos = `<div class="vaga-cursos">${v.cursos.map(escapeHtml).join(' · ')}</div>`;
+  if (!v.usuario_id) {
+    return `
+      <div class="licenca-card vaga-card livre">
+        <h4>Vaga ${escapeHtml(v.perfil_nome)} <span class="chip" style="background:#64748b20; color:#64748b">Livre</span></h4>
+        ${cursos}
+        <div class="acoes">
+          <button type="button" class="btn-curso" onclick="abrirOcuparVaga(${k.id}, ${v.id})">Passar para alguém</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="licenca-card vaga-card">
+      <h4>Vaga ${escapeHtml(v.perfil_nome)} <span class="chip" style="background:#10b98120; color:#10b981">${v.eh_gestor ? 'Você' : 'Ocupada'}</span></h4>
+      ${cursos}
+      <div class="linha"><span>Pessoa</span><strong>${escapeHtml(v.usuario_nome)}</strong></div>
+      <div class="linha"><span>E-mail</span><strong>${escapeHtml(v.usuario_email)}</strong></div>
+      <div class="linha"><span>Progresso</span><strong>${v.aulas_concluidas} de ${v.aulas_total} aulas (${pct}%)</strong></div>
+      <div class="barra-curso"><i style="width:${pct}%"></i></div>
+      <div class="acoes">
+        ${v.eh_gestor ? '' : `<button type="button" class="btn-curso secundario" onclick="reenviarConviteVaga(${k.id}, ${v.id})">Reenviar convite</button>`}
+        <button type="button" class="btn-curso secundario" onclick="liberarVagaPortal(${k.id}, ${v.id})">Liberar vaga</button>
+      </div>
+    </div>`;
+}
+
+function abrirOcuparVaga(contratoId, vagaId) {
+  const k = contratosPortal.find(x => x.id === contratoId);
+  const v = k && k.vagas.find(x => x.id === vagaId);
+  if (!v) return;
+  vagaEmEdicao = { contratoId, vagaId };
+  document.getElementById('form-ocupar-vaga').reset();
+  document.getElementById('ocupar-vaga-titulo').textContent = `Passar vaga ${v.perfil_nome}`;
+  document.getElementById('ocupar-vaga-ajuda').textContent =
+    `A pessoa recebe um convite por e-mail para criar a senha e vai ver só os cursos desta vaga: ${v.cursos.join(', ')}.`;
+  abrirModal('modal-ocupar-vaga');
+}
+
+async function enviarOcupacao(corpo) {
+  const { contratoId, vagaId } = vagaEmEdicao || {};
+  if (!contratoId) return;
+  const res = await apiFetch(`${API}/contratos-conector/meus/${contratoId}/vagas/${vagaId}/ocupar`, {
+    method: 'POST', body: JSON.stringify(corpo) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (!res.ok) return;
+  fecharModal('modal-ocupar-vaga');
+  carregarContratosPortal();
+  // O gestor que ocupou a própria vaga passa a ver os cursos dela
+  if (corpo.eu) carregarTreinamentos();
+}
+
+function salvarOcuparVaga(e) {
+  e.preventDefault();
+  const f = e.target;
+  if (!f.nome.value.trim()) { alert('Informe o nome da pessoa.'); return; }
+  enviarOcupacao({ nome: f.nome.value.trim(), email: f.email.value.trim() });
+}
+
+function ocuparVagaEuMesmo() {
+  if (!confirm('Ocupar esta vaga com o seu usuário? Você passa a ver os cursos dela.')) return;
+  enviarOcupacao({ eu: true });
+}
+
+async function liberarVagaPortal(contratoId, vagaId) {
+  if (!confirm('Liberar esta vaga? A pessoa perde o acesso aos cursos dela (o progresso fica guardado se ela voltar).')) return;
+  const res = await apiFetch(`${API}/contratos-conector/meus/${contratoId}/vagas/${vagaId}/liberar`, { method: 'POST' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  carregarContratosPortal();
+  carregarTreinamentos();
+}
+
+async function reenviarConviteVaga(contratoId, vagaId) {
+  const res = await apiFetch(`${API}/contratos-conector/meus/${contratoId}/vagas/${vagaId}/convite`, { method: 'POST' });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+}
+
+// Sistemas SAP do contrato: SID, descrição, URL, mandante e idioma (nunca usuário/senha do SAP)
+function abrirSids(contratoId) {
+  contratoSids = contratosPortal.find(x => x.id === contratoId);
+  if (!contratoSids) return;
+  document.getElementById('sids-ajuda').textContent =
+    `Até ${contratoSids.max_sids} sistemas. Todas as vagas usam estes sistemas; o conector chega à máquina de cada pessoa já configurado — ` +
+    'ela só informa o próprio usuário e senha do SAP na instalação.';
+  const box = document.getElementById('sids-linhas');
+  box.innerHTML = '';
+  const lista = contratoSids.conexoes && contratoSids.conexoes.length ? contratoSids.conexoes : [{}];
+  lista.forEach(c => adicionarLinhaSid(c));
+  abrirModal('modal-sids');
+}
+
+function adicionarLinhaSid(c = {}) {
+  const box = document.getElementById('sids-linhas');
+  if (contratoSids && box.children.length >= contratoSids.max_sids) {
+    alert(`Este contrato permite até ${contratoSids.max_sids} sistemas SAP.`);
+    return;
+  }
+  const div = document.createElement('div');
+  div.className = 'sid-linha';
+  div.innerHTML = `
+    <div class="form-group"><label>SID</label><input name="sid" maxlength="3" placeholder="DEV" value="${escapeHtml(c.sid || '')}"></div>
+    <div class="form-group"><label>Descrição</label><input name="descricao" maxlength="100" placeholder="Desenvolvimento" value="${escapeHtml(c.descricao || '')}"></div>
+    <div class="form-group"><label>URL</label><input name="url" maxlength="255" placeholder="https://servidor:8000" value="${escapeHtml(c.url || '')}"></div>
+    <div class="form-group"><label>Mandante</label><input name="mandante" maxlength="3" placeholder="100" value="${escapeHtml(c.mandante || '')}"></div>
+    <div class="form-group"><label>Idioma</label><input name="idioma" maxlength="2" placeholder="PT" value="${escapeHtml(c.idioma || 'PT')}"></div>
+    <button type="button" class="btn-remover" title="Remover" aria-label="Remover sistema" onclick="this.parentElement.remove()">×</button>`;
+  box.appendChild(div);
+}
+
+async function salvarSids(e) {
+  e.preventDefault();
+  if (!contratoSids) return;
+  const conexoes = [...document.querySelectorAll('#sids-linhas .sid-linha')].map(l => {
+    const v = n => l.querySelector(`[name="${n}"]`).value.trim();
+    return { sid: v('sid'), descricao: v('descricao'), url: v('url'), mandante: v('mandante'), idioma: v('idioma') };
+  }).filter(c => c.sid || c.url);
+  const res = await apiFetch(`${API}/contratos-conector/meus/${contratoSids.id}/conexoes`, {
+    method: 'PUT', body: JSON.stringify({ conexoes }) });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  fecharModal('modal-sids');
+  carregarContratosPortal();
 }
 
 async function carregarChamados() {

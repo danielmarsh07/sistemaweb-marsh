@@ -483,6 +483,7 @@ function showPage(page, opcoes = {}) {
     funil: 'Funil de vendas',
     'simulador-conector': 'Simulador Conector SAP',
     'precos-conector': 'Preços Conector SAP',
+    'contratos-conector': 'Contratos do Conector',
     relatorios: 'Relatórios',
     roteiro: 'Roteiro de uso',
     versoes: 'Versões',
@@ -516,6 +517,7 @@ function showPage(page, opcoes = {}) {
   if (page === 'funil') loadFunil();
   if (page === 'simulador-conector') loadSimuladorConector();
   if (page === 'precos-conector') loadPaginaPrecosConector();
+  if (page === 'contratos-conector') loadContratosConector();
   if (page === 'relatorios') loadRelatorios();
   if (page === 'visao-mensal') loadVisaoMensal();
   if (page === 'contas-financeiras') loadPaginaContasFinanceiras();
@@ -1664,6 +1666,8 @@ function badgeCurso(status) {
   return `<span style="background:${cor}20; color:${cor}; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">${pub ? 'Publicado' : 'Rascunho'}</span>`;
 }
 
+const TRILHAS_CURSO = { abap: 'IA no ABAP', funcional: 'IA para Funcionais', portal: 'Portal Marsh', conector: 'Conector SAP' };
+
 async function loadCursos() {
   const tbody = document.getElementById('cursos-tbody');
   if (tbody && tbody.querySelector('.text-center')) tbody.innerHTML = skeletonRows(6);
@@ -1679,7 +1683,7 @@ async function loadCursos() {
     <tr>
       <td data-label="Curso">
         <strong>${escapeHtml(c.titulo)}</strong>
-        <span class="licenca-prefixo">${escapeHtml(c.carga_horaria || '')}</span>
+        <span class="licenca-prefixo">${escapeHtml([c.carga_horaria, TRILHAS_CURSO[c.trilha] && `Trilha ${TRILHAS_CURSO[c.trilha]}`].filter(Boolean).join(' · '))}</span>
       </td>
       <td data-label="Aulas">${c.total_aulas}</td>
       <td data-label="Com vídeo">${c.aulas_com_video} / ${c.total_aulas}</td>
@@ -1713,6 +1717,7 @@ function editarCurso(id) {
   f.capa.value = c.capa || 'geral';
   f.carga_horaria.value = c.carga_horaria || '';
   f.status.value = c.status || 'rascunho';
+  f.trilha.value = c.trilha || '';
   document.getElementById('modal-curso-titulo').textContent = 'Editar curso';
   showModal('#modal-curso');
 }
@@ -1720,7 +1725,7 @@ function editarCurso(id) {
 async function salvarCurso() {
   const f = document.getElementById('form-curso');
   const dados = { titulo: f.titulo.value, descricao: f.descricao.value, capa: f.capa.value,
-                  carga_horaria: f.carga_horaria.value, status: f.status.value };
+                  carga_horaria: f.carga_horaria.value, status: f.status.value, trilha: f.trilha.value };
   const url = cursoEmEdicao ? `${API_URL}/treinamentos/cursos/${cursoEmEdicao}` : `${API_URL}/treinamentos/cursos`;
   const res = await apiFetch(url, { method: cursoEmEdicao ? 'PUT' : 'POST', body: JSON.stringify(dados) });
   if (!res) return;
