@@ -816,11 +816,15 @@
       <section id="contratos-page" class="page">
         <div class="page-header">
           <h2>Contratos recorrentes</h2>
-          <button type="button" class="btn btn-primary" onclick="abrirNovoContrato()">+ Novo contrato</button>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="abrirNovoContratoConector()">+ Licenças do Conector</button>
+            <button type="button" class="btn btn-primary" onclick="abrirNovoContrato()">+ Contrato de serviço</button>
+          </div>
         </div>
         <p class="pagina-descricao">
           Cada cliente pode ter vários contratos independentes: serviços com cobrança mensal e produtos (como as licenças do Conector) com cobrança anual.
           O contrato mensal gera uma fatura por mês; o anual, uma por ano no mês da cobrança. Mudanças aqui valem para as próximas faturas e ficam no histórico do contrato.
+          Licenças do Conector se criam em <strong>+ Licenças do Conector</strong>: o mesmo formulário define as licenças e já monta a cobrança anual aqui.
         </p>
         <div class="table-container">
           <table>
@@ -2419,6 +2423,10 @@
           <select name="contrato_conector_id"><option value="">Nenhum contrato do Conector</option></select>
           <small class="form-hint">Liga a cobrança às vagas do Conector do mesmo cliente.</small>
         </div>
+        <p class="fin-aviso" id="contrato-produto-aviso" style="display:none">
+          Licenças do Conector não se criam por aqui: use <strong>+ Licenças do Conector</strong>, que define as licenças e já monta a cobrança anual.
+          <button type="button" class="btn btn-secondary btn-sm" onclick="trocarParaLicencasConector()">Criar licenças do Conector</button>
+        </p>
         <div class="form-row">
           <div class="form-group">
             <label><span id="contrato-valor-rotulo">Valor mensal</span> (R$) <span class="obrig" title="Obrigatório">*</span></label>
@@ -3386,9 +3394,12 @@
         </div>
         <div class="form-section-title">Vagas por perfil</div>
         <div class="form-row">
-          <div class="form-group"><label>ABAP</label><input type="number" name="abap" min="0" max="200" value="0"></div>
-          <div class="form-group"><label>Funcional</label><input type="number" name="funcional" min="0" max="200" value="0"></div>
-          <div class="form-group"><label>Ambos</label><input type="number" name="ambos" min="0" max="200" value="0"></div>
+          <div class="form-group"><label>ABAP</label><input type="number" name="abap" min="0" max="200" value="0">
+            <small class="form-hint" id="ncc-linha-abap"></small></div>
+          <div class="form-group"><label>Funcional</label><input type="number" name="funcional" min="0" max="200" value="0">
+            <small class="form-hint" id="ncc-linha-funcional"></small></div>
+          <div class="form-group"><label>ABAP + Funcional</label><input type="number" name="ambos" min="0" max="200" value="0">
+            <small class="form-hint" id="ncc-linha-ambos"></small></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
@@ -3401,7 +3412,7 @@
           <div class="form-group">
             <label>Valor anual (R$)</label>
             <input type="number" name="valor_anual" min="0.01" step="0.01">
-            <small class="form-hint" id="ncc-preco-hint">Sugestão pela tabela de Preços Conector SAP.</small>
+            <small class="form-hint" id="ncc-preco-hint">Informe as licenças acima: o valor sai da tabela Cadastros → Preços Conector SAP (plano anual).</small>
           </div>
           <div class="form-group"><label>Dia do vencimento</label><input type="number" name="dia_vencimento" min="1" max="28" value="10"></div>
         </div>

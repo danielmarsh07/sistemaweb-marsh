@@ -287,7 +287,7 @@ router.get('/', async (req, res) => {
 router.get('/preco-sugerido', async (req, res) => {
   try {
     const { q } = cc.lerQuantidades({ abap: req.query.abap, funcional: req.query.funcional, ambos: req.query.ambos });
-    res.json({ valor_anual: await cc.precoAnualSugerido(pool, emp(req), q) });
+    res.json(await cc.detalhePrecoAnual(pool, emp(req), q));
   } catch (err) { responderErro(res, err, 'Erro ao calcular o preço'); }
 });
 

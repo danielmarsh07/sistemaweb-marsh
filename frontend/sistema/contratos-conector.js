@@ -54,23 +54,38 @@ async function abrirNovoContratoConector() {
   f.dia_vencimento.value = 10;
   f.valor_anual.value = '';
   f.valor_anual.dataset.editado = '';
-  f.valor_anual.oninput = () => { f.valor_anual.dataset.editado = '1'; };
+  f.valor_anual.oninput = () => { f.valor_anual.dataset.editado = '1'; sugerirPrecoConector(); };
+  document.getElementById('ncc-preco-hint').textContent = HINT_PRECO_PADRAO;
+  sugerirPrecoConector(); // já mostra o preço de cada perfil antes de digitar
   await preencherClientesSelect(f.cliente_id);
   showModal('#modal-novo-contrato-conector');
 }
 
-// Valor anual sugerido pela tabela de preços (enquanto o admin não digitar outro)
+// Valor anual sugerido pela tabela de preços (enquanto o admin não digitar outro).
+// A conta aparece embaixo do campo: quantidade × preço mensal do plano anual × 12, por perfil.
+const HINT_PRECO_PADRAO = 'Informe as licenças acima: o valor sai da tabela Cadastros → Preços Conector SAP (plano anual).';
 let _timerPreco = null;
 function sugerirPrecoConector() {
   clearTimeout(_timerPreco);
   _timerPreco = setTimeout(async () => {
     const f = document.getElementById('form-novo-contrato-conector');
-    if (f.valor_anual.dataset.editado) return;
+    const hint = document.getElementById('ncc-preco-hint');
     const q = `abap=${f.abap.value || 0}&funcional=${f.funcional.value || 0}&ambos=${f.ambos.value || 0}`;
     const res = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?${q}`);
     if (!res || !res.ok) return;
-    const { valor_anual } = await res.json();
-    f.valor_anual.value = valor_anual || '';
+    const { valor_anual, linhas } = await res.json();
+    // Embaixo de cada perfil: o preço da tabela e, com quantidade, quanto aquele perfil soma no ano
+    (linhas || []).forEach(l => {
+      const el = document.getElementById(`ncc-linha-${l.perfil}`);
+      if (el) el.innerHTML = `${formatMoeda(l.preco_mensal)}/mês por licença`
+        + (l.quantidade > 0 ? `<br><strong>${l.quantidade} × ${formatMoeda(l.preco_mensal)} × 12 = ${formatMoeda(l.total_anual)}/ano</strong>` : '');
+    });
+    const usadas = (linhas || []).filter(l => l.quantidade > 0);
+    hint.innerHTML = usadas.length
+      ? `${usadas.map(l => `${escapeHtml(l.rotulo)} ${formatMoeda(l.total_anual)}`).join(' + ')}
+          <br><strong>Total sugerido: ${formatMoeda(valor_anual)}/ano</strong> (tabela Preços Conector SAP, plano anual)${f.valor_anual.dataset.editado ? '<br>Você digitou outro valor: vale o que você digitou.' : ''}`
+      : HINT_PRECO_PADRAO;
+    if (!f.valor_anual.dataset.editado) f.valor_anual.value = valor_anual || '';
   }, 300);
 }
 

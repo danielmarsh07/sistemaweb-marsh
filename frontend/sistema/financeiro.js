@@ -512,12 +512,25 @@ const MESES_NOME = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
 const numeroContrato = id => `CT-${String(id).padStart(4, '0')}`;
 
 // Mostra o que faz sentido para o tipo/cobrança escolhidos (mês da cobrança só no anual; Conector só em produto)
+// Contrato novo de produto = licenças do Conector, que nascem pelo formulário do Conector (já monta a cobrança).
+// Aqui só se edita o produto que já existe; sem licenças para ligar, o aviso leva ao formulário certo.
 function ajustarFormContrato() {
   const form = document.getElementById('form-contrato');
   const anual = form.periodicidade.value === 'anual';
+  const produto = form.tipo.value === 'produto';
+  const semLicencas = form.contrato_conector_id.options.length <= 1;
   document.getElementById('contrato-mes-cobranca-grupo').style.display = anual ? '' : 'none';
-  document.getElementById('contrato-conector-grupo').style.display = form.tipo.value === 'produto' ? '' : 'none';
+  document.getElementById('contrato-conector-grupo').style.display = produto && contratoEmEdicao && !semLicencas ? '' : 'none';
+  document.getElementById('contrato-produto-aviso').style.display = produto && (!contratoEmEdicao || semLicencas) ? '' : 'none';
   document.getElementById('contrato-valor-rotulo').textContent = anual ? 'Valor anual' : 'Valor mensal';
+}
+
+function trocarParaLicencasConector() {
+  const cliente = document.getElementById('form-contrato').cliente_id.value;
+  closeModal(document.getElementById('modal-contrato'));
+  abrirNovoContratoConector().then(() => {
+    if (cliente) document.getElementById('form-novo-contrato-conector').cliente_id.value = cliente;
+  });
 }
 
 // Contratos do Conector do cliente escolhido, para ligar a cobrança às licenças
@@ -543,10 +556,10 @@ async function abrirNovoContrato() {
   document.getElementById('contrato-extra').style.display = 'none';
   document.getElementById('btn-reajustar-contrato').style.display = 'none';
   await preencherClientesSelect(form.cliente_id);
-  form.cliente_id.onchange = () => preencherConectorSelect(form);
+  form.cliente_id.onchange = () => preencherConectorSelect(form).then(ajustarFormContrato);
   await preencherConectorSelect(form);
   ajustarFormContrato();
-  document.getElementById('modal-contrato-titulo').textContent = 'Novo contrato';
+  document.getElementById('modal-contrato-titulo').textContent = 'Novo contrato de serviço';
   showModal('#modal-contrato');
 }
 
@@ -566,7 +579,7 @@ async function editarContrato(id) {
   form.reter_iss.checked = c.reter_iss;
   form.renovacao_automatica.checked = !!c.renovacao_automatica;
   RETENCOES.forEach(r => { form[r].value = c[r] ?? ''; });
-  form.cliente_id.onchange = () => preencherConectorSelect(form);
+  form.cliente_id.onchange = () => preencherConectorSelect(form).then(ajustarFormContrato);
   await preencherConectorSelect(form, c.contrato_conector_id);
   ajustarFormContrato();
   document.getElementById('contrato-status-row').style.display = '';
@@ -632,6 +645,10 @@ async function reajustarContrato() {
 
 async function salvarContrato() {
   const form = document.getElementById('form-contrato');
+  if (!contratoEmEdicao && form.tipo.value === 'produto') {
+    if (confirm('Licenças do Conector se criam no formulário próprio, que já monta a cobrança anual. Abrir agora?')) trocarParaLicencasConector();
+    return;
+  }
   const dados = {
     cliente_id: form.cliente_id.value,
     descricao: form.descricao.value,

@@ -377,12 +377,20 @@ async function historicoContrato(contratoId) {
 // As licenças do Conector são cobradas por um contrato financeiro anual (tipo produto) ligado a este contrato.
 // Preço sugerido = tabela de Preços Conector SAP (Cadastros), plano anual: valor mensal × 12 por vaga.
 // Perfil Ambos tem preço próprio na tabela (ambos_anual), que começa igual ao de Desenvolvimento.
-async function precoAnualSugerido(db, empresaId, q) {
+// Devolve também a conta por perfil, para a tela mostrar de onde veio o valor
+async function detalhePrecoAnual(db, empresaId, q) {
   const { normalizarPrecos } = require('./precificacao-conector');
   const cfg = (await db.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = $1', [empresaId])).rows[0];
   const { precos } = normalizarPrecos((cfg && cfg.prop_precos_conector) || {});
-  const mensal = (q.abap || 0) * precos.dev_anual + (q.ambos || 0) * precos.ambos_anual + (q.funcional || 0) * precos.leitura_anual;
-  return Math.round(mensal * 12 * 100) / 100;
+  const linhas = [['abap', 'ABAP', precos.dev_anual], ['funcional', 'Funcional', precos.leitura_anual], ['ambos', 'ABAP + Funcional', precos.ambos_anual]]
+    .map(([perfil, rotulo, mensal]) => ({ perfil, rotulo, quantidade: q[perfil] || 0, preco_mensal: mensal,
+      total_anual: Math.round((q[perfil] || 0) * mensal * 12 * 100) / 100 }));
+  const valor_anual = Math.round(linhas.reduce((s, l) => s + l.total_anual, 0) * 100) / 100;
+  return { valor_anual, linhas };
+}
+
+async function precoAnualSugerido(db, empresaId, q) {
+  return (await detalhePrecoAnual(db, empresaId, q)).valor_anual;
 }
 
 async function quantidadesDoContrato(db, contratoId) {
@@ -429,5 +437,5 @@ module.exports = {
   sqlCursoLiberado, papelPortal, acharOuCriarUsuario, enviarConvite, detalharContrato, cursosDoBeneficio,
   lerQuantidades, criarVagas, ocuparVaga, liberarVaga, ativarConvites, expirarConvites,
   ehAdminCorporativo, listarAdmins, adicionarAdmin, removerAdmin, historicoContrato,
-  precoAnualSugerido, criarCobrancaAnual
+  precoAnualSugerido, detalhePrecoAnual, criarCobrancaAnual
 };

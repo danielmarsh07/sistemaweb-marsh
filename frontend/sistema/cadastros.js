@@ -40,6 +40,7 @@ const fichaNovoContrato = () => abrirDaFicha(async () => {
   const f = document.getElementById('form-contrato');
   f.cliente_id.value = _fichaAtual;
   await preencherConectorSelect(f);
+  ajustarFormContrato();
 });
 const fichaConector = kid => abrirDaFicha(() => abrirContratoConector(kid));
 const fichaNovoConector = () => abrirDaFicha(async () => {
@@ -136,7 +137,10 @@ async function abrirFichaCliente(id) {
           <span>CT-${String(ct.id).padStart(4, '0')} · ${ct.tipo === 'produto' ? 'Produto' : 'Serviço'} · desde ${diaBr(ct.data_inicio)}${ct.data_fim ? ` até ${diaBr(ct.data_fim)}` : ''} · vence dia ${ct.dia_vencimento}</span></div>
         <div class="ficha-dir">${formatMoeda(ct.valor)}${ct.periodicidade === 'anual' ? `/ano (${MESES[ct.mes_cobranca - 1]})` : '/mês'} ${pill(ct.status === 'ativo' ? 'Ativo' : ct.status === 'suspenso' ? 'Suspenso' : 'Encerrado',
           ct.status === 'ativo' ? '#2e7d4f' : ct.status === 'suspenso' ? '#b7791f' : '#94a3b8')}</div></li>`).join('')}</ul>`
-      : fichaVazio('Nenhum contrato.')) + `<button type="button" class="btn btn-secondary btn-sm ficha-acao" onclick="fichaNovoContrato()">+ Novo contrato</button>`,
+      : fichaVazio('Nenhum contrato.')) + `<div class="ficha-botoes">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoContrato()">+ Contrato de serviço</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoConector()">+ Licenças do Conector (com cobrança)</button>
+      </div>`,
       { texto: 'Contratos', acao: "irPara('contratos')" }, 'ficha-caixa-larga'));
 
     caixas.push(fichaCaixa('Faturas recentes', d.faturas.length ? `<ul class="ficha-lista">${d.faturas.map(ft => {
@@ -168,7 +172,7 @@ async function abrirFichaCliente(id) {
     caixas.push(fichaCaixa('Licenças do Conector SAP', `${contratosK}
       <div class="ficha-subtitulo">Administradores da empresa</div>${listaAdmins}
       <div class="ficha-botoes">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoConector()">+ Contrato de licenças</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoConector()">+ Licenças do Conector (com cobrança)</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="fichaAdicionarAdmin()">+ Administrador</button>
       </div>`, { texto: 'Contratos do Conector', acao: "irPara('contratos-conector')" }, 'ficha-caixa-larga'));
   }

@@ -22,6 +22,11 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.3', data: '2026-10-16', destaques: [
+      'Contratos mais claros: os botões agora dizem "+ Contrato de serviço" e "+ Licenças do Conector (com cobrança)", na ficha do cliente e em Contratos',
+      'Licenças do Conector se criam num lugar só: o formulário define as licenças e já monta a cobrança anual. Escolher "Produto" no contrato de serviço leva direto para lá',
+      'No contrato do Conector, cada perfil (ABAP, Funcional, ABAP + Funcional) mostra o preço da tabela e quanto soma no ano enquanto você escolhe as quantidades; no fim aparece o total explicado'
+    ] },
     { versao: 'v4.2', data: '2026-10-16', destaques: [
       'Venda das licenças do Conector pelo site: na Loja, crie uma oferta "Licenças do Conector SAP" e divulgue o link',
       'O comprador escolhe quantas licenças de cada perfil (ABAP, Funcional, ABAP + Funcional) e vê o total na hora, com o preço da tabela Preços Conector SAP',
