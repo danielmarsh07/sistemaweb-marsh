@@ -18,16 +18,74 @@ const fichaVazio = txt => `<p class="ficha-vazio">${txt}</p>`;
 const fichaLinha = (rotulo, valor) => valor ? `<div class="ficha-campo"><span>${rotulo}</span><strong>${valor}</strong></div>` : '';
 
 function irPara(pagina) {
+  window._fichaRetorno = null;
   closeModal(document.getElementById('modal-ficha-cliente'));
   showPage(pagina);
 }
 
+// A ficha é o painel de controle da empresa: clicar num item abre o editor dele e, ao fechar ou salvar,
+// a ficha volta sozinha (atualizada). closeModal (script.js) reabre a ficha guardada em window._fichaRetorno.
+let _fichaAtual = null;
+function abrirDaFicha(acao) {
+  const id = _fichaAtual;
+  window._fichaRetorno = null;
+  closeModal(document.getElementById('modal-ficha-cliente'));
+  window._fichaRetorno = id;
+  Promise.resolve().then(acao).catch(err => { console.error(err); window._fichaRetorno = null; abrirFichaCliente(id); });
+}
+
+const fichaEditarContrato = id => abrirDaFicha(async () => { await loadContratos(); editarContrato(id); });
+const fichaNovoContrato = () => abrirDaFicha(async () => {
+  await abrirNovoContrato();
+  const f = document.getElementById('form-contrato');
+  f.cliente_id.value = _fichaAtual;
+  await preencherConectorSelect(f);
+});
+const fichaConector = kid => abrirDaFicha(() => abrirContratoConector(kid));
+const fichaNovoConector = () => abrirDaFicha(async () => {
+  await abrirNovoContratoConector();
+  document.getElementById('form-novo-contrato-conector').cliente_id.value = _fichaAtual;
+});
+const fichaEditarUsuario = (id, nome, email) => abrirDaFicha(() => abrirEditarUsuario(id, nome, email, 'cliente', _fichaAtual));
+
+async function fichaAdicionarAdmin() {
+  const email = prompt('E-mail do administrador da empresa (vê e distribui as licenças do Conector no portal):');
+  if (!email) return;
+  const nome = prompt('Nome (para quem ainda não tem acesso ao portal):', '') || '';
+  const res = await apiFetch(`${API_URL}/contratos-conector/clientes/${_fichaAtual}/admins`, { method: 'POST', body: JSON.stringify({ email: email.trim(), nome: nome.trim() }) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (res.ok) abrirFichaCliente(_fichaAtual);
+}
+
+async function fichaRemoverAdmin(usuarioId, nome) {
+  if (!confirm(`Tirar ${nome} dos administradores da empresa? A conta continua.`)) return;
+  const res = await apiFetch(`${API_URL}/contratos-conector/clientes/${_fichaAtual}/admins/${usuarioId}`, { method: 'DELETE' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  abrirFichaCliente(_fichaAtual);
+}
+
+const ACOES_ATIVIDADE = {
+  'contrato.criado': 'Contrato criado', 'contrato.alterado': 'Contrato alterado', 'contrato.reajustado': 'Reajuste aplicado',
+  'contrato.encerrado': 'Contrato encerrado', 'vaga.ocupada': 'Licença atribuída', 'vaga.convite_aceito': 'Convite aceito',
+  'vaga.liberada': 'Licença revogada', 'vaga.convite_cancelado': 'Convite cancelado', 'vaga.convite_expirado': 'Convite expirou',
+  'admin_corporativo.adicionado': 'Administrador adicionado', 'admin_corporativo.removido': 'Administrador removido',
+  'usuario.alterado': 'Usuário alterado', 'usuario.desativado': 'Usuário desativado', 'usuario.senha_redefinida': 'Senha redefinida',
+  'usuario.senha_definida_convite': 'Convite aceito (senha criada)', 'usuario.senha_definida_redefinir': 'Senha trocada pelo link'
+};
+const PERFIL_FICHA = { abap: 'ABAP', funcional: 'Funcional', ambos: 'ABAP + Funcional' };
+
 async function abrirFichaCliente(id) {
+  _fichaAtual = id;
+  window._fichaRetorno = null;
   const corpo = document.getElementById('ficha-corpo');
   corpo.innerHTML = '<p class="fin-muted">Carregando...</p>';
   document.getElementById('ficha-nome').textContent = 'Cliente';
   document.getElementById('ficha-sub').textContent = '';
-  document.getElementById('ficha-btn-editar').onclick = () => { closeModal(document.getElementById('modal-ficha-cliente')); editarCliente(id); };
+  document.getElementById('ficha-btn-editar').onclick = () => abrirDaFicha(() => editarCliente(id));
   showModal('#modal-ficha-cliente');
   const res = await apiFetch(`${API_URL}/clientes/${id}/ficha`);
   if (!res) return;
@@ -62,17 +120,22 @@ async function abrirFichaCliente(id) {
   if (d.admin && d.financeiro) {
     const f = d.financeiro;
     caixas.push(fichaCaixa('Financeiro', `
-      <div class="ficha-kpis">
-        <div><span>Contratado / mês</span><strong>${formatMoeda(f.mensal_contratado)}</strong></div>
+      <div class="ficha-kpis ficha-kpis-4">
+        <div><span>Recorrente / mês</span><strong>${formatMoeda(f.mensal_contratado)}</strong></div>
+        <div><span>Anual (licenças)</span><strong>${formatMoeda(f.anual_contratado)}</strong></div>
         <div><span>Recebido (12 meses)</span><strong>${formatMoeda(f.recebido_12m)}</strong></div>
         <div class="${f.vencido > 0 ? 'ficha-kpi-alerta' : ''}"><span>Vencido</span><strong>${formatMoeda(f.vencido)}</strong></div>
       </div>`));
 
-    caixas.push(fichaCaixa('Contratos', d.contratos.length ? `<ul class="ficha-lista">${d.contratos.map(ct => `
-      <li><div><strong>${escapeHtml(ct.descricao)}</strong><span>desde ${diaBr(ct.data_inicio)}${ct.data_fim ? ` até ${diaBr(ct.data_fim)}` : ''} · vence dia ${ct.dia_vencimento}</span></div>
-          <div class="ficha-dir">${formatMoeda(ct.valor)}/mês ${pill(ct.status === 'ativo' ? 'Ativo' : ct.status === 'suspenso' ? 'Suspenso' : 'Encerrado',
-            ct.status === 'ativo' ? '#2e7d4f' : ct.status === 'suspenso' ? '#b7791f' : '#94a3b8')}</div></li>`).join('')}</ul>`
-      : fichaVazio('Nenhum contrato.'), { texto: 'Contratos', acao: "irPara('contratos')" }));
+    const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    caixas.push(fichaCaixa('Contratos', (d.contratos.length ? `<ul class="ficha-lista">${d.contratos.map(ct => `
+      <li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato" onclick="fichaEditarContrato(${ct.id})" onkeydown="if(event.key==='Enter')fichaEditarContrato(${ct.id})">
+        <div><strong>${escapeHtml(ct.descricao)}</strong>
+          <span>CT-${String(ct.id).padStart(4, '0')} · ${ct.tipo === 'produto' ? 'Produto' : 'Serviço'} · desde ${diaBr(ct.data_inicio)}${ct.data_fim ? ` até ${diaBr(ct.data_fim)}` : ''} · vence dia ${ct.dia_vencimento}</span></div>
+        <div class="ficha-dir">${formatMoeda(ct.valor)}${ct.periodicidade === 'anual' ? `/ano (${MESES[ct.mes_cobranca - 1]})` : '/mês'} ${pill(ct.status === 'ativo' ? 'Ativo' : ct.status === 'suspenso' ? 'Suspenso' : 'Encerrado',
+          ct.status === 'ativo' ? '#2e7d4f' : ct.status === 'suspenso' ? '#b7791f' : '#94a3b8')}</div></li>`).join('')}</ul>`
+      : fichaVazio('Nenhum contrato.')) + `<button type="button" class="btn btn-secondary btn-sm ficha-acao" onclick="fichaNovoContrato()">+ Novo contrato</button>`,
+      { texto: 'Contratos', acao: "irPara('contratos')" }, 'ficha-caixa-larga'));
 
     caixas.push(fichaCaixa('Faturas recentes', d.faturas.length ? `<ul class="ficha-lista">${d.faturas.map(ft => {
       const st = ft.status === 'paga' ? pill(`Paga ${diaBr(ft.data_pagamento)}`, '#2e7d4f') : ft.status === 'rascunho' ? pill('Rascunho', '#64748b')
@@ -83,9 +146,41 @@ async function abrirFichaCliente(id) {
     }).join('')}</ul>` : fichaVazio('Nenhuma fatura.'), { texto: 'Faturamento', acao: "irPara('faturamento')" }));
   }
 
-  caixas.push(fichaCaixa('Usuários do portal', d.usuarios.length ? `<ul class="ficha-lista">${d.usuarios.map(u => `
-    <li><div><strong>${escapeHtml(u.nome)}</strong><span>${escapeHtml(u.email)}</span></div>
-        <div class="ficha-dir">${u.ativo ? pill('Ativo', '#2e7d4f') : pill('Inativo', '#94a3b8')}</div></li>`).join('')}</ul>`
+  // Licenças do Conector: contratos por vagas, administradores da empresa e convites
+  if (d.admin) {
+    const admins = d.usuarios.filter(u => u.admin_empresa);
+    const contratosK = d.conector.length ? `<ul class="ficha-lista">${d.conector.map(k => {
+      const st = k.status === 'cancelado' ? pill('Cancelado', '#94a3b8') : k.status === 'suspenso' ? pill('Suspenso', '#b7791f')
+        : k.vigente ? pill(`Ativo até ${diaBr(k.data_fim)}`, '#2e7d4f') : pill(`Vencido ${diaBr(k.data_fim)}`, '#b42318');
+      const perfis = [k.abap && `${k.abap} ABAP`, k.funcional && `${k.funcional} Funcional`, k.ambos && `${k.ambos} Ambos`].filter(Boolean).join(' · ');
+      return `<li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato do Conector" onclick="fichaConector(${k.id})" onkeydown="if(event.key==='Enter')fichaConector(${k.id})">
+        <div><strong>Contrato nº ${k.id} · ${k.total} licença(s)</strong>
+          <span>${perfis} · ${k.em_uso} em uso · ${k.convites} convite(s) pendente(s) · ${k.livres} disponível(is)${k.contrato_financeiro_id ? '' : ' · <em>sem cobrança</em>'}</span></div>
+        <div class="ficha-dir">${st}</div></li>`;
+    }).join('')}</ul>` : fichaVazio('Nenhum contrato de licenças do Conector.');
+    const listaAdmins = admins.length ? `<ul class="ficha-lista">${admins.map(a => `
+      <li><div><strong>${escapeHtml(a.nome)}</strong><span>${escapeHtml(a.email)}${a.convite_pendente ? ' · convite pendente' : ''}</span></div>
+        <div class="ficha-dir">${admins.length > 1 ? `<button type="button" class="btn btn-secondary btn-sm" onclick="fichaRemoverAdmin(${a.id}, '${escapeHtml(a.nome).replace(/'/g, '&#39;')}')">Remover</button>` : ''}</div></li>`).join('')}</ul>`
+      : fichaVazio('Ninguém administra as licenças no portal ainda.');
+    caixas.push(fichaCaixa('Licenças do Conector SAP', `${contratosK}
+      <div class="ficha-subtitulo">Administradores da empresa</div>${listaAdmins}
+      <div class="ficha-botoes">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoConector()">+ Contrato de licenças</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaAdicionarAdmin()">+ Administrador</button>
+      </div>`, { texto: 'Contratos do Conector', acao: "irPara('contratos-conector')" }, 'ficha-caixa-larga'));
+  }
+
+  caixas.push(fichaCaixa('Usuários do portal', d.usuarios.length ? `<ul class="ficha-lista">${d.usuarios.map(u => {
+    const papeis = [
+      u.admin_empresa && pill('Admin da empresa', '#1d6fd8'),
+      ...(u.licencas || []).map(l => pill(`${l.estado === 'convidada' ? 'Convite' : 'Licença'} ${PERFIL_FICHA[l.perfil] || l.perfil}`, l.estado === 'convidada' ? '#b7791f' : '#2e7d4f')),
+      !u.admin_empresa && !(u.licencas || []).length && u.portal_papel !== 'aluno' && pill('Acesso amplo', '#64748b')
+    ].filter(Boolean).join(' ');
+    return `<li class="ficha-clicavel" role="button" tabindex="0" title="Editar usuário"
+        onclick="fichaEditarUsuario(${u.id}, '${escapeHtml(u.nome).replace(/'/g, '&#39;')}', '${escapeHtml(u.email)}')">
+      <div><strong>${escapeHtml(u.nome)}</strong><span>${escapeHtml(u.email)}${u.convite_pendente ? ' · ainda não criou a senha' : ''}</span></div>
+      <div class="ficha-dir">${papeis} ${u.ativo ? '' : pill('Inativo', '#94a3b8')}</div></li>`;
+  }).join('')}</ul>`
     : fichaVazio('Ninguém acessa o portal ainda. Crie um usuário do tipo Cliente.'), { texto: 'Usuários', acao: "irPara('usuarios')" }));
 
   caixas.push(fichaCaixa('Chamados', `
@@ -96,15 +191,25 @@ async function abrirFichaCliente(id) {
         <div class="ficha-dir">${pill(txt, cor)}</div></li>`;
     }).join('')}</ul>` : fichaVazio('Nenhum chamado.')}`, { texto: 'Chamados', acao: "irPara('chamados')" }));
 
-  caixas.push(fichaCaixa('Licenças do conector SAP', d.licencas.length ? `<ul class="ficha-lista">${d.licencas.map(l => `
-    <li><div><strong>Plano ${escapeHtml(l.plano)}</strong><span>SIDs ${escapeHtml(String(l.sids || '').replace(/,/g, ', '))} · ${l.max_usuarios ? `até ${l.max_usuarios} usuários` : 'usuários ilimitados'}</span></div>
-        <div class="ficha-dir">${l.vencida ? pill(`Venceu ${diaBr(l.data_fim)}`, '#b42318') : pill(`${l.status === 'ativa' ? 'Ativa' : l.status} até ${diaBr(l.data_fim)}`, l.status === 'ativa' ? '#2e7d4f' : '#b7791f')}</div></li>`).join('')}</ul>`
-    : fichaVazio('Sem licença.'), { texto: 'Licenças', acao: "irPara('licencas')" }));
+  // Chaves do modelo antigo (uma chave por empresa): só aparece se houver
+  const chavesIndividuais = d.licencas.filter(l => !l.vaga_id);
+  if (chavesIndividuais.length) {
+    caixas.push(fichaCaixa('Chaves do Conector (modelo por empresa)', `<ul class="ficha-lista">${chavesIndividuais.map(l => `
+      <li><div><strong>Plano ${escapeHtml(l.plano)}</strong><span>SIDs ${escapeHtml(String(l.sids || '').replace(/,/g, ', '))} · ${l.max_usuarios ? `até ${l.max_usuarios} usuários` : 'usuários ilimitados'}</span></div>
+          <div class="ficha-dir">${l.vencida ? pill(`Venceu ${diaBr(l.data_fim)}`, '#b42318') : pill(`${l.status === 'ativa' ? 'Ativa' : l.status} até ${diaBr(l.data_fim)}`, l.status === 'ativa' ? '#2e7d4f' : '#b7791f')}</div></li>`).join('')}</ul>`,
+      { texto: 'Licenças', acao: "irPara('licencas')" }));
+  }
 
-  caixas.push(fichaCaixa('Cursos liberados', d.cursos.length ? `<ul class="ficha-lista">${d.cursos.map(cu => `
-    <li><div><strong>${escapeHtml(cu.titulo)}</strong><span>${cu.aulas} aula(s) · ${cu.alunos} aluno(s) com progresso${cu.acesso_ate ? ` · até ${diaBr(cu.acesso_ate)}` : ''}</span></div>
-        <div class="ficha-dir">${cu.status === 'publicado' ? pill('Publicado', '#2e7d4f') : pill('Rascunho', '#64748b')}</div></li>`).join('')}</ul>`
-    : fichaVazio('Nenhum curso liberado.'), { texto: 'Treinamentos', acao: "irPara('treinamentos')" }));
+  // Cursos: liberados para a empresa e quantas pessoas têm cada curso agora, por origem
+  const porCurso = new Map(d.cursos_acesso.map(x => [x.id, x]));
+  const cursosLinhas = [...d.cursos.map(cu => ({ ...cu, ...(porCurso.get(cu.id) || {}) })),
+    ...d.cursos_acesso.filter(x => !d.cursos.some(cu => cu.id === x.id))];
+  caixas.push(fichaCaixa('Cursos', cursosLinhas.length ? `<ul class="ficha-lista">${cursosLinhas.map(cu => {
+    const origens = [cu.por_licenca && `${cu.por_licenca} pela licença`, cu.pela_empresa && `${cu.pela_empresa} pela empresa`,
+      cu.individual && `${cu.individual} individual`].filter(Boolean).join(' · ');
+    return `<li><div><strong>${escapeHtml(cu.titulo)}</strong><span>${origens || 'ninguém com acesso agora'}${cu.acesso_ate ? ` · liberado até ${diaBr(cu.acesso_ate)}` : ''}</span></div>
+      <div class="ficha-dir">${cu.aulas !== undefined ? pill('Liberado p/ empresa', '#64748b') : ''}</div></li>`;
+  }).join('')}</ul>` : fichaVazio('Nenhum curso liberado ou em uso.'), { texto: 'Treinamentos', acao: "irPara('treinamentos')" }));
 
   caixas.push(fichaCaixa('Tecnologias', d.tecnologias.length
     ? `<div class="ficha-tags">${d.tecnologias.map(t => `<span title="${escapeHtml(t.categoria || '')}${t.desde ? ' · desde ' + diaBr(t.desde) : ''}">${escapeHtml(t.nome)}</span>`).join('')}</div>`
@@ -115,6 +220,16 @@ async function abrirFichaCliente(id) {
       <li><div><strong>${escapeHtml(o.titulo)}</strong><span>${[o.valor_mensal > 0 && `${formatMoeda(o.valor_mensal)}/mês`, o.valor_unico > 0 && `${formatMoeda(o.valor_unico)} único`].filter(Boolean).join(' + ') || 'sem valor'}</span></div>
           <div class="ficha-dir">${pill(ETAPA_FICHA[o.etapa] || o.etapa, o.etapa === 'ganha' ? '#2e7d4f' : o.etapa === 'perdida' ? '#94a3b8' : '#1d6fd8')}</div></li>`).join('')}</ul>`
       : fichaVazio('Nenhuma oportunidade.'), { texto: 'Funil', acao: "irPara('funil')" }));
+
+    // O que mudou por último na empresa (contratos, licenças, administradores, usuários)
+    const quando = v => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    caixas.push(fichaCaixa('Atividade recente', d.atividade.length ? `<ul class="ficha-lista">${d.atividade.map(a => {
+      const extra = (a.contrato_desc ? ` · ${escapeHtml(a.contrato_desc)}` : '')
+        + (a.acao === 'contrato.reajustado' && a.depois ? ` ${formatMoeda(a.antes.valor)} → ${formatMoeda(a.depois.valor)}` : '')
+        + (a.depois && a.depois.email ? ` · ${escapeHtml(a.depois.email)}` : '');
+      return `<li><div><strong>${escapeHtml(ACOES_ATIVIDADE[a.acao] || a.acao)}${extra}</strong>
+        <span>${quando(a.criado_em)} · ${a.feito_por ? escapeHtml(a.feito_por) : 'automático'}</span></div></li>`;
+    }).join('')}</ul>` : fichaVazio('Nada registrado ainda.'), null, 'ficha-caixa-larga'));
   }
 
   corpo.innerHTML = `<div class="ficha-grade">${caixas.join('')}</div>

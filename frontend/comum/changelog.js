@@ -22,6 +22,14 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v3.9', data: '2026-10-16', destaques: [
+      'Ficha do cliente virou o painel de controle da empresa: contratos, faturas, licenças do Conector, administradores, usuários, cursos e atividade recente num lugar só',
+      'Clique num contrato, contrato do Conector ou usuário dentro da ficha para abrir e editar; ao salvar ou fechar, a ficha volta sozinha já atualizada',
+      'Botões na ficha: "+ Novo contrato", "+ Contrato de licenças" e "+ Administrador", já com o cliente escolhido',
+      'Ficha mostra o valor recorrente por mês e o anual das licenças, o tipo e a cobrança de cada contrato, convites pendentes e quem ainda não criou a senha',
+      'Usuários aparecem com o papel: administrador da empresa, licença ABAP/Funcional (ou convite) e acesso amplo',
+      'Cursos da empresa com quantas pessoas têm cada um e por qual caminho (licença, empresa ou individual)'
+    ] },
     { versao: 'v3.8', data: '2026-10-16', destaques: [
       'Nova página Cadastros → Benefícios do Conector: escolha quais cursos gratuitos vêm com cada licença (ABAP, Funcional, ABAP + Funcional); já vem com a regra atual',
       'Curso gratuito vale só enquanto a licença estiver ativa: revogada, suspensa ou com o contrato vencido, o curso sai na hora; renovou, volta — com o progresso de onde parou',

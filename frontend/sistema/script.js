@@ -3313,6 +3313,12 @@ function closeModal(modal) {
   if (!modal) return;
   sairModoLeitura(modal);
   modal.classList.remove('show');
+  // Editor aberto a partir da ficha do cliente: fechou ou salvou, a ficha volta (atualizada)
+  if (window._fichaRetorno && modal.id !== 'modal-ficha-cliente') {
+    setTimeout(() => {
+      if (window._fichaRetorno && !document.querySelector('.modal.show')) abrirFichaCliente(window._fichaRetorno);
+    }, 80);
+  }
 }
 
 function resetForm(selector) {
