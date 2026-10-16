@@ -29,15 +29,16 @@ const VAGA_VIGENTE = `v.ativo AND v.estado = 'ativa' AND k.status = 'ativo' AND 
 
 /**
  * Origens de acesso a um curso (alias c), conferidas AO VIVO a cada pedido — a revogação vale na hora:
- *   liberacao  — curso liberado para a empresa do usuário (usuário de vaga, papel "aluno", não herda)
+ *   liberacao  — curso liberado para a empresa do usuário (usuário de vaga, papel "aluno", não herda a liberação avulsa;
+ *                a que vem de um contrato de cursos vale para todos do cliente)
  *   beneficio  — licença do Conector ativa, de contrato vigente, cujo perfil inclui o curso (gratuito enquanto durar)
  *   compra     — direito próprio (compra individual ou concessão manual), com validade; não depende de licença
  * pCliente / pUsuario = placeholders ($1, $2...).
  */
 function sqlViaLiberacao(pCliente, pUsuario) {
-  return `(EXISTS (SELECT 1 FROM cursos_liberacoes lb
-             WHERE lb.curso_id = c.id AND lb.cliente_id = ${pCliente} AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE))
-           AND COALESCE((SELECT portal_papel FROM usuarios WHERE id = ${pUsuario}), '') <> 'aluno')`;
+  return `EXISTS (SELECT 1 FROM cursos_liberacoes lb
+             WHERE lb.curso_id = c.id AND lb.cliente_id = ${pCliente} AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE)
+               AND (lb.contrato_cursos_id IS NOT NULL OR COALESCE((SELECT portal_papel FROM usuarios WHERE id = ${pUsuario}), '') <> 'aluno'))`;
 }
 function sqlViaBeneficio(pUsuario) {
   return `EXISTS (SELECT 1 FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
@@ -373,25 +374,37 @@ async function historicoContrato(contratoId) {
      ORDER BY a.criado_em DESC, a.id DESC LIMIT 300`, [contratoId])).rows;
 }
 
-// ===== Cobrança do contrato (fluxo novo, fase 1) =====
-// As licenças do Conector são cobradas por um contrato financeiro anual (tipo produto) ligado a este contrato.
-// Preço sugerido = tabela de Preços Conector SAP (Cadastros), plano anual: valor mensal × 12 por vaga.
-// Perfil Ambos tem preço próprio na tabela (ambos_anual), que começa igual ao de Desenvolvimento.
-// Devolve também a conta por perfil, para a tela mostrar de onde veio o valor
-async function detalhePrecoAnual(db, empresaId, q) {
+// ===== Preço e cobrança do contrato (docs/plano-contratos-unificados.md) =====
+// A tabela Preços Conector SAP (Cadastros) é o PREÇO DE LISTA: R$ por licença por mês no plano anual.
+// Cada contrato guarda o preço negociado por perfil (contratos_conector.precos); a cobrança anual é
+// quantidade × preço × 12. Mudar a tabela não mexe em contrato nenhum.
+const r2 = v => Math.round(v * 100) / 100;
+const iso = d => String(d instanceof Date ? d.toISOString() : d).slice(0, 10);
+const hojeBrasilia = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+
+/** Preço de lista por perfil (R$/licença/mês no plano anual). Perfil Ambos tem preço próprio (ambos_anual). */
+async function precosTabela(db, empresaId) {
   const { normalizarPrecos } = require('./precificacao-conector');
   const cfg = (await db.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = $1', [empresaId])).rows[0];
   const { precos } = normalizarPrecos((cfg && cfg.prop_precos_conector) || {});
-  const linhas = [['abap', 'ABAP', precos.dev_anual], ['funcional', 'Funcional', precos.leitura_anual], ['ambos', 'ABAP + Funcional', precos.ambos_anual]]
-    .map(([perfil, rotulo, mensal]) => ({ perfil, rotulo, quantidade: q[perfil] || 0, preco_mensal: mensal,
-      total_anual: Math.round((q[perfil] || 0) * mensal * 12 * 100) / 100 }));
-  const valor_anual = Math.round(linhas.reduce((s, l) => s + l.total_anual, 0) * 100) / 100;
-  return { valor_anual, linhas };
+  return { abap: precos.dev_anual, funcional: precos.leitura_anual, ambos: precos.ambos_anual };
 }
 
-async function precoAnualSugerido(db, empresaId, q) {
-  return (await detalhePrecoAnual(db, empresaId, q)).valor_anual;
+/** { abap, funcional, ambos } em R$/mês vindos da tela; campo vazio fica de fora. Nada informado = null. */
+function lerPrecos(entrada) {
+  if (!entrada || typeof entrada !== 'object') return null;
+  const p = {};
+  for (const perfil of Object.keys(PERFIS)) {
+    const bruto = entrada[perfil];
+    if (bruto === undefined || bruto === null || String(bruto).trim() === '') continue;
+    const v = Number(bruto);
+    if (!Number.isFinite(v) || v < 0 || v > 1000000) throw new ErroRegra(`Preço ${PERFIS[perfil].nome}: valor de 0 a 1.000.000 por mês.`);
+    p[perfil] = r2(v);
+  }
+  return Object.keys(p).length ? p : null;
 }
+
+const totalAnual = (q, precos) => r2(Object.keys(PERFIS).reduce((s, p) => s + (q[p] || 0) * (precos[p] || 0) * 12, 0));
 
 async function quantidadesDoContrato(db, contratoId) {
   const r = await db.query(
@@ -400,28 +413,82 @@ async function quantidadesDoContrato(db, contratoId) {
 }
 
 /**
+ * Preço por licença do contrato: o negociado (k.precos). Contrato antigo, sem preço guardado: a tabela na proporção
+ * do valor anual cobrado hoje (mantém o desconto que foi dado). Sem cobrança: a tabela.
+ * Devolve { precos, lista, origem: 'contrato' | 'cobranca' | 'tabela' }.
+ */
+async function precosDoContrato(db, k) {
+  const lista = await precosTabela(db, k.empresa_id);
+  if (k.precos) return { precos: { ...lista, ...k.precos }, lista, origem: 'contrato' };
+  const cob = (await db.query('SELECT valor FROM contratos WHERE contrato_conector_id = $1', [k.id])).rows[0];
+  const cheio = totalAnual(await quantidadesDoContrato(db, k.id), lista);
+  if (cob && cheio > 0) {
+    const f = Number(cob.valor) / cheio;
+    return { precos: Object.fromEntries(Object.entries(lista).map(([p, v]) => [p, r2(v * f)])), lista, origem: 'cobranca' };
+  }
+  return { precos: lista, lista, origem: 'tabela' };
+}
+
+/** Preço do último contrato do cliente (para o próximo vir igual), ou null se ele nunca teve preço próprio. */
+async function ultimosPrecosDoCliente(db, empresaId, clienteId) {
+  const k = (await db.query(
+    `SELECT * FROM contratos_conector WHERE empresa_id = $1 AND cliente_id = $2 AND status <> 'cancelado' ORDER BY id DESC LIMIT 1`,
+    [empresaId, clienteId])).rows[0];
+  if (!k) return null;
+  const r = await precosDoContrato(db, k);
+  return r.origem === 'tabela' ? null : { precos: r.precos, contrato_id: k.id };
+}
+
+/**
+ * Conta por perfil, para a tela mostrar de onde veio o valor: preço de lista, preço usado (negociado ou lista),
+ * desconto e total no ano. precos = negociado (opcional; o que faltar usa a lista).
+ */
+async function detalhePrecoAnual(db, empresaId, q, precos = null) {
+  const lista = await precosTabela(db, empresaId);
+  const usados = { ...lista, ...(precos || {}) };
+  const linhas = Object.keys(PERFIS).map(perfil => ({
+    perfil, rotulo: PERFIS[perfil].nome, quantidade: q[perfil] || 0,
+    preco_lista: lista[perfil], preco_mensal: usados[perfil],
+    desconto_pct: lista[perfil] > 0 ? r2((1 - usados[perfil] / lista[perfil]) * 100) : 0,
+    total_anual: r2((q[perfil] || 0) * usados[perfil] * 12)
+  }));
+  return { valor_anual: r2(linhas.reduce((s, l) => s + l.total_anual, 0)), linhas };
+}
+
+async function precoAnualSugerido(db, empresaId, q) {
+  return (await detalhePrecoAnual(db, empresaId, q)).valor_anual;
+}
+
+// Itens da cobrança (vão para o contrato financeiro): quantidade e preço por licença no ano
+function itensCobranca(q, precos) {
+  return Object.keys(PERFIS).filter(p => q[p] > 0).map(p => ({
+    descricao: `Licença Conector SAP — ${PERFIS[p].nome}`, tipo: 'anual', perfil: p, quantidade: q[p],
+    preco_mensal: precos[p], valor_unitario: r2(precos[p] * 12), total: r2(q[p] * precos[p] * 12) }));
+}
+const textoLicencas = q => Object.keys(PERFIS).filter(p => q[p] > 0).map(p => `${q[p]} ${PERFIS[p].nome}`).join(', ');
+const totalLicencas = q => Object.values(q).reduce((s, n) => s + (n || 0), 0);
+
+/**
  * Cria o contrato financeiro anual que cobra as licenças deste contrato do Conector.
- * k = linha de contratos_conector (data_inicio/data_fim). valor vazio = preço sugerido da tabela.
+ * k = linha de contratos_conector (data_inicio/data_fim). valor vazio = quantidade × preço do contrato × 12.
  */
 async function criarCobrancaAnual(db, k, { valor, dia_vencimento, usuarioId }) {
   const q = await quantidadesDoContrato(db, k.id);
-  const total = Object.values(q).reduce((s, n) => s + n, 0);
-  const v = valor !== undefined && valor !== null && String(valor).trim() !== '' ? Number(valor) : await precoAnualSugerido(db, k.empresa_id, q);
-  if (!(v > 0)) throw new ErroRegra('Informe o valor anual (a tabela de preços não gerou um valor).');
+  const { precos } = await precosDoContrato(db, k);
+  const v = valor !== undefined && valor !== null && String(valor).trim() !== '' ? Number(valor) : totalAnual(q, precos);
+  if (!(v > 0)) throw new ErroRegra('Informe o valor anual (as licenças deste contrato somam R$ 0).');
   const dia = dia_vencimento ? Number(dia_vencimento) : 10;
   if (!Number.isInteger(dia) || dia < 1 || dia > 28) throw new ErroRegra('Dia de vencimento: 1 a 28.');
-  const partes = [q.abap && `${q.abap} ABAP`, q.funcional && `${q.funcional} Funcional`, q.ambos && `${q.ambos} Ambos`].filter(Boolean).join(', ');
-  const inicio = String(k.data_inicio instanceof Date ? k.data_inicio.toISOString() : k.data_inicio).slice(0, 10);
-  const fim = String(k.data_fim instanceof Date ? k.data_fim.toISOString() : k.data_fim).slice(0, 10);
+  const inicio = iso(k.data_inicio);
+  const fim = iso(k.data_fim);
   try {
     const r = await db.query(
       `INSERT INTO contratos (empresa_id, cliente_id, descricao, descricao_servico, valor, dia_vencimento, data_inicio, data_fim,
          tipo, periodicidade, mes_cobranca, contrato_conector_id, itens, emitir_nfse, status, observacoes, criado_por_usuario_id, renovacao_automatica)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'produto', 'anual', $9, $10, $11, TRUE, 'ativo', $12, $13, TRUE) RETURNING id`,
-      [k.empresa_id, k.cliente_id, `Conector SAP — ${total} licença(s)`,
-       `Licenciamento anual do Conector SAP Marsh: ${partes}.`, v, dia, inicio, fim,
-       Number(inicio.slice(5, 7)), k.id,
-       JSON.stringify(Object.entries(q).map(([perfil, n]) => ({ descricao: `Licença Conector SAP — ${(PERFIS[perfil] || {}).nome || perfil}`, tipo: 'anual', quantidade: n }))),
+      [k.empresa_id, k.cliente_id, `Conector SAP — ${totalLicencas(q)} licença(s)`,
+       `Licenciamento anual do Conector SAP Marsh: ${textoLicencas(q)}.`, v, dia, inicio, fim,
+       Number(inicio.slice(5, 7)), k.id, JSON.stringify(itensCobranca(q, precos)),
        `Cobrança do contrato do Conector nº ${k.id}.`, usuarioId]);
     await auditoria.registrar({ empresa_id: k.empresa_id, usuario_id: usuarioId, acao: 'contrato.criado', entidade: 'contrato',
       entidade_id: r.rows[0].id, depois: { tipo: 'produto', periodicidade: 'anual', valor: v, contrato_conector_id: k.id } }, db);
@@ -432,10 +499,92 @@ async function criarCobrancaAnual(db, k, { valor, dia_vencimento, usuarioId }) {
   }
 }
 
+/** Meses inteiros de hoje até o fim (mês começado conta), de 0 a 12. */
+function mesesAte(fimIso, hojeIso) {
+  const [fy, fm, fd] = fimIso.split('-').map(Number);
+  const [ty, tm, td] = hojeIso.split('-').map(Number);
+  return Math.max(0, Math.min(12, (fy - ty) * 12 + (fm - tm) + (fd > td ? 1 : 0)));
+}
+
+/**
+ * O que acontece com a cobrança se as licenças mudarem. delta = { abap: +2, funcional: -1, ... }.
+ * Licença a mais: fatura proporcional (quantidade × preço × meses até o fim) e anuidade nova.
+ * Licença a menos: só a anuidade seguinte diminui (sem estorno).
+ */
+async function previaAlteracaoLicencas(db, k, delta, precosNovos = null) {
+  const atual = await quantidadesDoContrato(db, k.id);
+  const novo = Object.fromEntries(Object.keys(PERFIS).map(p => [p, (atual[p] || 0) + (delta[p] || 0)]));
+  if (Object.values(novo).some(n => n < 0)) throw new ErroRegra('O contrato não tem essas licenças para remover.');
+  const base = await precosDoContrato(db, k);
+  const precos = precosNovos ? { ...base.precos, ...precosNovos } : base.precos;
+  const cob = (await db.query(
+    `SELECT id, valor::float AS valor, status, dia_vencimento FROM contratos WHERE contrato_conector_id = $1`, [k.id])).rows[0] || null;
+  const hoje = hojeBrasilia();
+  const vigente = k.status === 'ativo' && iso(k.data_inicio) <= hoje && iso(k.data_fim) >= hoje;
+  const meses = vigente ? mesesAte(iso(k.data_fim), hoje) : 0;
+  const proporcional = Object.keys(PERFIS).filter(p => (delta[p] || 0) > 0).map(p => ({
+    perfil: p, rotulo: PERFIS[p].nome, quantidade: delta[p], preco_mensal: precos[p], meses, total: r2(delta[p] * precos[p] * meses) }));
+  const cobrancaAtiva = cob && cob.status === 'ativo' ? cob : null;
+  return {
+    atual, novo, precos, lista: base.lista, cobranca: cob,
+    valor_anual_atual: cob ? cob.valor : null,
+    valor_anual_novo: totalAnual(novo, precos),
+    meses, proporcional,
+    valor_proporcional: cobrancaAtiva ? r2(proporcional.reduce((s, l) => s + l.total, 0)) : 0
+  };
+}
+
+/**
+ * Aplica a prévia na cobrança (dentro da transação db): anuidade e itens novos no contrato financeiro,
+ * preço congelado no contrato do Conector e, se houver, a fatura proporcional em rascunho (aprovar no Faturamento).
+ * Devolve { fatura_id } ou {}.
+ */
+async function aplicarNaCobranca(db, k, previa, usuarioId) {
+  if (!k.precos || JSON.stringify(k.precos) !== JSON.stringify(previa.precos)) {
+    await db.query('UPDATE contratos_conector SET precos = $2, data_atualizacao = NOW() WHERE id = $1', [k.id, JSON.stringify(previa.precos)]);
+  }
+  const cob = previa.cobranca;
+  if (!cob || cob.status !== 'ativo') return {};
+  await db.query(
+    `UPDATE contratos SET valor = $2, itens = $3, descricao = $4, descricao_servico = $5, atualizado_por_usuario_id = $6, data_atualizacao = NOW()
+     WHERE id = $1`,
+    [cob.id, previa.valor_anual_novo, JSON.stringify(itensCobranca(previa.novo, previa.precos)),
+     `Conector SAP — ${totalLicencas(previa.novo)} licença(s)`, `Licenciamento anual do Conector SAP Marsh: ${textoLicencas(previa.novo)}.`, usuarioId]);
+  if (previa.valor_anual_novo !== previa.valor_anual_atual) {
+    await auditoria.registrar({ empresa_id: k.empresa_id, usuario_id: usuarioId, acao: 'contrato.alterado', entidade: 'contrato', entidade_id: cob.id,
+      antes: { valor: previa.valor_anual_atual }, depois: { valor: previa.valor_anual_novo },
+      detalhe: `Licenças: ${textoLicencas(previa.atual) || 'nenhuma'} → ${textoLicencas(previa.novo) || 'nenhuma'}` }, db);
+  }
+  if (!(previa.valor_proporcional > 0)) return {};
+  // Fatura proporcional: fora do contrato (contrato_id vazio) para não ocupar a competência da anuidade
+  const c = (await db.query('SELECT * FROM contratos WHERE id = $1', [cob.id])).rows[0];
+  const config = await require('./faturamento').carregarConfig(k.empresa_id);
+  const hoje = hojeBrasilia();
+  // Vencimento: o dia do contrato, no mês corrente se faltarem ao menos 5 dias, senão no seguinte
+  const [a, m, d] = hoje.split('-').map(Number);
+  let venc = new Date(Date.UTC(a, m - 1, c.dia_vencimento));
+  if (venc.getUTCDate() !== c.dia_vencimento || (venc - new Date(Date.UTC(a, m - 1, d))) / 86400000 < 5) venc = new Date(Date.UTC(a, m, c.dia_vencimento));
+  const descricao = `Licenciamento do Conector SAP Marsh — licenças acrescentadas: ${previa.proporcional
+    .map(l => `${l.quantidade} ${l.rotulo}`).join(', ')}, proporcional a ${previa.meses} mês(es) até ${iso(k.data_fim).split('-').reverse().join('/')}.`;
+  const { RETENCOES } = require('./faturamento');
+  const f = await db.query(
+    `INSERT INTO faturas (empresa_id, cliente_id, competencia, descricao, valor, data_vencimento, observacoes,
+       emitir_nfse, codigo_servico, nome_servico, aliquota_iss, reter_iss, criado_por_usuario_id,
+       ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss)
+     VALUES ($1, $2, date_trunc('month', $3::date)::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
+    [k.empresa_id, k.cliente_id, hoje, descricao, previa.valor_proporcional, venc.toISOString().slice(0, 10),
+     `Proporcional das licenças acrescentadas ao contrato do Conector nº ${k.id} (${previa.proporcional
+       .map(l => `${l.quantidade} × R$ ${l.preco_mensal.toFixed(2)} × ${l.meses}`).join(' + ')}).`,
+     c.emitir_nfse, c.codigo_servico || config.codigo_servico, c.nome_servico || config.nome_servico,
+     c.aliquota_iss ?? config.aliquota_iss, c.reter_iss, usuarioId, ...RETENCOES.map(r => c[r] ?? config[r] ?? 0)]);
+  return { fatura_id: f.rows[0].id };
+}
+
 module.exports = {
   PERFIS, TRILHAS, PERFIL_COBRE_CURSO, VAGA_VIGENTE, ErroRegra, sqlViaLiberacao, sqlViaBeneficio, sqlViaCompra,
   sqlCursoLiberado, papelPortal, acharOuCriarUsuario, enviarConvite, detalharContrato, cursosDoBeneficio,
   lerQuantidades, criarVagas, ocuparVaga, liberarVaga, ativarConvites, expirarConvites,
   ehAdminCorporativo, listarAdmins, adicionarAdmin, removerAdmin, historicoContrato,
-  precoAnualSugerido, detalhePrecoAnual, criarCobrancaAnual
+  precoAnualSugerido, detalhePrecoAnual, criarCobrancaAnual,
+  precosTabela, lerPrecos, precosDoContrato, ultimosPrecosDoCliente, previaAlteracaoLicencas, aplicarNaCobranca, mesesAte
 };

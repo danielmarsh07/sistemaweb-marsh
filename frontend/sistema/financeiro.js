@@ -481,7 +481,13 @@ async function loadContratos() {
   if (!res) return;
   if (!res.ok) { const e = await res.json(); tbody.innerHTML = `<tr><td colspan="7" class="text-center">${escapeHtml(e.erro)}</td></tr>`; return; }
   _contratosCache = await res.json();
-  if (!_contratosCache.length) {
+  // Licenças do Conector ainda sem cobrança também são contratos do cliente: entram na mesma lista
+  const rk = await apiFetch(`${API_URL}/contratos-conector`);
+  const semCobranca = rk && rk.ok ? (await rk.json()).filter(k => !k.contrato_financeiro_id && k.status !== 'cancelado') : [];
+  // Contratos de cursos sem cobrança recorrente (cortesia ou pagamento único) também entram
+  const rc = await apiFetch(`${API_URL}/contratos-cursos`);
+  const cursosSemRecorrente = rc && rc.ok ? (await rc.json()).filter(k => !k.contrato_financeiro_id && k.status === 'ativo') : [];
+  if (!_contratosCache.length && !semCobranca.length && !cursosSemRecorrente.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum contrato ainda. Use "+ Novo contrato".</td></tr>';
     return;
   }
@@ -489,23 +495,50 @@ async function loadContratos() {
     const [txt, cor] = STATUS_CONTRATO[c.status] || [c.status, '#64748b'];
     const anual = c.periodicidade === 'anual';
     const mesCob = MESES_NOME[(c.mes_cobranca || Number(String(c.data_inicio).slice(5, 7))) - 1];
+    const tipo = c.contrato_conector_id ? 'Licenças do Conector' : c.contrato_cursos_id ? 'Cursos' : c.tipo === 'produto' ? 'Produto' : 'Serviço';
     return `
     <tr>
       <td data-label="Cliente"><strong>${escapeHtml(c.cliente_nome)}</strong></td>
-      <td data-label="Contrato"><span class="fin-muted">${numeroContrato(c.id)} · ${c.tipo === 'produto' ? 'Produto' : 'Serviço'}</span><br>${escapeHtml(c.descricao)}${c.emitir_nfse ? '' : ' <span class="fin-muted">(sem NFS-e)</span>'}
-        ${c.contrato_conector_id ? `<small class="fin-muted" style="display:block">Licenças do Conector nº ${c.contrato_conector_id}</small>` : ''}
+      <td data-label="Contrato"><span class="fin-muted">${numeroContrato(c.id)} · ${tipo}</span><br>${escapeHtml(c.descricao)}${c.emitir_nfse ? '' : ' <span class="fin-muted">(sem NFS-e)</span>'}
         ${c.reajuste_pendente ? ` ${pill(`Reajuste ${c.indice_reajuste} pendente`, '#b7791f')}` : ''}</td>
       <td data-label="Valor" class="fin-num">${formatMoeda(c.valor)}<small class="fin-muted" style="display:block">${anual ? `por ano (${mesCob})` : 'por mês'}</small></td>
       <td data-label="Vencimento">Dia ${c.dia_vencimento}</td>
       <td data-label="Vigência">${diaBr(c.data_inicio)} → ${c.data_fim ? diaBr(c.data_fim) : 'sem prazo'}</td>
       <td data-label="Status">${pill(txt, cor)}</td>
       <td data-label="Ações" class="td-acoes">
+        ${c.contrato_conector_id ? `<button type="button" class="btn btn-secondary btn-sm" onclick="abrirContratoConector(${c.contrato_conector_id})">Licenças e preço</button>` : ''}
+        ${c.contrato_cursos_id ? `<button type="button" class="btn btn-secondary btn-sm" onclick="abrirContratoCursos(${c.contrato_cursos_id})">Cursos</button>` : ''}
         ${botao('eye', 'Visualizar', `visualizarRegistro(editarContrato, ${c.id}, '#modal-contrato')`)}
         ${botao('edit', 'Editar', `editarContrato(${c.id})`, 'btn-edit')}
         ${c.status !== 'encerrado' ? botao('trash', 'Encerrar / excluir', `encerrarContrato(${c.id})`, 'btn-danger') : ''}
       </td>
     </tr>`;
-  }).join('');
+  }).join('') + semCobranca.map(k => {
+    const licencas = [k.vagas_abap && `${k.vagas_abap} ABAP`, k.vagas_funcional && `${k.vagas_funcional} Funcional`, k.vagas_ambos && `${k.vagas_ambos} ABAP + Funcional`].filter(Boolean).join(' · ');
+    return `
+    <tr>
+      <td data-label="Cliente"><strong>${escapeHtml(k.cliente_nome)}</strong></td>
+      <td data-label="Contrato"><span class="fin-muted">Licenças do Conector nº ${k.id}</span><br>${escapeHtml(licencas || 'nenhuma licença')}</td>
+      <td data-label="Valor" class="fin-num"><span class="fin-muted">sem cobrança</span></td>
+      <td data-label="Vencimento">—</td>
+      <td data-label="Vigência">${diaBr(k.data_inicio)} → ${diaBr(k.data_fim)}</td>
+      <td data-label="Status">${pill(k.status === 'suspenso' ? 'Suspenso' : k.vigente ? 'Ativo' : 'Vencido', k.status === 'suspenso' ? '#b7791f' : k.vigente ? '#2e7d4f' : '#b42318')}</td>
+      <td data-label="Ações" class="td-acoes">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="abrirContratoConector(${k.id})">Licenças e preço</button>
+      </td>
+    </tr>`;
+  }).join('') + cursosSemRecorrente.map(k => `
+    <tr>
+      <td data-label="Cliente"><strong>${escapeHtml(k.cliente_nome)}</strong></td>
+      <td data-label="Contrato"><span class="fin-muted">Cursos para a empresa nº ${k.id} · Cursos</span><br>${escapeHtml(k.cursos.map(c => c.titulo).join(' · '))}</td>
+      <td data-label="Valor" class="fin-num">${k.cobranca === 'cortesia' ? '<span class="fin-muted">cortesia</span>' : `${formatMoeda(k.valor)}<small class="fin-muted" style="display:block">pagamento único</small>`}</td>
+      <td data-label="Vencimento">—</td>
+      <td data-label="Vigência">${diaBr(k.data_inicio)} → ${k.data_fim ? diaBr(k.data_fim) : 'sem prazo'}</td>
+      <td data-label="Status">${k.vigente ? pill('Ativo', '#2e7d4f') : pill('Vencido', '#b42318')}</td>
+      <td data-label="Ações" class="td-acoes">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="abrirContratoCursos(${k.id})">Cursos</button>
+      </td>
+    </tr>`).join('');
 }
 
 const MESES_NOME = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -525,12 +558,34 @@ function ajustarFormContrato() {
   document.getElementById('contrato-valor-rotulo').textContent = anual ? 'Valor anual' : 'Valor mensal';
 }
 
+// Troca de um modal para outro sem passar pelo closeModal (que reabriria a ficha do cliente no meio da troca)
+const esconderModal = id => document.getElementById(id).classList.remove('show');
+
 function trocarParaLicencasConector() {
   const cliente = document.getElementById('form-contrato').cliente_id.value;
-  closeModal(document.getElementById('modal-contrato'));
-  abrirNovoContratoConector().then(() => {
-    if (cliente) document.getElementById('form-novo-contrato-conector').cliente_id.value = cliente;
-  });
+  esconderModal('modal-contrato');
+  abrirNovoContratoConector(cliente || null);
+}
+
+// + Novo contrato (página Contratos e ficha do cliente): escolhe o tipo e abre o formulário certo
+let _novoContratoCliente = null;
+function novoContrato(clienteId = null) {
+  _novoContratoCliente = clienteId;
+  showModal('#modal-tipo-contrato');
+}
+
+async function escolherTipoContrato(tipo) {
+  const cli = _novoContratoCliente;
+  esconderModal('modal-tipo-contrato');
+  if (tipo === 'conector') return abrirNovoContratoConector(cli);
+  if (tipo === 'cursos') return abrirNovoContratoCursos(cli);
+  await abrirNovoContrato();
+  if (cli) {
+    const f = document.getElementById('form-contrato');
+    f.cliente_id.value = cli;
+    await preencherConectorSelect(f);
+    ajustarFormContrato();
+  }
 }
 
 // Contratos do Conector do cliente escolhido, para ligar a cobrança às licenças

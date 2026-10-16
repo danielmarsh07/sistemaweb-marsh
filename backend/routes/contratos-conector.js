@@ -283,11 +283,14 @@ router.get('/', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao listar contratos'); }
 });
 
-// GET /preco-sugerido?abap=&funcional=&ambos= — valor anual pela tabela de Preços Conector SAP (antes de /:id)
+// GET /preco-sugerido?abap=&funcional=&ambos=&cliente_id= — conta por perfil (antes de /:id).
+// Preço de partida: o do último contrato do cliente, se houver; senão a tabela Preços Conector SAP (lista).
 router.get('/preco-sugerido', async (req, res) => {
   try {
     const { q } = cc.lerQuantidades({ abap: req.query.abap, funcional: req.query.funcional, ambos: req.query.ambos });
-    res.json(await cc.detalhePrecoAnual(pool, emp(req), q));
+    const ultimo = req.query.cliente_id ? await cc.ultimosPrecosDoCliente(pool, emp(req), req.query.cliente_id) : null;
+    const detalhe = await cc.detalhePrecoAnual(pool, emp(req), q, ultimo && ultimo.precos);
+    res.json({ ...detalhe, origem: ultimo ? 'cliente' : 'tabela', contrato_referencia: ultimo && ultimo.contrato_id });
   } catch (err) { responderErro(res, err, 'Erro ao calcular o preço'); }
 });
 
@@ -299,8 +302,40 @@ router.get('/:id', async (req, res) => {
     const cob = (await pool.query(
       `SELECT id, valor::float AS valor, status, dia_vencimento, COALESCE(mes_cobranca, EXTRACT(MONTH FROM data_inicio)::int) AS mes_cobranca
        FROM contratos WHERE contrato_conector_id = $1`, [k.id])).rows[0] || null;
-    res.json({ ...detalhe, cobranca: cob });
+    const { precos, lista, origem } = await cc.precosDoContrato(pool, k);
+    res.json({ ...detalhe, cobranca: cob, preco: { precos, lista, origem } });
   } catch (err) { responderErro(res, err, 'Erro ao buscar contrato'); }
+});
+
+// GET /:id/licencas/previa?abap=&funcional=&ambos= — quanto muda a cobrança ao acrescentar essas licenças
+router.get('/:id/licencas/previa', async (req, res) => {
+  try {
+    const k = await contratoDaEmpresa(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    const { q } = cc.lerQuantidades({ abap: req.query.abap, funcional: req.query.funcional, ambos: req.query.ambos });
+    res.json(await cc.previaAlteracaoLicencas(pool, k, q));
+  } catch (err) { responderErro(res, err, 'Erro ao calcular'); }
+});
+
+// PUT /:id/precos { precos: { abap, funcional, ambos } } — preço negociado; vale a partir da próxima anuidade
+router.put('/:id/precos', async (req, res) => {
+  const db = await pool.connect();
+  try {
+    const k = await contratoDaEmpresa(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    const precos = cc.lerPrecos((req.body || {}).precos);
+    if (!precos) throw new cc.ErroRegra('Informe o preço de ao menos um perfil.');
+    await db.query('BEGIN');
+    const previa = await cc.previaAlteracaoLicencas(db, k, {}, precos);
+    await cc.aplicarNaCobranca(db, k, previa, req.usuario.id);
+    await db.query('COMMIT');
+    res.json({ mensagem: previa.cobranca && previa.cobranca.status === 'ativo'
+      ? `Preço salvo. A anuidade passa a R$ ${previa.valor_anual_novo.toFixed(2).replace('.', ',')} a partir da próxima cobrança (faturas já geradas não mudam).`
+      : 'Preço salvo.' });
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    responderErro(res, err, 'Erro ao salvar o preço');
+  } finally { db.release(); }
 });
 
 // Histórico das licenças do contrato e convite por perfil (admin Marsh)
@@ -382,15 +417,19 @@ router.post('/', async (req, res) => {
     const { inicio, fim } = lerDatas(b);
     const maxSids = b.max_sids === undefined || b.max_sids === '' ? 3 : Number(b.max_sids);
     if (!Number.isInteger(maxSids) || maxSids < 1 || maxSids > 10) throw new cc.ErroRegra('Máximo de SIDs: 1 a 10.');
+    // Preço negociado por licença (R$/mês); o que faltar fica com a tabela de lista
+    const precos = cc.lerPrecos(b.precos);
 
     await db.query('BEGIN');
     const { usuario: gestor, criado } = await cc.acharOuCriarUsuario(db, {
       clienteId: cliente.id, empresaId: emp(req), nome: b.gestor_nome, email: b.gestor_email, papel: 'gestor' });
+    const lista = precos ? await cc.precosTabela(db, emp(req)) : null;
     const k = (await db.query(
-      `INSERT INTO contratos_conector (empresa_id, cliente_id, gestor_usuario_id, data_inicio, data_fim, max_sids, observacoes, criado_por_usuario_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      `INSERT INTO contratos_conector (empresa_id, cliente_id, gestor_usuario_id, data_inicio, data_fim, max_sids, observacoes, criado_por_usuario_id, precos)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
       // Sem início: hoje no horário de Brasília (o CURRENT_DATE do banco é UTC e viraria o dia às 21h)
-      [emp(req), cliente.id, gestor.id, inicio || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }), fim, maxSids, String(b.observacoes || '').trim() || null, req.usuario.id])).rows[0];
+      [emp(req), cliente.id, gestor.id, inicio || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }), fim, maxSids,
+       String(b.observacoes || '').trim() || null, req.usuario.id, precos && JSON.stringify({ ...lista, ...precos })])).rows[0];
     await cc.criarVagas(db, k.id, q);
     // Quem compra vira administrador da empresa no portal (não ocupa licença por isso)
     await db.query(`INSERT INTO clientes_admins (cliente_id, usuario_id, criado_por_usuario_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
@@ -447,29 +486,54 @@ router.put('/:id', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao atualizar contrato'); }
 });
 
-// POST /:id/vagas — { abap?, funcional?, ambos? } acrescenta vagas
+const reais = v => `R$ ${Number(v).toFixed(2).replace('.', ',')}`;
+
+// POST /:id/vagas — { abap?, funcional?, ambos? } acrescenta licenças. Com cobrança ativa: anuidade nova e
+// fatura proporcional aos meses que faltam (rascunho no Faturamento), pelo preço do contrato.
 router.post('/:id/vagas', async (req, res) => {
+  const db = await pool.connect();
   try {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
     const { q, total } = cc.lerQuantidades(req.body || {});
-    if (total < 1) throw new cc.ErroRegra('Informe quantas vagas acrescentar.');
-    await cc.criarVagas(pool, k.id, q);
-    res.status(201).json({ mensagem: `${total} vaga(s) acrescentada(s).` });
-  } catch (err) { responderErro(res, err, 'Erro ao acrescentar vagas'); }
+    if (total < 1) throw new cc.ErroRegra('Informe quantas licenças acrescentar.');
+    await db.query('BEGIN');
+    await db.query('SELECT id FROM contratos_conector WHERE id = $1 FOR UPDATE', [k.id]);
+    const previa = await cc.previaAlteracaoLicencas(db, k, q);
+    await cc.criarVagas(db, k.id, q);
+    const { fatura_id } = await cc.aplicarNaCobranca(db, k, previa, req.usuario.id);
+    await db.query('COMMIT');
+    const cob = previa.cobranca && previa.cobranca.status === 'ativo';
+    res.status(201).json({ fatura_id, mensagem: `${total} licença(s) acrescentada(s).`
+      + (cob ? ` Anuidade: ${reais(previa.valor_anual_atual)} → ${reais(previa.valor_anual_novo)}.` : '')
+      + (fatura_id ? ` Fatura proporcional de ${reais(previa.valor_proporcional)} criada em rascunho no Faturamento (aprove para enviar).` : '') });
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    responderErro(res, err, 'Erro ao acrescentar licenças');
+  } finally { db.release(); }
 });
 
-// DELETE /:id/vagas/:vid — só vaga livre
+// DELETE /:id/vagas/:vid — só licença livre. Com cobrança ativa, a próxima anuidade diminui (sem estorno).
 router.delete('/:id/vagas/:vid', async (req, res) => {
+  const db = await pool.connect();
   try {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    const r = await pool.query(
-      `UPDATE contratos_conector_vagas SET ativo = FALSE WHERE id = $1 AND contrato_id = $2 AND ativo AND usuario_id IS NULL RETURNING id`,
-      [req.params.vid, k.id]);
-    if (!r.rows.length) throw new cc.ErroRegra('Só dá para remover uma vaga livre. Libere a vaga antes.');
-    res.json({ mensagem: 'Vaga removida.' });
-  } catch (err) { responderErro(res, err, 'Erro ao remover vaga'); }
+    await db.query('BEGIN');
+    const v = (await db.query(
+      `SELECT perfil FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo AND usuario_id IS NULL FOR UPDATE`,
+      [req.params.vid, k.id])).rows[0];
+    if (!v) throw new cc.ErroRegra('Só dá para remover uma licença livre. Libere a licença antes.');
+    const previa = await cc.previaAlteracaoLicencas(db, k, { [v.perfil]: -1 });
+    await db.query('UPDATE contratos_conector_vagas SET ativo = FALSE WHERE id = $1', [req.params.vid]);
+    await cc.aplicarNaCobranca(db, k, previa, req.usuario.id);
+    await db.query('COMMIT');
+    const cob = previa.cobranca && previa.cobranca.status === 'ativo';
+    res.json({ mensagem: 'Licença removida.' + (cob ? ` A próxima anuidade passa a ${reais(previa.valor_anual_novo)}.` : '') });
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    responderErro(res, err, 'Erro ao remover licença');
+  } finally { db.release(); }
 });
 
 router.post('/:id/vagas/:vid/ocupar', async (req, res) => {

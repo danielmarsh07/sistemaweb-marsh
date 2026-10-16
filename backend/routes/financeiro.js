@@ -20,7 +20,7 @@ const COLUNAS_CONTRATO = `
   ct.aliquota_iss::float AS aliquota_iss, ct.reter_iss, ct.status, ct.observacoes, ct.data_criacao,
   ct.ret_ir::float AS ret_ir, ct.ret_csll::float AS ret_csll, ct.ret_pis::float AS ret_pis,
   ct.ret_cofins::float AS ret_cofins, ct.ret_inss::float AS ret_inss,
-  ct.tipo, ct.periodicidade, ct.mes_cobranca, ct.contrato_conector_id, ct.itens, ct.proposta_id, ct.renovacao_automatica,
+  ct.tipo, ct.periodicidade, ct.mes_cobranca, ct.contrato_conector_id, ct.contrato_cursos_id, ct.itens, ct.proposta_id, ct.renovacao_automatica,
   to_char(ct.ultimo_reajuste, 'YYYY-MM-DD') AS ultimo_reajuste,
   (ct.status = 'ativo' AND ct.indice_reajuste <> 'nenhum' AND ct.mes_reajuste IS NOT NULL
    AND ct.data_inicio <= CURRENT_DATE - INTERVAL '12 months'

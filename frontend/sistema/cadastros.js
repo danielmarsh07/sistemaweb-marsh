@@ -35,18 +35,11 @@ function abrirDaFicha(acao) {
 }
 
 const fichaEditarContrato = id => abrirDaFicha(async () => { await loadContratos(); editarContrato(id); });
-const fichaNovoContrato = () => abrirDaFicha(async () => {
-  await abrirNovoContrato();
-  const f = document.getElementById('form-contrato');
-  f.cliente_id.value = _fichaAtual;
-  await preencherConectorSelect(f);
-  ajustarFormContrato();
-});
+// + Novo contrato: escolhe o tipo (serviço, licenças do Conector, cursos) já com este cliente
+const fichaNovoContrato = () => abrirDaFicha(() => novoContrato(_fichaAtual));
 const fichaConector = kid => abrirDaFicha(() => abrirContratoConector(kid));
-const fichaNovoConector = () => abrirDaFicha(async () => {
-  await abrirNovoContratoConector();
-  document.getElementById('form-novo-contrato-conector').cliente_id.value = _fichaAtual;
-});
+const fichaContratoCursos = id => abrirDaFicha(() => abrirContratoCursos(id));
+const fichaNovoContratoCursos = () => abrirDaFicha(() => abrirNovoContratoCursos(_fichaAtual));
 const fichaEditarUsuario = (id, nome, email) => abrirDaFicha(() => abrirEditarUsuario(id, nome, email, 'cliente', _fichaAtual));
 
 async function fichaAdicionarAdmin() {
@@ -80,6 +73,15 @@ const ACOES_ATIVIDADE = {
   'conector.suspenso_inadimplencia': 'Licenças suspensas por atraso', 'conector.reativado_pagamento': 'Licenças reativadas (fatura paga)'
 };
 const PERFIL_FICHA = { abap: 'ABAP', funcional: 'Funcional', ambos: 'ABAP + Funcional' };
+
+// Contrato de licenças do Conector na ficha: perfis, uso e situação
+const resumoLicencasFicha = k => [
+  [k.abap && `${k.abap} ABAP`, k.funcional && `${k.funcional} Funcional`, k.ambos && `${k.ambos} ABAP + Funcional`].filter(Boolean).join(' · ') || 'nenhuma licença',
+  `${k.em_uso} em uso`, k.convites ? `${k.convites} convite(s) pendente(s)` : '', `${k.livres} disponível(is)`
+].filter(Boolean).join(' · ');
+const statusConectorFicha = k => k.status === 'cancelado' ? pill('Cancelado', '#94a3b8')
+  : k.status === 'suspenso' ? pill(k.suspenso_por_fatura_id ? `Suspenso por atraso (fatura #${k.suspenso_por_fatura_id})` : 'Suspenso', k.suspenso_por_fatura_id ? '#b42318' : '#b7791f')
+  : k.vigente ? pill(`Ativo até ${diaBr(k.data_fim)}`, '#2e7d4f') : pill(`Vencido ${diaBr(k.data_fim)}`, '#b42318');
 
 async function abrirFichaCliente(id) {
   _fichaAtual = id;
@@ -130,17 +132,40 @@ async function abrirFichaCliente(id) {
         <div class="${f.vencido > 0 ? 'ficha-kpi-alerta' : ''}"><span>Vencido</span><strong>${formatMoeda(f.vencido)}</strong></div>
       </div>`));
 
+    // Todos os contratos numa lista só: serviço, licenças do Conector (com as licenças dentro) e cursos.
+    // Contrato de licenças abre a tela das licenças (que mostra a cobrança); os outros, o contrato financeiro.
     const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-    caixas.push(fichaCaixa('Contratos', (d.contratos.length ? `<ul class="ficha-lista">${d.contratos.map(ct => `
-      <li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato" onclick="fichaEditarContrato(${ct.id})" onkeydown="if(event.key==='Enter')fichaEditarContrato(${ct.id})">
+    const kPorId = Object.fromEntries((d.conector || []).map(k => [k.id, k]));
+    const itemContrato = (ct, k) => {
+      const abrir = k ? `fichaConector(${k.id})` : `fichaEditarContrato(${ct.id})`;
+      const tipo = k ? 'Licenças do Conector' : ct.tipo === 'produto' ? 'Produto' : 'Serviço';
+      return `
+      <li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato" onclick="${abrir}" onkeydown="if(event.key==='Enter')${abrir}">
         <div><strong>${escapeHtml(ct.descricao)}</strong>
-          <span>CT-${String(ct.id).padStart(4, '0')} · ${ct.tipo === 'produto' ? 'Produto' : 'Serviço'} · desde ${diaBr(ct.data_inicio)}${ct.data_fim ? ` até ${diaBr(ct.data_fim)}` : ''} · vence dia ${ct.dia_vencimento}</span></div>
-        <div class="ficha-dir">${formatMoeda(ct.valor)}${ct.periodicidade === 'anual' ? `/ano (${MESES[ct.mes_cobranca - 1]})` : '/mês'} ${pill(ct.status === 'ativo' ? 'Ativo' : ct.status === 'suspenso' ? 'Suspenso' : 'Encerrado',
-          ct.status === 'ativo' ? '#2e7d4f' : ct.status === 'suspenso' ? '#b7791f' : '#94a3b8')}</div></li>`).join('')}</ul>`
-      : fichaVazio('Nenhum contrato.')) + `<div class="ficha-botoes">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoContrato()">+ Contrato de serviço</button>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoConector()">+ Licenças do Conector (com cobrança)</button>
-      </div>`,
+          <span>CT-${String(ct.id).padStart(4, '0')} · ${tipo} · desde ${diaBr(ct.data_inicio)}${ct.data_fim ? ` até ${diaBr(ct.data_fim)}` : ''} · vence dia ${ct.dia_vencimento}</span>
+          ${k ? `<span>${resumoLicencasFicha(k)}</span>` : ''}</div>
+        <div class="ficha-dir">${formatMoeda(ct.valor)}${ct.periodicidade === 'anual' ? `/ano (${MESES[ct.mes_cobranca - 1]})` : '/mês'} ${k ? statusConectorFicha(k) : pill(ct.status === 'ativo' ? 'Ativo' : ct.status === 'suspenso' ? 'Suspenso' : 'Encerrado',
+          ct.status === 'ativo' ? '#2e7d4f' : ct.status === 'suspenso' ? '#b7791f' : '#94a3b8')}</div></li>`;
+    };
+    // Licenças sem contrato financeiro (sem cobrança) também aparecem aqui
+    const semCobranca = (d.conector || []).filter(k => !k.contrato_financeiro_id).map(k => `
+      <li class="ficha-clicavel" role="button" tabindex="0" title="Abrir as licenças" onclick="fichaConector(${k.id})" onkeydown="if(event.key==='Enter')fichaConector(${k.id})">
+        <div><strong>Licenças do Conector nº ${k.id}</strong>
+          <span>Licenças do Conector · <em>sem cobrança</em></span><span>${resumoLicencasFicha(k)}</span></div>
+        <div class="ficha-dir">${statusConectorFicha(k)}</div></li>`);
+    // Contratos de cursos (cortesia, pagamento único ou recorrente): um item por contrato, com os cursos
+    const COB_CURSOS = { cortesia: 'cortesia', unica: 'pagamento único', mensal: '/mês', anual: '/ano' };
+    const cursosItens = (d.contratos_cursos || []).map(k => `
+      <li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato de cursos" onclick="fichaContratoCursos(${k.id})" onkeydown="if(event.key==='Enter')fichaContratoCursos(${k.id})">
+        <div><strong>Cursos para a empresa nº ${k.id}</strong>
+          <span>Cursos · desde ${diaBr(k.data_inicio)}${k.data_fim ? ` até ${diaBr(k.data_fim)}` : ' · sem prazo'}</span>
+          <span>${escapeHtml(k.cursos.join(' · ') || 'nenhum curso')}</span></div>
+        <div class="ficha-dir">${k.cobranca === 'cortesia' ? 'Cortesia' : `${formatMoeda(k.valor)} ${COB_CURSOS[k.cobranca]}`}
+          ${k.status !== 'ativo' ? pill('Encerrado', '#94a3b8') : k.vigente ? pill('Ativo', '#2e7d4f') : pill(`Vencido ${diaBr(k.data_fim)}`, '#b42318')}</div></li>`);
+    const itens = [...d.contratos.filter(ct => !ct.contrato_cursos_id).map(ct => itemContrato(ct, ct.contrato_conector_id && kPorId[ct.contrato_conector_id])),
+      ...semCobranca, ...cursosItens];
+    caixas.push(fichaCaixa('Contratos', (itens.length ? `<ul class="ficha-lista">${itens.join('')}</ul>` : fichaVazio('Nenhum contrato.'))
+      + `<div class="ficha-botoes"><button type="button" class="btn btn-primary btn-sm" onclick="fichaNovoContrato()">+ Novo contrato</button></div>`,
       { texto: 'Contratos', acao: "irPara('contratos')" }, 'ficha-caixa-larga'));
 
     caixas.push(fichaCaixa('Faturas recentes', d.faturas.length ? `<ul class="ficha-lista">${d.faturas.map(ft => {
@@ -152,29 +177,16 @@ async function abrirFichaCliente(id) {
     }).join('')}</ul>` : fichaVazio('Nenhuma fatura.'), { texto: 'Faturamento', acao: "irPara('faturamento')" }));
   }
 
-  // Licenças do Conector: contratos por vagas, administradores da empresa e convites
+  // Administradores da empresa no portal: veem e distribuem as licenças e os cursos da empresa
   if (d.admin) {
     const admins = d.usuarios.filter(u => u.admin_empresa);
-    const contratosK = d.conector.length ? `<ul class="ficha-lista">${d.conector.map(k => {
-      const st = k.status === 'cancelado' ? pill('Cancelado', '#94a3b8')
-        : k.status === 'suspenso' ? pill(k.suspenso_por_fatura_id ? `Suspenso por atraso (fatura #${k.suspenso_por_fatura_id})` : 'Suspenso', k.suspenso_por_fatura_id ? '#b42318' : '#b7791f')
-        : k.vigente ? pill(`Ativo até ${diaBr(k.data_fim)}`, '#2e7d4f') : pill(`Vencido ${diaBr(k.data_fim)}`, '#b42318');
-      const perfis = [k.abap && `${k.abap} ABAP`, k.funcional && `${k.funcional} Funcional`, k.ambos && `${k.ambos} Ambos`].filter(Boolean).join(' · ');
-      return `<li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato do Conector" onclick="fichaConector(${k.id})" onkeydown="if(event.key==='Enter')fichaConector(${k.id})">
-        <div><strong>Contrato nº ${k.id} · ${k.total} licença(s)</strong>
-          <span>${perfis} · ${k.em_uso} em uso · ${k.convites} convite(s) pendente(s) · ${k.livres} disponível(is)${k.contrato_financeiro_id ? '' : ' · <em>sem cobrança</em>'}</span></div>
-        <div class="ficha-dir">${st}</div></li>`;
-    }).join('')}</ul>` : fichaVazio('Nenhum contrato de licenças do Conector.');
     const listaAdmins = admins.length ? `<ul class="ficha-lista">${admins.map(a => `
       <li><div><strong>${escapeHtml(a.nome)}</strong><span>${escapeHtml(a.email)}${a.convite_pendente ? ' · convite pendente' : ''}</span></div>
         <div class="ficha-dir">${admins.length > 1 ? `<button type="button" class="btn btn-secondary btn-sm" onclick="fichaRemoverAdmin(${a.id}, '${escapeHtml(a.nome).replace(/'/g, '&#39;')}')">Remover</button>` : ''}</div></li>`).join('')}</ul>`
-      : fichaVazio('Ninguém administra as licenças no portal ainda.');
-    caixas.push(fichaCaixa('Licenças do Conector SAP', `${contratosK}
-      <div class="ficha-subtitulo">Administradores da empresa</div>${listaAdmins}
-      <div class="ficha-botoes">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoConector()">+ Licenças do Conector (com cobrança)</button>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="fichaAdicionarAdmin()">+ Administrador</button>
-      </div>`, { texto: 'Contratos do Conector', acao: "irPara('contratos-conector')" }, 'ficha-caixa-larga'));
+      : fichaVazio('Ninguém administra a empresa no portal ainda.');
+    caixas.push(fichaCaixa('Administradores da empresa no portal', `
+      <p class="ficha-resumo">Veem os contratos, distribuem as licenças do Conector e convidam pessoas pelo portal.</p>${listaAdmins}
+      <div class="ficha-botoes"><button type="button" class="btn btn-secondary btn-sm" onclick="fichaAdicionarAdmin()">+ Administrador</button></div>`));
   }
 
   caixas.push(fichaCaixa('Usuários do portal', d.usuarios.length ? `<ul class="ficha-lista">${d.usuarios.map(u => {
@@ -211,12 +223,16 @@ async function abrirFichaCliente(id) {
   const porCurso = new Map(d.cursos_acesso.map(x => [x.id, x]));
   const cursosLinhas = [...d.cursos.map(cu => ({ ...cu, ...(porCurso.get(cu.id) || {}) })),
     ...d.cursos_acesso.filter(x => !d.cursos.some(cu => cu.id === x.id))];
-  caixas.push(fichaCaixa('Cursos', cursosLinhas.length ? `<ul class="ficha-lista">${cursosLinhas.map(cu => {
-    const origens = [cu.por_licenca && `${cu.por_licenca} pela licença`, cu.pela_empresa && `${cu.pela_empresa} pela empresa`,
-      cu.individual && `${cu.individual} individual`].filter(Boolean).join(' · ');
+  caixas.push(fichaCaixa('Cursos', (cursosLinhas.length ? `<ul class="ficha-lista">${cursosLinhas.map(cu => {
+    const origens = [cu.por_licenca && `${cu.por_licenca} pela licença do Conector`, cu.pela_empresa && `${cu.pela_empresa} pela empresa`,
+      cu.individual && `${cu.individual} individual (compra na Loja ou concessão)`].filter(Boolean).join(' · ');
+    const origem = cu.contrato_cursos_id ? pill(`Contrato de cursos nº ${cu.contrato_cursos_id}`, '#1d6fd8')
+      : cu.aulas !== undefined ? pill('Liberado p/ empresa', '#64748b') : '';
     return `<li><div><strong>${escapeHtml(cu.titulo)}</strong><span>${origens || 'ninguém com acesso agora'}${cu.acesso_ate ? ` · liberado até ${diaBr(cu.acesso_ate)}` : ''}</span></div>
-      <div class="ficha-dir">${cu.aulas !== undefined ? pill('Liberado p/ empresa', '#64748b') : ''}</div></li>`;
-  }).join('')}</ul>` : fichaVazio('Nenhum curso liberado ou em uso.'), { texto: 'Treinamentos', acao: "irPara('treinamentos')" }));
+      <div class="ficha-dir">${origem}</div></li>`;
+  }).join('')}</ul>` : fichaVazio('Nenhum curso liberado ou em uso.'))
+    + (d.admin ? `<div class="ficha-botoes"><button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoContratoCursos()">+ Liberar cursos para a empresa</button></div>` : ''),
+    { texto: 'Treinamentos', acao: "irPara('treinamentos')" }));
 
   caixas.push(fichaCaixa('Tecnologias', d.tecnologias.length
     ? `<div class="ficha-tags">${d.tecnologias.map(t => `<span title="${escapeHtml(t.categoria || '')}${t.desde ? ' · desde ' + diaBr(t.desde) : ''}">${escapeHtml(t.nome)}</span>`).join('')}</div>`

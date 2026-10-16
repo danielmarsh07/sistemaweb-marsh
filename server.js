@@ -58,6 +58,7 @@ const autenticar = require('./backend/middleware/autenticar');
 const apenasEquipe = require('./backend/middleware/apenas-equipe');
 const alertasRoutes = require('./backend/routes/alertas');
 const contratosConectorRoutes = require('./backend/routes/contratos-conector');
+const contratosCursosRoutes = require('./backend/routes/contratos-cursos');
 const bloquearAluno = require('./backend/middleware/bloquear-aluno');
 const lojaRoutes = require('./backend/routes/loja');
 
@@ -83,6 +84,7 @@ app.use('/api/assistente', autenticar, bloquearAluno, assistenteRoutes);
 app.use('/api/licencas', autenticar, bloquearAluno, licencasRoutes);
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/contratos-conector', autenticar, contratosConectorRoutes);
+app.use('/api/contratos-cursos', autenticar, apenasEquipe, contratosCursosRoutes); // só administradores (o router confere)
 app.use('/api/financeiro', autenticar, bloquearAluno, financeiroRoutes);
 app.use('/api/comercial', autenticar, comercialRoutes);
 app.use('/api/alertas', autenticar, alertasRoutes);
@@ -1381,6 +1383,32 @@ async function iniciar() {
     await pool.query(`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS itens JSONB;`);
     await pool.query(`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS eu_perfil VARCHAR(20);`);
     await pool.query(`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS contrato_conector_id INTEGER;`);
+
+    // 37. Contratos unificados — fase 1 (docs/plano-contratos-unificados.md): preço negociado por contrato
+    //     precos = { abap, funcional, ambos } em R$ por licença por mês (plano anual). A tabela Preços Conector SAP
+    //     vira o preço de lista; NULL = contrato antigo (o preço sai do valor cobrado, na proporção da tabela).
+    await pool.query(`ALTER TABLE contratos_conector ADD COLUMN IF NOT EXISTS precos JSONB;`);
+    //     Fase 2: contrato de cursos para a empresa inteira (valor 0 = cortesia). Os cursos entram como liberação
+    //     da empresa com validade (cursos_liberacoes.contrato_cursos_id), valendo para todos do cliente, inclusive
+    //     quem só usa licença; a cobrança (se houver) é um contrato financeiro ligado (contratos.contrato_cursos_id).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contratos_cursos (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        data_inicio DATE NOT NULL DEFAULT CURRENT_DATE,
+        data_fim DATE,
+        valor NUMERIC(12,2) NOT NULL DEFAULT 0,
+        cobranca VARCHAR(10) NOT NULL DEFAULT 'cortesia',
+        status VARCHAR(12) NOT NULL DEFAULT 'ativo',
+        observacoes TEXT,
+        criado_por_usuario_id INTEGER,
+        data_criacao TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        data_atualizacao TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_cursos_cliente ON contratos_cursos(cliente_id);`);
+    await pool.query(`ALTER TABLE cursos_liberacoes ADD COLUMN IF NOT EXISTS contrato_cursos_id INTEGER REFERENCES contratos_cursos(id) ON DELETE SET NULL;`);
+    await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS contrato_cursos_id INTEGER REFERENCES contratos_cursos(id) ON DELETE SET NULL;`);
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

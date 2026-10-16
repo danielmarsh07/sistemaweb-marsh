@@ -372,7 +372,8 @@ async function estimarContratos(empresa, lista, mesAtual, config) {
               ct.valor::float AS valor, to_char(ct.data_inicio, 'YYYY-MM-DD') AS data_inicio,
               to_char(ct.data_fim, 'YYYY-MM-DD') AS data_fim, ct.reter_iss, ct.aliquota_iss::float AS aliquota_iss,
               ct.ret_ir::float AS ret_ir, ct.ret_csll::float AS ret_csll, ct.ret_pis::float AS ret_pis,
-              ct.ret_cofins::float AS ret_cofins, ct.ret_inss::float AS ret_inss
+              ct.ret_cofins::float AS ret_cofins, ct.ret_inss::float AS ret_inss,
+              ct.periodicidade, COALESCE(ct.mes_cobranca, EXTRACT(MONTH FROM ct.data_inicio))::int AS mes_cobranca
        FROM contratos ct JOIN clientes c ON c.id = ct.cliente_id
        WHERE ct.empresa_id = $1 AND ct.status = 'ativo'`, [empresa]),
     pool.query(
@@ -390,6 +391,8 @@ async function estimarContratos(empresa, lista, mesAtual, config) {
     for (const ct of contratos.rows) {
       if (jaFaturado.has(`${ct.id}|${comp}`)) continue;
       if (mesDe(ct.data_inicio) > comp || (ct.data_fim && mesDe(ct.data_fim) < comp)) continue;
+      // Anual: só no mês da cobrança (igual ao faturamento), não todo mês
+      if (ct.periodicidade === 'anual' && Number(comp.slice(5, 7)) !== ct.mes_cobranca) continue;
       const ret = fat.RETENCOES.reduce((s, r) => s + Number(ct[r] ?? config[r] ?? 0), 0);
       const iss = ct.reter_iss ? Number(ct.aliquota_iss ?? config.aliquota_iss ?? 0) : 0;
       saida.push({ mes: m, cliente_id: ct.cliente_id, cliente_nome: ct.cliente_nome, valor: r2(ct.valor * (1 - (ret + iss) / 100)) });

@@ -22,6 +22,14 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.4', data: '2026-10-16', destaques: [
+      'Um botão só para contratar: "+ Novo contrato" (na ficha do cliente e em Contratos) pergunta o tipo (Serviço, Licenças do Conector ou Cursos) e abre o formulário certo',
+      'Preço especial por cliente sem mexer na tabela: cada contrato de licenças guarda o seu preço por perfil, com o preço de lista e o desconto ao lado. O próximo contrato do mesmo cliente já vem com esse preço',
+      'Licenças a mais no meio do contrato geram a fatura proporcional aos meses que faltam e atualizam a anuidade; licenças a menos reduzem a próxima anuidade. A conta aparece antes de confirmar',
+      'Novo contrato de Cursos para a empresa: escolha os cursos e a validade; cortesia (gratuito), pagamento único, mensal ou anual. Vale para todas as pessoas da empresa no portal',
+      'Ficha do cliente: todos os contratos numa caixa só (licenças do Conector dentro do contrato), botão "+ Liberar cursos para a empresa" e a origem de cada curso',
+      'Visão mensal: contrato anual aparece só no mês em que é cobrado (antes era estimado todo mês)'
+    ] },
     { versao: 'v4.3', data: '2026-10-16', destaques: [
       'Contratos mais claros: os botões agora dizem "+ Contrato de serviço" e "+ Licenças do Conector (com cobrança)", na ficha do cliente e em Contratos',
       'Licenças do Conector se criam num lugar só: o formulário define as licenças e já monta a cobrança anual. Escolher "Produto" no contrato de serviço leva direto para lá',

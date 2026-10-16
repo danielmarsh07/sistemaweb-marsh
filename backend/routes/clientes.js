@@ -80,7 +80,7 @@ router.get('/:id/ficha', async (req, res) => {
     if (!c) return res.status(404).json({ erro: 'Cliente não encontrado' });
 
     const vazio = { rows: [] };
-    const [usuarios, licencas, cursos, tecnologias, chamados, contratos, faturas, oportunidades, conector, cursosAcesso, atividade] = await Promise.all([
+    const [usuarios, licencas, cursos, tecnologias, chamados, contratos, faturas, oportunidades, conector, cursosAcesso, atividade, contratosCursos] = await Promise.all([
       // Usuários do portal com o papel: administrador da empresa, licença do Conector (ativa ou convite) e acesso amplo
       pool.query(
         `SELECT u.id, u.nome, u.email, u.ativo, u.portal_papel,
@@ -94,7 +94,7 @@ router.get('/:id/ficha', async (req, res) => {
                 (data_fim < CURRENT_DATE) AS vencida
          FROM licencas WHERE cliente_id = $1 AND ativo = TRUE AND status <> 'cancelada' ORDER BY data_fim DESC`, [id]),
       pool.query(
-        `SELECT cu.id, cu.titulo, cu.status, to_char(lb.data_fim, 'YYYY-MM-DD') AS acesso_ate,
+        `SELECT cu.id, cu.titulo, cu.status, to_char(lb.data_fim, 'YYYY-MM-DD') AS acesso_ate, lb.contrato_cursos_id,
                 (SELECT COUNT(*) FROM cursos_aulas a WHERE a.curso_id = cu.id AND a.ativo)::int AS aulas,
                 (SELECT COUNT(DISTINCT p.usuario_id) FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
                    JOIN usuarios u ON u.id = p.usuario_id WHERE a.curso_id = cu.id AND u.cliente_id = $1)::int AS alunos
@@ -111,7 +111,7 @@ router.get('/:id/ficha', async (req, res) => {
          FROM chamados WHERE cliente_id = $1 AND ativo = TRUE
          ORDER BY (status NOT IN ('resolvido','fechado')) DESC, data_abertura DESC LIMIT 8`, [id]),
       admin ? pool.query(
-        `SELECT id, descricao, valor::float AS valor, dia_vencimento, status, tipo, periodicidade, contrato_conector_id,
+        `SELECT id, descricao, valor::float AS valor, dia_vencimento, status, tipo, periodicidade, contrato_conector_id, contrato_cursos_id,
                 COALESCE(mes_cobranca, EXTRACT(MONTH FROM data_inicio)::int) AS mes_cobranca,
                 to_char(data_inicio, 'YYYY-MM-DD') AS data_inicio, to_char(data_fim, 'YYYY-MM-DD') AS data_fim
          FROM contratos WHERE cliente_id = $1 ORDER BY status = 'ativo' DESC, data_inicio DESC`, [id]) : vazio,
@@ -158,7 +158,15 @@ router.get('/:id/ficha', async (req, res) => {
             OR (a.entidade = 'contrato_conector' AND a.entidade_id IN (SELECT id FROM contratos_conector WHERE cliente_id = $1))
             OR (a.entidade = 'vaga_conector' AND (COALESCE(a.depois, a.antes)->>'contrato_id')::int IN (SELECT id FROM contratos_conector WHERE cliente_id = $1))
             OR (a.entidade = 'usuario' AND a.entidade_id IN (SELECT id FROM usuarios WHERE cliente_id = $1))
-         ORDER BY a.criado_em DESC, a.id DESC LIMIT 12`, [id]) : vazio
+         ORDER BY a.criado_em DESC, a.id DESC LIMIT 12`, [id]) : vazio,
+      // Contratos de cursos para a empresa (cortesia, pagamento único ou recorrente)
+      admin ? pool.query(
+        `SELECT k.id, k.status, k.cobranca, k.valor::float AS valor,
+                to_char(k.data_inicio, 'YYYY-MM-DD') AS data_inicio, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
+                (k.status = 'ativo' AND (k.data_fim IS NULL OR k.data_fim >= CURRENT_DATE)) AS vigente,
+                COALESCE((SELECT json_agg(c.titulo ORDER BY c.titulo) FROM cursos_liberacoes lb JOIN cursos c ON c.id = lb.curso_id
+                            WHERE lb.contrato_cursos_id = k.id), '[]') AS cursos
+         FROM contratos_cursos k WHERE k.cliente_id = $1 ORDER BY (k.status = 'ativo') DESC, k.id DESC`, [id]) : vazio
     ]);
 
     // Resumo financeiro do cliente (só admin)
@@ -179,7 +187,7 @@ router.get('/:id/ficha', async (req, res) => {
       usuarios: usuarios.rows, licencas: licencas.rows, cursos: cursos.rows, tecnologias: tecnologias.rows,
       chamados: { lista: chamados.rows, total: Number(chamados.rows[0]?.total || 0), abertos: Number(chamados.rows[0]?.abertos || 0) },
       contratos: contratos.rows, faturas: faturas.rows, oportunidades: oportunidades.rows,
-      conector: conector.rows, cursos_acesso: cursosAcesso.rows, atividade: atividade.rows
+      conector: conector.rows, cursos_acesso: cursosAcesso.rows, atividade: atividade.rows, contratos_cursos: contratosCursos.rows
     });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao montar a ficha do cliente', detalhe: err.message });

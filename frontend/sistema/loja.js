@@ -128,7 +128,7 @@ async function loadPedidosLoja() {
       <td data-label="Comprador"><strong>${escapeHtml(p.nome)}</strong><span class="loja-sub">${escapeHtml(p.email)} · ${escapeHtml(p.cpf_cnpj || '')}</span></td>
       <td data-label="Oferta">${escapeHtml(p.oferta)}${p.cupom ? `<span class="loja-sub">cupom ${escapeHtml(p.cupom)}</span>` : ''}
         ${p.itens ? `<span class="loja-sub">${Object.entries(p.itens).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${{ abap: 'ABAP', funcional: 'Funcional', ambos: 'Ambos' }[k] || k}`).join(' · ')}</span>` : ''}
-        ${p.contrato_conector_id ? `<a href="#" class="loja-sub" onclick="showPage('contratos-conector'); abrirContratoConector(${p.contrato_conector_id}); return false;">Contrato do Conector nº ${p.contrato_conector_id}</a>` : ''}</td>
+        ${p.contrato_conector_id ? `<a href="#" class="loja-sub" onclick="abrirContratoConector(${p.contrato_conector_id}); return false;">Contrato do Conector nº ${p.contrato_conector_id}</a>` : ''}</td>
       <td data-label="Valor" class="fin-num">${formatMoeda(p.valor)}${p.desconto > 0 ? `<span class="loja-sub">−${formatMoeda(p.desconto)}</span>` : ''}</td>
       <td data-label="Status">${pill(txt, cor)} ${p.modo === 'teste' ? pill('Teste', '#b7791f') : ''}
         ${p.status === 'pago' && p.acesso_fim ? `<span class="loja-sub">acesso até ${diaBr(p.acesso_fim)}</span>` : ''}

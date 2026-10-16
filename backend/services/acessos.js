@@ -25,12 +25,14 @@ async function origensVivas(usuarioId) {
      JOIN contratos_conector k ON k.id = v.contrato_id
      JOIN cursos c ON c.ativo AND c.status = 'publicado'
      WHERE v.usuario_id = $1 AND ${cc.VAGA_VIGENTE} AND ${cc.PERFIL_COBRE_CURSO}`, [usuarioId])).rows;
-  const liberacao = u.cliente_id && u.portal_papel !== 'aluno' ? (await pool.query(
+  // Liberação avulsa não vale para quem só usa licença (aluno); a de contrato de cursos vale para todos do cliente
+  const liberacao = u.cliente_id ? (await pool.query(
     `SELECT lb.curso_id, 'liberacao' AS origem, lb.cliente_id AS origem_id, to_char(lb.data_fim, 'YYYY-MM-DD') AS fim,
-            'Liberado para a empresa' AS descricao
+            CASE WHEN lb.contrato_cursos_id IS NOT NULL THEN 'Contrato de cursos nº ' || lb.contrato_cursos_id ELSE 'Liberado para a empresa' END AS descricao
      FROM cursos_liberacoes lb JOIN cursos c ON c.id = lb.curso_id
-     WHERE lb.cliente_id = $1 AND c.ativo AND c.status = 'publicado' AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE)`,
-    [u.cliente_id])).rows : [];
+     WHERE lb.cliente_id = $1 AND c.ativo AND c.status = 'publicado' AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE)
+       AND (lb.contrato_cursos_id IS NOT NULL OR $2 <> 'aluno')`,
+    [u.cliente_id, u.portal_papel || ''])).rows : [];
   return [...beneficio, ...liberacao];
 }
 

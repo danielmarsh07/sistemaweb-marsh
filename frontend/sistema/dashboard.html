@@ -187,9 +187,6 @@
           <a href="#" data-page="licencas" class="nav-link">
             <svg class="icon"><use href="#i-shield"/></svg> Licenças
           </a>
-          <a href="#" data-page="contratos-conector" class="nav-link">
-            <svg class="icon"><use href="#i-users"/></svg> Contratos por vagas
-          </a>
           <a href="#" data-page="treinamentos" class="nav-link">
             <svg class="icon"><use href="#i-cap"/></svg> Treinamentos
           </a>
@@ -816,15 +813,12 @@
       <section id="contratos-page" class="page">
         <div class="page-header">
           <h2>Contratos recorrentes</h2>
-          <div class="page-header-acoes">
-            <button type="button" class="btn btn-secondary" onclick="abrirNovoContratoConector()">+ Licenças do Conector</button>
-            <button type="button" class="btn btn-primary" onclick="abrirNovoContrato()">+ Contrato de serviço</button>
-          </div>
+          <button type="button" class="btn btn-primary" onclick="novoContrato()">+ Novo contrato</button>
         </div>
         <p class="pagina-descricao">
-          Cada cliente pode ter vários contratos independentes: serviços com cobrança mensal e produtos (como as licenças do Conector) com cobrança anual.
-          O contrato mensal gera uma fatura por mês; o anual, uma por ano no mês da cobrança. Mudanças aqui valem para as próximas faturas e ficam no histórico do contrato.
-          Licenças do Conector se criam em <strong>+ Licenças do Conector</strong>: o mesmo formulário define as licenças e já monta a cobrança anual aqui.
+          Todos os contratos dos clientes ficam aqui: serviços, licenças do Conector SAP e cursos. Em <strong>+ Novo contrato</strong> você escolhe o tipo
+          e o sistema abre o formulário certo. O contrato mensal gera uma fatura por mês; o anual, uma por ano no mês da cobrança.
+          Mudanças valem para as próximas faturas e ficam no histórico do contrato.
         </p>
         <div class="table-container">
           <table>
@@ -995,12 +989,11 @@
                 <a href="#" class="roteiro-ir" onclick="showPage('funil'); return false;">Funil de vendas →</a></li>
               <li><strong>Cadastro do cliente</strong>: razão social, <strong>CPF ou CNPJ</strong> (obrigatório para nota e cobrança), endereço e <strong>e-mail financeiro</strong>.
                 <a href="#" class="roteiro-ir" onclick="showPage('clientes'); return false;">Clientes →</a></li>
-              <li><strong>Contrato de serviço</strong> (consultoria SAP, CPI, sustentação…): tipo <em>Serviço</em>, cobrança <em>Mensal</em>, valor, vencimento, vigência,
-                reajuste e se <em>renova automaticamente</em>. Um contrato por serviço.
+              <li><strong>Contratos</strong>: na ficha do cliente ou em Contratos, <strong>+ Novo contrato</strong> e escolha o tipo.
+                <em>Serviço</em> (consultoria SAP, CPI, sustentação…): cobrança mensal, valor, vencimento, vigência, reajuste e renovação automática.
+                <em>Licenças do Conector</em>: quantas licenças de cada perfil e o <strong>preço negociado</strong> deste cliente (vem da tabela de lista; alterar não mexe na tabela),
+                já com a cobrança anual. Quem compra vira <strong>administrador da empresa</strong> no portal e convida as pessoas.
                 <a href="#" class="roteiro-ir" onclick="showPage('contratos'); return false;">Contratos →</a></li>
-              <li><strong>Licenças do Conector</strong>: crie o contrato de licenças (vagas por perfil) já com a <strong>cobrança anual</strong> (valor sugerido pela tabela).
-                Quem compra vira <strong>administrador da empresa</strong> no portal e convida as pessoas.
-                <a href="#" class="roteiro-ir" onclick="showPage('contratos-conector'); return false;">Contratos do Conector →</a></li>
               <li><strong>Acesso ao portal</strong>: o administrador da empresa recebe convite por e-mail para criar a senha. Outros usuários: Usuários → novo usuário do tipo <em>Cliente</em> com convite.
                 <a href="#" class="roteiro-ir" onclick="showPage('usuarios'); return false;">Usuários →</a></li>
               <li><strong>Cursos</strong>: os do Conector vêm com a licença (Benefícios); outros, libere para a empresa, para uma pessoa ou venda na Loja.</li>
@@ -1025,7 +1018,9 @@
             <h3>Licenças do Conector por contrato</h3>
             <p class="fin-muted">As licenças pertencem ao contrato; as pessoas recebem uma licença por convite. Nunca passa do total contratado.</p>
             <ol>
-              <li><strong>Contrato</strong>: cliente, administrador (e-mail), vagas por perfil (ABAP, Funcional, ABAP + Funcional), vigência e a cobrança anual.</li>
+              <li><strong>Contrato</strong>: cliente, administrador (e-mail), licenças por perfil (ABAP, Funcional, ABAP + Funcional) com o preço negociado, vigência e a cobrança anual.</li>
+              <li><strong>Mais ou menos licenças</strong>: em "Licenças e preço". A mais = fatura proporcional aos meses que faltam (rascunho) e anuidade nova;
+                a menos = a próxima anuidade diminui. Sempre pelo preço do contrato, com a conta na tela antes de confirmar.</li>
               <li><strong>Convites</strong>: o administrador da empresa (no portal) ou você (no contrato) convida pelo e-mail escolhendo o perfil. A licença fica <em>reservada</em>
                 até a pessoa criar a senha; o link vale 72 h (reenviar renova). Sem aceite, a licença volta sozinha.</li>
               <li><strong>Cursos inclusos</strong>: os marcados em Benefícios do Conector para o perfil, enquanto a licença estiver ativa.
@@ -1033,7 +1028,7 @@
               <li><strong>Revogar</strong>: a pessoa perde o Conector e os cursos inclusos na hora; conta, progresso, certificado e cursos comprados ficam.</li>
               <li><strong>Vários administradores</strong> por empresa (nunca zero); ser administrador não ocupa licença. Histórico de tudo no contrato.</li>
             </ol>
-            <a href="#" class="roteiro-ir" onclick="showPage('contratos-conector'); return false;">Contratos do Conector →</a>
+            <a href="#" class="roteiro-ir" onclick="showPage('contratos'); return false;">Contratos →</a>
             <a href="#" class="roteiro-ir" onclick="showPage('beneficios-conector'); return false;">Benefícios do Conector →</a>
           </section>
 
@@ -1356,6 +1351,9 @@
           </div>
         </div>
         <p class="pagina-descricao">Valores em R$ (por mês nas licenças e serviços mensais). É a mesma tabela usada pelo simulador: vale para as próximas simulações; propostas já criadas não mudam. Campo vazio volta ao padrão.</p>
+        <p class="fin-aviso"><strong>Esta é a tabela de preço de lista</strong> (Loja do site, simulador, propostas e sugestão de novos contratos).
+          Para um preço especial de um cliente, <strong>não mude a tabela</strong>: ajuste o preço no próprio contrato de licenças
+          (+ Novo contrato → Licenças do Conector, ou "Licenças e preço" num contrato existente). Mudar a tabela não altera contratos já feitos.</p>
         <form id="form-precos-conector-pagina" class="form rel-card">
           <div id="precos-conector-pagina-campos"></div>
           <div class="form-actions">
@@ -3368,9 +3366,82 @@
     </div>
   </div>
 
+  <!-- + Novo contrato: escolha do tipo (financeiro.js novoContrato) -->
+  <div id="modal-tipo-contrato" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Novo contrato: qual tipo?</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <div class="tipo-contrato-opcoes">
+        <button type="button" class="tipo-contrato-opcao" onclick="escolherTipoContrato('servico')">
+          <strong>Serviço</strong>
+          <span>Consultoria, AMS, projetos e sustentação. Cobrança mensal ou anual, com nota fiscal.</span>
+        </button>
+        <button type="button" class="tipo-contrato-opcao" onclick="escolherTipoContrato('conector')">
+          <strong>Licenças do Conector SAP</strong>
+          <span>Licenças por perfil (ABAP, Funcional, ABAP + Funcional) com o preço negociado deste cliente. Já monta a cobrança anual.</span>
+        </button>
+        <button type="button" class="tipo-contrato-opcao" id="tipo-contrato-cursos" onclick="escolherTipoContrato('cursos')">
+          <strong>Cursos para a empresa</strong>
+          <span>Libera cursos para todos da empresa, com validade. Pago ou cortesia (R$ 0).</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contrato de cursos para a empresa (contratos-cursos.js) -->
+  <div id="modal-contrato-cursos" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="contrato-cursos-titulo">Cursos para a empresa</h3>
+        <button class="btn-close">&times;</button>
+      </div>
+      <form id="form-contrato-cursos" class="form">
+        <p class="pagina-descricao">Os cursos escolhidos ficam liberados para <strong>todas as pessoas da empresa</strong> no portal até o fim da validade.
+          Quem ainda não tem acesso: crie um usuário do tipo Cliente ou um administrador da empresa (ele convida os demais).</p>
+        <div class="form-group">
+          <label>Cliente <span class="obrig" title="Obrigatório">*</span></label>
+          <select name="cliente_id" required></select>
+        </div>
+        <div class="form-section-title">Cursos</div>
+        <div id="cc-cursos" class="cc-cursos-lista"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
+          <div class="form-group"><label>Validade (fim)</label><input type="date" name="data_fim">
+            <small class="form-hint">Vazio = sem prazo.</small></div>
+        </div>
+        <div class="form-section-title">Cobrança</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Como cobrar</label>
+            <select name="cobranca" onchange="ajustarFormCursos()">
+              <option value="cortesia">Cortesia (gratuito, sem cobrança)</option>
+              <option value="unica">Pagamento único (fatura avulsa)</option>
+              <option value="mensal">Mensal</option>
+              <option value="anual">Anual</option>
+            </select>
+          </div>
+          <div class="form-group" id="cc-valor-grupo"><label id="cc-valor-rotulo">Valor (R$)</label><input type="number" name="valor" min="0.01" step="0.01"></div>
+          <div class="form-group" id="cc-dia-grupo"><label>Dia do vencimento</label><input type="number" name="dia_vencimento" min="1" max="28" value="10"></div>
+        </div>
+        <p class="form-hint" id="cc-cobranca-nota"></p>
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea name="observacoes" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-danger" id="cc-btn-encerrar" onclick="encerrarContratoCursos()">Encerrar contrato</button>
+          <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="cc-btn-salvar">Liberar cursos</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Novo contrato do Conector por vagas (contratos-conector.js) -->
   <div id="modal-novo-contrato-conector" class="modal">
-    <div class="modal-content">
+    <div class="modal-content modal-lg">
       <div class="modal-header">
         <h3>Novo contrato do Conector</h3>
         <button class="btn-close">&times;</button>
@@ -3392,28 +3463,36 @@
             <small class="form-hint">E-mail novo recebe convite para criar a senha.</small>
           </div>
         </div>
-        <div class="form-section-title">Vagas por perfil</div>
-        <div class="form-row">
-          <div class="form-group"><label>ABAP</label><input type="number" name="abap" min="0" max="200" value="0">
-            <small class="form-hint" id="ncc-linha-abap"></small></div>
-          <div class="form-group"><label>Funcional</label><input type="number" name="funcional" min="0" max="200" value="0">
-            <small class="form-hint" id="ncc-linha-funcional"></small></div>
-          <div class="form-group"><label>ABAP + Funcional</label><input type="number" name="ambos" min="0" max="200" value="0">
-            <small class="form-hint" id="ncc-linha-ambos"></small></div>
+        <div class="form-section-title">Licenças e preço deste contrato</div>
+        <p class="form-hint" id="ncc-preco-origem">O preço vem da tabela Preços Conector SAP (lista). Altere aqui para dar um preço especial só para este cliente.</p>
+        <div class="table-container">
+          <table class="tabela-precos-licencas">
+            <thead><tr><th>Perfil</th><th>Licenças</th><th>Preço por licença (R$/mês)</th><th>Total no ano</th></tr></thead>
+            <tbody>
+              <tr><td data-label="Perfil"><strong>ABAP</strong></td>
+                <td data-label="Licenças"><div class="form-group"><input type="number" name="abap" min="0" max="200" value="0"></div></td>
+                <td data-label="Preço por licença (R$/mês)"><div class="form-group"><input type="number" name="preco_abap" min="0" step="0.01"><small class="form-hint" id="ncc-lista-abap"></small></div></td>
+                <td data-label="Total no ano" class="fin-num" id="ncc-total-abap">—</td></tr>
+              <tr><td data-label="Perfil"><strong>Funcional</strong></td>
+                <td data-label="Licenças"><div class="form-group"><input type="number" name="funcional" min="0" max="200" value="0"></div></td>
+                <td data-label="Preço por licença (R$/mês)"><div class="form-group"><input type="number" name="preco_funcional" min="0" step="0.01"><small class="form-hint" id="ncc-lista-funcional"></small></div></td>
+                <td data-label="Total no ano" class="fin-num" id="ncc-total-funcional">—</td></tr>
+              <tr><td data-label="Perfil"><strong>ABAP + Funcional</strong></td>
+                <td data-label="Licenças"><div class="form-group"><input type="number" name="ambos" min="0" max="200" value="0"></div></td>
+                <td data-label="Preço por licença (R$/mês)"><div class="form-group"><input type="number" name="preco_ambos" min="0" step="0.01"><small class="form-hint" id="ncc-lista-ambos"></small></div></td>
+                <td data-label="Total no ano" class="fin-num" id="ncc-total-ambos">—</td></tr>
+            </tbody>
+          </table>
         </div>
+        <p class="ncc-total" id="ncc-preco-hint">Informe quantas licenças de cada perfil.</p>
         <div class="form-row">
           <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
           <div class="form-group"><label>Fim <span class="obrig" title="Obrigatório">*</span></label><input type="date" name="data_fim" required></div>
           <div class="form-group"><label>Máx. de SIDs</label><input type="number" name="max_sids" min="1" max="10" value="3"></div>
         </div>
         <div class="form-section-title">Cobrança</div>
-        <label class="check-linha"><input type="checkbox" name="gerar_cobranca" checked> Criar a cobrança anual no Financeiro</label>
+        <label class="check-linha"><input type="checkbox" name="gerar_cobranca" checked> Criar a cobrança anual no Financeiro (o valor anual acima)</label>
         <div class="form-row">
-          <div class="form-group">
-            <label>Valor anual (R$)</label>
-            <input type="number" name="valor_anual" min="0.01" step="0.01">
-            <small class="form-hint" id="ncc-preco-hint">Informe as licenças acima: o valor sai da tabela Cadastros → Preços Conector SAP (plano anual).</small>
-          </div>
           <div class="form-group"><label>Dia do vencimento</label><input type="number" name="dia_vencimento" min="1" max="28" value="10"></div>
         </div>
         <div class="form-group">
@@ -3462,7 +3541,19 @@
           </div>
         </form>
 
-        <div class="form-section-title">Vagas</div>
+        <div class="form-section-title">Preço deste contrato (R$ por licença por mês, plano anual)</div>
+        <form id="form-contrato-precos">
+          <div class="table-container">
+            <table class="tabela-precos-licencas">
+              <thead><tr><th>Perfil</th><th>Licenças</th><th>Preço negociado</th><th>Total no ano</th></tr></thead>
+              <tbody id="contrato-conector-precos"></tbody>
+            </table>
+          </div>
+          <p class="form-hint" id="contrato-conector-precos-nota"></p>
+          <div class="form-actions"><button type="submit" class="btn btn-secondary">Salvar preço</button></div>
+        </form>
+
+        <div class="form-section-title">Licenças</div>
         <div class="table-container">
           <table>
             <thead><tr><th>Perfil</th><th>Pessoa</th><th>Progresso</th><th>Ações</th></tr></thead>
@@ -3472,9 +3563,10 @@
         <form id="form-contrato-mais-vagas" class="form-row" style="align-items:end; margin-top:10px">
           <div class="form-group"><label>+ ABAP</label><input type="number" name="abap" min="0" max="200" value="0"></div>
           <div class="form-group"><label>+ Funcional</label><input type="number" name="funcional" min="0" max="200" value="0"></div>
-          <div class="form-group"><label>+ Ambos</label><input type="number" name="ambos" min="0" max="200" value="0"></div>
-          <div class="form-group"><button type="submit" class="btn btn-secondary">Acrescentar vagas</button></div>
+          <div class="form-group"><label>+ ABAP + Funcional</label><input type="number" name="ambos" min="0" max="200" value="0"></div>
+          <div class="form-group"><button type="submit" class="btn btn-secondary">Acrescentar licenças</button></div>
         </form>
+        <small class="form-hint">Com cobrança ativa: a anuidade é recalculada pelo preço deste contrato e sai uma fatura proporcional aos meses que faltam (rascunho no Faturamento). Você confirma antes.</small>
 
         <div class="form-section-title">Administradores da empresa (veem e distribuem as licenças no portal)</div>
         <ul id="contrato-conector-admins" class="fin-lista-itens"></ul>
@@ -4291,6 +4383,7 @@
   <script src="financeiro.js"></script>
   <script src="comercial.js"></script>
   <script src="contratos-conector.js"></script>
+  <script src="contratos-cursos.js"></script>
   <script src="relatorios.js"></script>
   <script src="visao-mensal.js"></script>
   <script src="marketing.js"></script>

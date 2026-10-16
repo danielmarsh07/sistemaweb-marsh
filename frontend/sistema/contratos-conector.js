@@ -43,50 +43,68 @@ async function loadContratosConector() {
   }).join('');
 }
 
-async function abrirNovoContratoConector() {
+const PERFIS_CONECTOR = [['abap', 'ABAP'], ['funcional', 'Funcional'], ['ambos', 'ABAP + Funcional']];
+// Preço de lista (tabela Preços Conector SAP) do formulário aberto, para mostrar o desconto de cada perfil
+let _listaConector = {};
+
+async function abrirNovoContratoConector(clienteId) {
   resetForm('#form-novo-contrato-conector');
   const f = document.getElementById('form-novo-contrato-conector');
   const umAno = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
   f.data_fim.value = umAno;
   f.max_sids.value = 3;
-  ['abap', 'funcional', 'ambos'].forEach(p => { f[p].value = 0; f[p].oninput = () => sugerirPrecoConector(); });
+  PERFIS_CONECTOR.forEach(([p]) => {
+    f[p].value = 0;
+    f[p].oninput = recalcularNovoConector;
+    f[`preco_${p}`].oninput = recalcularNovoConector;
+  });
   f.gerar_cobranca.checked = true;
   f.dia_vencimento.value = 10;
-  f.valor_anual.value = '';
-  f.valor_anual.dataset.editado = '';
-  f.valor_anual.oninput = () => { f.valor_anual.dataset.editado = '1'; sugerirPrecoConector(); };
-  document.getElementById('ncc-preco-hint').textContent = HINT_PRECO_PADRAO;
-  sugerirPrecoConector(); // já mostra o preço de cada perfil antes de digitar
-  await preencherClientesSelect(f.cliente_id);
+  await preencherClientesSelect(f.cliente_id, clienteId);
+  f.cliente_id.onchange = () => carregarPrecosNovoConector(f);
+  await carregarPrecosNovoConector(f);
   showModal('#modal-novo-contrato-conector');
 }
 
-// Valor anual sugerido pela tabela de preços (enquanto o admin não digitar outro).
-// A conta aparece embaixo do campo: quantidade × preço mensal do plano anual × 12, por perfil.
-const HINT_PRECO_PADRAO = 'Informe as licenças acima: o valor sai da tabela Cadastros → Preços Conector SAP (plano anual).';
-let _timerPreco = null;
-function sugerirPrecoConector() {
-  clearTimeout(_timerPreco);
-  _timerPreco = setTimeout(async () => {
-    const f = document.getElementById('form-novo-contrato-conector');
-    const hint = document.getElementById('ncc-preco-hint');
-    const q = `abap=${f.abap.value || 0}&funcional=${f.funcional.value || 0}&ambos=${f.ambos.value || 0}`;
-    const res = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?${q}`);
-    if (!res || !res.ok) return;
-    const { valor_anual, linhas } = await res.json();
-    // Embaixo de cada perfil: o preço da tabela e, com quantidade, quanto aquele perfil soma no ano
-    (linhas || []).forEach(l => {
-      const el = document.getElementById(`ncc-linha-${l.perfil}`);
-      if (el) el.innerHTML = `${formatMoeda(l.preco_mensal)}/mês por licença`
-        + (l.quantidade > 0 ? `<br><strong>${l.quantidade} × ${formatMoeda(l.preco_mensal)} × 12 = ${formatMoeda(l.total_anual)}/ano</strong>` : '');
-    });
-    const usadas = (linhas || []).filter(l => l.quantidade > 0);
-    hint.innerHTML = usadas.length
-      ? `${usadas.map(l => `${escapeHtml(l.rotulo)} ${formatMoeda(l.total_anual)}`).join(' + ')}
-          <br><strong>Total sugerido: ${formatMoeda(valor_anual)}/ano</strong> (tabela Preços Conector SAP, plano anual)${f.valor_anual.dataset.editado ? '<br>Você digitou outro valor: vale o que você digitou.' : ''}`
-      : HINT_PRECO_PADRAO;
-    if (!f.valor_anual.dataset.editado) f.valor_anual.value = valor_anual || '';
-  }, 300);
+// Preço de partida: o do último contrato do cliente; sem contrato anterior, a tabela (lista)
+async function carregarPrecosNovoConector(f) {
+  const cli = f.cliente_id.value ? `&cliente_id=${encodeURIComponent(f.cliente_id.value)}` : '';
+  const res = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?abap=0&funcional=0&ambos=0${cli}`);
+  if (!res || !res.ok) return;
+  const d = await res.json();
+  _listaConector = {};
+  d.linhas.forEach(l => { _listaConector[l.perfil] = l.preco_lista; f[`preco_${l.perfil}`].value = l.preco_mensal; });
+  document.getElementById('ncc-preco-origem').textContent = d.origem === 'cliente'
+    ? `Preço do último contrato deste cliente (nº ${d.contrato_referencia}). Altere se a negociação for outra; a tabela de lista não muda.`
+    : 'Preço da tabela Preços Conector SAP (lista). Altere aqui para dar um preço especial só para este cliente; a tabela não muda.';
+  recalcularNovoConector();
+}
+
+// Texto do preço comparado à lista: "lista R$ 790,00 · 18% de desconto"
+function notaLista(preco, lista) {
+  if (!(lista > 0)) return '';
+  const pct = Math.round((1 - preco / lista) * 1000) / 10;
+  return `lista ${formatMoeda(lista)}${pct > 0 ? ` · ${String(pct).replace('.', ',')}% de desconto` : pct < 0 ? ` · ${String(-pct).replace('.', ',')}% acima` : ''}`;
+}
+
+// Conta na hora, por perfil: licenças × preço × 12; no fim, o valor anual explicado
+function recalcularNovoConector() {
+  const f = document.getElementById('form-novo-contrato-conector');
+  let total = 0;
+  const partes = [];
+  PERFIS_CONECTOR.forEach(([p, rotulo]) => {
+    const q = Number(f[p].value) || 0;
+    const preco = Number(f[`preco_${p}`].value) || 0;
+    const ano = Math.round(q * preco * 12 * 100) / 100;
+    total += ano;
+    document.getElementById(`ncc-lista-${p}`).textContent = notaLista(preco, _listaConector[p]);
+    document.getElementById(`ncc-total-${p}`).innerHTML = q > 0
+      ? `${q} × ${formatMoeda(preco)} × 12<br><strong>${formatMoeda(ano)}</strong>` : '—';
+    if (q > 0) partes.push(`${rotulo} ${formatMoeda(ano)}`);
+  });
+  document.getElementById('ncc-preco-hint').innerHTML = partes.length
+    ? `${partes.join(' + ')}<br><strong>Valor anual: ${formatMoeda(total)}</strong>`
+    : 'Informe quantas licenças de cada perfil.';
 }
 
 async function salvarNovoContratoConector() {
@@ -94,9 +112,10 @@ async function salvarNovoContratoConector() {
   const corpo = {
     cliente_id: f.cliente_id.value, gestor_nome: f.gestor_nome.value, gestor_email: f.gestor_email.value,
     vagas: { abap: f.abap.value, funcional: f.funcional.value, ambos: f.ambos.value },
+    precos: { abap: f.preco_abap.value, funcional: f.preco_funcional.value, ambos: f.preco_ambos.value },
     data_inicio: f.data_inicio.value || undefined, data_fim: f.data_fim.value, max_sids: f.max_sids.value,
     observacoes: f.observacoes.value,
-    cobranca: { gerar: f.gerar_cobranca.checked, valor_anual: f.valor_anual.value, dia_vencimento: f.dia_vencimento.value }
+    cobranca: { gerar: f.gerar_cobranca.checked, dia_vencimento: f.dia_vencimento.value }
   };
   const res = await apiFetch(`${API_URL}/contratos-conector`, { method: 'POST', body: JSON.stringify(corpo) });
   if (!res) return;
@@ -105,6 +124,7 @@ async function salvarNovoContratoConector() {
   if (!res.ok) return;
   closeModal(document.getElementById('modal-novo-contrato-conector'));
   loadContratosConector();
+  if (document.getElementById('contratos-page').classList.contains('active')) loadContratos();
 }
 
 async function abrirContratoConector(id, manterAberto) {
@@ -128,6 +148,7 @@ async function abrirContratoConector(id, manterAberto) {
   f.max_sids.value = k.max_sids;
   f.observacoes.value = k.observacoes || '';
   document.getElementById('form-contrato-mais-vagas').reset();
+  renderPrecosContrato(k);
 
   document.getElementById('contrato-conector-vagas').innerHTML = k.vagas.length ? k.vagas.map(v => {
     const pct = v.aulas_total ? Math.round(100 * v.aulas_concluidas / v.aulas_total) : 0;
@@ -139,7 +160,7 @@ async function abrirContratoConector(id, manterAberto) {
          <button class="btn btn-secondary btn-sm" onclick="liberarVagaAdmin(${v.id})">Liberar</button>`
       : `<button class="btn btn-secondary btn-sm" onclick="ocuparVagaAdmin(${v.id})">Passar para alguém</button>
          <button class="btn btn-secondary btn-sm" onclick="ocuparVagaAdmin(${v.id}, true)">Gestor ocupa</button>
-         <button class="btn btn-icon btn-danger" title="Remover vaga livre" aria-label="Remover vaga livre" onclick="removerVagaAdmin(${v.id})">${iconSVG('trash')}</button>`;
+         <button class="btn btn-icon btn-danger" title="Remover licença livre" aria-label="Remover licença livre" onclick="removerVagaAdmin(${v.id}, '${v.perfil}')">${iconSVG('trash')}</button>`;
     return `
       <tr>
         <td data-label="Perfil"><strong>${escapeHtml(v.perfil_nome)}</strong><small class="fin-muted" style="display:block">${escapeHtml(v.cursos.join(' · '))}</small></td>
@@ -157,6 +178,63 @@ async function abrirContratoConector(id, manterAberto) {
   carregarAdminsCliente(k.cliente_id);
   document.getElementById('contrato-conector-historico').innerHTML = '';
   if (!manterAberto) showModal('#modal-contrato-conector');
+}
+
+const quantidadesConector = k => {
+  const q = { abap: 0, funcional: 0, ambos: 0 };
+  (k.vagas || []).forEach(v => { q[v.perfil] = (q[v.perfil] || 0) + 1; });
+  return q;
+};
+const cobrancaAtiva = k => k.cobranca && k.cobranca.status === 'ativo';
+
+// Preço negociado do contrato (editável) com o preço de lista ao lado e o total no ano
+function renderPrecosContrato(k) {
+  const q = quantidadesConector(k);
+  const { precos, lista, origem } = k.preco;
+  document.getElementById('contrato-conector-precos').innerHTML = PERFIS_CONECTOR.map(([p, rotulo]) => `
+    <tr>
+      <td data-label="Perfil"><strong>${rotulo}</strong></td>
+      <td data-label="Licenças">${q[p]}</td>
+      <td data-label="Preço negociado"><div class="form-group"><input type="number" name="preco_${p}" min="0" step="0.01" value="${precos[p]}">
+        <small class="form-hint">${notaLista(precos[p], lista[p])}</small></div></td>
+      <td data-label="Total no ano" class="fin-num">${formatMoeda(q[p] * precos[p] * 12)}</td>
+    </tr>`).join('');
+  document.getElementById('contrato-conector-precos-nota').textContent = {
+    contrato: 'Preço próprio deste contrato: mudar a tabela de lista não altera este valor.',
+    cobranca: 'Contrato anterior ao preço por contrato: o preço foi calculado a partir do valor cobrado hoje (mesmo desconto em todos os perfis). Salve para fixá-lo.',
+    tabela: 'Sem preço próprio ainda: está usando a tabela de lista. Salve para fixar o preço deste contrato.'
+  }[origem] || '';
+}
+
+async function salvarPrecosContrato(f) {
+  const k = _contratoAberto;
+  const q = quantidadesConector(k);
+  const precos = Object.fromEntries(PERFIS_CONECTOR.map(([p]) => [p, f[`preco_${p}`].value]));
+  const novo = PERFIS_CONECTOR.reduce((s, [p]) => s + q[p] * (Number(precos[p]) || 0) * 12, 0);
+  if (cobrancaAtiva(k) && !confirm(`A anuidade passa de ${formatMoeda(k.cobranca.valor)} para ${formatMoeda(novo)} a partir da próxima cobrança.\nFaturas já geradas não mudam. Salvar?`)) return;
+  const r = await acaoContrato('/precos', 'PUT', { precos });
+  if (r) { alert(r.mensagem); recarregarContrato(); }
+}
+
+// Acrescentar licenças: mostra a conta (anuidade nova e fatura proporcional) e pede confirmação
+async function acrescentarLicencas(f) {
+  const q = { abap: Number(f.abap.value) || 0, funcional: Number(f.funcional.value) || 0, ambos: Number(f.ambos.value) || 0 };
+  if (q.abap + q.funcional + q.ambos < 1) { alert('Informe quantas licenças acrescentar.'); return; }
+  const p = await acaoContrato(`/licencas/previa?abap=${q.abap}&funcional=${q.funcional}&ambos=${q.ambos}`, 'GET');
+  if (!p) return;
+  const quais = PERFIS_CONECTOR.filter(([x]) => q[x] > 0).map(([x, rotulo]) => `${q[x]} ${rotulo}`).join(', ');
+  let msg = `Acrescentar ${quais}.`;
+  if (p.cobranca && p.cobranca.status === 'ativo') {
+    msg += `\n\n• Anuidade: ${formatMoeda(p.valor_anual_atual)} → ${formatMoeda(p.valor_anual_novo)} (a partir da próxima cobrança)`;
+    msg += p.valor_proporcional > 0
+      ? `\n• Fatura proporcional agora (rascunho no Faturamento):\n   ${p.proporcional.map(l => `${l.quantidade} ${l.rotulo} × ${formatMoeda(l.preco_mensal)} × ${l.meses} mês(es) = ${formatMoeda(l.total)}`).join('\n   ')}\n   Total: ${formatMoeda(p.valor_proporcional)}`
+      : '\n• Sem fatura proporcional (o contrato não está em vigência agora).';
+  } else {
+    msg += '\n\nEste contrato não tem cobrança ativa: as licenças entram sem cobrar.';
+  }
+  if (!confirm(msg + '\n\nConfirmar?')) return;
+  const r = await acaoContrato('/vagas', 'POST', q);
+  if (r) { alert(r.mensagem); recarregarContrato(); }
 }
 
 // Administradores da empresa do cliente (veem e distribuem as licenças no portal)
@@ -211,15 +289,10 @@ async function verHistoricoContratoConector() {
 
 async function criarCobrancaConector() {
   const k = _contratoAberto;
-  const q = { abap: 0, funcional: 0, ambos: 0 };
-  (k.vagas || []).forEach(v => { q[v.perfil] = (q[v.perfil] || 0) + 1; });
-  const rs = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?abap=${q.abap}&funcional=${q.funcional}&ambos=${q.ambos}`);
-  const sugestao = rs && rs.ok ? (await rs.json()).valor_anual : '';
-  const valor = prompt(`Valor anual da cobrança das ${k.vagas.length} licença(s) (sugestão pela tabela de preços):`, sugestao ? String(sugestao).replace('.', ',') : '');
-  if (valor === null) return;
-  const res = await apiFetch(`${API_URL}/contratos-conector/${k.id}/cobranca`, {
-    method: 'POST', body: JSON.stringify({ valor_anual: Number(valor.replace(/\./g, '').replace(',', '.')) || undefined })
-  });
+  const q = quantidadesConector(k);
+  const valor = PERFIS_CONECTOR.reduce((s, [p]) => s + q[p] * k.preco.precos[p] * 12, 0);
+  if (!confirm(`Criar a cobrança anual de ${formatMoeda(valor)} (licenças × preço deste contrato × 12)?\nPara outro valor, ajuste antes o preço deste contrato.`)) return;
+  const res = await apiFetch(`${API_URL}/contratos-conector/${k.id}/cobranca`, { method: 'POST', body: JSON.stringify({}) });
   if (!res) return;
   const r = await res.json();
   alert(r.mensagem || r.erro);
@@ -256,6 +329,7 @@ async function acaoContrato(caminho, metodo = 'POST', corpo) {
 async function recarregarContrato() {
   await abrirContratoConector(_contratoAberto.id, true);
   loadContratosConector();
+  if (document.getElementById('contratos-page').classList.contains('active')) loadContratos();
 }
 
 async function salvarSidsAdmin() {
@@ -286,8 +360,12 @@ async function liberarVagaAdmin(vagaId) {
   if (await acaoContrato(`/vagas/${vagaId}/liberar`)) recarregarContrato();
 }
 
-async function removerVagaAdmin(vagaId) {
-  if (!confirm('Remover esta vaga do contrato?')) return;
+async function removerVagaAdmin(vagaId, perfil) {
+  const k = _contratoAberto;
+  const efeito = cobrancaAtiva(k) && k.preco
+    ? `\nA próxima anuidade passa de ${formatMoeda(k.cobranca.valor)} para ${formatMoeda(Math.max(0, k.cobranca.valor - k.preco.precos[perfil] * 12))} (sem estorno do que já foi pago).`
+    : '';
+  if (!confirm(`Remover esta licença livre do contrato?${efeito}`)) return;
   if (await acaoContrato(`/vagas/${vagaId}`, 'DELETE')) recarregarContrato();
 }
 
@@ -310,10 +388,8 @@ document.addEventListener('DOMContentLoaded', () => {
       max_sids: f.max_sids.value, observacoes: f.observacoes.value });
     if (r) { alert(r.mensagem); recarregarContrato(); }
   });
-  sub('form-contrato-mais-vagas', async f => {
-    const r = await acaoContrato('/vagas', 'POST', { abap: f.abap.value, funcional: f.funcional.value, ambos: f.ambos.value });
-    if (r) { alert(r.mensagem); recarregarContrato(); }
-  });
+  sub('form-contrato-mais-vagas', acrescentarLicencas);
+  sub('form-contrato-precos', salvarPrecosContrato);
   sub('form-beneficios', salvarBeneficiosConector);
   // Contratos e benefícios do Conector são dos administradores: técnico não vê os itens
   if (!usuario || !['admin_empresa', 'admin_sistema'].includes(usuario.tipo)) {

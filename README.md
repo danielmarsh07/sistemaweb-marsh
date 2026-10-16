@@ -106,7 +106,14 @@ Exclusiva do **super usuário** (`usuarios.super_usuario`, o dono do sistema): a
 - Abrir novos chamados
 - Enviar comentários na timeline
 
-### Contratos do Conector por vagas (Produtos SAP → Contratos por vagas)
+### Contratos num lugar só (Financeiro → Contratos e ficha do cliente)
+
+- **+ Novo contrato** pergunta o tipo e abre o formulário certo: **Serviço** (contrato financeiro), **Licenças do Conector** (abaixo) ou **Cursos para a empresa**. A página Contratos e a ficha listam os três juntos. Plano e decisões em `docs/plano-contratos-unificados.md`.
+- **Preço por contrato**: a tabela Preços Conector SAP é o preço de **lista** (Loja, simulador, propostas, sugestão). Cada contrato do Conector guarda o preço negociado por perfil (`contratos_conector.precos`, R$/licença/mês no plano anual); a cobrança anual = licenças × preço × 12. Contrato antigo sem preço guardado usa a tabela na proporção do valor cobrado. Novo contrato do mesmo cliente sugere o preço do último.
+- **Licenças a mais** (`POST /api/contratos-conector/:id/vagas`, prévia em `GET /:id/licencas/previa`): anuidade nova e fatura proporcional (licenças × preço × meses até o fim) em rascunho, sem `contrato_id` para não ocupar a competência da anuidade. **A menos**: a próxima anuidade diminui, sem estorno. `PUT /:id/precos` muda o preço negociado.
+- **Cursos para a empresa** (`/api/contratos-cursos`, tabela `contratos_cursos`): os cursos viram liberação da empresa com validade (`cursos_liberacoes.contrato_cursos_id`) e valem para todos do cliente, inclusive quem só usa licença. Cobrança: cortesia (sem fatura), pagamento único (fatura avulsa em rascunho), mensal ou anual (contrato financeiro com `contrato_cursos_id`). A tela de Treinamentos → Liberar não remove o que veio de contrato; encerrar o contrato tira os cursos e para a cobrança.
+
+### Contratos do Conector por vagas (abertos pela lista de Contratos ou pela ficha)
 
 - Quem compra (CPF ou CNPJ) é o **gestor** (`usuarios.portal_papel = 'gestor'`): no portal vê o contrato, passa cada vaga para uma pessoa (convite por e-mail), pode ocupar uma vaga ele mesmo e cadastra os sistemas SAP (até `max_sids`).
 - Vagas por perfil (`contratos_conector_vagas.perfil`): **abap** (IA no ABAP + Portal + Conector), **funcional** (IA para Funcionais + Portal + Conector), **ambos** (os quatro). Os cursos seguem `cursos.trilha` (abap | funcional | portal | conector), marcada no modal do curso.

@@ -178,7 +178,7 @@ router.get('/cursos/:id', async (req, res) => {
     if (!c) return res.status(404).json({ erro: 'Curso não encontrado' });
     const aulas = await pool.query(
       'SELECT * FROM cursos_aulas WHERE curso_id = $1 AND ativo ORDER BY ordem, id', [c.id]);
-    const lib = await pool.query('SELECT cliente_id, data_fim FROM cursos_liberacoes WHERE curso_id = $1', [c.id]);
+    const lib = await pool.query('SELECT cliente_id, data_fim, contrato_cursos_id FROM cursos_liberacoes WHERE curso_id = $1', [c.id]);
     res.json({ ...c, aulas: aulas.rows, liberacoes: lib.rows });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao buscar curso', detalhe: err.message });
@@ -298,7 +298,8 @@ router.put('/cursos/:id/liberacoes', async (req, res) => {
     const validos = ids.length ? (await client.query(
       'SELECT id FROM clientes WHERE id = ANY($1) AND empresa_id = $2 AND ativo = TRUE', [ids, emp(req)])).rows.map(r => r.id) : [];
     await client.query('BEGIN');
-    await client.query('DELETE FROM cursos_liberacoes WHERE curso_id = $1 AND NOT (cliente_id = ANY($2))', [c.id, validos]);
+    // Liberação que veio de um contrato de cursos só sai pelo contrato (encerrar ou tirar o curso dele)
+    await client.query('DELETE FROM cursos_liberacoes WHERE curso_id = $1 AND NOT (cliente_id = ANY($2)) AND contrato_cursos_id IS NULL', [c.id, validos]);
     for (const id of validos) {
       await client.query(`INSERT INTO cursos_liberacoes (curso_id, cliente_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [c.id, id]);
     }
