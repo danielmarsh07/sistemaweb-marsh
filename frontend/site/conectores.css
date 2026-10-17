@@ -1,0 +1,57 @@
+/* Página dos Conectores — complementa o style.css da landing. */
+
+/* Selo de situação (disponível / em desenvolvimento / próxima etapa) */
+.status {
+  display: inline-block; font-style: normal; font-size: 12px; font-weight: 700; line-height: 1;
+  padding: 6px 10px; border-radius: 999px; white-space: nowrap;
+}
+.status-ok   { background: #e3f5ea; color: #157347; }
+.status-dev  { background: #fef3c7; color: #92400e; }
+.status-plan { background: #e7f1fd; color: #1d4f99; }
+
+/* Painel da abertura: os quatro conectores e a situação de cada um */
+.painel-conectores {
+  list-style: none; display: grid; gap: 12px; padding: 22px; border-radius: 20px;
+  background: rgba(8, 26, 54, .35); border: 1px solid rgba(255, 255, 255, .2); backdrop-filter: blur(8px);
+}
+.painel-conectores li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .12);
+}
+.painel-conectores .icone { color: #fff; box-sizing: content-box; padding: 9px; border-radius: 12px; background: rgba(255, 255, 255, .14); }
+.painel-conectores strong { display: block; font-size: 16px; }
+.painel-conectores span { display: block; font-size: 13px; color: rgba(255, 255, 255, .72); }
+
+/* Cartões dos conectores: selo no canto, no lugar da etiqueta */
+.grade-conectores .solucao { padding-top: 32px; }
+.etiqueta-status { position: absolute; top: 22px; right: 22px; }
+
+/* Roteiro em linha do tempo */
+.roteiro { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.roteiro-etapa {
+  position: relative; padding: 26px 24px; border-radius: var(--raio);
+  background: var(--branco); border: 1px solid var(--borda); box-shadow: var(--sombra);
+  border-top: 4px solid var(--borda);
+}
+.roteiro-etapa.feito { border-top-color: #157347; }
+.roteiro-etapa.agora { border-top-color: #d97706; }
+.roteiro-etapa h3 { margin-top: 14px; }
+.roteiro-etapa p { color: var(--texto-2); font-size: 15px; }
+
+/* Chamada final */
+.chamada-botoes { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+.btn-secundario { background: var(--fundo-2); color: var(--azul-profundo); }
+.btn-secundario:hover { background: #dce7f5; }
+
+@media (max-width: 1024px) {
+  .roteiro { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .roteiro { grid-template-columns: 1fr; }
+  .painel-conectores { padding: 14px; }
+  .painel-conectores li { grid-template-columns: auto minmax(0, 1fr); }
+  .painel-conectores .status { grid-column: 2; justify-self: start; }
+  .etiqueta-status { position: static; margin-bottom: 14px; align-self: flex-start; }
+  .grade-conectores .solucao { padding-top: 28px; }
+  .chamada-botoes .btn { width: 100%; }
+}

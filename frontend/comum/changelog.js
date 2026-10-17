@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.7', data: '2026-10-16', destaques: [
+      'Site: página nova dos Conectores, com ECC, S/4HANA, Fiori e BTP, a situação de cada um, os perfis (ABAP/Fiori, Funcional, Apps Fiori e Basis) e o roteiro',
+      'Página inicial do site com o link para os Conectores no menu e no cartão do Conector SAP'
+    ] },
     { versao: 'v4.6', data: '2026-10-16', destaques: [
       'Portal do cliente com a cara do sistema: menu lateral, cabeçalho, mesmos cartões, cores e temas (claro e escuro)',
       'Cada assunto numa tela própria: Início, Chamados, Treinamentos, Minha licença, Licenças da empresa, Conector SAP, Financeiro e Meus pedidos. Só aparece o que a pessoa tem',
