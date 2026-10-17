@@ -29,6 +29,7 @@ const PACOTE_TTL = '10m';
 
 const ehAdmin = t => t === 'admin_empresa' || t === 'admin_sistema';
 const emp = req => req.usuario.empresa_id || 1;
+const reais = v => `R$ ${Number(v).toFixed(2).replace('.', ',')}`;
 
 function responderErro(res, err, msg) {
   if (err instanceof cc.ErroRegra) return res.status(400).json({ erro: err.message });
@@ -283,14 +284,17 @@ router.get('/', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao listar contratos'); }
 });
 
-// GET /preco-sugerido?abap=&funcional=&ambos=&cliente_id= — conta por perfil (antes de /:id).
-// Preço de partida: o do último contrato do cliente, se houver; senão a tabela Preços Conector SAP (lista).
+// GET /preco-sugerido?abap=&funcional=&ambos=&cliente_id=&ciclo= — conta por perfil e pacote Empresa (antes de /:id).
+// Preço de partida: o do último contrato do cliente no mesmo ciclo, se houver; senão a tabela Preços Conector SAP (lista).
 router.get('/preco-sugerido', async (req, res) => {
   try {
     const { q } = cc.lerQuantidades({ abap: req.query.abap, funcional: req.query.funcional, ambos: req.query.ambos });
-    const ultimo = req.query.cliente_id ? await cc.ultimosPrecosDoCliente(pool, emp(req), req.query.cliente_id) : null;
-    const detalhe = await cc.detalhePrecoAnual(pool, emp(req), q, ultimo && ultimo.precos);
-    res.json({ ...detalhe, origem: ultimo ? 'cliente' : 'tabela', contrato_referencia: ultimo && ultimo.contrato_id });
+    const ciclo = cc.lerCiclo(req.query.ciclo);
+    let ultimo = req.query.cliente_id ? await cc.ultimosPrecosDoCliente(pool, emp(req), req.query.cliente_id) : null;
+    if (ultimo && ultimo.ciclo !== ciclo) ultimo = null; // preço mensal e anual não se misturam
+    const detalhe = await cc.detalhePrecoAnual(pool, emp(req), q, ultimo && ultimo.precos, ciclo);
+    res.json({ ...detalhe, origem: ultimo ? 'cliente' : 'tabela', contrato_referencia: ultimo && ultimo.contrato_id,
+      modalidade_referencia: ultimo && ultimo.modalidade });
   } catch (err) { responderErro(res, err, 'Erro ao calcular o preço'); }
 });
 
@@ -302,8 +306,8 @@ router.get('/:id', async (req, res) => {
     const cob = (await pool.query(
       `SELECT id, valor::float AS valor, status, dia_vencimento, COALESCE(mes_cobranca, EXTRACT(MONTH FROM data_inicio)::int) AS mes_cobranca
        FROM contratos WHERE contrato_conector_id = $1`, [k.id])).rows[0] || null;
-    const { precos, lista, origem } = await cc.precosDoContrato(pool, k);
-    res.json({ ...detalhe, cobranca: cob, preco: { precos, lista, origem } });
+    const { precos, lista, origem, modalidade, ciclo } = await cc.precosDoContrato(pool, k);
+    res.json({ ...detalhe, cobranca: cob, preco: { precos, lista, origem, modalidade, ciclo } });
   } catch (err) { responderErro(res, err, 'Erro ao buscar contrato'); }
 });
 
@@ -330,7 +334,7 @@ router.put('/:id/precos', async (req, res) => {
     await cc.aplicarNaCobranca(db, k, previa, req.usuario.id);
     await db.query('COMMIT');
     res.json({ mensagem: previa.cobranca && previa.cobranca.status === 'ativo'
-      ? `Preço salvo. A anuidade passa a R$ ${previa.valor_anual_novo.toFixed(2).replace('.', ',')} a partir da próxima cobrança (faturas já geradas não mudam).`
+      ? `Preço salvo. A ${previa.ciclo === 'mensal' ? 'mensalidade' : 'anuidade'} passa a ${reais(previa.valor_anual_novo)} a partir da próxima cobrança (faturas já geradas não mudam).`
       : 'Preço salvo.' });
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
@@ -387,7 +391,7 @@ router.delete('/clientes/:cid/admins/:uid', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao remover administrador'); }
 });
 
-// POST /:id/cobranca { valor_anual?, dia_vencimento? } — cria a cobrança anual de um contrato que ainda não tem
+// POST /:id/cobranca { valor_anual?, dia_vencimento? } — cria a cobrança (anual ou mensal, pelo ciclo) de um contrato que ainda não tem
 router.post('/:id/cobranca', async (req, res) => {
   const b = req.body || {};
   const db = await pool.connect();
@@ -395,16 +399,17 @@ router.post('/:id/cobranca', async (req, res) => {
     const k = (await db.query('SELECT * FROM contratos_conector WHERE id = $1 AND empresa_id = $2', [req.params.id, emp(req)])).rows[0];
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
     await db.query('BEGIN');
-    const c = await cc.criarCobrancaAnual(db, k, { valor: b.valor_anual, dia_vencimento: b.dia_vencimento, usuarioId: req.usuario.id });
+    const c = await cc.criarCobranca(db, k, { valor: b.valor_anual, dia_vencimento: b.dia_vencimento, usuarioId: req.usuario.id });
     await db.query('COMMIT');
-    res.status(201).json({ mensagem: `Cobrança anual de R$ ${c.valor.toFixed(2).replace('.', ',')} criada. Veja em Financeiro → Contratos.`, contrato_financeiro_id: c.id });
+    res.status(201).json({ mensagem: `Cobrança ${c.ciclo === 'mensal' ? 'mensal' : 'anual'} de ${reais(c.valor)} criada. Veja em Financeiro → Contratos.`, contrato_financeiro_id: c.id });
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
     responderErro(res, err, 'Erro ao criar a cobrança');
   } finally { db.release(); }
 });
 
-// POST / — { cliente_id, gestor_nome, gestor_email, vagas: { abap, funcional, ambos }, data_inicio?, data_fim, max_sids?, observacoes? }
+// POST / — { cliente_id, gestor_nome, gestor_email, vagas: { abap, funcional, ambos }, precos?, modalidade? (licenca | empresa),
+//   ciclo? (anual | mensal), data_inicio?, data_fim, max_sids?, observacoes?, cobranca?: { gerar, valor_anual?, dia_vencimento? } }
 router.post('/', async (req, res) => {
   const b = req.body || {};
   const db = await pool.connect();
@@ -417,33 +422,18 @@ router.post('/', async (req, res) => {
     const { inicio, fim } = lerDatas(b);
     const maxSids = b.max_sids === undefined || b.max_sids === '' ? 3 : Number(b.max_sids);
     if (!Number.isInteger(maxSids) || maxSids < 1 || maxSids > 10) throw new cc.ErroRegra('Máximo de SIDs: 1 a 10.');
-    // Preço negociado por licença (R$/mês); o que faltar fica com a tabela de lista
-    const precos = cc.lerPrecos(b.precos);
 
     await db.query('BEGIN');
-    const { usuario: gestor, criado } = await cc.acharOuCriarUsuario(db, {
-      clienteId: cliente.id, empresaId: emp(req), nome: b.gestor_nome, email: b.gestor_email, papel: 'gestor' });
-    const lista = precos ? await cc.precosTabela(db, emp(req)) : null;
-    const k = (await db.query(
-      `INSERT INTO contratos_conector (empresa_id, cliente_id, gestor_usuario_id, data_inicio, data_fim, max_sids, observacoes, criado_por_usuario_id, precos)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-      // Sem início: hoje no horário de Brasília (o CURRENT_DATE do banco é UTC e viraria o dia às 21h)
-      [emp(req), cliente.id, gestor.id, inicio || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }), fim, maxSids,
-       String(b.observacoes || '').trim() || null, req.usuario.id, precos && JSON.stringify({ ...lista, ...precos })])).rows[0];
-    await cc.criarVagas(db, k.id, q);
-    // Quem compra vira administrador da empresa no portal (não ocupa licença por isso)
-    await db.query(`INSERT INTO clientes_admins (cliente_id, usuario_id, criado_por_usuario_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-      [cliente.id, gestor.id, req.usuario.id]);
-    // Cobrança anual no financeiro (opcional): { cobranca: { gerar: true, valor_anual?, dia_vencimento? } }
-    let cobranca = null;
-    if (b.cobranca && b.cobranca.gerar) {
-      const linha = (await db.query('SELECT * FROM contratos_conector WHERE id = $1', [k.id])).rows[0];
-      cobranca = await cc.criarCobrancaAnual(db, linha, { valor: b.cobranca.valor_anual, dia_vencimento: b.cobranca.dia_vencimento, usuarioId: req.usuario.id });
-    }
+    const r = await cc.criarContrato(db, {
+      empresaId: emp(req), clienteId: cliente.id, gestorNome: b.gestor_nome, gestorEmail: b.gestor_email, q, inicio, fim, maxSids,
+      observacoes: b.observacoes, precos: cc.lerPrecos(b.precos), modalidade: cc.lerModalidade(b.modalidade), ciclo: cc.lerCiclo(b.ciclo),
+      cobranca: b.cobranca && b.cobranca.gerar ? { gerar: true, valor: b.cobranca.valor_anual, dia_vencimento: b.cobranca.dia_vencimento } : null,
+      usuarioId: req.usuario.id });
     await db.query('COMMIT');
 
+    const { k, gestor, criado, cobranca } = r;
     const enviado = criado ? await cc.enviarConvite(gestor) : false;
-    const txtCobranca = cobranca ? ` Cobrança anual de R$ ${cobranca.valor.toFixed(2).replace('.', ',')} criada em Financeiro → Contratos.` : '';
+    const txtCobranca = cobranca ? ` Cobrança ${cobranca.ciclo === 'mensal' ? 'mensal' : 'anual'} de ${reais(cobranca.valor)} criada em Financeiro → Contratos.` : '';
     res.status(201).json({
       id: k.id, convite_enviado: enviado, contrato_financeiro_id: cobranca && cobranca.id,
       mensagem: (criado
@@ -486,8 +476,6 @@ router.put('/:id', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao atualizar contrato'); }
 });
 
-const reais = v => `R$ ${Number(v).toFixed(2).replace('.', ',')}`;
-
 // POST /:id/vagas — { abap?, funcional?, ambos? } acrescenta licenças. Com cobrança ativa: anuidade nova e
 // fatura proporcional aos meses que faltam (rascunho no Faturamento), pelo preço do contrato.
 router.post('/:id/vagas', async (req, res) => {
@@ -505,7 +493,7 @@ router.post('/:id/vagas', async (req, res) => {
     await db.query('COMMIT');
     const cob = previa.cobranca && previa.cobranca.status === 'ativo';
     res.status(201).json({ fatura_id, mensagem: `${total} licença(s) acrescentada(s).`
-      + (cob ? ` Anuidade: ${reais(previa.valor_anual_atual)} → ${reais(previa.valor_anual_novo)}.` : '')
+      + (cob ? ` ${previa.ciclo === 'mensal' ? 'Mensalidade' : 'Anuidade'}: ${reais(previa.valor_anual_atual)} → ${reais(previa.valor_anual_novo)}.` : '')
       + (fatura_id ? ` Fatura proporcional de ${reais(previa.valor_proporcional)} criada em rascunho no Faturamento (aprove para enviar).` : '') });
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
@@ -529,7 +517,7 @@ router.delete('/:id/vagas/:vid', async (req, res) => {
     await cc.aplicarNaCobranca(db, k, previa, req.usuario.id);
     await db.query('COMMIT');
     const cob = previa.cobranca && previa.cobranca.status === 'ativo';
-    res.json({ mensagem: 'Licença removida.' + (cob ? ` A próxima anuidade passa a ${reais(previa.valor_anual_novo)}.` : '') });
+    res.json({ mensagem: 'Licença removida.' + (cob ? ` A próxima ${previa.ciclo === 'mensal' ? 'mensalidade' : 'anuidade'} passa a ${reais(previa.valor_anual_novo)}.` : '') });
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
     responderErro(res, err, 'Erro ao remover licença');

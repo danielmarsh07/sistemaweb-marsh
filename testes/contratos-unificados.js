@@ -96,11 +96,65 @@ const maisDias = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv
     const detA = (await api(tokAdmin, `/contratos-conector/${antigo.body.id}`)).body;
     ok(detA.preco.origem === 'cobranca' && Math.abs(detA.preco.precos.abap * 12 - 100) < 0.1, `contrato sem preço guardado: preço pelo valor cobrado (${detA.preco.precos.abap}/mês)`);
 
-    // ===== Visão mensal: anual só no mês da cobrança =====
+    // ===== Visão mensal: anual só no mês da cobrança (antes de existir contrato mensal do cliente) =====
     const vm = (await api(tokAdmin, `/financeiro/visao-mensal?inicio=${hoje().slice(0, 7)}&meses=12`)).body;
     const linha = vm.receitas.find(l => l.chave === `cli:${cli}`);
     const mesesEstimados = linha ? Object.values(linha.celulas).filter(c => c.estimado).length : 0;
     ok(linha && mesesEstimados === 1, `visão mensal: contratos anuais estimados em 1 mês só (${mesesEstimados})`);
+
+    // ===== Fase 3: pacote Empresa, ciclo mensal e proposta que vira contrato =====
+    const gestorBase = { cliente_id: cli, gestor_nome: 'Gestor Unificado', gestor_email: `gestor-unif-${sufixo}@teste.com`, data_fim: fim };
+    const emp = await api(tokAdmin, '/contratos-conector', 'POST', { ...gestorBase, vagas: { abap: 4, funcional: 3 }, modalidade: 'empresa',
+      precos: { empresa_ate5: 3000, empresa_ate10: 5000, empresa_excedente: 400 }, cobranca: { gerar: true } });
+    let cobE = emp.status === 201 && await financeiro(emp.body.id);
+    ok(cobE && Number(cobE.valor) === 5000 * 12 && /pacote Empresa/.test(cobE.descricao_servico),
+      `pacote Empresa: 7 usuários = faixa até 10 × 12 (${cobE && cobE.valor} ${emp.body?.erro || ''})`);
+    const prevE = (await api(tokAdmin, `/contratos-conector/${emp.body.id}/licencas/previa?abap=4&funcional=0&ambos=0`)).body;
+    ok(prevE.valor_anual_novo === (5000 + 400) * 12 && prevE.valor_proporcional === 400 * prevE.meses,
+      `pacote: 11 usuários = faixa + 1 excedente; proporcional = diferença × meses (${prevE.valor_proporcional})`);
+    await api(tokAdmin, `/contratos-conector/${emp.body.id}/vagas`, 'POST', { abap: 4 });
+    cobE = await financeiro(emp.body.id);
+    ok(Number(cobE.valor) === 5400 * 12 && cobE.itens.length === 2, 'pacote: anuidade e itens (pacote + excedente) atualizados');
+    ok((await api(tokAdmin, `/contratos-conector/${emp.body.id}/licencas/previa?abap=1&funcional=0&ambos=0`)).body.valor_proporcional === 400 * prevE.meses,
+      'pacote acima de 10: cada usuário a mais custa o excedente');
+
+    const men = await api(tokAdmin, '/contratos-conector', 'POST', { ...gestorBase, vagas: { abap: 2 }, ciclo: 'mensal',
+      precos: { abap: 990 }, cobranca: { gerar: true } });
+    let cobM = await financeiro(men.body.id);
+    ok(cobM && cobM.periodicidade === 'mensal' && Number(cobM.valor) === 1980 && cobM.mes_cobranca === null, `ciclo mensal: cobrança mensal de ${cobM && cobM.valor}`);
+    const maisM = await api(tokAdmin, `/contratos-conector/${men.body.id}/vagas`, 'POST', { abap: 1 });
+    cobM = await financeiro(men.body.id);
+    ok(!maisM.body.fatura_id && Number(cobM.valor) === 2970, 'ciclo mensal: licença a mais muda a mensalidade, sem fatura proporcional');
+    ok((await api(tokAdmin, '/contratos-conector', 'POST', { ...gestorBase, vagas: { abap: 1 }, ciclo: 'semanal' })).status === 400, '! recusa ciclo inválido');
+
+    // Proposta pelo simulador → aceita → gerar contrato do Conector
+    const op = await api(tokAdmin, '/comercial/oportunidades', 'POST', { titulo: `TESTE Conector ${sufixo}`, cliente_id: cli,
+      contato_nome: 'Comprador Teste', contato_email: `comprador-${sufixo}@teste.com` });
+    const prop = await api(tokAdmin, `/comercial/oportunidades/${op.body.id}/propostas`, 'POST',
+      { simulador_conector: { funcionais: 2, abaps: 3, ciclo: 'anual', modalidade: 'individual', porte: 'nenhum' } });
+    const pc = (await pool.query('SELECT conector FROM propostas WHERE id = $1', [prop.body.id])).rows[0].conector;
+    ok(pc && pc.abaps === 3 && pc.funcionais === 2 && pc.modalidade === 'licenca' && pc.ciclo === 'anual' && pc.precos.abap > 0,
+      'proposta do simulador guarda a simulação');
+    await api(tokAdmin, `/comercial/propostas/${prop.body.id}/enviar`, 'POST', { enviar_email: false });
+    await api(tokAdmin, `/comercial/propostas/${prop.body.id}/status`, 'POST', { status: 'aceita' });
+    const gc = await api(tokAdmin, `/comercial/oportunidades/${op.body.id}/gerar-contrato`, 'POST', {
+      dia_vencimento: 12, data_inicio: hoje(),
+      conector: { vagas: { abap: 3, funcional: 2 }, modalidade: pc.modalidade, ciclo: pc.ciclo, precos: { ...pc.precos, abap: 700 },
+        gestor_email: `comprador-${sufixo}@teste.com`, gestor_nome: 'Comprador Teste' } });
+    ok(gc.status === 201 && gc.body.contrato_conector_id, `gerar contrato cria o contrato do Conector (${gc.body?.mensagem || gc.body?.erro})`);
+    const kp = (await pool.query('SELECT * FROM contratos_conector WHERE id = $1', [gc.body.contrato_conector_id])).rows[0];
+    const vagasP = (await pool.query('SELECT perfil, COUNT(*)::int n FROM contratos_conector_vagas WHERE contrato_id = $1 AND ativo GROUP BY perfil', [kp.id])).rows;
+    ok(kp.precos.abap === 700 && vagasP.find(v => v.perfil === 'abap').n === 3 && vagasP.find(v => v.perfil === 'funcional').n === 2,
+      'licenças e preço da proposta no contrato');
+    const cobP = await financeiro(kp.id);
+    ok(cobP && cobP.id === gc.body.contrato_id && Number(cobP.valor) === (3 * 700 + 2 * pc.precos.funcional) * 12 && cobP.dia_vencimento === 12 && cobP.proposta_id === prop.body.id,
+      `cobrança anual ligada à proposta (${cobP && cobP.valor})`);
+    const opDepois = (await pool.query('SELECT etapa, contrato_id FROM oportunidades WHERE id = $1', [op.body.id])).rows[0];
+    ok(opDepois.etapa === 'ganha' && opDepois.contrato_id === cobP.id, 'oportunidade ganha e ligada ao contrato');
+    ok((await api(tokAdmin, `/comercial/oportunidades/${op.body.id}/gerar-contrato`, 'POST', { dia_vencimento: 10, data_inicio: hoje(),
+      conector: { vagas: { abap: 1 } } })).status === 400, '! não gera duas vezes');
+    await pool.query('DELETE FROM oportunidades WHERE id = $1', [op.body.id]).catch(() => {});
+
 
     // ===== Fase 2: contrato de cursos =====
     const aluno = await usuarioTeste(pool, { tipo: 'cliente', cliente_id: cli, papel: 'aluno' });
@@ -148,6 +202,7 @@ const maisDias = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv
     await pool.query('DELETE FROM cursos_liberacoes WHERE cliente_id = $1', [cli]);
     await pool.query('DELETE FROM faturas WHERE cliente_id = $1', [cli]);
     await pool.query('DELETE FROM contratos WHERE cliente_id = $1', [cli]);
+    await pool.query('DELETE FROM oportunidades WHERE cliente_id = $1', [cli]).catch(err => console.log('(oportunidade de teste ficou:', err.message, ')'));
     await pool.query('DELETE FROM contratos_cursos WHERE cliente_id = $1', [cli]);
     await pool.query('DELETE FROM contratos_conector_vagas WHERE contrato_id IN (SELECT id FROM contratos_conector WHERE cliente_id = $1)', [cli]);
     await pool.query('DELETE FROM contratos_conector WHERE cliente_id = $1', [cli]);

@@ -94,7 +94,7 @@ const COLUNAS_PROPOSTA = `
   p.total_mensal::float AS total_mensal, p.total_unico::float AS total_unico,
   to_char(p.validade, 'YYYY-MM-DD') AS validade, p.status, p.token,
   p.data_envio, p.data_visualizacao, p.data_resposta, p.resposta_nome, p.resposta_comentario,
-  p.data_criacao, p.data_atualizacao, (p.validade < CURRENT_DATE) AS expirada`;
+  p.data_criacao, p.data_atualizacao, (p.validade < CURRENT_DATE) AS expirada, p.conector`;
 
 // Proposta + quem é o destinatário (cliente cadastrado ou prospect)
 async function carregarProposta(where, params) {
@@ -144,8 +144,30 @@ async function simularConector(b, empresa_id) {
   return { resultado: conector.calcular(v.entradas, precos), precos, cfg };
 }
 
+/**
+ * O que a proposta feita pelo simulador guarda para virar contrato do Conector (propostas.conector):
+ * quantidades, ciclo, modalidade (individual = por licença; empresa = pacote) e o preço cheio de cada perfil e do
+ * pacote no ciclo escolhido. O desconto da proposta fica anotado (vale só pelos meses combinados).
+ */
+function conectorDaSimulacao(r, precos) {
+  const e = r.entradas;
+  const mensal = e.ciclo === 'mensal';
+  const fator = mensal ? 1 + precos.empresa_acrescimo_mensal_pct / 100 : 1;
+  const r2 = v => Math.round(v * 100) / 100;
+  return {
+    funcionais: e.funcionais, abaps: e.abaps, ciclo: e.ciclo, sistemas: e.sistemas,
+    modalidade: r.modalidade_escolhida === 'empresa' ? 'empresa' : 'licenca',
+    desconto_pct: e.desconto_pct, desconto_meses: e.desconto_meses,
+    precos: {
+      abap: mensal ? precos.dev_mensal : precos.dev_anual, funcional: mensal ? precos.leitura_mensal : precos.leitura_anual,
+      ambos: mensal ? precos.dev_mensal : precos.ambos_anual,
+      empresa_ate5: r2(precos.empresa_ate5 * fator), empresa_ate10: r2(precos.empresa_ate10 * fator), empresa_excedente: r2(precos.empresa_excedente * fator)
+    }
+  };
+}
+
 module.exports = {
   ETAPAS, ETAPAS_ABERTAS, ORIGENS, PADRAO_PROPOSTA, COLUNAS_PROPOSTA,
   configProposta, calcularItens, proximoNumero, registrarHistorico, mudarEtapa, carregarProposta,
-  linkPublico, linkSistema, resumoFunil, precosConector, simularConector
+  linkPublico, linkSistema, resumoFunil, precosConector, simularConector, conectorDaSimulacao
 };

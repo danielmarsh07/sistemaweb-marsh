@@ -191,14 +191,19 @@ router.post('/oportunidades/:id/notas', async (req, res) => {
 });
 
 // POST /oportunidades/:id/gerar-contrato { dia_vencimento, data_inicio, descricao, descricao_servico, valor }
-// Cria o cliente (se for prospect) e o contrato recorrente; marca a oportunidade como ganha.
+// ou, para proposta do Conector SAP, { dia_vencimento, data_inicio, conector: { vagas: { abap, funcional, ambos }, modalidade,
+//   ciclo, precos, gestor_nome?, gestor_email?, data_fim? } } — cria o contrato do Conector com licenças, preço e cobrança.
+// Cria o cliente (se for prospect) e marca a oportunidade como ganha.
 router.post('/oportunidades/:id/gerar-contrato', async (req, res) => {
   const b = req.body || {};
+  const cc = require('../services/contratos-conector');
   const dia = Number(b.dia_vencimento || 10);
   if (!Number.isInteger(dia) || dia < 1 || dia > 28) return res.status(400).json({ erro: 'Dia de vencimento: 1 a 28.' });
   if (!dataValida(b.data_inicio)) return res.status(400).json({ erro: 'Data de início inválida.' });
-  if (!(Number(b.valor) > 0)) return res.status(400).json({ erro: 'Valor mensal deve ser maior que zero.' });
-  if (!vazioNulo(b.descricao) || !vazioNulo(b.descricao_servico)) return res.status(400).json({ erro: 'Informe o nome do contrato e a descrição do serviço.' });
+  if (!b.conector) {
+    if (!(Number(b.valor) > 0)) return res.status(400).json({ erro: 'Valor mensal deve ser maior que zero.' });
+    if (!vazioNulo(b.descricao) || !vazioNulo(b.descricao_servico)) return res.status(400).json({ erro: 'Informe o nome do contrato e a descrição do serviço.' });
+  }
   const client = await pool.connect();
   try {
     const o = await carregarOportunidade(req.params.id, emp(req));
@@ -228,13 +233,30 @@ router.post('/oportunidades/:id/gerar-contrato', async (req, res) => {
       `SELECT id, numero, versao, itens, total_unico::float AS total_unico FROM propostas
        WHERE oportunidade_id = $1 AND empresa_id = $2 AND status = 'aceita' ORDER BY data_resposta DESC NULLS LAST, id DESC LIMIT 1`,
       [o.id, emp(req)])).rows[0] || null;
-    const ct = await client.query(
-      `INSERT INTO contratos (empresa_id, cliente_id, descricao, descricao_servico, valor, dia_vencimento, data_inicio,
-         emitir_nfse, status, observacoes, criado_por_usuario_id, proposta_id, itens)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 'ativo', $8, $9, $10, $11) RETURNING id`,
-      [emp(req), clienteId, texto(b.descricao, 255), String(b.descricao_servico).trim(), Number(b.valor), dia,
-       b.data_inicio, `Gerado da oportunidade #${o.id} (${o.titulo}).`, req.usuario.id,
-       proposta && proposta.id, proposta && JSON.stringify(proposta.itens)]);
+    let ct, conector = null;
+    if (b.conector) {
+      // Proposta do Conector: contrato com as licenças e o preço da proposta (o gestor recebe convite para o portal)
+      const k = b.conector;
+      const { q } = cc.lerQuantidades(k.vagas);
+      const fimPadrao = (() => { const d = new Date(`${b.data_inicio}T12:00:00Z`); d.setUTCFullYear(d.getUTCFullYear() + 1); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+      const fim = k.data_fim || fimPadrao;
+      if (!dataValida(fim) || fim < b.data_inicio) throw new cc.ErroRegra('Fim do contrato inválido.');
+      conector = await cc.criarContrato(client, {
+        empresaId: emp(req), clienteId, gestorNome: k.gestor_nome || o.contato_nome, gestorEmail: k.gestor_email || o.contato_email,
+        q, inicio: b.data_inicio, fim, precos: cc.lerPrecos(k.precos), modalidade: cc.lerModalidade(k.modalidade), ciclo: cc.lerCiclo(k.ciclo),
+        cobranca: { gerar: true, dia_vencimento: dia }, usuarioId: req.usuario.id,
+        observacoes: `Gerado da oportunidade #${o.id} (${o.titulo})${proposta ? `, proposta ${proposta.numero} v${proposta.versao}` : ''}.` });
+      await client.query('UPDATE contratos SET proposta_id = $2 WHERE id = $1', [conector.cobranca.id, proposta && proposta.id]);
+      ct = { rows: [{ id: conector.cobranca.id }] };
+    } else {
+      ct = await client.query(
+        `INSERT INTO contratos (empresa_id, cliente_id, descricao, descricao_servico, valor, dia_vencimento, data_inicio,
+           emitir_nfse, status, observacoes, criado_por_usuario_id, proposta_id, itens)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, 'ativo', $8, $9, $10, $11) RETURNING id`,
+        [emp(req), clienteId, texto(b.descricao, 255), String(b.descricao_servico).trim(), Number(b.valor), dia,
+         b.data_inicio, `Gerado da oportunidade #${o.id} (${o.titulo}).`, req.usuario.id,
+         proposta && proposta.id, proposta && JSON.stringify(proposta.itens)]);
+    }
     let faturaUnica = null;
     if (proposta && proposta.total_unico > 0) {
       const cfg = (await client.query('SELECT * FROM financeiro_config WHERE empresa_id = $1', [emp(req)])).rows[0] || {};
@@ -245,27 +267,36 @@ router.post('/oportunidades/:id/gerar-contrato', async (req, res) => {
          VALUES ($1, $2, date_trunc('month', $3::date)::date, $4, $5,
            (date_trunc('month', $3::date) + INTERVAL '1 month' + ($6::int - 1) * INTERVAL '1 day')::date, 'rascunho',
            TRUE, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
-        [emp(req), clienteId, b.data_inicio, unicos.length ? unicos.join('; ') : `${texto(b.descricao, 200)} — valor único`,
+        [emp(req), clienteId, b.data_inicio, unicos.length ? unicos.join('; ') : `${texto(b.descricao, 200) || o.titulo} — valor único`,
          proposta.total_unico, dia, cfg.codigo_servico || null, cfg.nome_servico || null, cfg.aliquota_iss || 0,
          cfg.ret_ir || 0, cfg.ret_csll || 0, cfg.ret_pis || 0, cfg.ret_cofins || 0, cfg.ret_inss || 0, req.usuario.id,
          `Valor único da proposta ${proposta.numero} v${proposta.versao}.`])).rows[0].id;
     }
-    await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'contrato.criado', entidade: 'contrato',
-      entidade_id: ct.rows[0].id, depois: { valor: Number(b.valor), oportunidade_id: o.id, proposta_id: proposta && proposta.id },
-      detalhe: faturaUnica ? `Fatura avulsa #${faturaUnica} (valor único) criada como rascunho.` : null }, client);
+    if (!conector) {
+      await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'contrato.criado', entidade: 'contrato',
+        entidade_id: ct.rows[0].id, depois: { valor: Number(b.valor), oportunidade_id: o.id, proposta_id: proposta && proposta.id },
+        detalhe: faturaUnica ? `Fatura avulsa #${faturaUnica} (valor único) criada como rascunho.` : null }, client);
+    }
     await client.query('UPDATE oportunidades SET contrato_id = $1 WHERE id = $2', [ct.rows[0].id, o.id]);
     await com.mudarEtapa(o.id, 'ganha', req.usuario.id, { client });
-    await com.registrarHistorico(o.id, 'sistema',
-      `Contrato #${ct.rows[0].id} gerado${clienteNovo ? ' e cliente cadastrado' : ''}.`, req.usuario.id, client);
+    await com.registrarHistorico(o.id, 'sistema', conector
+      ? `Contrato do Conector nº ${conector.k.id} gerado (${conector.cobranca.ciclo === 'mensal' ? 'cobrança mensal' : 'cobrança anual'} #${ct.rows[0].id})${clienteNovo ? ' e cliente cadastrado' : ''}.`
+      : `Contrato #${ct.rows[0].id} gerado${clienteNovo ? ' e cliente cadastrado' : ''}.`, req.usuario.id, client);
     await client.query('COMMIT');
+    const convite = conector && conector.criado ? await cc.enviarConvite(conector.gestor) : false;
     res.status(201).json({
-      mensagem: `Contrato criado${clienteNovo ? ' e prospect cadastrado como cliente (complete CNPJ e endereço em Clientes)' : ''}.` +
-        (proposta ? ` Itens da proposta ${proposta.numero} copiados para o contrato.` : '') +
+      mensagem: (conector
+        ? `Contrato do Conector criado com as licenças e o preço da proposta; cobrança ${conector.cobranca.ciclo === 'mensal' ? 'mensal' : 'anual'} de R$ ${conector.cobranca.valor.toFixed(2).replace('.', ',')} em Contratos.` +
+          (conector.criado ? (convite ? ` Convite enviado ao gestor (${conector.gestor.email}).` : ' O convite ao gestor não pôde ser enviado; reenvie pelo contrato.') : '')
+        : `Contrato criado.` + (proposta ? ` Itens da proposta ${proposta.numero} copiados para o contrato.` : '')) +
+        (clienteNovo ? ' Prospect cadastrado como cliente (complete CNPJ e endereço em Clientes).' : '') +
         (faturaUnica ? ' O valor único virou uma fatura avulsa em rascunho no Faturamento.' : ''),
-      contrato_id: ct.rows[0].id, cliente_id: clienteId, cliente_novo: clienteNovo, fatura_unica_id: faturaUnica
+      contrato_id: ct.rows[0].id, contrato_conector_id: conector && conector.k.id,
+      cliente_id: clienteId, cliente_novo: clienteNovo, fatura_unica_id: faturaUnica
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
+    if (err instanceof cc.ErroRegra) return res.status(400).json({ erro: err.message });
     erro500(res, 'Erro ao gerar contrato', err);
   } finally { client.release(); }
 });
@@ -382,7 +413,8 @@ router.post('/oportunidades/:id/propostas', async (req, res) => {
         numero: await com.proximoNumero(client, emp(req)), versao: 1,
         titulo: `Conector SAP Marsh — ${cliente}`.slice(0, 255),
         ...conector.textosProposta(r, cfg, { incluirRoi: b.incluir_roi !== false }),
-        itens: itens.itens, total_mensal: itens.total_mensal, total_unico: itens.total_unico
+        itens: itens.itens, total_mensal: itens.total_mensal, total_unico: itens.total_unico,
+        conector: com.conectorDaSimulacao(r, sim.precos) // "Gerar contrato" cria o contrato do Conector com isto
       };
       validadeDias = r.entradas.validade_dias;
     } else if (b.copiar_de) {
@@ -403,10 +435,11 @@ router.post('/oportunidades/:id/propostas', async (req, res) => {
     }
     const r = await client.query(
       `INSERT INTO propostas (empresa_id, oportunidade_id, numero, versao, titulo, introducao, escopo, condicoes, itens,
-         total_mensal, total_unico, validade, criado_por_usuario_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11, CURRENT_DATE + $12::int, $13) RETURNING id`,
+         total_mensal, total_unico, validade, criado_por_usuario_id, conector)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11, CURRENT_DATE + $12::int, $13, $14) RETURNING id`,
       [emp(req), o.id, dados.numero, dados.versao, dados.titulo, dados.introducao, dados.escopo, dados.condicoes,
-       JSON.stringify(dados.itens || []), dados.total_mensal || 0, dados.total_unico || 0, validadeDias, req.usuario.id]);
+       JSON.stringify(dados.itens || []), dados.total_mensal || 0, dados.total_unico || 0, validadeDias, req.usuario.id,
+       dados.conector ? JSON.stringify(dados.conector) : null]);
     await com.registrarHistorico(o.id, 'proposta', `Proposta ${dados.numero}${dados.versao > 1 ? ` v${dados.versao}` : ''} criada (rascunho)` +
       (sim ? ` pelo simulador do Conector SAP: ${sim.resultado.comparacao.usuarios} usuário(s), plano ${sim.resultado.modalidade_escolhida}, ciclo ${sim.resultado.entradas.ciclo}.` : '.'),
       req.usuario.id, client);

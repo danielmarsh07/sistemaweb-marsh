@@ -64,5 +64,5 @@ Melhoria prevista (fase 2): a ficha mostrar "comprou pela Loja" com o pedido e a
 
 - [x] Fase 1 (v4.4) — o menu "Contratos por vagas" saiu; a lista de Contratos e a ficha mostram as licenças.
 - [x] Fase 2 (v4.4) — contrato de cursos; liberação de contrato vale também para quem só usa licença.
-- [ ] Fase 3
+- [x] Fase 3 (v4.5) — também: ciclo de cobrança anual ou mensal no contrato do Conector.
 - [ ] Fase 4

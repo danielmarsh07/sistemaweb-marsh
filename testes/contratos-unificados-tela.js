@@ -85,6 +85,14 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     ok(/desconto|acima/.test(await js(`document.getElementById('ncc-lista-abap').textContent`)), 'mostra a diferença para o preço de lista');
     ok(/Valor anual: R\$\s?15\.600,00/.test(await js(`document.getElementById('ncc-preco-hint').textContent`)), 'valor anual explicado no fim');
     await foto('2-conector');
+    // Pacote Empresa: some o preço por perfil, aparece o do pacote e a conta da faixa
+    await js(`(() => { const f = document.getElementById('form-novo-contrato-conector'); f.modalidade.value = 'empresa'; f.modalidade.dispatchEvent(new Event('change')); })()`);
+    await espera(200);
+    ok(!(await js(`document.getElementById('ncc-pacote').hidden`)) && /pacote até 5/.test(await js(`document.getElementById('ncc-preco-hint').textContent`)),
+      'pacote Empresa: mostra o preço do pacote e a faixa');
+    await foto('2b-pacote');
+    await js(`(() => { const f = document.getElementById('form-novo-contrato-conector'); f.modalidade.value = 'licenca'; f.modalidade.dispatchEvent(new Event('change')); })()`);
+    await espera(200);
     await cmd('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await espera(400);
     await foto('3-conector-celular');
@@ -125,6 +133,29 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     ok(await visivel('modal-ficha-cliente'), 'ao salvar, a ficha volta');
     ok((await js(`document.getElementById('ficha-corpo').textContent`)).includes('Cursos para a empresa nº'), 'ficha mostra o contrato de cursos');
 
+    // Proposta do simulador aceita → "Gerar contrato" mostra licenças, preço e gestor
+    await js(`closeModal(document.getElementById('modal-ficha-cliente'))`);
+    const api = async (p, m = 'GET', body) => (await fetch('http://localhost:3000/api' + p, { method: m,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: body && JSON.stringify(body) })).json();
+    const op = await api('/comercial/oportunidades', 'POST', { titulo: `TESTE tela proposta ${sufixo}`, cliente_id: cli,
+      contato_nome: 'Comprador Tela', contato_email: `comprador-tela-${sufixo}@teste.com` });
+    const prop = await api(`/comercial/oportunidades/${op.id}/propostas`, 'POST',
+      { simulador_conector: { funcionais: 2, abaps: 1, ciclo: 'anual', modalidade: 'individual', porte: 'nenhum' } });
+    await api(`/comercial/propostas/${prop.id}/enviar`, 'POST', { enviar_email: false });
+    await api(`/comercial/propostas/${prop.id}/status`, 'POST', { status: 'aceita' });
+    await js(`showPage('funil')`); await espera(1200);
+    await js(`abrirOportunidade(${op.id})`); await espera(1500);
+    await js(`abrirGerarContrato()`); await espera(500);
+    ok(!(await js(`document.getElementById('gc-conector').hidden`)) && await js(`document.getElementById('gc-geral').hidden`),
+      'gerar contrato: proposta do Conector mostra licenças e preço');
+    ok((await js(`document.getElementById('form-gerar-contrato').abap.value`)) === '1' && /Valor anual/.test(await js(`document.getElementById('gc-total').textContent`)),
+      'gerar contrato: licenças da proposta e valor anual explicado');
+    await foto('7-gerar-contrato');
+    await js(`salvarGerarContrato()`); await espera(2500);
+    ok((await pool.query('SELECT 1 FROM contratos_conector WHERE cliente_id = $1 AND observacoes LIKE $2', [cli, `%oportunidade #${op.id}%`])).rows.length === 1,
+      'gerar contrato pela tela cria o contrato do Conector');
+    await pool.query('DELETE FROM oportunidades WHERE id = $1', [op.id]).catch(() => {});
+
     ok(errosJs.length === 0, `sem erros de JavaScript${errosJs.length ? ': ' + errosJs.join(' | ') : ''}`);
   } finally {
     ws.close(); chrome.kill();
@@ -134,6 +165,7 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     await pool.query('DELETE FROM cursos_liberacoes WHERE cliente_id = $1', [cli]);
     await pool.query('DELETE FROM faturas WHERE cliente_id = $1', [cli]);
     await pool.query('DELETE FROM contratos WHERE cliente_id = $1', [cli]);
+    await pool.query('DELETE FROM oportunidades WHERE cliente_id = $1', [cli]).catch(() => {});
     await pool.query('DELETE FROM contratos_cursos WHERE cliente_id = $1', [cli]);
     await pool.query('DELETE FROM contratos_conector_vagas WHERE contrato_id IN (SELECT id FROM contratos_conector WHERE cliente_id = $1)', [cli]);
     await pool.query('DELETE FROM contratos_conector WHERE cliente_id = $1', [cli]);

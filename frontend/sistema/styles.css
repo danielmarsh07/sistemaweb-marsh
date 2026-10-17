@@ -3923,6 +3923,8 @@ svg.icon {
 .tabela-precos-licencas input[type="number"] { max-width: 140px; }
 .tabela-precos-licencas .form-hint { display: block; margin-top: 4px; }
 .tabela-precos-licencas td { vertical-align: top; }
+/* Pacote Empresa: o preço é do pacote (abaixo da tabela), não por perfil */
+.tabela-precos-licencas.modo-empresa .col-preco { display: none; }
 .ncc-total { margin: 8px 0 14px; font-size: 0.95rem; color: var(--text-secondary); }
 .ncc-total strong { color: var(--text-main); font-size: 1.05rem; }
 @media (max-width: 768px) {

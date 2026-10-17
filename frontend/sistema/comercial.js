@@ -424,29 +424,77 @@ async function excluirProposta(id) {
 }
 
 // ===== Gerar contrato =====
+// Proposta aceita feita pelo simulador do Conector (p.conector): gera o contrato do Conector com licenças, preço
+// (por licença ou pacote Empresa), ciclo e gestor. Senão, o contrato recorrente de serviço.
+let _gcConector = null;
+
 function abrirGerarContrato() {
   const o = _opAtual;
   if (!o) return;
   const aceita = o.propostas.find(p => p.status === 'aceita');
   const form = document.getElementById('form-gerar-contrato');
   form.reset();
+  _gcConector = aceita && aceita.conector ? aceita.conector : null;
+  document.getElementById('gc-geral').hidden = !!_gcConector;
+  document.getElementById('gc-conector').hidden = !_gcConector;
+  ['descricao', 'descricao_servico', 'valor'].forEach(k => { form[k].required = !_gcConector; });
+  form.gestor_email.required = !!_gcConector;
   form.descricao.value = o.titulo;
   form.descricao_servico.value = aceita ? aceita.titulo : o.titulo;
   form.valor.value = (aceita && aceita.total_mensal) || o.valor_mensal || '';
   form.dia_vencimento.value = 10;
   const d = new Date(); d.setMonth(d.getMonth() + 1, 1);
   form.data_inicio.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  if (_gcConector) preencherGerarConector(form, o, _gcConector);
   document.getElementById('gc-aviso').textContent = (o.cliente_id
     ? `O contrato será criado para ${o.nome_exibicao}.`
     : `"${o.empresa_nome || o.contato_nome}" ainda é prospect: será cadastrado como cliente com os dados de contato. Depois complete CNPJ e endereço em Clientes (a nota fiscal precisa).`) +
-    (aceita ? ` Os itens da proposta ${aceita.numero} vão para o contrato.` : '') +
+    (aceita && !_gcConector ? ` Os itens da proposta ${aceita.numero} vão para o contrato.` : '') +
+    (aceita && _gcConector ? ` A proposta ${aceita.numero} foi feita pelo simulador do Conector: confira as licenças e o preço abaixo.` : '') +
     (aceita && Number(aceita.total_unico) > 0 ? ` O valor único (${formatMoeda(aceita.total_unico)}) vira uma fatura avulsa em rascunho.` : '');
   showModal('#modal-gerar-contrato');
 }
 
+// Licenças e preço vindos da simulação: ABAPs → perfil ABAP, funcionais → Funcional; preço cheio do ciclo (editável)
+function preencherGerarConector(form, o, c) {
+  form.abap.value = c.abaps || 0;
+  form.funcional.value = c.funcionais || 0;
+  form.ambos.value = 0;
+  [...PERFIS_CONECTOR, ...PACOTE_CONECTOR].forEach(([k]) => { form[`gcp_${k}`].value = c.precos[k]; });
+  form.gestor_nome.value = o.contato_nome || '';
+  form.gestor_email.value = o.contato_email || '';
+  const empresa = c.modalidade === 'empresa';
+  document.getElementById('gc-tabela').classList.toggle('modo-empresa', empresa);
+  document.getElementById('gc-pacote').hidden = !empresa;
+  document.getElementById('gc-conector-resumo').textContent =
+    `${empresa ? 'Pacote Empresa' : 'Por licença'} · cobrança ${c.ciclo}` +
+    (c.desconto_pct > 0 ? ` · a proposta tinha ${String(c.desconto_pct).replace('.', ',')}% de desconto nos primeiros ${c.desconto_meses} mês(es): os preços abaixo são cheios; ajuste se o combinado for outro.` : '.');
+  form.querySelectorAll('#gc-conector input[type="number"]').forEach(i => { i.oninput = recalcularGerarConector; });
+  recalcularGerarConector();
+}
+
+function recalcularGerarConector() {
+  if (!_gcConector) return;
+  const form = document.getElementById('form-gerar-contrato');
+  const q = quantidadesDoForm(form);
+  const precos = precosDoForm(form, 'gcp_');
+  const valor = Math.round(mensalidadeConector(q, precos, _gcConector.modalidade) * multCiclo(_gcConector.ciclo) * 100) / 100;
+  const partes = _gcConector.modalidade === 'empresa' ? [textoPacote(q, precos)].filter(Boolean)
+    : PERFIS_CONECTOR.filter(([p]) => q[p] > 0).map(([p, r]) => `${q[p]} ${r} × ${formatMoeda(precos[p])}`);
+  const conta = partes.length > 1 && _gcConector.ciclo !== 'mensal' ? `(${partes.join(' + ')})` : partes.join(' + ');
+  document.getElementById('gc-total').innerHTML = partes.length
+    ? `${conta}${_gcConector.ciclo === 'mensal' ? '' : ' × 12'}<br><strong>${nomeValorCiclo(_gcConector.ciclo)}: ${formatMoeda(valor)}</strong>`
+    : 'Informe as licenças.';
+}
+
 async function salvarGerarContrato() {
   const form = document.getElementById('form-gerar-contrato');
-  const dados = Object.fromEntries(['descricao', 'descricao_servico', 'valor', 'dia_vencimento', 'data_inicio'].map(k => [k, form[k].value]));
+  const dados = _gcConector
+    ? { dia_vencimento: form.dia_vencimento.value, data_inicio: form.data_inicio.value,
+        conector: { vagas: quantidadesDoForm(form), modalidade: _gcConector.modalidade, ciclo: _gcConector.ciclo,
+          precos: precosDoForm(form, 'gcp_'), gestor_nome: form.gestor_nome.value, gestor_email: form.gestor_email.value,
+          data_fim: form.data_fim.value || undefined } }
+    : Object.fromEntries(['descricao', 'descricao_servico', 'valor', 'dia_vencimento', 'data_inicio'].map(k => [k, form[k].value]));
   const r = await resultadoJson(await apiFetch(`${API_URL}/comercial/oportunidades/${_opAtual.id}/gerar-contrato`, {
     method: 'POST', body: JSON.stringify(dados)
   }));

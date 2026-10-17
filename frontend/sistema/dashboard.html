@@ -3137,34 +3137,70 @@
   </div>
 
   <div id="modal-gerar-contrato" class="modal">
-    <div class="modal-content">
+    <div class="modal-content modal-lg">
       <div class="modal-header">
         <h3>Gerar contrato recorrente</h3>
         <button class="btn-close">&times;</button>
       </div>
       <form id="form-gerar-contrato" class="form">
         <p class="pagina-descricao" id="gc-aviso"></p>
-        <div class="form-group">
-          <label>Nome do contrato <span class="obrig" title="Obrigatório">*</span></label>
-          <input type="text" name="descricao" required maxlength="255">
-        </div>
-        <div class="form-group">
-          <label>Descrição do serviço na nota fiscal <span class="obrig" title="Obrigatório">*</span></label>
-          <textarea name="descricao_servico" rows="3" required></textarea>
-        </div>
-        <div class="form-row">
+        <div id="gc-geral">
+          <div class="form-group">
+            <label>Nome do contrato <span class="obrig" title="Obrigatório">*</span></label>
+            <input type="text" name="descricao" required maxlength="255">
+          </div>
+          <div class="form-group">
+            <label>Descrição do serviço na nota fiscal <span class="obrig" title="Obrigatório">*</span></label>
+            <textarea name="descricao_servico" rows="3" required></textarea>
+          </div>
           <div class="form-group">
             <label>Valor mensal (R$) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="valor" min="0.01" step="0.01" required>
           </div>
+        </div>
+        <!-- Proposta do Conector SAP: vira contrato do Conector com licenças, preço e cobrança -->
+        <div id="gc-conector" hidden>
+          <div class="form-section-title">Licenças do Conector (da proposta)</div>
+          <p class="form-hint" id="gc-conector-resumo"></p>
+          <div class="table-container">
+            <table class="tabela-precos-licencas" id="gc-tabela">
+              <thead><tr><th>Perfil</th><th>Licenças</th><th class="col-preco">Preço por licença (R$/mês)</th></tr></thead>
+              <tbody>
+                <tr><td data-label="Perfil"><strong>ABAP</strong></td>
+                  <td data-label="Licenças"><div class="form-group"><input type="number" name="abap" min="0" max="200" value="0"></div></td>
+                  <td data-label="Preço por licença (R$/mês)" class="col-preco"><div class="form-group"><input type="number" name="gcp_abap" min="0" step="0.01"></div></td></tr>
+                <tr><td data-label="Perfil"><strong>Funcional</strong></td>
+                  <td data-label="Licenças"><div class="form-group"><input type="number" name="funcional" min="0" max="200" value="0"></div></td>
+                  <td data-label="Preço por licença (R$/mês)" class="col-preco"><div class="form-group"><input type="number" name="gcp_funcional" min="0" step="0.01"></div></td></tr>
+                <tr><td data-label="Perfil"><strong>ABAP + Funcional</strong></td>
+                  <td data-label="Licenças"><div class="form-group"><input type="number" name="ambos" min="0" max="200" value="0"></div></td>
+                  <td data-label="Preço por licença (R$/mês)" class="col-preco"><div class="form-group"><input type="number" name="gcp_ambos" min="0" step="0.01"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="gc-pacote" class="form-row" hidden>
+            <div class="form-group"><label>Pacote até 5 usuários (R$/mês)</label><input type="number" name="gcp_empresa_ate5" min="0" step="0.01"></div>
+            <div class="form-group"><label>Pacote até 10 usuários (R$/mês)</label><input type="number" name="gcp_empresa_ate10" min="0" step="0.01"></div>
+            <div class="form-group"><label>Por usuário acima de 10 (R$/mês)</label><input type="number" name="gcp_empresa_excedente" min="0" step="0.01"></div>
+          </div>
+          <p class="ncc-total" id="gc-total"></p>
+          <div class="form-row">
+            <div class="form-group"><label>Gestor (nome)</label><input type="text" name="gestor_nome" maxlength="150"></div>
+            <div class="form-group"><label>Gestor (e-mail) <span class="obrig" title="Obrigatório">*</span></label><input type="email" name="gestor_email" maxlength="150">
+              <small class="form-hint">Vira administrador da empresa no portal (e-mail novo recebe convite).</small></div>
+          </div>
+          <div class="form-group"><label>Fim do contrato</label><input type="date" name="data_fim">
+            <small class="form-hint">Vazio = 12 meses a partir do início.</small></div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
             <label>Dia do vencimento <span class="obrig" title="Obrigatório">*</span></label>
             <input type="number" name="dia_vencimento" min="1" max="28" value="10" required>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Início <span class="obrig" title="Obrigatório">*</span></label>
-          <input type="date" name="data_inicio" required>
+          <div class="form-group">
+            <label>Início <span class="obrig" title="Obrigatório">*</span></label>
+            <input type="date" name="data_inicio" required>
+          </div>
         </div>
         <small class="form-hint">Nota fiscal e retenções seguem o padrão do faturamento; ajuste depois em Financeiro → Contratos se precisar.</small>
         <div class="form-actions">
@@ -3464,25 +3500,49 @@
           </div>
         </div>
         <div class="form-section-title">Licenças e preço deste contrato</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Como cobrar</label>
+            <select name="modalidade">
+              <option value="licenca">Por licença (preço por perfil)</option>
+              <option value="empresa">Pacote Empresa (preço fechado por faixa de usuários)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ciclo da cobrança</label>
+            <select name="ciclo">
+              <option value="anual">Anual (uma fatura por ano)</option>
+              <option value="mensal">Mensal (uma fatura por mês)</option>
+            </select>
+          </div>
+        </div>
         <p class="form-hint" id="ncc-preco-origem">O preço vem da tabela Preços Conector SAP (lista). Altere aqui para dar um preço especial só para este cliente.</p>
         <div class="table-container">
-          <table class="tabela-precos-licencas">
-            <thead><tr><th>Perfil</th><th>Licenças</th><th>Preço por licença (R$/mês)</th><th>Total no ano</th></tr></thead>
+          <table class="tabela-precos-licencas" id="ncc-tabela">
+            <thead><tr><th>Perfil</th><th>Licenças</th><th class="col-preco">Preço por licença (R$/mês)</th><th class="col-preco">Total</th></tr></thead>
             <tbody>
               <tr><td data-label="Perfil"><strong>ABAP</strong></td>
                 <td data-label="Licenças"><div class="form-group"><input type="number" name="abap" min="0" max="200" value="0"></div></td>
-                <td data-label="Preço por licença (R$/mês)"><div class="form-group"><input type="number" name="preco_abap" min="0" step="0.01"><small class="form-hint" id="ncc-lista-abap"></small></div></td>
-                <td data-label="Total no ano" class="fin-num" id="ncc-total-abap">—</td></tr>
+                <td data-label="Preço por licença (R$/mês)" class="col-preco"><div class="form-group"><input type="number" name="preco_abap" min="0" step="0.01"><small class="form-hint" id="ncc-lista-abap"></small></div></td>
+                <td data-label="Total" class="fin-num col-preco" id="ncc-total-abap">—</td></tr>
               <tr><td data-label="Perfil"><strong>Funcional</strong></td>
                 <td data-label="Licenças"><div class="form-group"><input type="number" name="funcional" min="0" max="200" value="0"></div></td>
-                <td data-label="Preço por licença (R$/mês)"><div class="form-group"><input type="number" name="preco_funcional" min="0" step="0.01"><small class="form-hint" id="ncc-lista-funcional"></small></div></td>
-                <td data-label="Total no ano" class="fin-num" id="ncc-total-funcional">—</td></tr>
+                <td data-label="Preço por licença (R$/mês)" class="col-preco"><div class="form-group"><input type="number" name="preco_funcional" min="0" step="0.01"><small class="form-hint" id="ncc-lista-funcional"></small></div></td>
+                <td data-label="Total" class="fin-num col-preco" id="ncc-total-funcional">—</td></tr>
               <tr><td data-label="Perfil"><strong>ABAP + Funcional</strong></td>
                 <td data-label="Licenças"><div class="form-group"><input type="number" name="ambos" min="0" max="200" value="0"></div></td>
-                <td data-label="Preço por licença (R$/mês)"><div class="form-group"><input type="number" name="preco_ambos" min="0" step="0.01"><small class="form-hint" id="ncc-lista-ambos"></small></div></td>
-                <td data-label="Total no ano" class="fin-num" id="ncc-total-ambos">—</td></tr>
+                <td data-label="Preço por licença (R$/mês)" class="col-preco"><div class="form-group"><input type="number" name="preco_ambos" min="0" step="0.01"><small class="form-hint" id="ncc-lista-ambos"></small></div></td>
+                <td data-label="Total" class="fin-num col-preco" id="ncc-total-ambos">—</td></tr>
             </tbody>
           </table>
+        </div>
+        <div id="ncc-pacote" class="form-row" hidden>
+          <div class="form-group"><label>Pacote até 5 usuários (R$/mês)</label><input type="number" name="preco_empresa_ate5" min="0" step="0.01">
+            <small class="form-hint" id="ncc-lista-empresa_ate5"></small></div>
+          <div class="form-group"><label>Pacote até 10 usuários (R$/mês)</label><input type="number" name="preco_empresa_ate10" min="0" step="0.01">
+            <small class="form-hint" id="ncc-lista-empresa_ate10"></small></div>
+          <div class="form-group"><label>Por usuário acima de 10 (R$/mês)</label><input type="number" name="preco_empresa_excedente" min="0" step="0.01">
+            <small class="form-hint" id="ncc-lista-empresa_excedente"></small></div>
         </div>
         <p class="ncc-total" id="ncc-preco-hint">Informe quantas licenças de cada perfil.</p>
         <div class="form-row">
@@ -3491,7 +3551,7 @@
           <div class="form-group"><label>Máx. de SIDs</label><input type="number" name="max_sids" min="1" max="10" value="3"></div>
         </div>
         <div class="form-section-title">Cobrança</div>
-        <label class="check-linha"><input type="checkbox" name="gerar_cobranca" checked> Criar a cobrança anual no Financeiro (o valor anual acima)</label>
+        <label class="check-linha"><input type="checkbox" name="gerar_cobranca" checked> Criar a cobrança no Financeiro (o valor acima, no ciclo escolhido)</label>
         <div class="form-row">
           <div class="form-group"><label>Dia do vencimento</label><input type="number" name="dia_vencimento" min="1" max="28" value="10"></div>
         </div>

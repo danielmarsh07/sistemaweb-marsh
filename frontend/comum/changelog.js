@@ -22,6 +22,12 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.5', data: '2026-10-16', destaques: [
+      'Proposta aceita vira contrato do Conector: em "Gerar contrato", a proposta feita pelo simulador já traz as licenças por perfil, o preço, o gestor e a cobrança; é só conferir e gerar',
+      'Contrato do Conector por pacote Empresa: preço fechado até 5 ou até 10 usuários e um valor por usuário acima de 10, igual à proposta',
+      'Cobrança das licenças anual ou mensal: no mensal, licenças a mais entram na próxima fatura; no anual, sai a fatura proporcional',
+      'No pacote Empresa, ao passar de faixa (ex.: de 5 para 6 usuários) a conta mostra a diferença e a fatura proporcional'
+    ] },
     { versao: 'v4.4', data: '2026-10-16', destaques: [
       'Um botão só para contratar: "+ Novo contrato" (na ficha do cliente e em Contratos) pergunta o tipo (Serviço, Licenças do Conector ou Cursos) e abre o formulário certo',
       'Preço especial por cliente sem mexer na tabela: cada contrato de licenças guarda o seu preço por perfil, com o preço de lista e o desconto ao lado. O próximo contrato do mesmo cliente já vem com esse preço',

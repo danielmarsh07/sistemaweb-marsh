@@ -44,8 +44,31 @@ async function loadContratosConector() {
 }
 
 const PERFIS_CONECTOR = [['abap', 'ABAP'], ['funcional', 'Funcional'], ['ambos', 'ABAP + Funcional']];
-// Preço de lista (tabela Preços Conector SAP) do formulário aberto, para mostrar o desconto de cada perfil
+const PACOTE_CONECTOR = [['empresa_ate5', 'Pacote até 5 usuários'], ['empresa_ate10', 'Pacote até 10 usuários'], ['empresa_excedente', 'Por usuário acima de 10']];
+// Preço de lista (tabela Preços Conector SAP) do formulário aberto, para mostrar o desconto de cada perfil e do pacote
 let _listaConector = {};
+
+// Mesma conta do backend (services/contratos-conector.js mensalidade): por licença ou pacote Empresa, em R$/mês
+function mensalidadeConector(q, precos, modalidade) {
+  const n = (q.abap || 0) + (q.funcional || 0) + (q.ambos || 0);
+  if (modalidade === 'empresa') {
+    if (!n) return 0;
+    return Math.round(((n <= 5 ? precos.empresa_ate5 : precos.empresa_ate10) + Math.max(0, n - 10) * precos.empresa_excedente) * 100) / 100;
+  }
+  return Math.round(PERFIS_CONECTOR.reduce((s, [p]) => s + (q[p] || 0) * (precos[p] || 0), 0) * 100) / 100;
+}
+const multCiclo = ciclo => (ciclo === 'mensal' ? 1 : 12);
+const nomeValorCiclo = ciclo => (ciclo === 'mensal' ? 'Valor mensal' : 'Valor anual');
+
+// Explicação da conta do pacote: "7 usuário(s) → pacote até 10 (R$ 6.000,00/mês)"
+function textoPacote(q, precos) {
+  const n = (q.abap || 0) + (q.funcional || 0) + (q.ambos || 0);
+  if (!n) return '';
+  const faixa = n <= 5 ? 5 : 10;
+  const exc = Math.max(0, n - 10);
+  return `${n} usuário(s) → pacote até ${faixa} (${formatMoeda(precos[`empresa_ate${faixa}`])}/mês)`
+    + (exc ? ` + ${exc} acima de 10 × ${formatMoeda(precos.empresa_excedente)}` : '');
+}
 
 async function abrirNovoContratoConector(clienteId) {
   resetForm('#form-novo-contrato-conector');
@@ -58,6 +81,11 @@ async function abrirNovoContratoConector(clienteId) {
     f[p].oninput = recalcularNovoConector;
     f[`preco_${p}`].oninput = recalcularNovoConector;
   });
+  PACOTE_CONECTOR.forEach(([c]) => { f[`preco_${c}`].oninput = recalcularNovoConector; });
+  f.modalidade.value = 'licenca';
+  f.ciclo.value = 'anual';
+  f.modalidade.onchange = recalcularNovoConector;
+  f.ciclo.onchange = () => carregarPrecosNovoConector(f); // o preço de lista muda com o ciclo
   f.gerar_cobranca.checked = true;
   f.dia_vencimento.value = 10;
   await preencherClientesSelect(f.cliente_id, clienteId);
@@ -66,14 +94,16 @@ async function abrirNovoContratoConector(clienteId) {
   showModal('#modal-novo-contrato-conector');
 }
 
-// Preço de partida: o do último contrato do cliente; sem contrato anterior, a tabela (lista)
+// Preço de partida: o do último contrato do cliente (no mesmo ciclo); sem contrato anterior, a tabela (lista)
 async function carregarPrecosNovoConector(f) {
   const cli = f.cliente_id.value ? `&cliente_id=${encodeURIComponent(f.cliente_id.value)}` : '';
-  const res = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?abap=0&funcional=0&ambos=0${cli}`);
+  const res = await apiFetch(`${API_URL}/contratos-conector/preco-sugerido?abap=0&funcional=0&ambos=0&ciclo=${f.ciclo.value}${cli}`);
   if (!res || !res.ok) return;
   const d = await res.json();
   _listaConector = {};
   d.linhas.forEach(l => { _listaConector[l.perfil] = l.preco_lista; f[`preco_${l.perfil}`].value = l.preco_mensal; });
+  d.pacote.forEach(p => { _listaConector[p.chave] = p.preco_lista; f[`preco_${p.chave}`].value = p.preco; });
+  if (d.modalidade_referencia) f.modalidade.value = d.modalidade_referencia;
   document.getElementById('ncc-preco-origem').textContent = d.origem === 'cliente'
     ? `Preço do último contrato deste cliente (nº ${d.contrato_referencia}). Altere se a negociação for outra; a tabela de lista não muda.`
     : 'Preço da tabela Preços Conector SAP (lista). Altere aqui para dar um preço especial só para este cliente; a tabela não muda.';
@@ -87,23 +117,33 @@ function notaLista(preco, lista) {
   return `lista ${formatMoeda(lista)}${pct > 0 ? ` · ${String(pct).replace('.', ',')}% de desconto` : pct < 0 ? ` · ${String(-pct).replace('.', ',')}% acima` : ''}`;
 }
 
-// Conta na hora, por perfil: licenças × preço × 12; no fim, o valor anual explicado
+const precosDoForm = (f, prefixo = 'preco_') => Object.fromEntries([...PERFIS_CONECTOR, ...PACOTE_CONECTOR]
+  .map(([c]) => [c, Number(f[`${prefixo}${c}`].value) || 0]));
+const quantidadesDoForm = f => Object.fromEntries(PERFIS_CONECTOR.map(([p]) => [p, Number(f[p].value) || 0]));
+
+// Conta na hora: por licença (licenças × preço × ciclo) ou pacote Empresa; no fim, o valor explicado
 function recalcularNovoConector() {
   const f = document.getElementById('form-novo-contrato-conector');
-  let total = 0;
+  const empresa = f.modalidade.value === 'empresa';
+  const ciclo = f.ciclo.value;
+  const mult = multCiclo(ciclo);
+  const q = quantidadesDoForm(f);
+  const precos = precosDoForm(f);
+  document.getElementById('ncc-tabela').classList.toggle('modo-empresa', empresa);
+  document.getElementById('ncc-pacote').hidden = !empresa;
   const partes = [];
   PERFIS_CONECTOR.forEach(([p, rotulo]) => {
-    const q = Number(f[p].value) || 0;
-    const preco = Number(f[`preco_${p}`].value) || 0;
-    const ano = Math.round(q * preco * 12 * 100) / 100;
-    total += ano;
-    document.getElementById(`ncc-lista-${p}`).textContent = notaLista(preco, _listaConector[p]);
-    document.getElementById(`ncc-total-${p}`).innerHTML = q > 0
-      ? `${q} × ${formatMoeda(preco)} × 12<br><strong>${formatMoeda(ano)}</strong>` : '—';
-    if (q > 0) partes.push(`${rotulo} ${formatMoeda(ano)}`);
+    const total = Math.round(q[p] * precos[p] * mult * 100) / 100;
+    document.getElementById(`ncc-lista-${p}`).textContent = notaLista(precos[p], _listaConector[p]);
+    document.getElementById(`ncc-total-${p}`).innerHTML = q[p] > 0
+      ? `${q[p]} × ${formatMoeda(precos[p])}${mult > 1 ? ' × 12' : ''}<br><strong>${formatMoeda(total)}</strong>` : '—';
+    if (q[p] > 0) partes.push(`${rotulo} ${formatMoeda(total)}`);
   });
-  document.getElementById('ncc-preco-hint').innerHTML = partes.length
-    ? `${partes.join(' + ')}<br><strong>Valor anual: ${formatMoeda(total)}</strong>`
+  PACOTE_CONECTOR.forEach(([c]) => { document.getElementById(`ncc-lista-${c}`).textContent = notaLista(precos[c], _listaConector[c]); });
+  const valor = Math.round(mensalidadeConector(q, precos, f.modalidade.value) * mult * 100) / 100;
+  const explicacao = empresa ? (textoPacote(q, precos) ? `${textoPacote(q, precos)}${mult > 1 ? ' × 12' : ''}` : '') : partes.join(' + ');
+  document.getElementById('ncc-preco-hint').innerHTML = explicacao
+    ? `${explicacao}<br><strong>${nomeValorCiclo(ciclo)}: ${formatMoeda(valor)}</strong>`
     : 'Informe quantas licenças de cada perfil.';
 }
 
@@ -112,7 +152,7 @@ async function salvarNovoContratoConector() {
   const corpo = {
     cliente_id: f.cliente_id.value, gestor_nome: f.gestor_nome.value, gestor_email: f.gestor_email.value,
     vagas: { abap: f.abap.value, funcional: f.funcional.value, ambos: f.ambos.value },
-    precos: { abap: f.preco_abap.value, funcional: f.preco_funcional.value, ambos: f.preco_ambos.value },
+    modalidade: f.modalidade.value, ciclo: f.ciclo.value, precos: precosDoForm(f),
     data_inicio: f.data_inicio.value || undefined, data_fim: f.data_fim.value, max_sids: f.max_sids.value,
     observacoes: f.observacoes.value,
     cobranca: { gerar: f.gerar_cobranca.checked, dia_vencimento: f.dia_vencimento.value }
@@ -139,8 +179,8 @@ async function abrirContratoConector(id, manterAberto) {
     `${k.cpf_cnpj ? ` · CPF/CNPJ ${escapeHtml(k.cpf_cnpj)}` : ''} · origem: ${k.origem === 'loja' ? 'compra pelo site' : 'manual'}`;
   const mesesNome = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   document.getElementById('contrato-conector-cobranca').innerHTML = k.cobranca
-    ? `Cobrança: <strong>${formatMoeda(k.cobranca.valor)}/ano</strong> (em ${mesesNome[k.cobranca.mes_cobranca - 1]}, vencimento dia ${k.cobranca.dia_vencimento}) — contrato financeiro CT-${String(k.cobranca.id).padStart(4, '0')}${k.cobranca.status !== 'ativo' ? ` (${escapeHtml(k.cobranca.status)})` : ''}.`
-    : `<span style="color:#b7791f">Sem cobrança no Financeiro.</span> <button type="button" class="btn btn-secondary btn-sm" onclick="criarCobrancaConector()">Criar cobrança anual</button>`;
+    ? `Cobrança: <strong>${formatMoeda(k.cobranca.valor)}${k.preco.ciclo === 'mensal' ? '/mês' : '/ano'}</strong> (${k.preco.ciclo === 'mensal' ? 'todo mês' : `em ${mesesNome[k.cobranca.mes_cobranca - 1]}`}, vencimento dia ${k.cobranca.dia_vencimento}) — contrato financeiro CT-${String(k.cobranca.id).padStart(4, '0')}${k.cobranca.status !== 'ativo' ? ` (${escapeHtml(k.cobranca.status)})` : ''}.`
+    : `<span style="color:#b7791f">Sem cobrança no Financeiro.</span> <button type="button" class="btn btn-secondary btn-sm" onclick="criarCobrancaConector()">Criar cobrança ${k.preco.ciclo === 'mensal' ? 'mensal' : 'anual'}</button>`;
   const f = document.getElementById('form-contrato-conector');
   f.status.value = k.status;
   f.data_inicio.value = k.data_inicio;
@@ -186,49 +226,67 @@ const quantidadesConector = k => {
   return q;
 };
 const cobrancaAtiva = k => k.cobranca && k.cobranca.status === 'ativo';
+const nomeCobrancaCiclo = ciclo => (ciclo === 'mensal' ? 'mensalidade' : 'anuidade');
+// Valor de cada cobrança do contrato aberto com estas licenças e estes preços
+const valorCobrancaConector = (k, q, precos) => Math.round(mensalidadeConector(q, precos, k.preco.modalidade) * multCiclo(k.preco.ciclo) * 100) / 100;
 
-// Preço negociado do contrato (editável) com o preço de lista ao lado e o total no ano
+// Preço negociado do contrato (editável) com o preço de lista ao lado: por perfil ou pacote Empresa
 function renderPrecosContrato(k) {
   const q = quantidadesConector(k);
-  const { precos, lista, origem } = k.preco;
-  document.getElementById('contrato-conector-precos').innerHTML = PERFIS_CONECTOR.map(([p, rotulo]) => `
-    <tr>
-      <td data-label="Perfil"><strong>${rotulo}</strong></td>
-      <td data-label="Licenças">${q[p]}</td>
-      <td data-label="Preço negociado"><div class="form-group"><input type="number" name="preco_${p}" min="0" step="0.01" value="${precos[p]}">
-        <small class="form-hint">${notaLista(precos[p], lista[p])}</small></div></td>
-      <td data-label="Total no ano" class="fin-num">${formatMoeda(q[p] * precos[p] * 12)}</td>
-    </tr>`).join('');
-  document.getElementById('contrato-conector-precos-nota').textContent = {
+  const { precos, lista, origem, modalidade, ciclo } = k.preco;
+  const mult = multCiclo(ciclo);
+  const linhas = modalidade === 'empresa'
+    ? PACOTE_CONECTOR.map(([c, rotulo]) => `
+      <tr>
+        <td data-label="Perfil"><strong>${rotulo}</strong></td>
+        <td data-label="Licenças">${c === 'empresa_ate5' ? `${q.abap + q.funcional + q.ambos} usuário(s)` : ''}</td>
+        <td data-label="Preço negociado"><div class="form-group"><input type="number" name="preco_${c}" min="0" step="0.01" value="${precos[c]}">
+          <small class="form-hint">${notaLista(precos[c], lista[c])}</small></div></td>
+        <td data-label="Total" class="fin-num">${c === 'empresa_ate5' ? `<strong>${formatMoeda(valorCobrancaConector(k, q, precos))}</strong>` : ''}</td>
+      </tr>`).join('')
+    : PERFIS_CONECTOR.map(([p, rotulo]) => `
+      <tr>
+        <td data-label="Perfil"><strong>${rotulo}</strong></td>
+        <td data-label="Licenças">${q[p]}</td>
+        <td data-label="Preço negociado"><div class="form-group"><input type="number" name="preco_${p}" min="0" step="0.01" value="${precos[p]}">
+          <small class="form-hint">${notaLista(precos[p], lista[p])}</small></div></td>
+        <td data-label="Total" class="fin-num">${formatMoeda(q[p] * precos[p] * mult)}</td>
+      </tr>`).join('');
+  document.getElementById('contrato-conector-precos').innerHTML = linhas;
+  const como = `${modalidade === 'empresa' ? `Pacote Empresa: ${textoPacote(q, precos) || 'sem licenças'}` : 'Por licença'} · cobrança ${ciclo}.`;
+  document.getElementById('contrato-conector-precos-nota').textContent = `${como} ` + ({
     contrato: 'Preço próprio deste contrato: mudar a tabela de lista não altera este valor.',
-    cobranca: 'Contrato anterior ao preço por contrato: o preço foi calculado a partir do valor cobrado hoje (mesmo desconto em todos os perfis). Salve para fixá-lo.',
+    cobranca: 'Contrato anterior ao preço por contrato: o preço foi calculado a partir do valor cobrado hoje (mesmo desconto em tudo). Salve para fixá-lo.',
     tabela: 'Sem preço próprio ainda: está usando a tabela de lista. Salve para fixar o preço deste contrato.'
-  }[origem] || '';
+  }[origem] || '');
 }
 
 async function salvarPrecosContrato(f) {
   const k = _contratoAberto;
   const q = quantidadesConector(k);
-  const precos = Object.fromEntries(PERFIS_CONECTOR.map(([p]) => [p, f[`preco_${p}`].value]));
-  const novo = PERFIS_CONECTOR.reduce((s, [p]) => s + q[p] * (Number(precos[p]) || 0) * 12, 0);
-  if (cobrancaAtiva(k) && !confirm(`A anuidade passa de ${formatMoeda(k.cobranca.valor)} para ${formatMoeda(novo)} a partir da próxima cobrança.\nFaturas já geradas não mudam. Salvar?`)) return;
+  const chaves = (k.preco.modalidade === 'empresa' ? PACOTE_CONECTOR : PERFIS_CONECTOR).map(([c]) => c);
+  const precos = Object.fromEntries(chaves.map(c => [c, f[`preco_${c}`].value]));
+  const novo = valorCobrancaConector(k, q, { ...k.preco.precos, ...Object.fromEntries(chaves.map(c => [c, Number(precos[c]) || 0])) });
+  if (cobrancaAtiva(k) && !confirm(`A ${nomeCobrancaCiclo(k.preco.ciclo)} passa de ${formatMoeda(k.cobranca.valor)} para ${formatMoeda(novo)} a partir da próxima cobrança.\nFaturas já geradas não mudam. Salvar?`)) return;
   const r = await acaoContrato('/precos', 'PUT', { precos });
   if (r) { alert(r.mensagem); recarregarContrato(); }
 }
 
-// Acrescentar licenças: mostra a conta (anuidade nova e fatura proporcional) e pede confirmação
+// Acrescentar licenças: mostra a conta (cobrança nova e fatura proporcional) e pede confirmação
 async function acrescentarLicencas(f) {
   const q = { abap: Number(f.abap.value) || 0, funcional: Number(f.funcional.value) || 0, ambos: Number(f.ambos.value) || 0 };
   if (q.abap + q.funcional + q.ambos < 1) { alert('Informe quantas licenças acrescentar.'); return; }
   const p = await acaoContrato(`/licencas/previa?abap=${q.abap}&funcional=${q.funcional}&ambos=${q.ambos}`, 'GET');
   if (!p) return;
   const quais = PERFIS_CONECTOR.filter(([x]) => q[x] > 0).map(([x, rotulo]) => `${q[x]} ${rotulo}`).join(', ');
+  const nome = nomeCobrancaCiclo(p.ciclo);
   let msg = `Acrescentar ${quais}.`;
   if (p.cobranca && p.cobranca.status === 'ativo') {
-    msg += `\n\n• Anuidade: ${formatMoeda(p.valor_anual_atual)} → ${formatMoeda(p.valor_anual_novo)} (a partir da próxima cobrança)`;
-    msg += p.valor_proporcional > 0
+    msg += `\n\n• ${nome[0].toUpperCase() + nome.slice(1)}: ${formatMoeda(p.valor_anual_atual)} → ${formatMoeda(p.valor_anual_novo)} (a partir da próxima cobrança)`;
+    if (p.ciclo === 'mensal') msg += '\n• Cobrança mensal: a diferença já entra na próxima fatura, sem fatura proporcional.';
+    else msg += p.valor_proporcional > 0
       ? `\n• Fatura proporcional agora (rascunho no Faturamento):\n   ${p.proporcional.map(l => `${l.quantidade} ${l.rotulo} × ${formatMoeda(l.preco_mensal)} × ${l.meses} mês(es) = ${formatMoeda(l.total)}`).join('\n   ')}\n   Total: ${formatMoeda(p.valor_proporcional)}`
-      : '\n• Sem fatura proporcional (o contrato não está em vigência agora).';
+      : '\n• Sem fatura proporcional (o contrato não está em vigência agora ou o pacote não mudou de faixa).';
   } else {
     msg += '\n\nEste contrato não tem cobrança ativa: as licenças entram sem cobrar.';
   }
@@ -290,8 +348,8 @@ async function verHistoricoContratoConector() {
 async function criarCobrancaConector() {
   const k = _contratoAberto;
   const q = quantidadesConector(k);
-  const valor = PERFIS_CONECTOR.reduce((s, [p]) => s + q[p] * k.preco.precos[p] * 12, 0);
-  if (!confirm(`Criar a cobrança anual de ${formatMoeda(valor)} (licenças × preço deste contrato × 12)?\nPara outro valor, ajuste antes o preço deste contrato.`)) return;
+  const valor = valorCobrancaConector(k, q, k.preco.precos);
+  if (!confirm(`Criar a cobrança ${k.preco.ciclo === 'mensal' ? 'mensal' : 'anual'} de ${formatMoeda(valor)} (pelo preço deste contrato)?\nPara outro valor, ajuste antes o preço deste contrato.`)) return;
   const res = await apiFetch(`${API_URL}/contratos-conector/${k.id}/cobranca`, { method: 'POST', body: JSON.stringify({}) });
   if (!res) return;
   const r = await res.json();
@@ -362,8 +420,10 @@ async function liberarVagaAdmin(vagaId) {
 
 async function removerVagaAdmin(vagaId, perfil) {
   const k = _contratoAberto;
+  const depois = quantidadesConector(k);
+  depois[perfil] = Math.max(0, depois[perfil] - 1);
   const efeito = cobrancaAtiva(k) && k.preco
-    ? `\nA próxima anuidade passa de ${formatMoeda(k.cobranca.valor)} para ${formatMoeda(Math.max(0, k.cobranca.valor - k.preco.precos[perfil] * 12))} (sem estorno do que já foi pago).`
+    ? `\nA próxima ${nomeCobrancaCiclo(k.preco.ciclo)} passa de ${formatMoeda(k.cobranca.valor)} para ${formatMoeda(valorCobrancaConector(k, depois, k.preco.precos))} (sem estorno do que já foi pago).`
     : '';
   if (!confirm(`Remover esta licença livre do contrato?${efeito}`)) return;
   if (await acaoContrato(`/vagas/${vagaId}`, 'DELETE')) recarregarContrato();

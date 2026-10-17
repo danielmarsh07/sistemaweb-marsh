@@ -1409,6 +1409,12 @@ async function iniciar() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_contratos_cursos_cliente ON contratos_cursos(cliente_id);`);
     await pool.query(`ALTER TABLE cursos_liberacoes ADD COLUMN IF NOT EXISTS contrato_cursos_id INTEGER REFERENCES contratos_cursos(id) ON DELETE SET NULL;`);
     await pool.query(`ALTER TABLE contratos ADD COLUMN IF NOT EXISTS contrato_cursos_id INTEGER REFERENCES contratos_cursos(id) ON DELETE SET NULL;`);
+    //     Fase 3: contrato do Conector por licença ou por pacote Empresa (preço fechado até 5/10 usuários + excedente),
+    //     cobrança anual ou mensal; a proposta feita pelo simulador guarda a simulação (propostas.conector) para
+    //     "Gerar contrato" criar o contrato do Conector com as licenças e os preços dela.
+    await pool.query(`ALTER TABLE contratos_conector ADD COLUMN IF NOT EXISTS modalidade VARCHAR(10) NOT NULL DEFAULT 'licenca';`);
+    await pool.query(`ALTER TABLE contratos_conector ADD COLUMN IF NOT EXISTS ciclo VARCHAR(10) NOT NULL DEFAULT 'anual';`);
+    await pool.query(`ALTER TABLE propostas ADD COLUMN IF NOT EXISTS conector JSONB;`);
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
