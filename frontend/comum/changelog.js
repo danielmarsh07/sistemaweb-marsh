@@ -22,6 +22,13 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.6', data: '2026-10-16', destaques: [
+      'Portal do cliente com a cara do sistema: menu lateral, cabeçalho, mesmos cartões, cores e temas (claro e escuro)',
+      'Cada assunto numa tela própria: Início, Chamados, Treinamentos, Minha licença, Licenças da empresa, Conector SAP, Financeiro e Meus pedidos. Só aparece o que a pessoa tem',
+      'Início com os números dos chamados e atalhos para cada área',
+      'No celular: barra de baixo com os atalhos principais e o Menu com todas as telas, igual ao sistema; o voltar do celular volta para a tela anterior',
+      'Corrigido: o botão "Material de apoio" aparecia em aulas sem material'
+    ] },
     { versao: 'v4.5', data: '2026-10-16', destaques: [
       'Proposta aceita vira contrato do Conector: em "Gerar contrato", a proposta feita pelo simulador já traz as licenças por perfil, o preço, o gestor e a cobrança; é só conferir e gerar',
       'Contrato do Conector por pacote Empresa: preço fechado até 5 ou até 10 usuários e um valor por usuário acima de 10, igual à proposta',

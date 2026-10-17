@@ -105,6 +105,8 @@ Exclusiva do **super usuário** (`usuarios.super_usuario`, o dono do sistema): a
 - Acompanhe status (aberto, em andamento, resolvido)
 - Abrir novos chamados
 - Enviar comentários na timeline
+- **Mesmo visual do sistema** (desde a v4.6): usa o `styles.css` (menu lateral, cabeçalho, páginas, temas, barra de baixo e gaveta no celular). O CSS próprio do `portal.html` ficou só para os componentes do portal.
+- Telas (`TELAS_PORTAL` em `portal-script.js`): Início, Chamados, Treinamentos, Minha licença, Licenças da empresa, Conector SAP, Financeiro e Meus pedidos. Cada uma só aparece no menu se a pessoa tem aquilo (a seção `secao-*` deixa de estar `hidden`); quem só usa licença não vê Chamados. A barra de baixo do celular mostra as 4 primeiras + Menu. Teste: `testes/portal-tela.js`.
 
 ### Contratos num lugar só (Financeiro → Contratos e ficha do cliente)
 

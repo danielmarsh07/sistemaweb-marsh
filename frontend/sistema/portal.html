@@ -2,11 +2,12 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Portal do Cliente — Marsh Consultoria</title>
   <link rel="manifest" href="/manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="chamado-conector.css">
   <link rel="icon" type="image/png" href="/img/logo-simbolo.png">
   <meta name="theme-color" content="#0066cc" />
@@ -61,41 +62,11 @@
       --yellow: #f59e0b;
     }
 
-    html { background: var(--bg-main); }
 
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      min-height: 100vh;
-      color: var(--text-main);
-      line-height: 1.6;
-      color-scheme: dark;
-      background-color: var(--bg-main);
-      background-image:
-        linear-gradient(180deg, rgba(2, 8, 23, 0.78) 0%, rgba(2, 8, 23, 0.92) 60%, rgba(2, 8, 23, 0.96) 100%),
-        url('background-1.png');
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: cover;
-      background-attachment: fixed;
-      -webkit-font-smoothing: antialiased;
-    }
-    @supports (background-image: image-set(url(x.webp) type("image/webp"))) {
-      body {
-        background-image:
-          linear-gradient(180deg, rgba(2, 8, 23, 0.78) 0%, rgba(2, 8, 23, 0.92) 60%, rgba(2, 8, 23, 0.96) 100%),
-          image-set(url('background-1.webp') type('image/webp'), url('background-1.png') type('image/png'));
-      }
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      background:
-        radial-gradient(800px circle at 12% 18%, rgba(37, 99, 235, 0.10), transparent 60%),
-        radial-gradient(700px circle at 88% 82%, rgba(34, 211, 238, 0.07), transparent 60%);
-    }
+
+
+
+
     .portal-header, .portal-main, .modal-overlay, .lightbox {
       position: relative;
       z-index: 1;
@@ -103,76 +74,23 @@
     .modal-overlay, .lightbox { z-index: 200; }
 
     /* ===== HEADER ===== */
-    .portal-header {
-      background: var(--navy);
-      color: white;
-      padding: 0 1.5rem;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 1px solid rgba(0,200,255,0.15);
-    }
 
-    .portal-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
 
-    .portal-brand .logo {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, var(--blue), var(--cyan));
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 18px;
-    }
 
-    .portal-brand h1 {
-      font-size: 1rem;
-      font-weight: 600;
-    }
 
-    .portal-brand small {
-      display: block;
-      font-size: 0.7rem;
-      color: var(--cyan);
-      font-weight: 400;
-    }
 
-    .portal-user {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 0.85rem;
-      color: rgba(255,255,255,0.7);
-    }
 
-    .btn-sair {
-      padding: 0.3rem 0.8rem;
-      background: transparent;
-      border: 1px solid rgba(255,255,255,0.15);
-      color: rgba(255,255,255,0.6);
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      transition: 0.2s;
-    }
-    .btn-sair:hover { border-color: rgba(255,255,255,0.4); color: white; }
+
+
+
+
+
+
+
+
 
     /* ===== MAIN ===== */
-    .portal-main {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 2rem 1.5rem;
-    }
+
 
     /* ===== WELCOME ===== */
     .welcome-bar {
@@ -838,33 +756,12 @@
        ============================================================ */
 
     /* HEADER: glass */
-    .portal-header {
-      background: rgba(2, 8, 23, 0.78);
-      -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
-      backdrop-filter: blur(var(--blur)) saturate(140%);
-      border-bottom: 1px solid var(--border);
-      box-shadow: 0 1px 0 var(--border), 0 8px 24px rgba(0, 0, 0, 0.18);
-    }
-    .portal-brand h1 {
-      background: linear-gradient(90deg, #fff, #cbd5e1);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-    .portal-brand .logo {
-      box-shadow: 0 6px 18px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.18);
-    }
-    .portal-user { color: var(--text-secondary); }
-    .btn-sair {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-    }
-    .btn-sair:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: var(--border-strong);
-      color: var(--text-main);
-    }
+
+
+
+
+
+
 
     /* WELCOME bar */
     .welcome-bar {
@@ -1283,20 +1180,9 @@
       --red: #ef4444;
       --green: #10b981;
     }
-    :root[data-theme="light"] body {
-      background-image:
-        linear-gradient(180deg, rgba(245, 245, 247, 0.86) 0%, rgba(245, 245, 247, 0.94) 60%, rgba(245, 245, 247, 0.98) 100%),
-        url('background-1.png');
-      color-scheme: light;
-    }
-    @supports (background-image: image-set(url(x.webp) type("image/webp"))) {
-      :root[data-theme="light"] body {
-        background-image:
-          linear-gradient(180deg, rgba(245, 245, 247, 0.86) 0%, rgba(245, 245, 247, 0.94) 60%, rgba(245, 245, 247, 0.98) 100%),
-          image-set(url('background-1.webp') type('image/webp'), url('background-1.png') type('image/png'));
-      }
-    }
-    :root[data-theme="light"] .portal-header { background: rgba(10, 10, 10, 0.92); }
+
+
+
 
     /* ===== TEMA ENTERPRISE (espelho do dashboard) ===== */
     :root[data-theme="enterprise"] {
@@ -1332,26 +1218,11 @@
       --red: #bb0000;
       --green: #107e3e;
     }
-    :root[data-theme="enterprise"] body {
-      background-image: none;
-      background-color: var(--bg-main);
-      color-scheme: light;
-    }
-    :root[data-theme="enterprise"] body::before { display: none; }
-    :root[data-theme="enterprise"] .portal-header {
-      background: #ffffff;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-      border-bottom: 1px solid var(--border);
-      box-shadow: none;
-    }
-    :root[data-theme="enterprise"] .portal-brand h1 {
-      background: none;
-      -webkit-background-clip: initial;
-      background-clip: initial;
-      color: var(--text-main);
-    }
-    :root[data-theme="enterprise"] .portal-user { color: var(--text-secondary); }
+
+
+
+
+
     :root[data-theme="enterprise"] .btn-sair,
     :root[data-theme="enterprise"] .btn-aparencia {
       background: #ffffff;
@@ -1535,31 +1406,13 @@
       --veu-meio:  rgba(242, 246, 251, 0.85);
       --veu-fim:   rgba(242, 246, 251, 0);
     }
-    :root[data-theme="sereno"] body {
-      background-image: none;
-      background-color: var(--bg-main);
-      color-scheme: light;
-    }
-    :root[data-theme="sereno"] body::before { display: none; }
-    :root[data-theme="sereno"] .portal-header {
-      background: rgba(242, 246, 251, 0.9);
-      -webkit-backdrop-filter: saturate(140%) blur(8px);
-      backdrop-filter: saturate(140%) blur(8px);
-      border-bottom: 1px solid var(--border);
-      box-shadow: none;
-    }
-    :root[data-theme="sereno"] .portal-brand .logo {
-      background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
-      box-shadow: none;
-    }
-    :root[data-theme="sereno"] .portal-brand h1 {
-      background: none;
-      -webkit-background-clip: initial;
-      background-clip: initial;
-      color: var(--text-main);
-    }
-    :root[data-theme="sereno"] .portal-brand small { color: var(--text-muted); }
-    :root[data-theme="sereno"] .portal-user { color: var(--text-secondary); }
+
+
+
+
+
+
+
     :root[data-theme="sereno"] .btn-sair,
     :root[data-theme="sereno"] .btn-aparencia {
       background: var(--bg-card);
@@ -1700,22 +1553,12 @@
       --veu-meio:  rgba(11, 20, 36, 0.80);
       --veu-fim:   rgba(11, 20, 36, 0.15);
     }
-    :root[data-theme="sereno-escuro"] body {
-      background-image: none;
-      background-color: var(--bg-main);
-      color-scheme: dark;
-    }
-    :root[data-theme="sereno-escuro"] body::before { display: none; }
-    :root[data-theme="sereno-escuro"] .portal-header {
-      background: rgba(11, 20, 36, 0.94);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-      border-bottom: 1px solid var(--border);
-      box-shadow: none;
-    }
-    :root[data-theme="sereno-escuro"] .portal-brand .logo { background: linear-gradient(135deg, #1d6fd8, var(--accent-cyan)); box-shadow: none; }
-    :root[data-theme="sereno-escuro"] .portal-brand h1 { background: none; -webkit-background-clip: initial; background-clip: initial; color: var(--text-main); }
-    :root[data-theme="sereno-escuro"] .portal-brand small { color: var(--text-muted); }
+
+
+
+
+
+
     :root[data-theme="sereno-escuro"] .welcome-bar {
       min-height: 140px;
       border: 1px solid var(--border);
@@ -1763,8 +1606,8 @@
     }
 
     /* Logo: símbolo "M" (img/logo-simbolo.png) no lugar da caixa colorida */
-    .portal-brand .logo.logo-img { background: none !important; box-shadow: none !important; overflow: visible; }
-    .portal-brand .logo.logo-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+
 
     /* =====================================================================
        ===== TREINAMENTOS E LICENÇA NO PORTAL (todos os temas) =============
@@ -1903,27 +1746,80 @@
       .curso-aulas { max-height: none; }
       .btn-curso, .btn-concluir, .btn-material { min-height: 44px; }
     }
+
+    /* ===== Layout do sistema (styles.css): menu lateral, páginas, barra de baixo ===== */
+    /* Modais do portal acima do menu lateral (1000) e da barra de baixo */
+    .modal-overlay, .lightbox { z-index: 2000; }
+    .page-header h2 { font-size: 1.15rem; }
+    .portal-secao { margin-bottom: 0; }
+    /* Atalhos do Início: um cartão por tela que a pessoa tem */
+    .section-header-filtros { justify-content: flex-start; }
+    .portal-atalhos { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    .portal-atalho {
+      display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; min-height: 64px;
+      padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card);
+      color: var(--text-main); font: inherit; cursor: pointer; transition: border-color .15s, background .15s;
+    }
+    .portal-atalho:hover, .portal-atalho:focus-visible { border-color: var(--border-hover); background: var(--bg-hover); outline: none; }
+    .portal-atalho strong { display: block; font-size: 0.95rem; }
+    .portal-atalho small { display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 2px; }
+    .portal-atalho-icone { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+      background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
+    .portal-atalho-icone .icon { width: 20px; height: 20px; }
+    #stats-chamados .stat-card { cursor: pointer; }
+    /* Escondido é escondido: o display de botões e links (ex.: Material de apoio, itens do menu) venceria o atributo hidden */
+    body.portal [hidden] { display: none !important; }
+    @media (max-width: 768px) {
+      .portal-atalhos { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
-<body>
+<body class="portal">
 
-  <!-- HEADER -->
-  <header class="portal-header">
-    <div class="portal-brand">
-      <div class="logo logo-img"><img src="img/logo-simbolo.svg" alt="Marsh"></div>
-      <div>
-        <h1>Marsh Consultoria</h1>
-        <small id="header-empresa">Portal do Cliente</small>
+  <!-- Ícones de linha (estilo Lucide, licença MIT), os mesmos do sistema — usar: <svg class="icon"><use href="#i-nome"/></svg> -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><path d="M2.6 17.4A2 2 0 0 0 2 18.8V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.2a2 2 0 0 0 1.4-.6l.8-.8a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r="1"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-contraste" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-conta" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  </svg>
+
+  <!-- MENU LATERAL (igual ao do sistema): cada item só aparece se a pessoa tem aquilo (portal-script.js atualizarMenuPortal) -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-box logo-img"><img src="img/logo-simbolo.svg" alt="Marsh"></div>
+      <div class="sidebar-marca">
+        <h2 class="marca-palavra">MARSH</h2>
+        <span id="header-empresa">Portal do Cliente</span>
       </div>
     </div>
-    <div class="portal-user">
-      <button id="btn-aparencia" class="btn-aparencia" type="button" title="Minha conta (tema e senha)" aria-label="Minha conta: tema e senha">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9 1.65 1.65 0 0 0 4.27 7.18l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
-      <span id="header-usuario">...</span>
-      <button class="btn-sair" onclick="sair()">Sair</button>
+    <nav class="sidebar-nav" aria-label="Menu do portal">
+      <a href="#" data-page="inicio" class="nav-link active"><svg class="icon"><use href="#i-dash"/></svg> Início</a>
+      <a href="#" data-page="chamados" class="nav-link"><svg class="icon"><use href="#i-ticket"/></svg> Chamados</a>
+      <a href="#" data-page="treinamentos" class="nav-link" hidden><svg class="icon"><use href="#i-cap"/></svg> Treinamentos</a>
+      <a href="#" data-page="minha-licenca" class="nav-link" hidden><svg class="icon"><use href="#i-key"/></svg> Minha licença</a>
+      <a href="#" data-page="empresa" class="nav-link" hidden><svg class="icon"><use href="#i-users"/></svg> Licenças da empresa</a>
+      <a href="#" data-page="conector" class="nav-link" hidden><svg class="icon"><use href="#i-download"/></svg> Conector SAP</a>
+      <a href="#" data-page="financeiro" class="nav-link" hidden><svg class="icon"><use href="#i-wallet"/></svg> Financeiro</a>
+      <a href="#" data-page="pedidos" class="nav-link" hidden><svg class="icon"><use href="#i-doc"/></svg> Meus pedidos</a>
+    </nav>
+    <div class="sidebar-footer sidebar-usuario">
+      <div class="avatar" id="usuario-avatar" aria-hidden="true">··</div>
+      <div class="who">
+        <strong id="header-usuario">...</strong>
+        <span id="usuario-papel">Portal do Cliente</span>
+      </div>
+      <button class="icon-btn" onclick="sair()" title="Sair" aria-label="Sair"><svg class="icon"><use href="#i-out"/></svg></button>
     </div>
-  </header>
+  </aside>
 
   <!-- MODAL: APARÊNCIA -->
   <div class="modal-overlay" id="modal-aparencia">
@@ -1951,106 +1847,164 @@
     </div>
   </div>
 
-  <!-- MAIN -->
-  <main class="portal-main">
+  <main class="main-content">
+    <header class="header">
+      <div class="header-titulo">
+        <span class="crumb">Portal /</span>
+        <h1 id="page-title">Início</h1>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" onclick="alternarClaroEscuro()" title="Alternar claro / escuro" aria-label="Alternar claro / escuro">
+          <svg class="icon"><use href="#i-contraste"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-aparencia" type="button" title="Minha conta (tema e senha)" aria-label="Minha conta: tema e senha">
+          <svg class="icon"><use href="#i-conta"/></svg>
+        </button>
+        <button class="icon-btn so-mobile" onclick="sair()" title="Sair" aria-label="Sair">
+          <svg class="icon"><use href="#i-out"/></svg>
+        </button>
+      </div>
+    </header>
 
-    <!-- Welcome -->
-    <div class="welcome-bar">
-      <div>
-        <h2 id="welcome-nome">Olá!</h2>
-        <p id="welcome-empresa">Acompanhe seus chamados de suporte</p>
-      </div>
-      <button class="btn-novo-chamado" onclick="abrirModalNovoChamado()">+ Novo Chamado</button>
-    </div>
+    <div class="container">
 
-    <!-- Stats -->
-    <div class="stats-row" id="stats-chamados">
-      <div class="stat-box">
-        <div class="num" id="stat-abertos" style="color:#0d6efd">0</div>
-        <div class="lbl">Abertos</div>
-      </div>
-      <div class="stat-box">
-        <div class="num" id="stat-andamento" style="color:#f59e0b">0</div>
-        <div class="lbl">Em andamento</div>
-      </div>
-      <div class="stat-box">
-        <div class="num" id="stat-resolvidos" style="color:#10b981">0</div>
-        <div class="lbl">Resolvidos</div>
-      </div>
-      <div class="stat-box">
-        <div class="num" id="stat-total" style="color:#64748b">0</div>
-        <div class="lbl">Total</div>
-      </div>
-    </div>
-
-    <!-- Licenças do Conector da empresa (só administradores da empresa): contratos, licenças, convites, histórico e SAP -->
-    <section id="secao-contrato" class="portal-secao" hidden>
-      <div class="section-header"><h3>Licenças do Conector SAP da empresa</h3></div>
-      <p class="ajuda">Convide as pessoas pelo e-mail: cada convite reserva uma licença até a pessoa aceitar. Ser administrador não ocupa licença;
-        se você também for usar o Conector, convide a si mesmo.</p>
-      <div id="lista-contratos"></div>
-      <div class="contrato-resumo" style="margin-top:18px">
-        <div>
-          <strong>Administradores da empresa</strong>
-          <p>Veem todos os contratos e distribuem as licenças.</p>
-          <ul id="lista-admins" class="lista-admins"></ul>
+      <!-- ===== INÍCIO: boas-vindas, números e atalhos ===== -->
+      <section id="inicio-page" class="page active">
+        <div class="hero">
+          <div class="hero-texto">
+            <h2 id="welcome-nome">Olá!</h2>
+            <p id="welcome-empresa">Acompanhe seus chamados de suporte</p>
+          </div>
         </div>
-        <div class="acoes">
-          <button type="button" class="btn-curso secundario" onclick="adicionarAdminPortal()">Adicionar administrador</button>
+        <div class="stats-grid" id="stats-chamados">
+          <div class="stat-card" role="button" tabindex="0" onclick="mostrarTela('chamados')">
+            <div class="stat-icon"><svg class="icon"><use href="#i-ticket"/></svg></div>
+            <div class="stat-content"><h3>Chamados abertos</h3><p id="stat-abertos" class="stat-number">0</p></div>
+          </div>
+          <div class="stat-card" role="button" tabindex="0" onclick="mostrarTela('chamados')">
+            <div class="stat-icon"><svg class="icon"><use href="#i-ticket"/></svg></div>
+            <div class="stat-content"><h3>Em andamento</h3><p id="stat-andamento" class="stat-number">0</p></div>
+          </div>
+          <div class="stat-card" role="button" tabindex="0" onclick="mostrarTela('chamados')">
+            <div class="stat-icon"><svg class="icon"><use href="#i-shield"/></svg></div>
+            <div class="stat-content"><h3>Resolvidos</h3><p id="stat-resolvidos" class="stat-number">0</p></div>
+          </div>
+          <div class="stat-card" role="button" tabindex="0" onclick="mostrarTela('chamados')">
+            <div class="stat-icon"><svg class="icon"><use href="#i-doc"/></svg></div>
+            <div class="stat-content"><h3>Total de chamados</h3><p id="stat-total" class="stat-number">0</p></div>
+          </div>
         </div>
-      </div>
-    </section>
+        <h3 class="secao-titulo">Atalhos</h3>
+        <div class="portal-atalhos" id="portal-atalhos"></div>
+      </section>
 
-    <!-- Minha licença do Conector (quem ocupa vaga): progresso do perfil, certificado, chave e instalador -->
-    <section id="secao-minha-licenca" class="portal-secao" hidden>
-      <div class="section-header"><h3>Minha licença do Conector SAP</h3></div>
-      <div id="lista-minhas-vagas" class="licencas-portal"></div>
-    </section>
-
-    <!-- Meus pedidos (compras na loja de cursos; some se não houver) -->
-    <section id="secao-pedidos" class="portal-secao" hidden>
-      <div class="section-header"><h3>Meus pedidos</h3></div>
-      <div id="lista-pedidos" class="lista-pedidos"></div>
-    </section>
-
-    <!-- Treinamentos (cursos liberados para a empresa ou pela vaga do Conector; some se não houver) -->
-    <section id="secao-treinamentos" class="portal-secao" hidden>
-      <div class="section-header"><h3>Treinamentos</h3></div>
-      <div id="lista-cursos" class="cursos-grid"></div>
-    </section>
-
-    <!-- Financeiro: faturas e notas fiscais (some se a empresa não tiver faturas) -->
-    <section id="secao-financeiro" class="portal-secao" hidden>
-      <div class="section-header"><h3>Financeiro</h3></div>
-      <div id="financeiro-pagamento"></div>
-      <div id="lista-faturas" class="licencas-portal"></div>
-    </section>
-
-    <!-- Conector SAP: licença + download do instalador (some se a empresa não tiver licença) -->
-    <section id="secao-licenca" class="portal-secao" hidden>
-      <div class="section-header"><h3>Conector SAP</h3></div>
-      <div id="conector-download" class="conector-download"></div>
-      <div id="lista-licencas" class="licencas-portal"></div>
-    </section>
-
-    <!-- Lista de chamados -->
-    <div id="bloco-chamados">
-      <div class="section-header">
-        <h3>Meus Chamados</h3>
-        <div class="filtros">
-          <button class="filtro-btn active" data-filtro="" onclick="filtrarChamados(this, '')">Todos</button>
-          <button class="filtro-btn" data-filtro="aberto" onclick="filtrarChamados(this, 'aberto')">Abertos</button>
-          <button class="filtro-btn" data-filtro="em_andamento" onclick="filtrarChamados(this, 'em_andamento')">Em andamento</button>
-          <button class="filtro-btn" data-filtro="resolvido" onclick="filtrarChamados(this, 'resolvido')">Resolvidos</button>
+      <!-- ===== CHAMADOS ===== -->
+      <section id="chamados-page" class="page">
+        <div class="page-header">
+          <h2>Chamados</h2>
+          <button type="button" class="btn btn-primary" onclick="abrirModalNovoChamado()">+ Novo chamado</button>
         </div>
-      </div>
-      <div id="faixa-aprovacao" class="cc-faixa-aprovacao" hidden></div>
-      <div id="lista-chamados">
-        <div class="empty-state"><div class="icon">⏳</div><p>Carregando...</p></div>
-      </div>
+        <div id="bloco-chamados">
+          <div class="section-header section-header-filtros">
+            <div class="filtros">
+              <button class="filtro-btn active" data-filtro="" onclick="filtrarChamados(this, '')">Todos</button>
+              <button class="filtro-btn" data-filtro="aberto" onclick="filtrarChamados(this, 'aberto')">Abertos</button>
+              <button class="filtro-btn" data-filtro="em_andamento" onclick="filtrarChamados(this, 'em_andamento')">Em andamento</button>
+              <button class="filtro-btn" data-filtro="resolvido" onclick="filtrarChamados(this, 'resolvido')">Resolvidos</button>
+            </div>
+          </div>
+          <div id="faixa-aprovacao" class="cc-faixa-aprovacao" hidden></div>
+          <div id="lista-chamados">
+            <div class="empty-state"><div class="icon">⏳</div><p>Carregando...</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== TREINAMENTOS (cursos liberados para a empresa, pela licença ou comprados) ===== -->
+      <section id="treinamentos-page" class="page">
+        <div class="page-header"><h2>Treinamentos</h2></div>
+        <section id="secao-treinamentos" class="portal-secao" hidden>
+          <div id="lista-cursos" class="cursos-grid"></div>
+        </section>
+      </section>
+
+      <!-- ===== MINHA LICENÇA (quem ocupa licença): progresso do perfil, certificado, chave e instalador ===== -->
+      <section id="minha-licenca-page" class="page">
+        <div class="page-header"><h2>Minha licença do Conector SAP</h2></div>
+        <section id="secao-minha-licenca" class="portal-secao" hidden>
+          <div id="lista-minhas-vagas" class="licencas-portal"></div>
+        </section>
+      </section>
+
+      <!-- ===== LICENÇAS DA EMPRESA (só administradores da empresa): contratos, licenças, convites, histórico e SAP ===== -->
+      <section id="empresa-page" class="page">
+        <div class="page-header"><h2>Licenças do Conector SAP da empresa</h2></div>
+        <section id="secao-contrato" class="portal-secao" hidden>
+          <p class="pagina-descricao">Convide as pessoas pelo e-mail: cada convite reserva uma licença até a pessoa aceitar. Ser administrador não ocupa licença;
+            se você também for usar o Conector, convide a si mesmo.</p>
+          <div id="lista-contratos"></div>
+          <div class="contrato-resumo" style="margin-top:18px">
+            <div>
+              <strong>Administradores da empresa</strong>
+              <p>Veem todos os contratos e distribuem as licenças.</p>
+              <ul id="lista-admins" class="lista-admins"></ul>
+            </div>
+            <div class="acoes">
+              <button type="button" class="btn-curso secundario" onclick="adicionarAdminPortal()">Adicionar administrador</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- ===== CONECTOR SAP: chaves da empresa (modelo antigo) e download do instalador ===== -->
+      <section id="conector-page" class="page">
+        <div class="page-header"><h2>Conector SAP</h2></div>
+        <section id="secao-licenca" class="portal-secao" hidden>
+          <div id="conector-download" class="conector-download"></div>
+          <div id="lista-licencas" class="licencas-portal"></div>
+        </section>
+      </section>
+
+      <!-- ===== FINANCEIRO: faturas e notas fiscais ===== -->
+      <section id="financeiro-page" class="page">
+        <div class="page-header"><h2>Financeiro</h2></div>
+        <section id="secao-financeiro" class="portal-secao" hidden>
+          <div id="financeiro-pagamento"></div>
+          <div id="lista-faturas" class="licencas-portal"></div>
+        </section>
+      </section>
+
+      <!-- ===== MEUS PEDIDOS (compras na Loja de cursos) ===== -->
+      <section id="pedidos-page" class="page">
+        <div class="page-header"><h2>Meus pedidos</h2></div>
+        <section id="secao-pedidos" class="portal-secao" hidden>
+          <div id="lista-pedidos" class="lista-pedidos"></div>
+        </section>
+      </section>
+
     </div>
-
   </main>
+
+  <!-- BARRA DE BAIXO (celular): até 4 atalhos + Menu, montada pelo portal-script.js com as telas que a pessoa tem.
+       Sem rolagem lateral: no iPhone o arrasto para o lado vira o gesto de voltar do Safari. -->
+  <nav class="bottom-nav" id="bottom-nav" aria-label="Navegação do portal"></nav>
+
+  <!-- MENU (celular): gaveta com todas as telas do menu lateral -->
+  <div class="menu-mobile" id="menu-mobile" hidden>
+    <div class="menu-mobile-fundo" data-fechar-menu></div>
+    <div class="menu-mobile-painel" role="dialog" aria-modal="true" aria-labelledby="menu-mobile-titulo">
+      <div class="menu-mobile-alca" aria-hidden="true"></div>
+      <div class="menu-mobile-topo">
+        <strong id="menu-mobile-titulo">Menu</strong>
+        <button type="button" class="icon-btn" data-fechar-menu aria-label="Fechar menu">×</button>
+      </div>
+      <div class="menu-mobile-corpo" id="menu-mobile-corpo"></div>
+      <div class="menu-mobile-rodape">
+        <span id="menu-mobile-usuario"></span>
+        <button type="button" class="btn btn-secondary" onclick="sair()">Sair</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL: CURSO (player + lista de aulas) -->
   <div class="modal-overlay" id="modal-curso">

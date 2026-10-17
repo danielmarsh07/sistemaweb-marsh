@@ -20,15 +20,135 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-usuario').textContent = usuario.nome;
   document.getElementById('header-empresa').textContent = usuario.empresa_nome || 'Portal do Cliente';
   document.getElementById('welcome-nome').textContent = `Olá, ${usuario.nome.split(' ')[0]}!`;
-  document.getElementById('welcome-empresa').textContent = 'Acompanhe seus chamados e abra novas solicitações';
+  document.getElementById('welcome-empresa').textContent = 'Tudo da sua empresa com a Marsh: chamados, licenças, cursos e faturas.';
+
+  const iniciais = usuario.nome.split(' ').filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
+  document.getElementById('usuario-avatar').textContent = iniciais || '··';
 
   inicializarDropzone();
-  carregarPortal();
+  iniciarNavegacaoPortal();
+  carregarPortal().then(atualizarMenuPortal);
 
-  // Botão Aparência → abre modal com theme picker
+  // Botão Minha conta → abre modal com tema e senha
   const btnAp = document.getElementById('btn-aparencia');
   if (btnAp) btnAp.addEventListener('click', abrirAparencia);
 });
+
+// ===== NAVEGAÇÃO (mesmo desenho do sistema: menu lateral, páginas, barra de baixo e gaveta no celular) =====
+// Cada tela do menu só aparece se a pessoa tem aquilo: a seção correspondente (secao-*) deixa de estar hidden
+// quando os dados chegam. Quem só usa licença (papel "aluno") não vê chamados.
+const TELAS_PORTAL = {
+  inicio:          { titulo: 'Início' },
+  chamados:        { titulo: 'Chamados', resumo: 'Abra e acompanhe chamados de suporte' },
+  treinamentos:    { titulo: 'Treinamentos', secao: 'secao-treinamentos', resumo: 'Seus cursos e o progresso' },
+  'minha-licenca': { titulo: 'Minha licença', secao: 'secao-minha-licenca', resumo: 'Certificado, chave e instalador do Conector' },
+  empresa:         { titulo: 'Licenças da empresa', secao: 'secao-contrato', resumo: 'Convide pessoas e distribua as licenças' },
+  conector:        { titulo: 'Conector SAP', secao: 'secao-licenca', resumo: 'Chave da empresa e instalador' },
+  financeiro:      { titulo: 'Financeiro', secao: 'secao-financeiro', resumo: 'Faturas e notas fiscais' },
+  pedidos:         { titulo: 'Meus pedidos', secao: 'secao-pedidos', resumo: 'Compras na loja de cursos' }
+};
+let telaAtual = 'inicio';
+
+function mostrarTela(tela, { semHistorico = false } = {}) {
+  if (!TELAS_PORTAL[tela] || !document.getElementById(`${tela}-page`)) return;
+  if (!semHistorico && tela !== telaAtual) history.pushState({ tela }, '', `#${tela}`);
+  telaAtual = tela;
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `${tela}-page`));
+  document.querySelectorAll('[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page === tela));
+  const menu = document.getElementById('btn-menu-mobile');
+  if (menu) menu.classList.toggle('active', !document.querySelector(`.bottom-nav-item[data-page="${tela}"]`));
+  document.getElementById('page-title').textContent = TELAS_PORTAL[tela].titulo;
+  window.scrollTo({ top: 0 });
+}
+
+const telasVisiveis = () => [...document.querySelectorAll('.sidebar .nav-link[data-page]')].filter(l => !l.hidden);
+
+// Depois de carregar: mostra no menu só as telas com conteúdo, monta a barra de baixo e os atalhos do Início
+function atualizarMenuPortal() {
+  const aluno = acessoPortal.papel === 'aluno';
+  document.querySelectorAll('.sidebar .nav-link[data-page]').forEach(l => {
+    const t = TELAS_PORTAL[l.dataset.page];
+    if (l.dataset.page === 'chamados') l.hidden = aluno;
+    else if (t.secao) l.hidden = document.getElementById(t.secao).hidden;
+  });
+  document.getElementById('usuario-papel').textContent = aluno ? 'Usuário de licença'
+    : acessoPortal.gestor ? 'Administrador da empresa' : 'Portal do Cliente';
+
+  // Barra de baixo: as 4 primeiras telas + Menu (com a gaveta das demais)
+  const links = telasVisiveis();
+  const barra = document.getElementById('bottom-nav');
+  barra.innerHTML = links.slice(0, 4).map(l => `
+    <button class="bottom-nav-item" data-page="${l.dataset.page}" type="button">
+      <span class="bn-icon">${l.querySelector('svg.icon').outerHTML}</span>
+      <span>${escapeHtml(TELAS_PORTAL[l.dataset.page].titulo.replace('Licenças da empresa', 'Empresa').replace('Minha licença', 'Licença'))}</span>
+    </button>`).join('') + `
+    <button class="bottom-nav-item bottom-nav-menu" id="btn-menu-mobile" type="button" aria-haspopup="dialog" aria-controls="menu-mobile">
+      <span class="bn-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
+      <span>Menu</span>
+    </button>`;
+  barra.querySelectorAll('.bottom-nav-item[data-page]').forEach(b => b.addEventListener('click', () => mostrarTela(b.dataset.page)));
+  document.getElementById('btn-menu-mobile').addEventListener('click', () => {
+    const menu = document.getElementById('menu-mobile');
+    menu.hidden ? abrirMenuMobile() : fecharMenuMobile();
+  });
+
+  // Atalhos do Início: um cartão por tela que a pessoa tem
+  document.getElementById('portal-atalhos').innerHTML = links.filter(l => l.dataset.page !== 'inicio').map(l => {
+    const t = TELAS_PORTAL[l.dataset.page];
+    return `<button type="button" class="portal-atalho" onclick="mostrarTela('${l.dataset.page}')">
+      <span class="portal-atalho-icone">${l.querySelector('svg.icon').outerHTML}</span>
+      <span><strong>${escapeHtml(t.titulo)}</strong><small>${escapeHtml(t.resumo || '')}</small></span>
+    </button>`;
+  }).join('');
+
+  // Abrir já numa tela pelo endereço (ex.: /portal.html#treinamentos), se ela existir para a pessoa
+  const inicial = decodeURIComponent(location.hash.slice(1));
+  history.replaceState({ tela: 'inicio' }, '', location.pathname);
+  if (inicial && links.some(l => l.dataset.page === inicial)) mostrarTela(inicial);
+  else mostrarTela(telaAtual, { semHistorico: true });
+}
+
+function iniciarNavegacaoPortal() {
+  document.querySelectorAll('.sidebar .nav-link[data-page]').forEach(l =>
+    l.addEventListener('click', e => { e.preventDefault(); mostrarTela(l.dataset.page); }));
+  const menu = document.getElementById('menu-mobile');
+  menu.querySelectorAll('[data-fechar-menu]').forEach(el => el.addEventListener('click', fecharMenuMobile));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenuMobile(); });
+  // Voltar do navegador (e o gesto do iPhone) volta para a tela anterior em vez de sair do portal
+  window.addEventListener('popstate', e => {
+    fecharMenuMobile();
+    mostrarTela((e.state && e.state.tela) || 'inicio', { semHistorico: true });
+  });
+}
+
+// Gaveta do celular: todas as telas do menu lateral
+function abrirMenuMobile() {
+  const corpo = document.getElementById('menu-mobile-corpo');
+  corpo.innerHTML = `<section class="menu-mobile-secao"><div class="menu-mobile-grade">${telasVisiveis().map(l => `
+    <button type="button" class="menu-mobile-item${l.dataset.page === telaAtual ? ' active' : ''}" data-page="${l.dataset.page}">
+      ${l.querySelector('svg.icon').outerHTML}<span>${escapeHtml(TELAS_PORTAL[l.dataset.page].titulo)}</span>
+    </button>`).join('')}</div></section>`;
+  corpo.querySelectorAll('.menu-mobile-item').forEach(b => b.addEventListener('click', () => { fecharMenuMobile(); mostrarTela(b.dataset.page); }));
+  document.getElementById('menu-mobile-usuario').textContent = usuario.nome;
+  const menu = document.getElementById('menu-mobile');
+  menu.hidden = false;
+  document.body.classList.add('menu-mobile-aberto');
+  requestAnimationFrame(() => menu.classList.add('aberto'));
+}
+
+function fecharMenuMobile() {
+  const menu = document.getElementById('menu-mobile');
+  if (!menu || menu.hidden) return;
+  menu.classList.remove('aberto');
+  document.body.classList.remove('menu-mobile-aberto');
+  setTimeout(() => { if (!menu.classList.contains('aberto')) menu.hidden = true; }, 220);
+}
+
+// Botão do cabeçalho: alterna entre o Sereno claro e o escuro (igual ao sistema)
+function alternarClaroEscuro() {
+  if (!window.Theme) return;
+  Theme.set(['sereno-escuro', 'dark'].includes(Theme.get()) ? 'sereno' : 'sereno-escuro');
+}
 
 // ===== APARÊNCIA / TEMA =====
 function abrirAparencia() {
