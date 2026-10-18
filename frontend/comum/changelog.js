@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.0', data: '2026-10-18', destaques: [
+      'Corrigida a tela de Configuração do faturamento, que cortava o fim e não tinha barra de rolagem; agora ela é mais larga e rola até o botão Salvar',
+      'Toda janela mais alta que a tela passa a rolar por dentro, em vez de esconder o final'
+    ] },
     { versao: 'v4.9', data: '2026-10-18', destaques: [
       'Visão mensal mostra os impostos de cada mês, calculados sozinhos pelas notas emitidas: ISS, PIS e COFINS no mês seguinte à nota; IRPJ e CSLL no mês seguinte ao fim do trimestre',
       'Nova linha "Guardar para o IRPJ/CSLL trimestral": quanto separar a cada mês para os impostos do trimestre',

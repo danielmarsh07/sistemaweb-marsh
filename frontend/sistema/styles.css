@@ -1759,6 +1759,9 @@ tbody tr:last-child td {
   width: 90%;
   max-width: 460px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  /* Janela mais alta que a tela (ex.: Configuração do faturamento) rola por dentro em vez de cortar o fim */
+  max-height: 92vh;
+  overflow-y: auto;
 }
 
 .modal-header {
