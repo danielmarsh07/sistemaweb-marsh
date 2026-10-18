@@ -22,7 +22,7 @@ const COLUNAS_FATURA = `
   to_char(f.data_pagamento, 'YYYY-MM-DD') AS data_pagamento,
   f.valor_pago::float AS valor_pago, f.forma_pagamento, f.observacoes,
   f.emitir_nfse, f.codigo_servico, f.nome_servico, f.aliquota_iss::float AS aliquota_iss, f.reter_iss,
-  f.nfse_status, f.nfse_numero, f.nfse_codigo_verificacao, f.nfse_pdf_url, f.nfse_xml_url, f.nfse_erro,
+  f.nfse_status, f.nfse_numero, f.nfse_codigo_verificacao, f.nfse_pdf_url, f.nfse_xml_url, f.nfse_erro, f.nfse_simulada,
   f.email_enviado_em, f.lembrete_enviado_em, f.data_criacao,
   f.ret_ir::float AS ret_ir, f.ret_csll::float AS ret_csll, f.ret_pis::float AS ret_pis,
   f.ret_cofins::float AS ret_cofins, f.ret_inss::float AS ret_inss,
@@ -35,7 +35,7 @@ async function carregarConfig(empresa_id) {
   return r.rows[0] || {
     empresa_id, instrucoes_pagamento: null, pix_chave: null, codigo_servico: null, nome_servico: null,
     aliquota_iss: 0, email_copia: null, dias_lembrete: 3, vencimento_mes_seguinte: true,
-    geracao_automatica: true, dia_geracao: 1, dias_suspensao: 30,
+    geracao_automatica: true, dia_geracao: 1, dias_suspensao: 30, nfse_modo: 'producao',
     ret_ir: 0, ret_csll: 0, ret_pis: 0, ret_cofins: 0, ret_inss: 0
   };
 }
@@ -53,9 +53,10 @@ async function carregarCliente(id) {
 }
 
 // Envia a fatura por e-mail e marca o envio. Devolve true/false.
-async function enviarEmailFatura(fatura) {
+// manual = botão "Enviar por e-mail": vai ao cliente mesmo no modo teste; os envios automáticos do modo teste vão só para a cópia
+async function enviarEmailFatura(fatura, { manual = false } = {}) {
   const [cliente, config] = await Promise.all([carregarCliente(fatura.cliente_id), carregarConfig(fatura.empresa_id)]);
-  const ok = await email.enviarFatura({ fatura, cliente, config });
+  const ok = await email.enviarFatura({ fatura, cliente, config, somenteCopia: !manual && config.nfse_modo === 'teste' });
   if (ok) await pool.query('UPDATE faturas SET email_enviado_em = NOW() WHERE id = $1', [fatura.id]);
   return ok;
 }
@@ -63,6 +64,11 @@ async function enviarEmailFatura(fatura) {
 // Emite (ou reemite após erro) a NFS-e da fatura. Não lança: grava o erro na fatura.
 async function emitirNfse(fatura) {
   if (!fatura.emitir_nfse) return 'nao_emitida';
+  // Modo teste (QAS): a nota é dada como emitida sem chamar o Asaas, e o processo segue como se tivesse saído
+  if ((await carregarConfig(fatura.empresa_id)).nfse_modo === 'teste') {
+    await pool.query(`UPDATE faturas SET nfse_status = 'emitida', nfse_simulada = TRUE, nfse_erro = NULL, data_atualizacao = NOW() WHERE id = $1`, [fatura.id]);
+    return 'emitida';
+  }
   // Sem Asaas a fatura segue sem nota (fica "não emitida" para emitir depois pelo botão)
   if (!asaas.configurado()) return 'nao_emitida';
   if (!fatura.codigo_servico) {

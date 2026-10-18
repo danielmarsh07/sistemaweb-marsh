@@ -1420,6 +1420,11 @@ async function iniciar() {
     //     NULL = padrões do Lucro Presumido para serviços (PIS 0,65%, COFINS 3%, presunção 32%, IRPJ 15% + 10%, CSLL 9%).
     await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS impostos JSONB;`);
 
+    // 39. Modo da NFS-e: 'producao' (emite no Asaas) ou 'teste' (QAS: a nota é dada como emitida sem chamar o Asaas,
+    //     o processo segue igual e os e-mails automáticos vão só para o e-mail de cópia). nfse_simulada marca essas notas.
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS nfse_modo VARCHAR(10) NOT NULL DEFAULT 'producao' CHECK (nfse_modo IN ('producao', 'teste'));`);
+    await pool.query(`ALTER TABLE faturas ADD COLUMN IF NOT EXISTS nfse_simulada BOOLEAN NOT NULL DEFAULT FALSE;`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

@@ -374,33 +374,45 @@ function blocoFatura({ fatura, config }) {
 }
 
 /** Fatura aprovada (com a NFS-e, se já emitida) — vai para o financeiro do cliente */
-async function enviarFatura({ fatura, cliente, config }) {
-  const to = destinatariosFatura(cliente);
-  if (!to.length) return false;
+// Modo teste da NFS-e (QAS): o envio automático vai só para o e-mail de cópia, avisando para quem iria
+function destinoTeste(to, config, somenteCopia) {
+  if (!somenteCopia) return { to, cc: config && config.email_copia ? [config.email_copia] : undefined, aviso: '', prefixo: '' };
+  if (!config || !config.email_copia) return null; // sem cópia configurada, o modo teste não envia nada
+  return {
+    to: [config.email_copia], cc: undefined, prefixo: '[TESTE] ',
+    aviso: `<p style="margin:0 0 16px;padding:10px 12px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:13px">
+      Modo teste (QAS) da NFS-e: este e-mail <strong>não</strong> foi enviado ao cliente (iria para ${esc(to.join(', '))}).
+      Para mandar ao cliente, use "Enviar por e-mail" na fatura.</p>`
+  };
+}
+
+async function enviarFatura({ fatura, cliente, config, somenteCopia = false }) {
+  const destino = destinoTeste(destinatariosFatura(cliente), config, somenteCopia);
+  if (!destino || !destino.to.length) return false;
   const nome = cliente.nome_fantasia || cliente.razao_social || cliente.nome;
   const html = templateBase({
     titulo: `Fatura ${mesAno(fatura.competencia)}`,
     preheader: `Fatura de ${mesAno(fatura.competencia)} — ${moeda(fatura.valor_liquido ?? fatura.valor)}, vencimento ${diaBr(fatura.data_vencimento)}`,
-    corpo: `
+    corpo: `${destino.aviso}
       <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">Sua fatura de ${mesAno(fatura.competencia)}</h2>
       <p style="margin:0 0 24px;color:#64748b;font-size:14px">Olá, ${esc(nome)}. Segue o faturamento do período.</p>
       ${blocoFatura({ fatura, config })}`
   });
   return enviar({
-    to, cc: config && config.email_copia ? [config.email_copia] : undefined,
-    subject: `[Marsh] Fatura ${mesAno(fatura.competencia)} — ${moeda(fatura.valor_liquido ?? fatura.valor)} · vence ${diaBr(fatura.data_vencimento)}`,
+    to: destino.to, cc: destino.cc,
+    subject: `${destino.prefixo}[Marsh] Fatura ${mesAno(fatura.competencia)} — ${moeda(fatura.valor_liquido ?? fatura.valor)} · vence ${diaBr(fatura.data_vencimento)}`,
     html
   });
 }
 
 /** Lembrete de fatura vencida e não paga */
 async function enviarLembreteFatura({ fatura, cliente, config }) {
-  const to = destinatariosFatura(cliente);
-  if (!to.length) return false;
+  const destino = destinoTeste(destinatariosFatura(cliente), config, config && config.nfse_modo === 'teste');
+  if (!destino || !destino.to.length) return false;
   const html = templateBase({
     titulo: 'Fatura em aberto',
     preheader: `A fatura de ${mesAno(fatura.competencia)} venceu em ${diaBr(fatura.data_vencimento)}`,
-    corpo: `
+    corpo: `${destino.aviso}
       <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">Lembrete: fatura em aberto</h2>
       <p style="margin:0 0 24px;color:#64748b;font-size:14px">
         Não identificamos o pagamento da fatura abaixo, vencida em ${diaBr(fatura.data_vencimento)}.
@@ -408,8 +420,8 @@ async function enviarLembreteFatura({ fatura, cliente, config }) {
       ${blocoFatura({ fatura, config })}`
   });
   return enviar({
-    to, cc: config && config.email_copia ? [config.email_copia] : undefined,
-    subject: `[Marsh] Lembrete: fatura ${mesAno(fatura.competencia)} vencida em ${diaBr(fatura.data_vencimento)}`,
+    to: destino.to, cc: destino.cc,
+    subject: `${destino.prefixo}[Marsh] Lembrete: fatura ${mesAno(fatura.competencia)} vencida em ${diaBr(fatura.data_vencimento)}`,
     html
   });
 }
@@ -571,6 +583,7 @@ async function enviarCursoLiberado({ nome, email, curso, fim, linkSenha, teste }
 }
 
 module.exports = {
+  destinoTeste,
   enviarCursoLiberado,
   enviarLicencasLiberadas,
   enviarAvisoVencimentoLicencas,

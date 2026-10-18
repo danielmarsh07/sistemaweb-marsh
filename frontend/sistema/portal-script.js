@@ -1511,7 +1511,7 @@ async function carregarFinanceiroPortal() {
         <div class="linha"><span>Valor da nota</span><strong>${moeda(f.valor)}</strong></div>
         ${f.valor_liquido < f.valor ? `<div class="linha"><span>Valor a pagar (com retenções)</span><strong>${moeda(f.valor_liquido)}</strong></div>` : ''}
         <div class="linha"><span>Vencimento</span><strong>${br(f.data_vencimento)}</strong></div>
-        <div class="linha"><span>NFS-e</span><strong>${f.nfse_status === 'emitida' ? 'Nº ' + escapeHtml(f.nfse_numero || '-') : f.nfse_status === 'processando' ? 'Em emissão' : '—'}</strong></div>
+        <div class="linha"><span>NFS-e</span><strong>${f.nfse_status === 'emitida' && !f.nfse_simulada ? 'Nº ' + escapeHtml(f.nfse_numero || '-') : f.nfse_status === 'processando' ? 'Em emissão' : '—'}</strong></div>
         ${f.pix_payload ? blocoPixPortal(f) : ''}
         ${docs ? `<div class="docs">${docs}</div>` : ''}
       </div>`;

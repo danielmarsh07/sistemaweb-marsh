@@ -22,6 +22,12 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.1', data: '2026-10-18', destaques: [
+      'Nova chave em Configuração do faturamento: emissão da NFS-e em Produção (Asaas) ou Teste (QAS)',
+      'No modo Teste, ao aprovar a fatura a nota fica como "Emitida (teste)" e o processo segue normal, sem enviar nada ao Asaas',
+      'No modo Teste, os e-mails automáticos (fatura e lembretes) vão só para o e-mail de cópia; o cliente só recebe se você usar "Enviar por e-mail"',
+      'Notas com erro podem ser resolvidas no modo Teste pelo botão "Emitir NFS-e"; o portal do cliente não mostra número de nota de teste'
+    ] },
     { versao: 'v5.0', data: '2026-10-18', destaques: [
       'Corrigida a tela de Configuração do faturamento, que cortava o fim e não tinha barra de rolagem; agora ela é mais larga e rola até o botão Salvar',
       'Toda janela mais alta que a tela passa a rolar por dentro, em vez de esconder o final'

@@ -57,7 +57,7 @@ router.get('/minhas-faturas', async (req, res) => {
       `SELECT f.id, to_char(f.competencia, 'YYYY-MM-DD') AS competencia, f.descricao, f.valor::float AS valor,
               to_char(f.data_vencimento, 'YYYY-MM-DD') AS data_vencimento, f.status,
               to_char(f.data_pagamento, 'YYYY-MM-DD') AS data_pagamento,
-              f.nfse_status, f.nfse_numero, f.nfse_pdf_url, f.nfse_xml_url,
+              f.nfse_status, f.nfse_numero, f.nfse_pdf_url, f.nfse_xml_url, f.nfse_simulada,
               ${fat.sqlValorLiquido('f')} AS valor_liquido,
               CASE WHEN f.status = 'aberta' AND f.pix_status = 'pendente' THEN f.pix_payload END AS pix_payload,
               CASE WHEN f.status = 'aberta' AND f.pix_status = 'pendente' THEN f.pix_qrcode END AS pix_qrcode,
@@ -91,7 +91,8 @@ router.get('/status', async (req, res) => {
     asaas_fiscal_configurado: await asaas.fiscalConfigurado(),
     asaas_ambiente: asaas.ambiente(),
     webhook_configurado: !!process.env.ASAAS_WEBHOOK_TOKEN,
-    email_configurado: email.emailConfigurado()
+    email_configurado: email.emailConfigurado(),
+    nfse_modo: (await fat.carregarConfig(emp(req))).nfse_modo || 'producao'
   });
 });
 
@@ -118,12 +119,14 @@ router.put('/config', async (req, res) => {
   if (!Number.isInteger(diaGeracao) || diaGeracao < 1 || diaGeracao > 28) return res.status(400).json({ erro: 'Dia da geração automática: 1 a 28.' });
   const imp = impostos.validarParametros(b.impostos);
   if (imp.erro) return res.status(400).json({ erro: imp.erro });
+  const nfseModo = b.nfse_modo === undefined ? null : b.nfse_modo;
+  if (nfseModo !== null && !['producao', 'teste'].includes(nfseModo)) return res.status(400).json({ erro: 'Modo da NFS-e: produção ou teste.' });
   try {
     await pool.query(
       `INSERT INTO financeiro_config (empresa_id, instrucoes_pagamento, pix_chave, codigo_servico, nome_servico,
          aliquota_iss, email_copia, dias_lembrete, vencimento_mes_seguinte,
-         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, cobranca_pix, geracao_automatica, dia_geracao, dias_suspensao, impostos, data_atualizacao)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,NOW())
+         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, cobranca_pix, geracao_automatica, dia_geracao, dias_suspensao, impostos, nfse_modo, data_atualizacao)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,COALESCE($20::varchar, 'producao'),NOW())
        ON CONFLICT (empresa_id) DO UPDATE SET
          instrucoes_pagamento = EXCLUDED.instrucoes_pagamento, pix_chave = EXCLUDED.pix_chave,
          codigo_servico = EXCLUDED.codigo_servico, nome_servico = EXCLUDED.nome_servico,
@@ -133,11 +136,12 @@ router.put('/config', async (req, res) => {
          ret_cofins = EXCLUDED.ret_cofins, ret_inss = EXCLUDED.ret_inss,
          cobranca_pix = EXCLUDED.cobranca_pix, geracao_automatica = EXCLUDED.geracao_automatica,
          dia_geracao = EXCLUDED.dia_geracao, dias_suspensao = EXCLUDED.dias_suspensao,
-         impostos = COALESCE(EXCLUDED.impostos, financeiro_config.impostos), data_atualizacao = NOW()`,
+         impostos = COALESCE(EXCLUDED.impostos, financeiro_config.impostos),
+         nfse_modo = COALESCE($20::varchar, financeiro_config.nfse_modo), data_atualizacao = NOW()`,
       [emp(req), vazioNulo(b.instrucoes_pagamento), vazioNulo(b.pix_chave), vazioNulo(b.codigo_servico),
        vazioNulo(b.nome_servico), aliquota, vazioNulo(b.email_copia), dias, b.vencimento_mes_seguinte !== false,
        ...RET.map(r => Number(b[r] || 0)), !!b.cobranca_pix, b.geracao_automatica !== false, diaGeracao, diasSuspensao,
-       imp.impostos && JSON.stringify(imp.impostos)]);
+       imp.impostos && JSON.stringify(imp.impostos), nfseModo]);
     res.json({ mensagem: 'Configuração salva!' });
   } catch (err) { erro500(res, 'Erro ao salvar configuração', err); }
 });
@@ -483,7 +487,8 @@ router.post('/faturas/:id/nfse', async (req, res) => {
     if (!f) return res.status(404).json({ erro: 'Fatura não encontrada.' });
     if (f.status !== 'aberta' && f.status !== 'paga') return res.status(400).json({ erro: 'Aprove a fatura antes de emitir a nota.' });
     if (!['nao_emitida', 'erro'].includes(f.nfse_status)) return res.status(400).json({ erro: 'A nota desta fatura já foi enviada ao Asaas.' });
-    if (!asaas.configurado()) return res.status(400).json({ erro: 'Asaas não configurado: defina ASAAS_API_KEY no servidor para emitir NFS-e.' });
+    const teste = (await fat.carregarConfig(emp(req))).nfse_modo === 'teste';
+    if (!teste && !asaas.configurado()) return res.status(400).json({ erro: 'Asaas não configurado: defina ASAAS_API_KEY no servidor para emitir NFS-e.' });
     if (!f.emitir_nfse) await pool.query('UPDATE faturas SET emitir_nfse = TRUE WHERE id = $1', [f.id]);
     const status = await fat.emitirNfse({ ...f, emitir_nfse: true });
     await fat.aposAtualizarNota(f.id, emp(req));
@@ -509,7 +514,7 @@ router.post('/faturas/:id/enviar-email', async (req, res) => {
     if (!f) return res.status(404).json({ erro: 'Fatura não encontrada.' });
     if (f.status === 'rascunho' || f.status === 'cancelada') return res.status(400).json({ erro: 'Só faturas aprovadas podem ser enviadas.' });
     if (!email.emailConfigurado()) return res.status(400).json({ erro: 'Envio de e-mail não configurado (RESEND_API_KEY).' });
-    const ok = await fat.enviarEmailFatura(f);
+    const ok = await fat.enviarEmailFatura(f, { manual: true });
     if (!ok) return res.status(400).json({ erro: 'Não foi possível enviar: confira o e-mail financeiro do cliente.' });
     res.json({ mensagem: 'Fatura enviada por e-mail!' });
   } catch (err) { erro500(res, 'Erro ao enviar e-mail', err); }
@@ -585,6 +590,9 @@ router.post('/faturas/:id/cancelar', async (req, res) => {
         return res.status(400).json({ erro: `A nota fiscal não pôde ser cancelada: ${err.message}. A fatura continua aberta.` });
       }
       aviso = 'Cancelamento da NFS-e solicitado à prefeitura.';
+    } else if (f.nfse_simulada && f.nfse_status === 'emitida') {
+      // Nota do modo teste: não existe na prefeitura, só sai do sistema
+      await pool.query(`UPDATE faturas SET nfse_status = 'cancelada' WHERE id = $1`, [f.id]);
     }
     await fat.cancelarPix(f);
     await pool.query(

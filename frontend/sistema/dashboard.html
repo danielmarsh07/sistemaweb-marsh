@@ -2658,6 +2658,14 @@
         <small class="form-hint fin-hint-pix">O cliente recebe o QR code e o código copia e cola (no e-mail e no portal) no valor líquido, e a baixa é automática quando ele paga. O Asaas cobra uma tarifa por PIX recebido, que entra nas contas a pagar como tarifa bancária. Para isso funcionar, a conta do Asaas precisa ter uma chave PIX cadastrada e o webhook precisa enviar os eventos de cobrança.</small>
 
         <div class="form-section-title">Nota fiscal (padrão dos contratos)</div>
+        <div class="form-group">
+          <label>Emissão da NFS-e</label>
+          <select name="nfse_modo">
+            <option value="producao">Produção: emitir a nota de verdade no Asaas</option>
+            <option value="teste">Teste (QAS): dar a nota como emitida, sem enviar ao Asaas</option>
+          </select>
+          <small class="form-hint">No modo teste, ao aprovar a fatura a nota fica como "emitida (teste)" e o processo segue normal; os e-mails automáticos (fatura e lembretes) vão só para o e-mail de cópia abaixo, nunca ao cliente. Para mandar ao cliente, use "Enviar por e-mail" na fatura.</small>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>Código do serviço</label>

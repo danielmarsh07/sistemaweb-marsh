@@ -50,12 +50,15 @@ function situacaoPix(f) {
   return '';
 }
 
+const nfseModoTeste = () => !!(_finStatus && _finStatus.nfse_modo === 'teste');
+
 function nfseFatura(f) {
   if (!f.emitir_nfse && f.nfse_status === 'nao_emitida') return '<span class="fin-muted">Sem nota</span>';
   switch (f.nfse_status) {
     case 'emitida': {
       const links = [f.nfse_pdf_url && `<a href="${escapeHtml(f.nfse_pdf_url)}" target="_blank" rel="noopener">PDF</a>`,
                      f.nfse_xml_url && `<a href="${escapeHtml(f.nfse_xml_url)}" target="_blank" rel="noopener">XML</a>`].filter(Boolean).join(' · ');
+      if (f.nfse_simulada) return `<span title="Modo teste (QAS): dada como emitida, sem envio ao Asaas">${pill('Emitida (teste)', '#b7791f')}</span>`;
       return `${pill(`Nº ${f.nfse_numero || '—'}`, '#2e7d4f')}${links ? `<div class="fin-links">${links}</div>` : ''}`;
     }
     case 'processando': return pill('Processando', '#b7791f');
@@ -97,7 +100,8 @@ async function carregarStatusFinanceiro() {
   if (!res || !res.ok) return null;
   _finStatus = await res.json();
   const avisos = [];
-  if (!_finStatus.asaas_configurado) avisos.push('Emissão de NFS-e desligada: falta configurar a chave do Asaas (ASAAS_API_KEY). As faturas funcionam normalmente; as notas ficam para emitir depois.');
+  if (_finStatus.nfse_modo === 'teste') avisos.push('NFS-e em modo TESTE (QAS): ao aprovar, a nota é dada como emitida sem ir ao Asaas, e os e-mails automáticos vão só para o e-mail de cópia. Para emitir de verdade, troque para Produção em Configurar.');
+  else if (!_finStatus.asaas_configurado) avisos.push('Emissão de NFS-e desligada: falta configurar a chave do Asaas (ASAAS_API_KEY). As faturas funcionam normalmente; as notas ficam para emitir depois.');
   else {
     if (_finStatus.asaas_fiscal_configurado === false) avisos.push('Asaas conectado, mas a configuração fiscal da conta está pendente: no painel do Asaas, em Notas Fiscais, informe inscrição municipal, regime e o acesso ao portal da prefeitura. Até lá as notas não são emitidas.');
     if (_finStatus.asaas_ambiente === 'sandbox') avisos.push('Asaas em modo de TESTE (sandbox): as notas emitidas não têm valor fiscal.');
@@ -216,8 +220,11 @@ async function aprovarSelecionadas() {
   const total = sel.reduce((s, f) => s + (f.valor_liquido ?? f.valor), 0);
   const comNota = sel.filter(f => f.emitir_nfse).length;
   if (!confirm(`Aprovar ${ids.length} fatura(s), total a receber ${formatMoeda(total)}?\n\n` +
-    `• ${comNota} NFS-e serão emitidas no Asaas${_finStatus && _finStatus.asaas_ambiente === 'sandbox' ? ' (TESTE)' : ''}\n` +
-    `• Cada cliente recebe a fatura por e-mail (com a nota assim que ela for autorizada)\n\nEssa ação não pode ser desfeita (só cancelando a fatura).`)) return;
+    (nfseModoTeste()
+      ? `• ${comNota} NFS-e serão dadas como emitidas (modo teste, sem Asaas)\n• O e-mail da fatura vai só para o e-mail de cópia, não ao cliente\n\n`
+      : `• ${comNota} NFS-e serão emitidas no Asaas${_finStatus && _finStatus.asaas_ambiente === 'sandbox' ? ' (TESTE)' : ''}\n` +
+        `• Cada cliente recebe a fatura por e-mail (com a nota assim que ela for autorizada)\n\n`) +
+    `Essa ação não pode ser desfeita (só cancelando a fatura).`)) return;
 
   const btn = document.querySelector('#fin-barra-aprovar .btn');
   btn.disabled = true; btn.textContent = 'Processando...';
@@ -346,7 +353,9 @@ const nomeFatura = id => { const f = _faturasCache.find(x => x.id === id); retur
 function excluirFatura(id) { acaoFatura(id, '', `Excluir o rascunho de ${nomeFatura(id)}?`); }
 
 async function emitirNfseFatura(id) {
-  const r = await acaoFatura(id, '/nfse', `Emitir a NFS-e de ${nomeFatura(id)} no Asaas?`);
+  const r = await acaoFatura(id, '/nfse', nfseModoTeste()
+    ? `Modo teste (QAS): dar a NFS-e de ${nomeFatura(id)} como emitida, sem enviar ao Asaas?`
+    : `Emitir a NFS-e de ${nomeFatura(id)} no Asaas?`);
   if (r && r.nfse_status === 'erro') alert(`A nota não foi emitida:\n${r.nfse_erro}`);
 }
 
@@ -356,7 +365,8 @@ async function sincronizarNfseFatura(id) {
 }
 
 async function reenviarEmailFatura(id) {
-  const r = await acaoFatura(id, '/enviar-email', `Enviar a fatura de ${nomeFatura(id)} por e-mail ao cliente?`);
+  const r = await acaoFatura(id, '/enviar-email', `Enviar a fatura de ${nomeFatura(id)} por e-mail ao cliente?${nfseModoTeste()
+    ? '\n\nAtenção: modo teste ligado, mas este envio vai para o CLIENTE de verdade.' : ''}`);
   if (r) alert(r.mensagem);
 }
 
@@ -435,6 +445,7 @@ async function abrirConfigFinanceiro() {
   form.geracao_automatica.checked = c.geracao_automatica !== false;
   form.dia_geracao.value = c.dia_geracao || 1;
   form.dias_suspensao.value = c.dias_suspensao || 30;
+  form.nfse_modo.value = c.nfse_modo === 'teste' ? 'teste' : 'producao';
   RETENCOES.forEach(r => { form[r].value = c[r] ? c[r] : ''; });
   IMPOSTOS_EMPRESA.forEach(k => { form[`imp_${k}`].value = c.impostos ? c.impostos[k] : ''; });
   const item = (ok, txt) => `<div class="${ok ? 'ok' : 'off'}">${ok ? '●' : '○'} ${escapeHtml(txt)}</div>`;
@@ -465,6 +476,7 @@ async function salvarConfigFinanceiro() {
       geracao_automatica: form.geracao_automatica.checked,
       dia_geracao: Number(form.dia_geracao.value || 1),
       dias_suspensao: Number(form.dias_suspensao.value || 30),
+      nfse_modo: form.nfse_modo.value,
       ...Object.fromEntries(RETENCOES.map(r => [r, form[r].value || 0])),
       impostos: Object.fromEntries(IMPOSTOS_EMPRESA.map(k => [k, form[`imp_${k}`].value === '' ? undefined : Number(form[`imp_${k}`].value)]))
     })
@@ -472,7 +484,11 @@ async function salvarConfigFinanceiro() {
   if (!res) return;
   const r = await res.json();
   if (!res.ok) { alert(r.erro); return; }
+  if (form.nfse_modo.value === 'teste' && !form.email_copia.value.trim()) {
+    alert('Modo teste ligado, mas sem "Cópia dos e-mails para": os e-mails automáticos das faturas não serão enviados a ninguém.');
+  }
   closeModal(document.getElementById('modal-fin-config'));
+  carregarStatusFinanceiro().then(() => { if (typeof loadFaturamento === 'function' && currentPage === 'faturamento') loadFaturamento(); });
 }
 
 // ===== Contratos =====
