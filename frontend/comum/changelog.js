@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.2', data: '2026-10-18', destaques: [
+      'Novo botão "Ver a nota fiscal (PDF)" nas faturas com nota emitida',
+      'Nota emitida pelo Asaas abre o PDF oficial; nota do modo teste abre a nota pronta para imprimir ou salvar em PDF, com a tarja "sem valor fiscal"'
+    ] },
     { versao: 'v5.1', data: '2026-10-18', destaques: [
       'Nova chave em Configuração do faturamento: emissão da NFS-e em Produção (Asaas) ou Teste (QAS)',
       'No modo Teste, ao aprovar a fatura a nota fica como "Emitida (teste)" e o processo segue normal, sem enviar nada ao Asaas',

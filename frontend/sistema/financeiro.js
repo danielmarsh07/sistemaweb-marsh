@@ -7,7 +7,8 @@ Object.assign(_ICONS, {
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   nota: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',
   desfazer: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
-  pix: '<path d="m12 3 4.5 4.5a2 2 0 0 1 0 2.8L12 14.8l-4.5-4.5a2 2 0 0 1 0-2.8z"/><path d="m5.5 13.5 4 4a3.5 3.5 0 0 0 5 0l4-4"/>'
+  pix: '<path d="m12 3 4.5 4.5a2 2 0 0 1 0 2.8L12 14.8l-4.5-4.5a2 2 0 0 1 0-2.8z"/><path d="m5.5 13.5 4 4a3.5 3.5 0 0 0 5 0l4-4"/>',
+  pdf: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><circle cx="11.5" cy="14.5" r="2.5"/><path d="m13.3 16.3 2.2 2.2"/>'
 });
 
 let _faturasCache = [];
@@ -76,6 +77,7 @@ function botao(icone, titulo, acao, extra = '') {
 function acoesFatura(f) {
   const b = [];
   b.push(botao('eye', 'Visualizar', `visualizarRegistro(editarFatura, ${f.id}, '#modal-fatura')`));
+  if (f.nfse_status === 'emitida') b.push(botao('pdf', f.nfse_simulada ? 'Ver a nota (PDF, modo teste)' : 'Ver a nota fiscal (PDF)', `verNotaFatura(${f.id})`));
   if (f.status === 'rascunho') {
     b.push(botao('edit', 'Editar', `editarFatura(${f.id})`, 'btn-edit'));
     b.push(botao('trash', 'Excluir rascunho', `excluirFatura(${f.id})`, 'btn-danger'));
@@ -357,6 +359,23 @@ async function emitirNfseFatura(id) {
     ? `Modo teste (QAS): dar a NFS-e de ${nomeFatura(id)} como emitida, sem enviar ao Asaas?`
     : `Emitir a NFS-e de ${nomeFatura(id)} no Asaas?`);
   if (r && r.nfse_status === 'erro') alert(`A nota não foi emitida:\n${r.nfse_erro}`);
+}
+
+// Nota real: abre o PDF oficial. Nota do modo teste: abre o espelho para imprimir/salvar em PDF.
+async function verNotaFatura(id) {
+  const f = _faturasCache.find(x => x.id === id);
+  if (f && f.nfse_pdf_url && !f.nfse_simulada) { window.open(f.nfse_pdf_url, '_blank', 'noopener'); return; }
+  const janela = window.open('', '_blank'); // abre já no clique, para o navegador não bloquear a janela
+  if (janela) janela.document.write('<p style="font-family:sans-serif;padding:20px">Carregando a nota…</p>');
+  const res = await apiFetch(`${API_URL}/financeiro/faturas/${id}/nfse/espelho`);
+  if (!res || !res.ok) {
+    if (janela) janela.close();
+    if (res) alert((await res.json().catch(() => ({}))).erro || 'Não foi possível abrir a nota.');
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([await res.text()], { type: 'text/html' }));
+  if (janela) janela.location.href = url; else window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 async function sincronizarNfseFatura(id) {

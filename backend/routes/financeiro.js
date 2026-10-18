@@ -497,6 +497,16 @@ router.post('/faturas/:id/nfse', async (req, res) => {
   } catch (err) { erro500(res, 'Erro ao emitir NFS-e', err); }
 });
 
+// GET /faturas/:id/nfse/espelho — espelho da nota em HTML para imprimir/salvar PDF (nota de teste ou prévia)
+router.get('/faturas/:id/nfse/espelho', async (req, res) => {
+  try {
+    const f = await fat.carregarFatura(req.params.id, emp(req));
+    if (!f) return res.status(404).json({ erro: 'Fatura não encontrada.' });
+    if (f.status === 'rascunho') return res.status(400).json({ erro: 'Aprove a fatura antes de ver a nota.' });
+    res.type('html').send(await require('../services/espelho-nfse').espelhoDaFatura(f));
+  } catch (err) { erro500(res, 'Erro ao montar a nota', err); }
+});
+
 // POST /faturas/:id/nfse/sincronizar — consulta o status da nota no Asaas
 router.post('/faturas/:id/nfse/sincronizar', async (req, res) => {
   try {

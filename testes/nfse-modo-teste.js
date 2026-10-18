@@ -45,6 +45,12 @@ const ok = (c, msg) => console.log(c ? 'OK  ' : 'FAIL', msg);
   const em = await api('POST', `/faturas/${nova.id}/nfse`);
   ok(em.nfse_status === 'emitida', 'nota com erro: emitir no modo teste marca como emitida');
 
+  // Espelho da nota (botão "Ver a nota"): HTML com a tarja de teste, número TESTE-id e os valores
+  const esp = await fetch(`${BASE}/faturas/${nova.id}/nfse/espelho`, { headers: { Authorization: `Bearer ${token}` } });
+  const html = await esp.text();
+  ok(esp.status === 200 && /text\/html/.test(esp.headers.get('content-type')) && html.includes('MODO TESTE') &&
+    html.includes(`TESTE-${nova.id}`) && html.includes('1.000,00') && html.includes('Imprimir / salvar PDF'), 'espelho da nota de teste para imprimir/PDF');
+
   // Cancelar a fatura cancela a nota simulada sem ir ao Asaas
   const ca = await api('POST', `/faturas/${nova.id}/cancelar`);
   const fc = (await pool.query(`SELECT status, nfse_status FROM faturas WHERE id = $1`, [nova.id])).rows[0];
