@@ -982,6 +982,7 @@ async function abrirNovaConta(modelo) {
   document.getElementById('conta-nova-campos').hidden = false;
   document.getElementById('conta-paga-campos').hidden = true;
   document.getElementById('conta-seguintes-linha').hidden = true;
+  document.getElementById('conta-btn-excluir').hidden = true;
   await preencherSelectsConta(form, modelo && modelo.categoria_id ? modelo : null);
   if (modelo && modelo.descricao) {
     form.descricao.value = modelo.descricao;
@@ -1025,6 +1026,8 @@ async function editarConta(id) {
   ajustarCampoVencimento();
   document.getElementById('conta-nova-campos').hidden = true;
   document.getElementById('conta-seguintes-linha').hidden = !c.grupo_id || (!c.recorrente && c.parcela >= c.total_parcelas);
+  // Paga não se exclui (desfaça o pagamento antes); assim dá para excluir direto da Visão mensal
+  document.getElementById('conta-btn-excluir').hidden = c.status !== 'aberta';
   const serie = c.recorrente ? ' (assinatura)' : c.parcela ? ` (${c.parcela}/${c.total_parcelas})` : '';
   document.getElementById('modal-conta-pagar-titulo').textContent = `Editar conta${serie}`;
   showModal('#modal-conta-pagar');
@@ -1100,6 +1103,13 @@ async function excluirConta(id) {
   } else if (!confirm(`Excluir "${c.descricao}" (${formatMoeda(c.valor)})?`)) return;
   const r = await acaoContaPagar(id, '', null, null, query);
   if (r && query) alert(r.mensagem);
+  return r;
+}
+
+// Botão "Excluir" da tela de edição (também aberta pela Visão mensal)
+async function excluirContaEmEdicao() {
+  if (!contaEmEdicao) return;
+  if (await excluirConta(contaEmEdicao.id)) closeModal(document.getElementById('modal-conta-pagar'));
 }
 
 async function estornarConta(id) {

@@ -9,6 +9,7 @@ const router = express.Router();
 const pool = require('../db');
 const fat = require('../services/faturamento');
 const relatorios = require('../services/relatorios-financeiros');
+const auditoria = require('../services/auditoria');
 const {
   GRUPOS_DRE, somarMeses, mesDe, competenciaValida, dataValida,
   garantirCategoriasPadrao, validarConta, criarContaPagar, darBaixaConta
@@ -287,14 +288,18 @@ router.delete('/contas-pagar/:id', async (req, res) => {
     if (!c) return res.status(404).json({ erro: 'Conta não encontrada.' });
     if (c.status === 'paga') return res.status(400).json({ erro: 'Desfaça o pagamento antes de excluir.' });
     let r;
+    const apagadas = `RETURNING id, descricao, valor::float AS valor, to_char(data_vencimento, 'YYYY-MM-DD') AS vencimento, parcela`;
     if (req.query.seguintes === '1' && c.grupo_id) {
       r = await pool.query(
-        `DELETE FROM contas_pagar WHERE grupo_id = $1 AND empresa_id = $2 AND parcela >= $3 AND status <> 'paga'`,
+        `DELETE FROM contas_pagar WHERE grupo_id = $1 AND empresa_id = $2 AND parcela >= $3 AND status <> 'paga' ${apagadas}`,
         [c.grupo_id, emp(req), c.parcela]);
       await pool.query('UPDATE contas_pagar SET recorrente = FALSE WHERE grupo_id = $1 AND empresa_id = $2', [c.grupo_id, emp(req)]);
     } else {
-      r = await pool.query('DELETE FROM contas_pagar WHERE id = $1', [c.id]);
+      r = await pool.query(`DELETE FROM contas_pagar WHERE id = $1 ${apagadas}`, [c.id]);
     }
+    await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'conta_pagar.excluida', entidade: 'conta_pagar',
+      entidade_id: c.id, antes: { contas: r.rows, grupo_id: c.grupo_id, recorrente: c.recorrente, total_parcelas: c.total_parcelas },
+      detalhe: req.query.seguintes === '1' && c.grupo_id ? 'esta e as próximas da série' : null });
     const fim = req.query.seguintes === '1' && c.recorrente ? ' Assinatura encerrada.' : '';
     res.json({ mensagem: (r.rowCount > 1 ? `${r.rowCount} contas excluídas.` : 'Conta excluída.') + fim });
   } catch (err) { erro500(res, 'Erro ao excluir conta', err); }
@@ -445,8 +450,9 @@ router.get('/visao-mensal', async (req, res) => {
         });
       }
       const sec = secoes.get(secaoChave);
-      // Uma série (parcelada/assinatura) é uma linha; lançamentos soltos com a mesma descrição também se juntam
-      const chave = c.grupo_id || `d|${c.descricao.trim().toLowerCase()}|${c.categoria_id}|${c.conta_financeira_id || 0}|${c.natureza}`;
+      // Mesma descrição, categoria, conta e natureza = uma linha, seja série (parcelada/assinatura) ou avulso:
+      // o "+" num mês vazio de uma série cai na mesma linha em vez de abrir outra
+      const chave = `d|${c.descricao.trim().toLowerCase()}|${c.categoria_id}|${c.conta_financeira_id || 0}|${c.natureza}`;
       if (!sec.linhas.has(chave)) {
         sec.linhas.set(chave, {
           chave, descricao: c.descricao, categoria: c.categoria_nome, natureza: c.natureza, recorrente: c.recorrente,
@@ -457,6 +463,8 @@ router.get('/visao-mensal', async (req, res) => {
         });
       }
       const ln = sec.linhas.get(chave);
+      if (c.recorrente) ln.recorrente = true;
+      if (c.total_parcelas && !ln.total_parcelas) ln.total_parcelas = c.total_parcelas;
       ln.modelo.valor = c.valor; // o último valor da série é o padrão para lançar um mês vazio
       const cel = ln.celulas[c.mes];
       cel.valor += c.valor; cel.ids.push(c.id);

@@ -4112,7 +4112,8 @@ tr:hover .vm-mais, .vm-btn:focus-visible .vm-mais { opacity: 1; }
 }
 
 /* Modo visualização (ícone de olho): campos legíveis, sem cara de desabilitado, e sem o botão Salvar */
-.modal.modo-leitura .form-actions [type="submit"] { display: none; }
+.modal.modo-leitura .form-actions [type="submit"],
+.modal.modo-leitura .form-actions .btn-danger { display: none; }
 .modal:not(.modo-leitura) .btn-sair-leitura { display: none; }
 .modal.modo-leitura .form input:disabled,
 .modal.modo-leitura .form select:disabled,

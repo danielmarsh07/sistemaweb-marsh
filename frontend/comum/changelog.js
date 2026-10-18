@@ -22,6 +22,11 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.8', data: '2026-10-18', destaques: [
+      'Botão "Excluir" na tela da conta a pagar: dá para excluir direto da Visão mensal, sem ir em Contas a pagar',
+      'Na Visão mensal, lançar um mês vazio de uma série ou assinatura (o "+") fica na mesma linha, sem abrir outra com o mesmo nome',
+      'Exclusões de contas a pagar passam a ficar registradas no histórico de auditoria (quem excluiu, quando e o quê)'
+    ] },
     { versao: 'v4.7', data: '2026-10-16', destaques: [
       'Site: página nova dos Conectores, com ECC, S/4HANA, Fiori e BTP, a situação de cada um, os perfis (ABAP/Fiori, Funcional, Apps Fiori e Basis) e o roteiro',
       'Página inicial do site com o link para os Conectores no menu e no cartão do Conector SAP'

@@ -71,6 +71,23 @@ const BASE = 'http://localhost:3000/api/financeiro';
   const porCat = await api('GET', `/visao-mensal?inicio=${m0}&meses=3&agrupar=categoria`);
   ok(porCat.secoes.some(s => s.titulo === 'Parcelamentos de impostos'), 'visão: agrupar por categoria');
 
+  // "+" num mês vazio de uma série (lançamento avulso com a mesma descrição) cai na mesma linha
+  await api('POST', '/contas-pagar', { descricao: 'TESTE Licença', categoria_id: cat('Outras despesas'), valor: 550,
+    competencia: m0, data_vencimento: `${m0}-10`, conta_financeira_id: conta.id, tipo: 'parcelada', parcela_inicial: 1, total_parcelas: 2 });
+  await api('POST', '/contas-pagar', { descricao: 'TESTE Licença', categoria_id: cat('Outras despesas'), valor: 550,
+    competencia: m2, data_vencimento: `${m2}-10`, conta_financeira_id: conta.id, tipo: 'unica' });
+  const vmLic = await api('GET', `/visao-mensal?inicio=${m0}&meses=3`);
+  const linhasLic = vmLic.secoes.find(s => s.titulo === 'TESTE Conta').linhas.filter(l => l.descricao === 'TESTE Licença');
+  ok(linhasLic.length === 1 && vmLic.meses.every(m => linhasLic[0].celulas[m].ids.length === 1) && linhasLic[0].total_parcelas === 2,
+    `visão: série + avulso de mesmo nome = uma linha (${linhasLic.length})`);
+
+  // Exclusão fica na auditoria
+  const avulsa = (await contas(`AND descricao = 'TESTE Licença' AND grupo_id IS NULL`)).rows[0];
+  await api('DELETE', `/contas-pagar/${avulsa.id}`);
+  const aud = await pool.query(`SELECT antes FROM auditoria WHERE acao = 'conta_pagar.excluida' AND entidade_id = $1`, [avulsa.id]);
+  ok(aud.rows.length === 1 && aud.rows[0].antes.contas[0].descricao === 'TESTE Licença', 'exclusão de conta registrada na auditoria');
+  await pool.query(`DELETE FROM auditoria WHERE acao = 'conta_pagar.excluida' AND entidade_id = $1`, [avulsa.id]);
+
   // Pagar fatura do cartão
   const pf = await api('POST', `/contas-financeiras/${cartao.id}/pagar-fatura`, { mes: m0, data_pagamento: `${m0}-05` });
   ok(pf.qtd === 2, `pagar fatura: ${pf.mensagem}`);
