@@ -3980,6 +3980,9 @@ svg.icon {
 .vm-secao > * { background: color-mix(in srgb, var(--primary) 7%, var(--bg-card-solid, #fff)); font-weight: 700; color: var(--text-main); }
 .vm-secao > th { text-transform: none; letter-spacing: 0; font-size: 0.86rem; }
 .vm-secao-receita > * { background: color-mix(in srgb, #2e7d4f 9%, var(--bg-card-solid, #fff)); }
+.vm-secao-imposto > * { background: color-mix(in srgb, #b45309 9%, var(--bg-card-solid, #fff)); }
+.vm-reserva > * { color: #b45309; font-style: italic; font-size: 0.85rem; }
+.vm-reserva .vm-btn { color: inherit; font-style: inherit; }
 .vm-total > *, .vm-saldo > * { font-weight: 700; border-top: 2px solid var(--border); }
 .vm-saldo > * { font-size: 0.92rem; }
 .vm-cel { padding: 2px 4px !important; }

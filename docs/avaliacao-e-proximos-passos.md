@@ -23,7 +23,7 @@ O sistema cobre o ciclo inteiro da Marsh num lugar só: venda (funil e propostas
 |---|---|---|---|
 | 7 | [x] | **Assistente de voz no financeiro novo** | feito em 12/10/2026: saldo em caixa, resumo do mês, despesas por categoria, faturas, lançar conta a pagar (única, parcelada, assinatura, cartão), dar baixa e registrar recebimento; só para administradores. Erro de chave/créditos da OpenAI vira alerta. **Pendente:** gerar uma chave nova da OpenAI (a atual foi recusada) |
 | 8 | [ ] | **Reajuste anual dos contratos** | IPCA/IGP-M fica gravado, mas o valor nunca muda sozinho |
-| 9 | [ ] | **Tabela de impostos** | aguardando o contador confirmar regime, alíquotas, retenções por cliente e INSS do pró-labore |
+| 9 | [~] | **Tabela de impostos** | v4.9 (18/10/2026): Lucro Presumido estimado na Visão mensal (ISS, PIS, COFINS mensais; IRPJ/CSLL trimestrais + reserva mensal), alíquotas editáveis na Configuração do faturamento. **Falta o contador confirmar:** alíquotas, retenções por cliente e INSS do pró-labore (não entra no cálculo) |
 | 10 | [ ] | **Importar a planilha de custos** | aguardando: itens pessoais, vencimento das faturas dos cartões, parcela atual de cada item, valores em branco |
 | 11 | [ ] | **Cursos — etapa 1: conteúdo no ar** | decidir hospedagem de vídeo, formato das aulas e material de apoio |
 | 12 | [ ] | **Cursos — etapa 2: aluno e turma** | matrícula por pessoa, prazo de acesso (junto com o item 3) |

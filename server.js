@@ -1416,6 +1416,10 @@ async function iniciar() {
     await pool.query(`ALTER TABLE contratos_conector ADD COLUMN IF NOT EXISTS ciclo VARCHAR(10) NOT NULL DEFAULT 'anual';`);
     await pool.query(`ALTER TABLE propostas ADD COLUMN IF NOT EXISTS conector JSONB;`);
 
+    // 38. Impostos da empresa (Lucro Presumido) estimados pelas notas, na Visão mensal (services/impostos.js).
+    //     NULL = padrões do Lucro Presumido para serviços (PIS 0,65%, COFINS 3%, presunção 32%, IRPJ 15% + 10%, CSLL 9%).
+    await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS impostos JSONB;`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

@@ -18,6 +18,8 @@ let _contratosCache = [];
 let contratoEmEdicao = null;
 
 const RETENCOES = ['ret_ir', 'ret_csll', 'ret_pis', 'ret_cofins', 'ret_inss'];
+// Impostos da empresa (Lucro Presumido) usados na Visão mensal; campo vazio = padrão
+const IMPOSTOS_EMPRESA = ['pis', 'cofins', 'presuncao', 'irpj', 'csll', 'irpj_adicional', 'limite_adicional'];
 const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const mesAnoBr = iso => { const [a, m] = String(iso).slice(0, 7).split('-'); return `${MESES_CURTOS[Number(m) - 1]}/${a}`; };
 const hojeIso = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
@@ -434,6 +436,7 @@ async function abrirConfigFinanceiro() {
   form.dia_geracao.value = c.dia_geracao || 1;
   form.dias_suspensao.value = c.dias_suspensao || 30;
   RETENCOES.forEach(r => { form[r].value = c[r] ? c[r] : ''; });
+  IMPOSTOS_EMPRESA.forEach(k => { form[`imp_${k}`].value = c.impostos ? c.impostos[k] : ''; });
   const item = (ok, txt) => `<div class="${ok ? 'ok' : 'off'}">${ok ? '●' : '○'} ${escapeHtml(txt)}</div>`;
   document.getElementById('fin-config-status').innerHTML = st ? [
     item(st.asaas_configurado, st.asaas_configurado ? `Asaas conectado (${st.asaas_ambiente === 'producao' ? 'produção' : 'teste / sandbox'})` : 'Asaas não conectado — defina ASAAS_API_KEY no servidor'),
@@ -462,7 +465,8 @@ async function salvarConfigFinanceiro() {
       geracao_automatica: form.geracao_automatica.checked,
       dia_geracao: Number(form.dia_geracao.value || 1),
       dias_suspensao: Number(form.dias_suspensao.value || 30),
-      ...Object.fromEntries(RETENCOES.map(r => [r, form[r].value || 0]))
+      ...Object.fromEntries(RETENCOES.map(r => [r, form[r].value || 0])),
+      impostos: Object.fromEntries(IMPOSTOS_EMPRESA.map(k => [k, form[`imp_${k}`].value === '' ? undefined : Number(form[`imp_${k}`].value)]))
     })
   });
   if (!res) return;

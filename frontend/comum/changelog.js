@@ -22,6 +22,12 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v4.9', data: '2026-10-18', destaques: [
+      'Visão mensal mostra os impostos de cada mês, calculados sozinhos pelas notas emitidas: ISS, PIS e COFINS no mês seguinte à nota; IRPJ e CSLL no mês seguinte ao fim do trimestre',
+      'Nova linha "Guardar para o IRPJ/CSLL trimestral": quanto separar a cada mês para os impostos do trimestre',
+      'Clique no valor do imposto para ver o cálculo, nota por nota; ao lançar a guia em Contas a pagar, a estimativa daquele mês sai do total',
+      'Alíquotas do Lucro Presumido editáveis em Configuração do faturamento'
+    ] },
     { versao: 'v4.8', data: '2026-10-18', destaques: [
       'Botão "Excluir" na tela da conta a pagar: dá para excluir direto da Visão mensal, sem ir em Contas a pagar',
       'Na Visão mensal, lançar um mês vazio de uma série ou assinatura (o "+") fica na mesma linha, sem abrir outra com o mesmo nome',

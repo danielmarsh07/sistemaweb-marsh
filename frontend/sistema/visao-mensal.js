@@ -56,7 +56,7 @@ function vmTituloSecao(chave, rotulo) {
 
 // Recolher tudo / expandir tudo (seções da tela + receitas)
 function vmAlternarTudo() {
-  const chaves = [..._vm.secoes.map(s => s.chave), 'receitas'];
+  const chaves = [..._vm.secoes.map(s => s.chave), 'impostos', 'receitas'];
   const recolher = chaves.some(c => !_vmRecolhidas.has(c));
   chaves.forEach(c => (recolher ? _vmRecolhidas.add(c) : _vmRecolhidas.delete(c)));
   try { localStorage.setItem(VM_RECOLHIDAS, JSON.stringify([..._vmRecolhidas])); } catch { /* sem storage */ }
@@ -146,6 +146,22 @@ function vmReceitasVisiveis(f) {
   return rec;
 }
 
+// Impostos estimados pelas notas: mesma regra das receitas (somem com filtro de despesa e no "só pessoal").
+// Linha sem nenhum valor no período não aparece.
+function vmImpostosVisiveis(f) {
+  if (!_vm.impostos || f.natureza === 'pessoal' || f.categoria || f.tipo || f.situacao) return [];
+  return _vm.impostos.linhas.filter(l => _vm.meses.some(m => l.celulas[m].valor || l.celulas[m].lancado))
+    .filter(l => !f.busca.length || f.busca.every(t => vmNorm(`${l.descricao} impostos`).includes(t)));
+}
+
+function vmDetalheImposto(chave, mes) {
+  const l = _vm.impostos.linhas.find(x => x.chave === chave);
+  const c = chave === 'reserva' ? _vm.impostos.reserva[mes] : l && l.celulas[mes];
+  if (!c) return;
+  const titulo = chave === 'reserva' ? 'Guardar para o IRPJ/CSLL' : l.descricao;
+  alert(`${titulo} — ${mesAnoBr(mes + '-01')}${c.valor ? `: ${formatMoeda(c.valor)}` : ''}\n\n${c.detalhe.join('\n')}\n\nEstimativa pelas notas e alíquotas da Configuração do faturamento; confira com o contador.`);
+}
+
 function renderVisaoMensal() {
   if (!_vm) return;
   const d = _vm;
@@ -218,7 +234,34 @@ function renderVisaoMensal() {
         }).join('')}
       </tr>`).join('');
 
-  const totPagar = Object.fromEntries(d.meses.map(m => [m, secoes.reduce((t, s) => t + s.totais[m], 0)]));
+  // Impostos sobre as notas (estimado)
+  const impostos = vmImpostosVisiveis(f);
+  const totImp = Object.fromEntries(d.meses.map(m => [m, impostos.reduce((t, l) => t + l.celulas[m].valor, 0)]));
+  const linhasImposto = impostos.map(l => `
+      <tr>
+        <th scope="row" class="vm-item"><span class="vm-item-nome">${escapeHtml(l.descricao)}</span></th>
+        ${d.meses.map(m => {
+          const c = l.celulas[m];
+          if (!c.valor && !c.lancado) return `<td class="vm-cel vm-st-vazia${colAtual(m)}"></td>`;
+          const st = c.lancado ? 'paga' : c.estimado ? 'estimado' : 'aberta';
+          const titulo = c.lancado ? 'Guia já lançada nas contas a pagar' : `${l.descricao} a pagar em ${mesAnoBr(m + '-01')} — clique para ver o cálculo`;
+          return `<td class="vm-cel vm-st-${st}${colAtual(m)}"><button type="button" class="vm-btn" title="${escapeHtml(titulo)}"
+            onclick="vmDetalheImposto('${l.chave}', '${m}')">${c.lancado ? '<span class="vm-mais">lançado</span>' : vmValor(c.valor)}</button></td>`;
+        }).join('')}
+      </tr>`).join('');
+  const secaoImpostos = impostos.length ? `
+        <tr class="vm-secao vm-secao-imposto"><th scope="rowgroup">${vmTituloSecao('impostos', 'Impostos sobre as notas (estimado)')}${
+          _vmRecolhidas.has('impostos') ? ` <span class="vm-qtd">${impostos.length} item(ns)</span>` : ''}</th>${d.meses.map(m =>
+          `<td class="fin-num${colAtual(m)}">${vmValor(totImp[m])}</td>`).join('')}</tr>
+        ${_vmRecolhidas.has('impostos') ? '' : linhasImposto}` : '';
+  const reserva = _vm.impostos && f.natureza !== 'pessoal' && !f.categoria && !f.tipo && !f.situacao
+    && d.meses.some(m => _vm.impostos.reserva[m].valor) ? _vm.impostos.reserva : null;
+  const linhaReserva = reserva ? `
+      <tr class="vm-reserva"><th scope="row" title="Quanto separar, do que entra no mês, para pagar o IRPJ e a CSLL do trimestre">Guardar para o IRPJ/CSLL trimestral</th>${d.meses.map(m =>
+        `<td class="fin-num${colAtual(m)}">${reserva[m].valor
+          ? `<button type="button" class="vm-btn" title="Ver de quais notas vem" onclick="vmDetalheImposto('reserva', '${m}')">${formatMoeda(reserva[m].valor)}</button>` : ''}</td>`).join('')}</tr>` : '';
+
+  const totPagar = Object.fromEntries(d.meses.map(m => [m, secoes.reduce((t, s) => t + s.totais[m], 0) + totImp[m]]));
   const linhaTotal = (rotulo, valores, classe) => `
       <tr class="${classe}"><th scope="row">${rotulo}</th>${d.meses.map(m =>
         `<td class="fin-num${colAtual(m)}${valores[m] < 0 ? ' fin-negativo' : ''}">${formatMoeda(valores[m])}</td>`).join('')}</tr>`;
@@ -227,7 +270,7 @@ function renderVisaoMensal() {
 
   const totalLinhas = d.secoes.reduce((t, s) => t + s.linhas.length, 0);
   const visiveis = secoes.reduce((t, s) => t + s.linhas.length, 0);
-  const todasRecolhidas = [...d.secoes.map(s => s.chave), 'receitas'].every(c => _vmRecolhidas.has(c));
+  const todasRecolhidas = [...d.secoes.map(s => s.chave), 'impostos', 'receitas'].every(c => _vmRecolhidas.has(c));
   document.getElementById('vm-btn-tudo').textContent = todasRecolhidas ? 'Expandir tudo' : 'Recolher tudo';
   document.getElementById('vm-contador').textContent = filtrando ? `${visiveis} de ${totalLinhas} lançamento(s)` : `${totalLinhas} lançamento(s)`;
 
@@ -238,6 +281,7 @@ function renderVisaoMensal() {
         ${secoes.map(linhasSecao).join('') ||
           `<tr><td colspan="${d.meses.length + 1}" class="vm-vazio">${filtrando
             ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento no período. Use "+ Lançamento".'}</td></tr>`}
+        ${secaoImpostos}
         ${receitas.length ? `
         <tr class="vm-secao vm-secao-receita"><th scope="rowgroup">${vmTituloSecao('receitas', 'Receitas (líquido de retenções)')}${
           _vmRecolhidas.has('receitas') ? ` <span class="vm-qtd">${receitas.length} item(ns)</span>` : ''}</th>${d.meses.map(m =>
@@ -246,6 +290,7 @@ function renderVisaoMensal() {
         ${linhaTotal('Total a pagar', totPagar, 'vm-total')}
         ${comReceita ? linhaTotal('Total a receber', totRec, 'vm-total') : ''}
         ${comReceita ? linhaTotal('Saldo do mês', saldo, 'vm-saldo') : ''}
+        ${linhaReserva}
       </tbody>
     </table>`;
 }
@@ -288,6 +333,9 @@ function exportarVisaoMensal() {
     for (const l of s.linhas) {
       linhas.push([s.titulo, l.descricao, l.categoria || '', l.natureza, ..._vm.meses.map(m => num(l.celulas[m].valor))]);
     }
+  }
+  for (const l of vmImpostosVisiveis(f)) {
+    linhas.push(['Impostos (estimado)', l.descricao, '', 'empresa', ..._vm.meses.map(m => num(l.celulas[m].valor))]);
   }
   for (const l of vmReceitasVisiveis(f)) {
     linhas.push(['Receitas', l.descricao, '', 'empresa', ..._vm.meses.map(m => num(l.celulas[m].valor))]);

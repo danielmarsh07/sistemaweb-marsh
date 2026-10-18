@@ -10,6 +10,7 @@ const pool = require('../db');
 const fat = require('../services/faturamento');
 const relatorios = require('../services/relatorios-financeiros');
 const auditoria = require('../services/auditoria');
+const impostos = require('../services/impostos');
 const {
   GRUPOS_DRE, somarMeses, mesDe, competenciaValida, dataValida,
   garantirCategoriasPadrao, validarConta, criarContaPagar, darBaixaConta
@@ -400,10 +401,38 @@ async function estimarContratos(empresa, lista, mesAtual, config) {
       if (ct.periodicidade === 'anual' && Number(comp.slice(5, 7)) !== ct.mes_cobranca) continue;
       const ret = fat.RETENCOES.reduce((s, r) => s + Number(ct[r] ?? config[r] ?? 0), 0);
       const iss = ct.reter_iss ? Number(ct.aliquota_iss ?? config.aliquota_iss ?? 0) : 0;
-      saida.push({ mes: m, cliente_id: ct.cliente_id, cliente_nome: ct.cliente_nome, valor: r2(ct.valor * (1 - (ret + iss) / 100)) });
+      saida.push({ mes: m, comp, cliente_id: ct.cliente_id, cliente_nome: ct.cliente_nome, valor: r2(ct.valor * (1 - (ret + iss) / 100)),
+        bruto: ct.valor, aliquota_iss: Number(ct.aliquota_iss ?? config.aliquota_iss ?? 0), reter_iss: !!ct.reter_iss,
+        ...Object.fromEntries(fat.RETENCOES.map(r => [r, Number(ct[r] ?? config[r] ?? 0)])) });
     }
   }
   return saida;
+}
+
+// Impostos estimados pelas notas (services/impostos.js): faturas pela competência + contratos ainda sem fatura.
+// contasDoPeriodo: as contas a pagar da visão, para saber em que mês a guia já foi lançada de verdade.
+async function montarImpostos(empresa, lista, mesAtual, config, contasDoPeriodo) {
+  const deslocamento = config.vencimento_mes_seguinte === false ? 0 : 1;
+  const { de, ate } = impostos.competenciasNecessarias(lista, deslocamento);
+  const vencs = [];
+  for (let m = de; m <= ate; m = mesDe(somarMeses(`${m}-01`, 1))) vencs.push(mesDe(somarMeses(`${m}-01`, deslocamento)));
+  const [faturas, estimados] = await Promise.all([
+    pool.query(
+      `SELECT to_char(f.competencia, 'YYYY-MM') AS comp, COALESCE(NULLIF(c.nome_fantasia, ''), c.razao_social, c.nome) AS cliente,
+              f.valor::float AS bruto, COALESCE(f.aliquota_iss, 0)::float AS iss, f.reter_iss,
+              ${fat.RETENCOES.map(r => `COALESCE(f.${r}, 0)::float AS ${r}`).join(', ')}
+       FROM faturas f JOIN clientes c ON c.id = f.cliente_id
+       WHERE f.empresa_id = $1 AND f.status <> 'cancelada' AND f.competencia >= $2::date AND f.competencia < $3::date`,
+      [empresa, `${de}-01`, somarMeses(`${ate}-01`, 1)]),
+    estimarContratos(empresa, vencs, mesAtual, config)
+  ]);
+  const notas = [
+    ...faturas.rows,
+    ...estimados.filter(e => e.comp >= de && e.comp <= ate).map(e => ({ comp: e.comp, cliente: e.cliente_nome, bruto: e.bruto,
+      iss: e.aliquota_iss, reter_iss: e.reter_iss, ...Object.fromEntries(fat.RETENCOES.map(r => [r, e[r]])), estimado: true }))
+  ];
+  const lancados = new Set(contasDoPeriodo.map(c => impostos.grupoDaCategoria(c.categoria_nome) && `${c.mes}|${impostos.grupoDaCategoria(c.categoria_nome)}`).filter(Boolean));
+  return impostos.calcular({ notas, lista, deslocamento, config, lancados });
 }
 
 router.get('/visao-mensal', async (req, res) => {
@@ -514,15 +543,19 @@ router.get('/visao-mensal', async (req, res) => {
       }]))
     })).sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR'));
 
+    const impostos = await montarImpostos(empresa, lista, mesAtual, config, contas.rows);
+
     const todasLinhas = secoesSaida.flatMap(s => s.linhas);
     const totais = Object.fromEntries(lista.map(m => {
-      const pagar = r2(todasLinhas.reduce((s, l) => s + l.celulas[m].valor, 0));
+      const imp = r2(impostos.linhas.reduce((s, l) => s + l.celulas[m].valor, 0));
+      const pagar = r2(todasLinhas.reduce((s, l) => s + l.celulas[m].valor, 0) + imp);
       const pessoal = r2(todasLinhas.filter(l => l.natureza === 'pessoal').reduce((s, l) => s + l.celulas[m].valor, 0));
       const receber = r2(receitas.reduce((s, l) => s + l.celulas[m].valor, 0));
-      return [m, { pagar, pagar_empresa: r2(pagar - pessoal), pagar_pessoal: pessoal, receber, saldo: r2(receber - pagar) }];
+      return [m, { pagar, pagar_empresa: r2(pagar - pessoal), pagar_pessoal: pessoal, impostos: imp,
+        reserva_trimestral: impostos.reserva[m].valor, receber, saldo: r2(receber - pagar) }];
     }));
 
-    res.json({ meses: lista, mes_atual: mesAtual, agrupar, secoes: secoesSaida, receitas, totais,
+    res.json({ meses: lista, mes_atual: mesAtual, agrupar, secoes: secoesSaida, receitas, impostos, totais,
       cartoes: cartoes.rows });
   } catch (err) { erro500(res, 'Erro ao montar a visão mensal', err); }
 });

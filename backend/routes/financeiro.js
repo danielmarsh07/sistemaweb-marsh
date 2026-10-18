@@ -12,6 +12,7 @@ const asaas = require('../services/asaas');
 const email = require('../services/email');
 const fat = require('../services/faturamento');
 const auditoria = require('../services/auditoria');
+const impostos = require('../services/impostos');
 
 const COLUNAS_CONTRATO = `
   ct.id, ct.cliente_id, ct.descricao, ct.descricao_servico, ct.valor::float AS valor, ct.dia_vencimento,
@@ -96,7 +97,10 @@ router.get('/status', async (req, res) => {
 
 // ===== Configuração =====
 router.get('/config', async (req, res) => {
-  try { res.json(await fat.carregarConfig(emp(req))); }
+  try {
+    const c = await fat.carregarConfig(emp(req));
+    res.json({ ...c, impostos: impostos.parametros(c) }); // vazio = padrões do Lucro Presumido
+  }
   catch (err) { erro500(res, 'Erro ao buscar configuração', err); }
 });
 
@@ -112,12 +116,14 @@ router.put('/config', async (req, res) => {
   const diasSuspensao = Number(b.dias_suspensao ?? 30);
   if (!Number.isInteger(diasSuspensao) || diasSuspensao < 1 || diasSuspensao > 180) return res.status(400).json({ erro: 'Dias para suspender por atraso: 1 a 180.' });
   if (!Number.isInteger(diaGeracao) || diaGeracao < 1 || diaGeracao > 28) return res.status(400).json({ erro: 'Dia da geração automática: 1 a 28.' });
+  const imp = impostos.validarParametros(b.impostos);
+  if (imp.erro) return res.status(400).json({ erro: imp.erro });
   try {
     await pool.query(
       `INSERT INTO financeiro_config (empresa_id, instrucoes_pagamento, pix_chave, codigo_servico, nome_servico,
          aliquota_iss, email_copia, dias_lembrete, vencimento_mes_seguinte,
-         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, cobranca_pix, geracao_automatica, dia_geracao, dias_suspensao, data_atualizacao)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
+         ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss, cobranca_pix, geracao_automatica, dia_geracao, dias_suspensao, impostos, data_atualizacao)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,NOW())
        ON CONFLICT (empresa_id) DO UPDATE SET
          instrucoes_pagamento = EXCLUDED.instrucoes_pagamento, pix_chave = EXCLUDED.pix_chave,
          codigo_servico = EXCLUDED.codigo_servico, nome_servico = EXCLUDED.nome_servico,
@@ -126,10 +132,12 @@ router.put('/config', async (req, res) => {
          ret_ir = EXCLUDED.ret_ir, ret_csll = EXCLUDED.ret_csll, ret_pis = EXCLUDED.ret_pis,
          ret_cofins = EXCLUDED.ret_cofins, ret_inss = EXCLUDED.ret_inss,
          cobranca_pix = EXCLUDED.cobranca_pix, geracao_automatica = EXCLUDED.geracao_automatica,
-         dia_geracao = EXCLUDED.dia_geracao, dias_suspensao = EXCLUDED.dias_suspensao, data_atualizacao = NOW()`,
+         dia_geracao = EXCLUDED.dia_geracao, dias_suspensao = EXCLUDED.dias_suspensao,
+         impostos = COALESCE(EXCLUDED.impostos, financeiro_config.impostos), data_atualizacao = NOW()`,
       [emp(req), vazioNulo(b.instrucoes_pagamento), vazioNulo(b.pix_chave), vazioNulo(b.codigo_servico),
        vazioNulo(b.nome_servico), aliquota, vazioNulo(b.email_copia), dias, b.vencimento_mes_seguinte !== false,
-       ...RET.map(r => Number(b[r] || 0)), !!b.cobranca_pix, b.geracao_automatica !== false, diaGeracao, diasSuspensao]);
+       ...RET.map(r => Number(b[r] || 0)), !!b.cobranca_pix, b.geracao_automatica !== false, diaGeracao, diasSuspensao,
+       imp.impostos && JSON.stringify(imp.impostos)]);
     res.json({ mensagem: 'Configuração salva!' });
   } catch (err) { erro500(res, 'Erro ao salvar configuração', err); }
 });
