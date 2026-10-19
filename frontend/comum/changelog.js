@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.3', data: '2026-10-19', destaques: [
+      'Portal: a aba Financeiro da empresa aparece só para o gestor; quem recebeu curso ou licença do Conector pela empresa não vê mais as faturas dela',
+      'Quem compra pela loja continua vendo as faturas das próprias compras'
+    ] },
     { versao: 'v5.2', data: '2026-10-18', destaques: [
       'Novo botão "Ver a nota fiscal (PDF)" nas faturas com nota emitida',
       'Nota emitida pelo Asaas abre o PDF oficial; nota do modo teste abre a nota pronta para imprimir ou salvar em PDF, com a tarja "sem valor fiscal"'

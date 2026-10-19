@@ -110,9 +110,18 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     ok((await api(tokAluno, `/treinamentos/meus/${cursos.abap}`)).status === 200, 'aluno abre curso do perfil');
     ok((await api(tokAluno, `/treinamentos/aulas/${aulas.funcional[0]}/concluir`, 'POST', {})).status === 404, 'aluno não conclui aula fora do perfil');
     ok((await api(tokAluno, `/treinamentos/aulas/${aulas.abap[0]}/concluir`, 'POST', {})).status === 200, 'aluno conclui aula do perfil');
-    for (const p of ['/chamados', '/financeiro/minhas-faturas', '/licencas/minhas', '/licencas/download', '/atendimentos/1']) {
+    for (const p of ['/chamados', '/licencas/minhas', '/licencas/download', '/atendimentos/1']) {
       ok((await api(tokAluno, p)).status === 403, `aluno bloqueado em ${p}`);
     }
+    // Financeiro: faturas da empresa só para o gestor; aluno e usuário comum do cliente (cadastrado pela equipe) não veem
+    const fatId = (await pool.query(
+      `INSERT INTO faturas (empresa_id, cliente_id, competencia, descricao, valor, data_vencimento, status)
+       VALUES (1, $1, date_trunc('month', CURRENT_DATE)::date, 'TESTE fatura da empresa', 100, CURRENT_DATE, 'aberta') RETURNING id`, [cliA])).rows[0].id;
+    const faturasDe = async t => ((await api(t, '/financeiro/minhas-faturas')).body?.faturas || []).map(f => f.id);
+    const tokComum = tok({ id: await usuarioTeste(pool, { cliente_id: cliA }), tipo: 'cliente', cliente_id: cliA });
+    ok((await faturasDe(tokGestor)).includes(fatId), 'gestor vê as faturas da empresa');
+    ok(!(await faturasDe(tokAluno)).includes(fatId), 'aluno da vaga não vê as faturas da empresa');
+    ok(!(await faturasDe(tokComum)).includes(fatId), 'usuário comum do cliente não vê as faturas da empresa');
     ok((await api(tokAluno, '/contratos-conector/meus')).body.length === 0, 'aluno não vê o contrato');
     const euAluno = (await api(tokAluno, '/contratos-conector/eu')).body;
     ok(euAluno.papel === 'aluno' && !euAluno.gestor && euAluno.vagas.length === 1 && euAluno.vagas[0].perfil === 'abap', '/eu: aluno com a vaga ABAP');
@@ -190,6 +199,7 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     await pool.query('DELETE FROM cursos_aulas WHERE curso_id = ANY($1)', [cids]);
     await pool.query('DELETE FROM cursos WHERE id = ANY($1)', [cids]);
     await apagarUsuariosTeste(pool);
+    await pool.query(`DELETE FROM faturas WHERE cliente_id IN ($1, $2) AND descricao = 'TESTE fatura da empresa'`, [cliA, cliB]);
     await pool.query('DELETE FROM clientes WHERE id IN ($1, $2)', [cliA, cliB]);
     await pool.end();
   }

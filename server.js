@@ -85,7 +85,7 @@ app.use('/api/licencas', autenticar, bloquearAluno, licencasRoutes);
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/contratos-conector', autenticar, contratosConectorRoutes);
 app.use('/api/contratos-cursos', autenticar, apenasEquipe, contratosCursosRoutes); // só administradores (o router confere)
-app.use('/api/financeiro', autenticar, bloquearAluno, financeiroRoutes);
+app.use('/api/financeiro', autenticar, financeiroRoutes); // cliente só usa /minhas-faturas (o router filtra gestor x compras próprias)
 app.use('/api/comercial', autenticar, comercialRoutes);
 app.use('/api/alertas', autenticar, alertasRoutes);
 app.use('/api/loja', autenticar, lojaRoutes); // loja de cursos: aluno vê os próprios pedidos; o resto é admin

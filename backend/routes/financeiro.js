@@ -50,9 +50,19 @@ function erro500(res, msg, err) {
 }
 
 // ===== Portal do cliente =====
+// Faturas da empresa: só o gestor (administrador corporativo) — ou qualquer usuário de um cliente que ainda não tem gestor.
+// Os demais usuários (vagas do Conector, cursos da empresa) veem só as faturas das próprias compras na loja.
 router.get('/minhas-faturas', async (req, res) => {
-  if (req.usuario.tipo !== 'cliente' || !req.usuario.cliente_id) return res.json([]);
+  if (req.usuario.tipo !== 'cliente') return res.json([]);
   try {
+    const clienteId = req.usuario.cliente_id || null;
+    let daEmpresa = false;
+    if (clienteId) {
+      const g = await pool.query(
+        `SELECT bool_or(usuario_id = $2) AS eu, COUNT(*)::int AS total FROM clientes_admins WHERE cliente_id = $1`,
+        [clienteId, req.usuario.id]);
+      daEmpresa = g.rows[0].eu === true || g.rows[0].total === 0;
+    }
     const r = await pool.query(
       `SELECT f.id, to_char(f.competencia, 'YYYY-MM-DD') AS competencia, f.descricao, f.valor::float AS valor,
               to_char(f.data_vencimento, 'YYYY-MM-DD') AS data_vencimento, f.status,
@@ -64,9 +74,11 @@ router.get('/minhas-faturas', async (req, res) => {
               CASE WHEN f.status = 'aberta' AND f.pix_status = 'pendente' THEN f.pix_url END AS pix_url,
               (f.status = 'aberta' AND f.data_vencimento < CURRENT_DATE) AS vencida
        FROM faturas f
-       WHERE f.cliente_id = $1 AND f.status IN ('aberta', 'paga')
+       WHERE f.status IN ('aberta', 'paga')
+         AND (($2 AND f.cliente_id = $1)
+              OR f.id IN (SELECT p.fatura_id FROM pedidos p WHERE p.usuario_id = $3 AND p.fatura_id IS NOT NULL))
        ORDER BY f.competencia DESC, f.id DESC
-       LIMIT 60`, [req.usuario.cliente_id]);
+       LIMIT 60`, [clienteId, daEmpresa, req.usuario.id]);
     const config = await fat.carregarConfig(req.usuario.empresa_id || 1);
     res.json({
       faturas: r.rows,

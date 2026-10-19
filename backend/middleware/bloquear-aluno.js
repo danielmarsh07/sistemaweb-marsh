@@ -1,5 +1,5 @@
 // Usuário de vaga do Conector (portal_papel = 'aluno') vê só os próprios treinamentos:
-// fica de fora de chamados, financeiro, licenças e assistente da empresa.
+// fica de fora de chamados, licenças e assistente da empresa (o financeiro filtra por conta própria: só compras dele).
 // O papel vem do banco (não do token), para valer na hora em que o gestor muda a vaga.
 const { papelPortal } = require('../services/contratos-conector');
 
