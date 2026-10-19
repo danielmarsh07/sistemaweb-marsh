@@ -68,6 +68,7 @@ router.get('/meus', async (req, res) => {
     const r = await pool.query(
       `SELECT c.id, c.titulo, c.descricao, c.capa, c.carga_horaria, c.trilha,
          ${cc.sqlViaLiberacao('$1', '$2')} AS via_liberacao,
+         ${cc.sqlViaContratoCursos('$2')} AS via_contrato,
          ${cc.sqlViaBeneficio('$2')} AS via_beneficio,
          ${cc.sqlViaCompra('$2')} AS via_compra,
          (SELECT to_char(MAX(d.fim), 'YYYY-MM-DD') FROM direitos_acesso d WHERE d.usuario_id = $2 AND d.curso_id = c.id

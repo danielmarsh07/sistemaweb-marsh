@@ -524,6 +524,39 @@ router.delete('/:id/vagas/:vid', async (req, res) => {
   } finally { db.release(); }
 });
 
+// GET /:id/vagas/:vid/perfil/previa?para= — quanto muda a cobrança ao trocar o perfil desta licença
+router.get('/:id/vagas/:vid/perfil/previa', async (req, res) => {
+  try {
+    const k = await contratoDaEmpresa(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    const para = String(req.query.para || '');
+    const v = (await pool.query('SELECT perfil FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo', [req.params.vid, k.id])).rows[0];
+    if (!v) return res.status(404).json({ erro: 'Licença não encontrada.' });
+    if (!cc.PERFIS[para] || para === v.perfil) throw new cc.ErroRegra('Escolha um perfil diferente do atual.');
+    res.json(await cc.previaAlteracaoLicencas(pool, k, { [v.perfil]: -1, [para]: 1 }, null, { troca: { de: v.perfil, para } }));
+  } catch (err) { responderErro(res, err, 'Erro ao calcular'); }
+});
+
+// POST /:id/vagas/:vid/perfil { perfil } — muda o perfil da licença (a pessoa continua na vaga, com os cursos do perfil novo)
+router.post('/:id/vagas/:vid/perfil', async (req, res) => {
+  try {
+    const k = await contratoDaEmpresa(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    const r = await cc.mudarPerfilVaga(k, req.params.vid, String((req.body || {}).perfil || ''), req.usuario.id);
+    if (r.usuario_id) {
+      await acessos.sincronizarUsuario(r.usuario_id, { atorId: req.usuario.id }).catch(err => console.error('[acessos] perfil:', err.message));
+      await cert.avaliarUsuario(r.usuario_id).catch(err => console.error('[certificacao] perfil:', err.message));
+    }
+    const p = r.previa;
+    const cob = p.cobranca && p.cobranca.status === 'ativo';
+    res.json({ fatura_id: r.fatura_id || null,
+      mensagem: `Licença mudou de ${cc.PERFIS[r.de].nome} para ${cc.PERFIS[r.para].nome}.`
+        + (r.usuario_id ? ' A pessoa já vê os cursos do perfil novo.' : '')
+        + (cob && p.valor_anual_novo !== p.valor_anual_atual ? ` ${p.ciclo === 'mensal' ? 'Mensalidade' : 'Anuidade'}: ${reais(p.valor_anual_atual)} → ${reais(p.valor_anual_novo)}.` : '')
+        + (r.fatura_id ? ` Fatura proporcional de ${reais(p.valor_proporcional)} criada em rascunho no Faturamento (aprove para enviar).` : '') });
+  } catch (err) { responderErro(res, err, 'Erro ao mudar o perfil'); }
+});
+
 router.post('/:id/vagas/:vid/ocupar', async (req, res) => {
   try {
     const k = await contratoDaEmpresa(req);

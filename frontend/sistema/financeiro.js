@@ -569,7 +569,7 @@ async function loadContratos() {
   }).join('') + cursosSemRecorrente.map(k => `
     <tr>
       <td data-label="Cliente"><strong>${escapeHtml(k.cliente_nome)}</strong></td>
-      <td data-label="Contrato"><span class="fin-muted">Cursos para a empresa nº ${k.id} · Cursos</span><br>${escapeHtml(k.cursos.map(c => c.titulo).join(' · '))}</td>
+      <td data-label="Contrato"><span class="fin-muted">Contrato de cursos nº ${k.id} · ${k.ocupadas} de ${k.total_vagas} vaga(s) ocupada(s)</span><br>${escapeHtml(k.cursos.map(c => c.titulo).join(' · '))}</td>
       <td data-label="Valor" class="fin-num">${k.cobranca === 'cortesia' ? '<span class="fin-muted">cortesia</span>' : `${formatMoeda(k.valor)}<small class="fin-muted" style="display:block">pagamento único</small>`}</td>
       <td data-label="Vencimento">—</td>
       <td data-label="Vigência">${diaBr(k.data_inicio)} → ${k.data_fim ? diaBr(k.data_fim) : 'sem prazo'}</td>

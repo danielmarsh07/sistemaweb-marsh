@@ -25,15 +25,23 @@ async function origensVivas(usuarioId) {
      JOIN contratos_conector k ON k.id = v.contrato_id
      JOIN cursos c ON c.ativo AND c.status = 'publicado'
      WHERE v.usuario_id = $1 AND ${cc.VAGA_VIGENTE} AND ${cc.PERFIL_COBRE_CURSO}`, [usuarioId])).rows;
-  // Liberação avulsa não vale para quem só usa licença (aluno); a de contrato de cursos vale para todos do cliente
+  // Liberação avulsa para a empresa: não vale para quem só usa licença (aluno)
   const liberacao = u.cliente_id ? (await pool.query(
     `SELECT lb.curso_id, 'liberacao' AS origem, lb.cliente_id AS origem_id, to_char(lb.data_fim, 'YYYY-MM-DD') AS fim,
-            CASE WHEN lb.contrato_cursos_id IS NOT NULL THEN 'Contrato de cursos nº ' || lb.contrato_cursos_id ELSE 'Liberado para a empresa' END AS descricao
+            'Liberado para a empresa' AS descricao
      FROM cursos_liberacoes lb JOIN cursos c ON c.id = lb.curso_id
      WHERE lb.cliente_id = $1 AND c.ativo AND c.status = 'publicado' AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE)
-       AND (lb.contrato_cursos_id IS NOT NULL OR $2 <> 'aluno')`,
+       AND lb.contrato_cursos_id IS NULL AND $2 <> 'aluno'`,
     [u.cliente_id, u.portal_papel || ''])).rows : [];
-  return [...beneficio, ...liberacao];
+  // Vaga ocupada num contrato de cursos: só a pessoa da vaga
+  const contrato = (await pool.query(
+    `SELECT c.id AS curso_id, 'contrato' AS origem, cv.id AS origem_id, to_char(kc.data_fim, 'YYYY-MM-DD') AS fim,
+            'Contrato de cursos nº ' || kc.id AS descricao
+     FROM contratos_cursos_vagas cv JOIN contratos_cursos kc ON kc.id = cv.contrato_id
+     JOIN contratos_cursos_itens it ON it.contrato_id = kc.id
+     JOIN cursos c ON c.id = it.curso_id AND c.ativo AND c.status = 'publicado'
+     WHERE cv.usuario_id = $1 AND ${cc.VAGA_CURSOS_VIGENTE}`, [usuarioId])).rows;
+  return [...beneficio, ...liberacao, ...contrato];
 }
 
 async function garantirMatricula(usuarioId, cursoId) {
@@ -99,6 +107,19 @@ async function motivoFimBeneficio(d) {
   return ['revogado', 'Benefício encerrado'];
 }
 
+/** Por que o acesso pela vaga de um contrato de cursos acabou. */
+async function motivoFimContrato(d) {
+  const r = (await pool.query(
+    `SELECT v.usuario_id, v.ativo AS vaga_ativa, k.status, (k.data_fim < CURRENT_DATE) AS vencido,
+            EXISTS (SELECT 1 FROM contratos_cursos_itens it WHERE it.contrato_id = k.id AND it.curso_id = $2) AS no_contrato
+     FROM contratos_cursos_vagas v JOIN contratos_cursos k ON k.id = v.contrato_id WHERE v.id = $1`, [d.origem_id, d.curso_id])).rows[0];
+  if (!r || !r.vaga_ativa || Number(r.usuario_id) !== Number(d.usuario_id)) return ['revogado', 'Vaga do contrato de cursos liberada'];
+  if (r.status !== 'ativo') return ['revogado', 'Contrato de cursos encerrado'];
+  if (r.vencido) return ['expirado', 'Contrato de cursos venceu'];
+  if (!r.no_contrato) return ['revogado', 'Curso retirado do contrato de cursos'];
+  return ['revogado', 'Acesso pelo contrato de cursos encerrado'];
+}
+
 /**
  * Alinha o rastro de benefício/liberação do usuário com as regras vivas: concede o que passou a valer,
  * restabelece o que voltou (ex.: licença renovada) e encerra o que deixou de valer, com o motivo.
@@ -111,11 +132,14 @@ async function sincronizarUsuario(usuarioId, { atorId = null } = {}) {
     await gravarAtivo({ usuarioId, cursoId: v.curso_id, origem: v.origem, origemId: v.origem_id, descricao: v.descricao, fim: v.fim, atorId });
   }
   const ativos = (await pool.query(
-    `SELECT * FROM direitos_acesso WHERE usuario_id = $1 AND status = 'ativo' AND origem IN ('beneficio', 'liberacao')`, [usuarioId])).rows;
+    `SELECT * FROM direitos_acesso WHERE usuario_id = $1 AND status = 'ativo' AND origem IN ('beneficio', 'liberacao', 'contrato')`, [usuarioId])).rows;
   for (const d of ativos) {
     if (validas.has(chave(d))) continue;
     if (d.origem === 'beneficio') {
       const [status, motivo] = await motivoFimBeneficio(d);
+      await encerrar(d, status, motivo, atorId);
+    } else if (d.origem === 'contrato') {
+      const [status, motivo] = await motivoFimContrato(d);
       await encerrar(d, status, motivo, atorId);
     } else {
       const venceu = d.fim && String(d.fim instanceof Date ? d.fim.toISOString() : d.fim).slice(0, 10) < new Date().toISOString().slice(0, 10);
@@ -137,7 +161,9 @@ async function sincronizarTodos({ contratoId = null } = {}) {
        UNION
        SELECT u.id FROM usuarios u JOIN cursos_liberacoes lb ON lb.cliente_id = u.cliente_id WHERE u.tipo = 'cliente' AND u.ativo
        UNION
-       SELECT usuario_id FROM direitos_acesso WHERE status = 'ativo' AND origem IN ('beneficio', 'liberacao')`;
+       SELECT usuario_id FROM contratos_cursos_vagas WHERE usuario_id IS NOT NULL AND ativo
+       UNION
+       SELECT usuario_id FROM direitos_acesso WHERE status = 'ativo' AND origem IN ('beneficio', 'liberacao', 'contrato')`;
   const r = await pool.query(sql, contratoId ? [contratoId] : []);
   for (const { id } of r.rows) await sincronizarUsuario(id);
   return r.rows.length;

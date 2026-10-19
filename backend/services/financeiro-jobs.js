@@ -142,6 +142,8 @@ async function expirarConvitesConector() {
   try {
     const n = await require('./contratos-conector').expirarConvites();
     if (n) console.log(`[rotina] ${n} convite(s) do Conector expirado(s): licenças liberadas`);
+    const nc = await require('./contratos-cursos').expirarConvites();
+    if (nc) console.log(`[rotina] ${nc} convite(s) de contrato de cursos expirado(s): vagas liberadas`);
   } catch (err) {
     registrarAlerta({ chave: 'job:convites', titulo: 'Rotina: falha ao expirar convites do Conector', detalhe: err.message });
   }

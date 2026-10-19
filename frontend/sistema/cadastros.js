@@ -157,8 +157,8 @@ async function abrirFichaCliente(id) {
     const COB_CURSOS = { cortesia: 'cortesia', unica: 'pagamento único', mensal: '/mês', anual: '/ano' };
     const cursosItens = (d.contratos_cursos || []).map(k => `
       <li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o contrato de cursos" onclick="fichaContratoCursos(${k.id})" onkeydown="if(event.key==='Enter')fichaContratoCursos(${k.id})">
-        <div><strong>Cursos para a empresa nº ${k.id}</strong>
-          <span>Cursos · desde ${diaBr(k.data_inicio)}${k.data_fim ? ` até ${diaBr(k.data_fim)}` : ' · sem prazo'}</span>
+        <div><strong>Contrato de cursos nº ${k.id}</strong>
+          <span>Cursos · ${k.ocupadas} de ${k.vagas} vaga(s) ocupada(s) · desde ${diaBr(k.data_inicio)}${k.data_fim ? ` até ${diaBr(k.data_fim)}` : ' · sem prazo'}</span>
           <span>${escapeHtml(k.cursos.join(' · ') || 'nenhum curso')}</span></div>
         <div class="ficha-dir">${k.cobranca === 'cortesia' ? 'Cortesia' : `${formatMoeda(k.valor)} ${COB_CURSOS[k.cobranca]}`}
           ${k.status !== 'ativo' ? pill('Encerrado', '#94a3b8') : k.vigente ? pill('Ativo', '#2e7d4f') : pill(`Vencido ${diaBr(k.data_fim)}`, '#b42318')}</div></li>`);
@@ -193,7 +193,8 @@ async function abrirFichaCliente(id) {
     const papeis = [
       u.admin_empresa && pill('Admin da empresa', '#1d6fd8'),
       ...(u.licencas || []).map(l => pill(`${l.estado === 'convidada' ? 'Convite' : 'Licença'} ${PERFIL_FICHA[l.perfil] || l.perfil}`, l.estado === 'convidada' ? '#b7791f' : '#2e7d4f')),
-      !u.admin_empresa && !(u.licencas || []).length && u.portal_papel !== 'aluno' && pill('Acesso amplo', '#64748b')
+      ...(u.vagas_cursos || []).map(v => pill(`${v.estado === 'convidada' ? 'Convite' : 'Cursos'} (contrato nº ${v.contrato_id})`, v.estado === 'convidada' ? '#b7791f' : '#1d6fd8')),
+      !u.admin_empresa && !(u.licencas || []).length && !(u.vagas_cursos || []).length && u.portal_papel !== 'aluno' && pill('Acesso amplo', '#64748b')
     ].filter(Boolean).join(' ');
     return `<li class="ficha-clicavel" role="button" tabindex="0" title="Editar usuário"
         onclick="fichaEditarUsuario(${u.id}, '${escapeHtml(u.nome).replace(/'/g, '&#39;')}', '${escapeHtml(u.email)}')">
@@ -224,14 +225,15 @@ async function abrirFichaCliente(id) {
   const cursosLinhas = [...d.cursos.map(cu => ({ ...cu, ...(porCurso.get(cu.id) || {}) })),
     ...d.cursos_acesso.filter(x => !d.cursos.some(cu => cu.id === x.id))];
   caixas.push(fichaCaixa('Cursos', (cursosLinhas.length ? `<ul class="ficha-lista">${cursosLinhas.map(cu => {
-    const origens = [cu.por_licenca && `${cu.por_licenca} pela licença do Conector`, cu.pela_empresa && `${cu.pela_empresa} pela empresa`,
+    const origens = [cu.por_licenca && `${cu.por_licenca} pela licença do Conector`, cu.por_contrato && `${cu.por_contrato} pelo contrato de cursos`,
+      cu.pela_empresa && `${cu.pela_empresa} pela empresa`,
       cu.individual && `${cu.individual} individual (compra na Loja ou concessão)`].filter(Boolean).join(' · ');
     const origem = cu.contrato_cursos_id ? pill(`Contrato de cursos nº ${cu.contrato_cursos_id}`, '#1d6fd8')
       : cu.aulas !== undefined ? pill('Liberado p/ empresa', '#64748b') : '';
     return `<li><div><strong>${escapeHtml(cu.titulo)}</strong><span>${origens || 'ninguém com acesso agora'}${cu.acesso_ate ? ` · liberado até ${diaBr(cu.acesso_ate)}` : ''}</span></div>
       <div class="ficha-dir">${origem}</div></li>`;
   }).join('')}</ul>` : fichaVazio('Nenhum curso liberado ou em uso.'))
-    + (d.admin ? `<div class="ficha-botoes"><button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoContratoCursos()">+ Liberar cursos para a empresa</button></div>` : ''),
+    + (d.admin ? `<div class="ficha-botoes"><button type="button" class="btn btn-secondary btn-sm" onclick="fichaNovoContratoCursos()">+ Contrato de cursos (por pessoas)</button></div>` : ''),
     { texto: 'Treinamentos', acao: "irPara('treinamentos')" }));
 
   caixas.push(fichaCaixa('Tecnologias', d.tecnologias.length

@@ -699,6 +699,21 @@ async function loadDashboardFinanceiro() {
     : '<tr><td colspan="5" class="text-center">Nenhuma fatura em aberto.</td></tr>';
 }
 
+// Olho dos cards em R$ do início: um clique mostra (ou oculta) todos os valores de uma vez; ao abrir a tela, ficam ocultos
+function alternarValores(ev) {
+  ev.stopPropagation(); // o card navega ao clicar
+  const grade = ev.currentTarget.closest('.stats-grid');
+  const ocultar = !grade.classList.contains('valores-ocultos');
+  grade.classList.toggle('valores-ocultos', ocultar);
+  const texto = ocultar ? 'Mostrar valores' : 'Ocultar valores';
+  grade.querySelectorAll('.olho-valor').forEach(b => {
+    b.querySelector('use').setAttribute('href', ocultar ? '#i-eye-off' : '#i-eye');
+    b.title = texto;
+    b.setAttribute('aria-label', texto);
+    b.setAttribute('aria-pressed', String(!ocultar));
+  });
+}
+
 function renderDashboardChamados(chamados) {
   const tbody = document.getElementById('dashboard-chamados-tbody');
   if (!chamados || chamados.length === 0) {

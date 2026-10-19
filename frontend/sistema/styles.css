@@ -1413,6 +1413,19 @@ body::before {
   line-height: 1.15;
 }
 
+/* Valores em R$ do início: ocultos por padrão; o olho mostra/oculta todos de uma vez */
+.valor-mascara { display: none; letter-spacing: 0.08em; }
+.valores-ocultos [data-sigilo] { display: none; }
+.valores-ocultos .valor-mascara { display: block; }
+.olho-valor {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; margin: -6px 0 -6px 2px; padding: 0;
+  border: 0; border-radius: 6px; background: transparent; color: inherit;
+  cursor: pointer; vertical-align: middle; opacity: 0.75;
+}
+.olho-valor:hover, .olho-valor:focus-visible { opacity: 1; background: var(--bg-hover, rgba(0, 0, 0, 0.06)); }
+.olho-valor .icon { width: 16px; height: 16px; }
+
 .stat-saldo {
   font-size: 22px;
 }

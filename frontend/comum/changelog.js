@@ -22,6 +22,16 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.5', data: '2026-10-19', destaques: [
+      'Contrato de cursos agora é por pessoas: você define os cursos e o número de vagas, e só quem está numa vaga vê os cursos (antes valia para a empresa inteira)',
+      'Ao criar o contrato de cursos já dá para informar as pessoas (nome e e-mail) e o gestor; quem é novo recebe o convite na hora',
+      'O gestor da empresa vê os contratos de cursos no portal (Licenças da empresa) e convida, libera ou reenvia o convite das vagas',
+      'Licença do Conector ganhou o botão "Mudar perfil" (ex.: Funcional → ABAP + Funcional): a pessoa já vê os cursos novos e a cobrança acerta só a diferença',
+      'O contrato de cursos da Multiterminais virou 2 vagas livres: coloque nelas quem deve fazer os cursos'
+    ] },
+    { versao: 'v5.4', data: '2026-10-19', destaques: [
+      'Visão geral: Receita recorrente, A receber e Vencido abrem com os valores ocultos; o olho mostra ou oculta os três de uma vez'
+    ] },
     { versao: 'v5.3', data: '2026-10-19', destaques: [
       'Portal: a aba Financeiro da empresa aparece só para o gestor; quem recebeu curso ou licença do Conector pela empresa não vê mais as faturas dela',
       'Quem compra pela loja continua vendo as faturas das próprias compras'

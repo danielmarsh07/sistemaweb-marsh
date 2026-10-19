@@ -87,6 +87,9 @@ router.get('/:id/ficha', async (req, res) => {
                 EXISTS (SELECT 1 FROM clientes_admins a WHERE a.cliente_id = $1 AND a.usuario_id = u.id) AS admin_empresa,
                 (SELECT json_agg(json_build_object('perfil', v.perfil, 'estado', v.estado, 'contrato_id', v.contrato_id))
                    FROM contratos_conector_vagas v WHERE v.usuario_id = u.id AND v.ativo) AS licencas,
+                (SELECT json_agg(json_build_object('estado', v.estado, 'contrato_id', v.contrato_id))
+                   FROM contratos_cursos_vagas v JOIN contratos_cursos k ON k.id = v.contrato_id
+                  WHERE v.usuario_id = u.id AND v.ativo AND k.status = 'ativo') AS vagas_cursos,
                 EXISTS (SELECT 1 FROM usuarios_tokens t WHERE t.usuario_id = u.id AND t.tipo = 'convite' AND t.usado_em IS NULL AND t.expira_em > NOW()) AS convite_pendente
          FROM usuarios u WHERE u.cliente_id = $1 AND u.tipo = 'cliente' ORDER BY u.ativo DESC, u.nome`, [id]),
       pool.query(
@@ -144,6 +147,7 @@ router.get('/:id/ficha', async (req, res) => {
         `SELECT c.id, c.titulo,
                 COUNT(DISTINCT d.usuario_id) FILTER (WHERE d.origem = 'beneficio')::int AS por_licenca,
                 COUNT(DISTINCT d.usuario_id) FILTER (WHERE d.origem = 'liberacao')::int AS pela_empresa,
+                COUNT(DISTINCT d.usuario_id) FILTER (WHERE d.origem = 'contrato')::int AS por_contrato,
                 COUNT(DISTINCT d.usuario_id) FILTER (WHERE d.origem IN ('compra', 'manual'))::int AS individual
          FROM direitos_acesso d JOIN cursos c ON c.id = d.curso_id JOIN usuarios u ON u.id = d.usuario_id
          WHERE u.cliente_id = $1 AND d.status = 'ativo' AND (d.fim IS NULL OR d.fim >= CURRENT_DATE)
@@ -164,8 +168,10 @@ router.get('/:id/ficha', async (req, res) => {
         `SELECT k.id, k.status, k.cobranca, k.valor::float AS valor,
                 to_char(k.data_inicio, 'YYYY-MM-DD') AS data_inicio, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
                 (k.status = 'ativo' AND (k.data_fim IS NULL OR k.data_fim >= CURRENT_DATE)) AS vigente,
-                COALESCE((SELECT json_agg(c.titulo ORDER BY c.titulo) FROM cursos_liberacoes lb JOIN cursos c ON c.id = lb.curso_id
-                            WHERE lb.contrato_cursos_id = k.id), '[]') AS cursos
+                COALESCE((SELECT json_agg(c.titulo ORDER BY c.titulo) FROM contratos_cursos_itens it JOIN cursos c ON c.id = it.curso_id
+                            WHERE it.contrato_id = k.id), '[]') AS cursos,
+                (SELECT COUNT(*)::int FROM contratos_cursos_vagas v WHERE v.contrato_id = k.id AND v.ativo) AS vagas,
+                (SELECT COUNT(*)::int FROM contratos_cursos_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.usuario_id IS NOT NULL) AS ocupadas
          FROM contratos_cursos k WHERE k.cliente_id = $1 ORDER BY (k.status = 'ativo') DESC, k.id DESC`, [id]) : vazio
     ]);
 

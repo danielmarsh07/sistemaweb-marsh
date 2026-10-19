@@ -110,6 +110,8 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     ok((await js(`document.getElementById('contratos-tbody').textContent`)).includes('Licenças do Conector'), 'Contratos lista o contrato de licenças');
     await js(`abrirContratoConector(${kid})`); await espera(1500);
     ok((await js(`document.querySelectorAll('#contrato-conector-precos input').length`)) === 3, 'contrato aberto: preço por perfil editável');
+    ok((await js(`[...document.querySelectorAll('#contrato-conector-vagas button')].filter(b => b.textContent.trim() === 'Mudar perfil').length`)) > 0,
+      'cada licença tem o botão Mudar perfil');
     await foto('4-contrato-aberto');
     await js(`closeModal(document.getElementById('modal-contrato-conector'))`);
 
@@ -117,7 +119,7 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     await js(`abrirFichaCliente(${cli})`); await espera(2000);
     const ficha = await js(`document.getElementById('ficha-corpo').textContent`);
     ok(ficha.includes('Licenças do Conector') && ficha.includes('+ Novo contrato'), 'ficha: contrato de licenças na caixa Contratos');
-    ok(ficha.includes('+ Liberar cursos para a empresa'), 'ficha: botão de liberar cursos');
+    ok(ficha.includes('+ Contrato de cursos (por pessoas)'), 'ficha: botão de contrato de cursos');
     await foto('5-ficha');
 
     // Contrato de cursos a partir da ficha
@@ -125,13 +127,22 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     ok(await visivel('modal-contrato-cursos'), 'abre o contrato de cursos');
     ok(await js(`!!document.querySelector('#cc-cursos input[value="${curso}"]')`), 'lista o curso para marcar');
     await js(`document.querySelector('#cc-cursos input[value="${curso}"]').checked = true`);
+    await js(`(f => { f.vagas.value = 2; f.pessoas.value = 'Pessoa Tela; pessoa-tela-${sufixo}@teste.com'; })(document.getElementById('form-contrato-cursos'))`);
     await foto('6-cursos');
-    await js(`salvarContratoCursos()`); await espera(2500);
-    ok((await pool.query('SELECT 1 FROM cursos_liberacoes WHERE cliente_id = $1 AND curso_id = $2 AND contrato_cursos_id IS NOT NULL', [cli, curso])).rows.length === 1,
-      'cortesia salva: curso liberado para a empresa');
+    await js(`salvarContratoCursos()`); await espera(3000);
+    const kc = (await pool.query(
+      `SELECT k.id, (SELECT COUNT(*)::int FROM contratos_cursos_vagas v WHERE v.contrato_id = k.id AND v.ativo) AS vagas,
+              (SELECT COUNT(*)::int FROM contratos_cursos_vagas v WHERE v.contrato_id = k.id AND v.usuario_id IS NOT NULL) AS ocupadas,
+              EXISTS (SELECT 1 FROM contratos_cursos_itens it WHERE it.contrato_id = k.id AND it.curso_id = $2) AS tem_curso
+       FROM contratos_cursos k WHERE k.cliente_id = $1`, [cli, curso])).rows[0];
+    ok(kc && kc.vagas === 2 && kc.ocupadas === 1 && kc.tem_curso, 'contrato de cursos salvo com 2 vagas e a pessoa informada numa delas');
     await espera(500);
     ok(await visivel('modal-ficha-cliente'), 'ao salvar, a ficha volta');
-    ok((await js(`document.getElementById('ficha-corpo').textContent`)).includes('Cursos para a empresa nº'), 'ficha mostra o contrato de cursos');
+    ok((await js(`document.getElementById('ficha-corpo').textContent`)).includes('Contrato de cursos nº'), 'ficha mostra o contrato de cursos');
+    await js(`abrirContratoCursos(${kc.id})`); await espera(1500);
+    ok((await js(`document.querySelectorAll('#cc-vagas-tbody tr').length`)) === 2, 'contrato aberto lista as 2 vagas');
+    await foto('6b-cursos-vagas');
+    await js(`closeModal(document.getElementById('modal-contrato-cursos'))`);
 
     // Proposta do simulador aceita → "Gerar contrato" mostra licenças, preço e gestor
     await js(`closeModal(document.getElementById('modal-ficha-cliente'))`);

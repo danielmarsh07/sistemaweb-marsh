@@ -34,6 +34,8 @@
     <symbol id="i-contraste" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></symbol>
     <symbol id="i-trend-up" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
     <symbol id="i-trend-down" viewBox="0 0 24 24"><path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.1A9.7 9.7 0 0 1 12 6c5 0 9 6 9 6a17 17 0 0 1-2.6 3.3M6.6 6.6C4.3 8.2 3 12 3 12s4 6 9 6a9 9 0 0 0 4.4-1.1"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
     <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
     <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
@@ -267,7 +269,7 @@
         <div class="secao-recolhivel" data-secao="dash-indicadores">
         <h3 class="secao-titulo">Indicadores</h3>
         <div class="secao-corpo">
-        <div class="stats-grid">
+        <div class="stats-grid valores-ocultos"><!-- valores em R$ começam ocultos; o olho mostra/oculta todos -->
           <div class="stat-card" style="cursor:pointer" onclick="showPage('clientes')">
             <div class="stat-icon"><svg class="icon"><use href="#i-users"/></svg></div>
             <div class="stat-content">
@@ -292,22 +294,25 @@
           <div class="stat-card dash-fin" style="cursor:pointer" onclick="showPage('contratos')">
             <div class="stat-icon"><svg class="icon"><use href="#i-trend-up"/></svg></div>
             <div class="stat-content">
-              <h3>Receita recorrente / mês</h3>
-              <p id="dash-mrr" class="stat-number">R$ 0</p>
+              <h3>Receita recorrente / mês <button type="button" class="olho-valor" onclick="alternarValores(event)" title="Mostrar valores" aria-label="Mostrar valores" aria-pressed="false"><svg class="icon"><use href="#i-eye-off"/></svg></button></h3>
+              <p id="dash-mrr" class="stat-number" data-sigilo>R$ 0</p>
+              <p class="stat-number valor-mascara" aria-hidden="true">R$ •••••</p>
             </div>
           </div>
           <div class="stat-card dash-fin" style="cursor:pointer" onclick="showPage('faturamento')">
             <div class="stat-icon"><svg class="icon"><use href="#i-wallet"/></svg></div>
             <div class="stat-content">
-              <h3>A receber</h3>
-              <p id="dash-areceber" class="stat-number">R$ 0</p>
+              <h3>A receber <button type="button" class="olho-valor" onclick="alternarValores(event)" title="Mostrar valores" aria-label="Mostrar valores" aria-pressed="false"><svg class="icon"><use href="#i-eye-off"/></svg></button></h3>
+              <p id="dash-areceber" class="stat-number" data-sigilo>R$ 0</p>
+              <p class="stat-number valor-mascara" aria-hidden="true">R$ •••••</p>
             </div>
           </div>
           <div class="stat-card dash-fin" style="cursor:pointer" onclick="showPage('faturamento')">
             <div class="stat-icon"><svg class="icon"><use href="#i-trend-down"/></svg></div>
             <div class="stat-content">
-              <h3>Vencido</h3>
-              <p id="dash-vencido" class="stat-number">R$ 0</p>
+              <h3>Vencido <button type="button" class="olho-valor" onclick="alternarValores(event)" title="Mostrar valores" aria-label="Mostrar valores" aria-pressed="false"><svg class="icon"><use href="#i-eye-off"/></svg></button></h3>
+              <p id="dash-vencido" class="stat-number" data-sigilo>R$ 0</p>
+              <p class="stat-number valor-mascara" aria-hidden="true">R$ •••••</p>
             </div>
           </div>
         </div>
@@ -592,7 +597,7 @@
         </div>
         <p class="pagina-descricao">
           Cursos em vídeo para o portal do cliente. Só aparecem quando estão <strong>publicados</strong> e a pessoa tem uma origem de acesso:
-          curso <strong>liberado para a empresa</strong>, <strong>incluso na licença do Conector</strong> (Cadastros → Benefícios do Conector),
+          vaga num <strong>contrato de cursos</strong>, curso <strong>liberado para a empresa</strong>, <strong>incluso na licença do Conector</strong> (Cadastros → Benefícios do Conector),
           compra ou liberação individual. Vídeos: YouTube (não listado), Vimeo, Panda Video ou Bunny Stream.
         </p>
         <div class="table-container">
@@ -996,7 +1001,8 @@
                 <a href="#" class="roteiro-ir" onclick="showPage('contratos'); return false;">Contratos →</a></li>
               <li><strong>Acesso ao portal</strong>: o administrador da empresa recebe convite por e-mail para criar a senha. Outros usuários: Usuários → novo usuário do tipo <em>Cliente</em> com convite.
                 <a href="#" class="roteiro-ir" onclick="showPage('usuarios'); return false;">Usuários →</a></li>
-              <li><strong>Cursos</strong>: os do Conector vêm com a licença (Benefícios); outros, libere para a empresa, para uma pessoa ou venda na Loja.</li>
+              <li><strong>Cursos</strong>: os do Conector vêm com a licença (Benefícios); outros (ex.: ABAP para quem é Funcional), faça um
+                <strong>contrato de cursos</strong> com vagas por pessoa, libere para uma pessoa ou venda na Loja.</li>
             </ol>
           </section>
 
@@ -1021,6 +1027,8 @@
               <li><strong>Contrato</strong>: cliente, administrador (e-mail), licenças por perfil (ABAP, Funcional, ABAP + Funcional) com o preço negociado, vigência e a cobrança anual.</li>
               <li><strong>Mais ou menos licenças</strong>: em "Licenças e preço". A mais = fatura proporcional aos meses que faltam (rascunho) e anuidade nova;
                 a menos = a próxima anuidade diminui. Sempre pelo preço do contrato, com a conta na tela antes de confirmar.</li>
+              <li><strong>Mudar perfil</strong> de uma licença (ex.: Funcional → ABAP + Funcional): a pessoa continua na vaga e já vê os cursos do perfil novo;
+                cobra só a diferença de preço nos meses que faltam (rascunho). Para um perfil mais barato, a próxima anuidade diminui.</li>
               <li><strong>Convites</strong>: o administrador da empresa (no portal) ou você (no contrato) convida pelo e-mail escolhendo o perfil. A licença fica <em>reservada</em>
                 até a pessoa criar a senha; o link vale 72 h (reenviar renova). Sem aceite, a licença volta sozinha.</li>
               <li><strong>Cursos inclusos</strong>: os marcados em Benefícios do Conector para o perfil, enquanto a licença estiver ativa.
@@ -1037,7 +1045,8 @@
             <p class="fin-muted">Aparece no portal quando está <strong>publicado</strong> e a pessoa tem um motivo de acesso. Cada curso mostra a origem.</p>
             <ol>
               <li><strong>Criar</strong> o curso, cadastrar as <strong>aulas</strong> (YouTube, Vimeo, Panda ou Bunny) e <strong>publicar</strong>.</li>
-              <li>Formas de acesso: <em>incluso na licença do Conector</em> (Benefícios), <em>liberado para a empresa</em>, <em>liberação individual</em> (com prazo) ou <em>compra na Loja</em>.</li>
+              <li>Formas de acesso: <em>incluso na licença do Conector</em> (Benefícios), <em>contrato de cursos</em> (só quem está numa vaga do contrato),
+                <em>liberação individual</em> (com prazo) ou <em>compra na Loja</em>.</li>
               <li>Quem tem por dois caminhos não perde o curso quando um deles acaba. Progresso e conclusão nunca são apagados.</li>
               <li><strong>Progresso</strong> do curso: quem tem acesso agora, quem já perdeu (histórico) e a origem de cada acesso.</li>
             </ol>
@@ -3442,29 +3451,57 @@
           <span>Licenças por perfil (ABAP, Funcional, ABAP + Funcional) com o preço negociado deste cliente. Já monta a cobrança anual.</span>
         </button>
         <button type="button" class="tipo-contrato-opcao" id="tipo-contrato-cursos" onclick="escolherTipoContrato('cursos')">
-          <strong>Cursos para a empresa</strong>
-          <span>Libera cursos para todos da empresa, com validade. Pago ou cortesia (R$ 0).</span>
+          <strong>Cursos (por pessoas)</strong>
+          <span>Cursos escolhidos para um número de vagas; cada vaga é uma pessoa, convidada por e-mail. Pago ou cortesia (R$ 0).</span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Contrato de cursos para a empresa (contratos-cursos.js) -->
+  <!-- Contrato de cursos por pessoas (contratos-cursos.js) -->
   <div id="modal-contrato-cursos" class="modal">
-    <div class="modal-content">
+    <div class="modal-content modal-lg">
       <div class="modal-header">
-        <h3 id="contrato-cursos-titulo">Cursos para a empresa</h3>
+        <h3 id="contrato-cursos-titulo">Contrato de cursos</h3>
         <button class="btn-close">&times;</button>
       </div>
       <form id="form-contrato-cursos" class="form">
-        <p class="pagina-descricao">Os cursos escolhidos ficam liberados para <strong>todas as pessoas da empresa</strong> no portal até o fim da validade.
-          Quem ainda não tem acesso: crie um usuário do tipo Cliente ou um administrador da empresa (ele convida os demais).</p>
+        <p class="pagina-descricao">Os cursos valem <strong>só para as pessoas colocadas nas vagas</strong> deste contrato (cada vaga = uma pessoa, convite por e-mail).
+          Independe do Conector: use, por exemplo, para dar o curso de ABAP a quem tem licença Funcional.
+          Você e o gestor da empresa (no portal) preenchem as vagas.</p>
         <div class="form-group">
           <label>Cliente <span class="obrig" title="Obrigatório">*</span></label>
-          <select name="cliente_id" required></select>
+          <select name="cliente_id" required onchange="mostrarGestoresCursos()"></select>
+          <small class="form-hint" id="cc-gestores-nota"></small>
         </div>
         <div class="form-section-title">Cursos</div>
         <div id="cc-cursos" class="cc-cursos-lista"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Vagas (pessoas) <span class="obrig" title="Obrigatório">*</span></label>
+            <input type="number" name="vagas" min="1" max="500" value="1" required>
+            <small class="form-hint" id="cc-vagas-nota">Quantas pessoas podem fazer os cursos ao mesmo tempo.</small></div>
+        </div>
+        <div id="cc-novo-pessoas">
+          <div class="form-section-title">Quem vai fazer (opcional — dá para preencher depois)</div>
+          <div class="form-group">
+            <label>Uma pessoa por linha: <em>Nome; e-mail</em></label>
+            <textarea name="pessoas" rows="3" placeholder="Maria Silva; maria@empresa.com.br&#10;joao@empresa.com.br"></textarea>
+            <small class="form-hint">Quem ainda não tem acesso recebe o convite por e-mail; quem já tem recebe os cursos na hora.</small>
+          </div>
+          <div class="form-section-title">Gestor da empresa no portal (opcional)</div>
+          <div class="form-row">
+            <div class="form-group"><label>Nome</label><input type="text" name="gestor_nome" maxlength="150"></div>
+            <div class="form-group"><label>E-mail</label><input type="email" name="gestor_email" maxlength="150">
+              <small class="form-hint">Vê o contrato no portal e coloca ou tira pessoas das vagas. Deixe vazio se a empresa já tem gestor.</small></div>
+          </div>
+        </div>
+        <div id="cc-vagas-box" style="display:none">
+          <div class="form-section-title">Vagas</div>
+          <div class="table-container"><table>
+            <thead><tr><th>Pessoa</th><th>Progresso</th><th>Ações</th></tr></thead>
+            <tbody id="cc-vagas-tbody"></tbody>
+          </table></div>
+        </div>
         <div class="form-row">
           <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
           <div class="form-group"><label>Validade (fim)</label><input type="date" name="data_fim">
@@ -3492,7 +3529,7 @@
         <div class="form-actions">
           <button type="button" class="btn btn-danger" id="cc-btn-encerrar" onclick="encerrarContratoCursos()">Encerrar contrato</button>
           <button type="button" class="btn btn-secondary btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="cc-btn-salvar">Liberar cursos</button>
+          <button type="submit" class="btn btn-primary" id="cc-btn-salvar">Criar contrato</button>
         </div>
       </form>
     </div>

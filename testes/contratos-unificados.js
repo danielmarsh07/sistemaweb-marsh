@@ -2,8 +2,8 @@ require('./_ambiente-local');
 // Contratos unificados (docs/plano-contratos-unificados.md):
 //   fase 1 — preço negociado por contrato do Conector (a tabela é só a lista), licenças a mais = fatura proporcional
 //            e anuidade nova, a menos = anuidade menor, contrato antigo sem preço guardado mantém o desconto;
-//   fase 2 — contrato de cursos para a empresa (cortesia, pagamento único, mensal), vale também para quem só usa licença,
-//            não sai pela tela de Treinamentos e encerrar tira o acesso;
+//   fase 2 — contrato de cursos POR PESSOAS (cortesia, pagamento único, mensal): só quem está numa vaga vê os cursos,
+//            o gestor preenche/libera vagas no portal, não sai pela tela de Treinamentos e encerrar tira o acesso;
 //   visão mensal — contrato anual estimado só no mês da cobrança.
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
@@ -81,6 +81,22 @@ const maisDias = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv
     cob = await financeiro(kid);
     ok(p2.status === 200 && Number(cob.valor) === 3 * 400 * 12, `novo preço vale para a anuidade (${cob.valor})`);
     ok((await api(tokAdmin, `/contratos-conector/${kid}/precos`, 'PUT', { precos: { abap: -1 } })).status === 400, '! recusa preço negativo');
+
+    // Mudar o perfil de uma licença: ABAP (400) → ABAP + Funcional (600) cobra só a diferença nos meses que faltam
+    const vagaTroca = (await api(tokAdmin, `/contratos-conector/${kid}`)).body.vagas.find(v => v.perfil === 'abap');
+    const pvT = (await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vagaTroca.id}/perfil/previa?para=ambos`)).body;
+    ok(pvT.valor_proporcional === 200 * 12 && pvT.valor_anual_novo === (2 * 400 + 600) * 12,
+      `prévia da troca: diferença ${pvT.valor_proporcional}, anuidade ${pvT.valor_anual_atual} → ${pvT.valor_anual_novo}`);
+    ok((await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vagaTroca.id}/perfil/previa?para=abap`)).status === 400, '! troca para o mesmo perfil');
+    const troca = await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vagaTroca.id}/perfil`, 'POST', { perfil: 'ambos' });
+    const fatT = troca.body.fatura_id && (await pool.query('SELECT * FROM faturas WHERE id = $1', [troca.body.fatura_id])).rows[0];
+    ok(troca.status === 200 && fatT && Number(fatT.valor) === 2400 && /mudança de perfil/.test(fatT.descricao), `troca gera fatura da diferença (${troca.body?.mensagem || troca.body?.erro})`);
+    cob = await financeiro(kid);
+    ok(Number(cob.valor) === 16800 && (await pool.query('SELECT perfil FROM contratos_conector_vagas WHERE id = $1', [vagaTroca.id])).rows[0].perfil === 'ambos',
+      `licença virou ABAP + Funcional e a anuidade subiu (${cob.valor})`);
+    const volta = await api(tokAdmin, `/contratos-conector/${kid}/vagas/${vagaTroca.id}/perfil`, 'POST', { perfil: 'abap' });
+    cob = await financeiro(kid);
+    ok(volta.status === 200 && !volta.body.fatura_id && Number(cob.valor) === 3 * 400 * 12, `troca para perfil mais barato: sem fatura, anuidade menor (${cob.valor})`);
 
     // Mudar a tabela de lista não mexe no contrato
     const tabelaAntes = (await pool.query('SELECT prop_precos_conector FROM financeiro_config WHERE empresa_id = 1')).rows[0];
@@ -165,13 +181,44 @@ const maisDias = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv
     ok((await api(tokAdmin, '/contratos-cursos', 'POST', { cliente_id: cli, curso_ids: [], cobranca: 'cortesia' })).status === 400, '! recusa sem curso');
     ok((await api(tokAdmin, '/contratos-cursos', 'POST', { cliente_id: cli, curso_ids: [curso], cobranca: 'mensal' })).status === 400, '! recusa cobrança sem valor');
 
-    const cort = await api(tokAdmin, '/contratos-cursos', 'POST', { cliente_id: cli, curso_ids: [curso], cobranca: 'cortesia', data_fim: maisDias(30) });
+    // Contrato por pessoas: só quem está numa vaga vê os cursos (o resto da empresa não)
+    const emailAluno = (await pool.query('SELECT email FROM usuarios WHERE id = $1', [aluno])).rows[0].email;
+    const outro = await usuarioTeste(pool, { tipo: 'cliente', cliente_id: cli });
+    const tokOutro = tok({ id: outro, tipo: 'cliente', cliente_id: cli });
+    const meusOutro = async () => ((await api(tokOutro, '/treinamentos/meus')).body || []).map(c => c.id);
+    ok((await api(tokAdmin, '/contratos-cursos', 'POST', { cliente_id: cli, curso_ids: [curso], vagas: 1,
+      pessoas: [{ email: 'a@x.com', nome: 'A' }, { email: 'b@x.com', nome: 'B' }] })).status === 400, '! recusa mais pessoas que vagas');
+    const cort = await api(tokAdmin, '/contratos-cursos', 'POST', { cliente_id: cli, curso_ids: [curso], cobranca: 'cortesia', data_fim: maisDias(30),
+      vagas: 2, pessoas: [{ email: emailAluno }] });
     ok(cort.status === 201 && !cort.body.contrato_financeiro_id && !cort.body.fatura_id, `cortesia sem cobrança (${cort.body?.mensagem || cort.body?.erro})`);
-    ok((await meus()).includes(curso), 'contrato de cursos vale para quem só usa licença (aluno)');
+    ok((await meus()).includes(curso), 'pessoa colocada na vaga (já tinha acesso, mesmo sendo aluno de licença) vê o curso');
+    ok(!(await meusOutro()).includes(curso), 'quem não está numa vaga NÃO vê o curso do contrato');
+    let detV = (await api(tokAdmin, `/contratos-cursos/${cort.body.id}`)).body;
+    ok(detV.total_vagas === 2 && detV.ocupadas === 1, 'contrato com 2 vagas, 1 ocupada');
+    const vagaAluno = detV.vagas.find(v => v.usuario_id === aluno);
+    ok((await api(tokAdmin, `/contratos-cursos/${cort.body.id}/convidar`, 'POST', { email: emailAluno })).status === 400, '! mesma pessoa em duas vagas');
 
-    // Tela de Treinamentos (substitui a lista de empresas) não derruba a liberação do contrato
+    // Tela de Treinamentos (lista de empresas) não mexe no contrato
     await api(tokAdmin, `/treinamentos/cursos/${curso}/liberacoes`, 'PUT', { cliente_ids: [] });
-    ok((await meus()).includes(curso), 'liberação do contrato não sai pela tela de Treinamentos');
+    ok((await meus()).includes(curso), 'contrato de cursos não sai pela tela de Treinamentos');
+
+    // Gestor da empresa no portal: vê o contrato e coloca pessoas nas vagas
+    await pool.query('INSERT INTO clientes_admins (cliente_id, usuario_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [cli, outro]);
+    const meusContratos = (await api(tokOutro, '/contratos-cursos/meus')).body;
+    ok(Array.isArray(meusContratos) && meusContratos.some(k => k.id === cort.body.id), 'gestor vê o contrato de cursos no portal');
+    ok((await api(tokAluno, '/contratos-cursos/meus')).body.length === 0, 'quem não é gestor não vê o contrato');
+    ok((await api(tokAluno, `/contratos-cursos/meus/${cort.body.id}/convidar`, 'POST', { eu: true })).status === 404, '! não gestor não convida');
+    const euMesmo = await api(tokOutro, `/contratos-cursos/meus/${cort.body.id}/convidar`, 'POST', { eu: true });
+    ok(euMesmo.status === 200 && (await meusOutro()).includes(curso), `gestor ocupa a última vaga e passa a ver o curso (${euMesmo.body?.mensagem || euMesmo.body?.erro})`);
+    ok((await api(tokOutro, `/contratos-cursos/meus/${cort.body.id}/convidar`, 'POST', { nome: 'X', email: `x-${sufixo}@teste.com` })).status === 400,
+      '! sem vaga livre');
+    ok((await api(tokAdmin, `/contratos-cursos/${cort.body.id}`, 'PUT', { curso_ids: [curso], vagas: 1 })).status === 400, '! não diminui abaixo das ocupadas');
+
+    // Liberar a vaga tira o curso só daquela pessoa
+    ok((await api(tokOutro, `/contratos-cursos/meus/${cort.body.id}/vagas/${vagaAluno.id}/liberar`, 'POST')).status === 200, 'gestor libera a vaga');
+    ok(!(await meus()).includes(curso) && (await meusOutro()).includes(curso), 'quem saiu perde o curso; quem ficou continua');
+    const dir = (await pool.query(`SELECT status, motivo FROM direitos_acesso WHERE usuario_id = $1 AND curso_id = $2 AND origem = 'contrato'`, [aluno, curso])).rows[0];
+    ok(dir && dir.status === 'revogado' && /liberada/.test(dir.motivo), `rastro do acesso registra a saída (${dir && dir.motivo})`);
 
     const unica = await api(tokAdmin, '/contratos-cursos', 'POST', { cliente_id: cli, curso_ids: [curso2], cobranca: 'unica', valor: 900 });
     const fatU = unica.body.fatura_id && (await pool.query('SELECT * FROM faturas WHERE id = $1', [unica.body.fatura_id])).rows[0];
@@ -183,16 +230,17 @@ const maisDias = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv
       'mensal = contrato financeiro ligado');
 
     // Editar: troca de curso e validade
-    const ed = await api(tokAdmin, `/contratos-cursos/${cort.body.id}`, 'PUT', { curso_ids: [curso, curso2], data_fim: maisDias(60) });
+    const ed = await api(tokAdmin, `/contratos-cursos/${cort.body.id}`, 'PUT', { curso_ids: [curso, curso2], data_fim: maisDias(60), vagas: 3 });
     const detC = (await api(tokAdmin, `/contratos-cursos/${cort.body.id}`)).body;
-    ok(ed.status === 200 && detC.cursos.length === 2 && detC.data_fim === maisDias(60), 'edita cursos e validade');
+    ok(ed.status === 200 && detC.cursos.length === 2 && detC.data_fim === maisDias(60) && detC.total_vagas === 3, 'edita cursos, validade e vagas');
+    ok((await meusOutro()).includes(curso2), 'curso acrescentado ao contrato aparece para quem está na vaga');
 
     const ficha = (await api(tokAdmin, `/clientes/${cli}/ficha`)).body;
     ok(Array.isArray(ficha.contratos_cursos) && ficha.contratos_cursos.length === 3, 'ficha do cliente lista os contratos de cursos');
 
     // Encerrar: cursos saem, cobrança recorrente para
     for (const id of [cort.body.id, unica.body.id, mensal.body.id]) await api(tokAdmin, `/contratos-cursos/${id}/encerrar`, 'POST');
-    ok(!(await meus()).includes(curso) && !(await meus()).includes(curso2), 'encerrar tira os cursos da empresa');
+    ok(!(await meusOutro()).includes(curso) && !(await meusOutro()).includes(curso2), 'encerrar tira os cursos de quem estava nas vagas');
     ok((await pool.query('SELECT status FROM contratos WHERE id = $1', [ctM.id])).rows[0].status === 'encerrado', 'encerrar para a cobrança mensal');
     ok((await api(tokAdmin, `/contratos-cursos/${cort.body.id}/encerrar`, 'POST')).status === 400, '! não encerra duas vezes');
   } finally {

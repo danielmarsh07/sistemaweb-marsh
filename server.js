@@ -84,7 +84,7 @@ app.use('/api/assistente', autenticar, bloquearAluno, assistenteRoutes);
 app.use('/api/licencas', autenticar, bloquearAluno, licencasRoutes);
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/contratos-conector', autenticar, contratosConectorRoutes);
-app.use('/api/contratos-cursos', autenticar, apenasEquipe, contratosCursosRoutes); // só administradores (o router confere)
+app.use('/api/contratos-cursos', autenticar, contratosCursosRoutes); // portal: só o gestor (/meus); o resto é admin (o router confere)
 app.use('/api/financeiro', autenticar, financeiroRoutes); // cliente só usa /minhas-faturas (o router filtra gestor x compras próprias)
 app.use('/api/comercial', autenticar, comercialRoutes);
 app.use('/api/alertas', autenticar, alertasRoutes);
@@ -1424,6 +1424,53 @@ async function iniciar() {
     //     o processo segue igual e os e-mails automáticos vão só para o e-mail de cópia). nfse_simulada marca essas notas.
     await pool.query(`ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS nfse_modo VARCHAR(10) NOT NULL DEFAULT 'producao' CHECK (nfse_modo IN ('producao', 'teste'));`);
     await pool.query(`ALTER TABLE faturas ADD COLUMN IF NOT EXISTS nfse_simulada BOOLEAN NOT NULL DEFAULT FALSE;`);
+
+    // 40. Contrato de cursos POR PESSOAS (services/contratos-cursos.js): o contrato tem os cursos (contratos_cursos_itens)
+    //     e N vagas; só quem ocupa uma vaga (convite por e-mail, como no Conector) vê os cursos. Nada vale mais para a
+    //     empresa inteira. Marsh e o gestor (administrador da empresa no portal) preenchem as vagas.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contratos_cursos_itens (
+        contrato_id INTEGER NOT NULL REFERENCES contratos_cursos(id) ON DELETE CASCADE,
+        curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+        PRIMARY KEY (contrato_id, curso_id)
+      );`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contratos_cursos_vagas (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER NOT NULL REFERENCES contratos_cursos(id) ON DELETE CASCADE,
+        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+        estado VARCHAR(10) NOT NULL DEFAULT 'livre' CHECK (estado IN ('livre', 'convidada', 'ativa')),
+        convidado_em TIMESTAMPTZ,
+        data_atribuicao TIMESTAMPTZ,
+        ativo BOOLEAN NOT NULL DEFAULT TRUE
+      );`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_cursos_vagas_contrato ON contratos_cursos_vagas(contrato_id);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_cursos_vagas_usuario ON contratos_cursos_vagas(usuario_id) WHERE usuario_id IS NOT NULL;`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_cursos_vagas_contrato_usuario ON contratos_cursos_vagas(contrato_id, usuario_id) WHERE usuario_id IS NOT NULL AND ativo;`);
+    //     Nova origem de acesso: 'contrato' (vaga de contrato de cursos; origem_id = vaga)
+    const chk = (await pool.query(`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'direitos_acesso_origem_check'`)).rows[0];
+    if (!chk || !chk.def.includes('contrato')) {
+      await pool.query(`ALTER TABLE direitos_acesso DROP CONSTRAINT IF EXISTS direitos_acesso_origem_check;`);
+      await pool.query(`ALTER TABLE direitos_acesso ADD CONSTRAINT direitos_acesso_origem_check CHECK (origem IN ('compra', 'beneficio', 'liberacao', 'manual', 'contrato'));`);
+    }
+    //     Uma vez por contrato antigo (liberação para a empresa inteira): os cursos viram itens, a liberação sai e o contrato
+    //     ganha vagas LIVRES (uma por pessoa ativa do cliente, mínimo 1) — ninguém recebe os cursos até ser colocado numa vaga.
+    const antigos = (await pool.query(
+      `SELECT DISTINCT k.id, k.cliente_id FROM contratos_cursos k JOIN cursos_liberacoes lb ON lb.contrato_cursos_id = k.id`)).rows;
+    for (const k of antigos) {
+      await pool.query(
+        `INSERT INTO contratos_cursos_itens (contrato_id, curso_id) SELECT $1, curso_id FROM cursos_liberacoes WHERE contrato_cursos_id = $1
+         ON CONFLICT DO NOTHING`, [k.id]);
+      await pool.query(`DELETE FROM cursos_liberacoes WHERE contrato_cursos_id = $1`, [k.id]);
+      const tem = (await pool.query(`SELECT 1 FROM contratos_cursos_vagas WHERE contrato_id = $1 LIMIT 1`, [k.id])).rows.length;
+      if (!tem) {
+        await pool.query(
+          `INSERT INTO contratos_cursos_vagas (contrato_id)
+           SELECT $1 FROM generate_series(1, GREATEST(1, (SELECT COUNT(*) FROM usuarios WHERE cliente_id = $2 AND tipo = 'cliente' AND ativo)::int))`,
+          [k.id, k.cliente_id]);
+      }
+      console.log(`[migração 40] contrato de cursos nº ${k.id}: agora por pessoas (vagas livres).`);
+    }
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

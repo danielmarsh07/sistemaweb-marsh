@@ -356,11 +356,14 @@ let vagaEmEdicao = null;   // { contratoId, vagaId }
 let contratoSids = null;   // contrato aberto no modal de sistemas SAP
 
 async function carregarContratosPortal() {
-  const res = await apiFetch(`${API}/contratos-conector/meus`);
+  const [res, resCursos] = await Promise.all([apiFetch(`${API}/contratos-conector/meus`), apiFetch(`${API}/contratos-cursos/meus`)]);
   if (!res || !res.ok) return;
   contratosPortal = await res.json();
+  contratosCursosPortal = resCursos && resCursos.ok ? await resCursos.json() : [];
+  renderContratosCursosPortal();
   const secao = document.getElementById('secao-contrato');
-  secao.hidden = !contratosPortal.length;
+  secao.hidden = !contratosPortal.length && !contratosCursosPortal.length;
+  document.getElementById('contrato-conector-descricao').hidden = !contratosPortal.length;
   const br = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
   document.getElementById('lista-contratos').innerHTML = contratosPortal.map(k => {
     const ativas = k.vagas.filter(v => v.usuario_id && v.estado !== 'convidada').length;
@@ -436,6 +439,88 @@ function cartaoVaga(k, v) {
 }
 
 const meuId = () => (usuario ? usuario.id : null);
+
+// ===== CONTRATOS DE CURSOS (gestor): vagas por pessoa =====
+let contratosCursosPortal = [];
+
+function renderContratosCursosPortal() {
+  const bloco = document.getElementById('bloco-contratos-cursos');
+  bloco.hidden = !contratosCursosPortal.length;
+  if (!contratosCursosPortal.length) return;
+  const br = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
+  document.getElementById('lista-contratos-cursos').innerHTML = contratosCursosPortal.map(k => {
+    const livres = k.vagas.filter(v => !v.usuario_id).length;
+    const st = k.vigente ? ['Ativo', '#10b981'] : ['Fora da validade', '#ef4444'];
+    const cursos = `<div class="vaga-cursos">${k.cursos.map(c => escapeHtml(c.titulo)).join(' · ')}</div>`;
+    const cartoes = k.vagas.map(v => {
+      if (!v.usuario_id) {
+        return `<div class="licenca-card vaga-card livre">
+          <h4>Vaga de cursos <span class="chip" style="background:#64748b20; color:#64748b">Disponível</span></h4>${cursos}
+          <div class="acoes"><button type="button" class="btn-curso" onclick="convidarCursosPortal(${k.id}, ${v.id})">Convidar para esta vaga</button></div></div>`;
+      }
+      const pct = v.aulas_total ? Math.round(100 * v.aulas_concluidas / v.aulas_total) : 0;
+      const convite = v.estado === 'convidada';
+      return `<div class="licenca-card vaga-card">
+        <h4>Vaga de cursos ${convite ? '<span class="chip" style="background:#f59e0b20; color:#b7791f">Convite pendente</span>'
+          : `<span class="chip" style="background:#10b98120; color:#10b981">${v.usuario_id === meuId() ? 'Você' : 'Em uso'}</span>`}</h4>${cursos}
+        <div class="linha"><span>Pessoa</span><strong>${escapeHtml(v.usuario_nome)}</strong></div>
+        <div class="linha"><span>E-mail</span><strong>${escapeHtml(v.usuario_email)}</strong></div>
+        ${convite ? '<p class="ajuda">Os cursos aparecem para a pessoa quando ela criar a senha (o link vale 72 horas).</p>'
+          : `<div class="linha"><span>Progresso</span><strong>${v.aulas_concluidas} de ${v.aulas_total} aulas (${pct}%)</strong></div>
+             <div class="barra-curso"><i style="width:${pct}%"></i></div>`}
+        <div class="acoes">
+          ${convite ? `<button type="button" class="btn-curso secundario" onclick="reenviarConviteCursosPortal(${k.id}, ${v.id})">Reenviar convite</button>` : ''}
+          <button type="button" class="btn-curso secundario" onclick="liberarCursosPortal(${k.id}, ${v.id}, ${convite})">${convite ? 'Cancelar convite' : 'Liberar vaga'}</button>
+        </div></div>`;
+    }).join('');
+    return `<div class="contrato-resumo">
+        <div><strong>Contrato de cursos nº ${k.id}</strong> <span class="chip" style="background:${st[1]}20; color:${st[1]}">${st[0]}</span>
+          <p>Válido de ${br(k.data_inicio)}${k.data_fim ? ` até <strong>${br(k.data_fim)}</strong>` : ' (sem prazo)'}</p>
+          <p><strong>${k.total_vagas}</strong> vaga(s) · <strong>${k.ocupadas}</strong> ocupada(s) · <strong>${livres}</strong> disponível(is)</p></div>
+        <div class="acoes">${livres && k.vigente ? `<button type="button" class="btn-curso" onclick="convidarCursosPortal(${k.id})">Convidar pessoa</button>` : ''}</div>
+      </div>
+      <div class="licencas-portal">${cartoes}</div>`;
+  }).join('<div style="height:18px"></div>');
+}
+
+async function convidarCursosPortal(contratoId, vagaId) {
+  const eu = confirm('Você mesmo vai fazer os cursos desta vaga?\n\nOK = eu mesmo · Cancelar = convidar outra pessoa');
+  let corpo;
+  if (eu) corpo = { eu: true };
+  else {
+    const email = prompt('E-mail da pessoa:');
+    if (!email) return;
+    const nome = prompt('Nome da pessoa:') || '';
+    if (!nome.trim()) { alert('Informe o nome da pessoa.'); return; }
+    corpo = { email: email.trim(), nome: nome.trim() };
+  }
+  if (vagaId) corpo.vaga_id = vagaId;
+  const res = await apiFetch(`${API}/contratos-cursos/meus/${contratoId}/convidar`, { method: 'POST', body: JSON.stringify(corpo) });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  if (!res.ok) return;
+  carregarContratosPortal();
+  if (eu) carregarTreinamentos();
+}
+
+async function liberarCursosPortal(contratoId, vagaId, convite) {
+  if (!confirm(convite ? 'Cancelar este convite? A vaga volta a ficar disponível.'
+    : 'Liberar esta vaga? A pessoa perde os cursos deste contrato na hora (a conta e o progresso ficam guardados).')) return;
+  const res = await apiFetch(`${API}/contratos-cursos/meus/${contratoId}/vagas/${vagaId}/liberar`, { method: 'POST' });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  carregarContratosPortal();
+  carregarTreinamentos();
+}
+
+async function reenviarConviteCursosPortal(contratoId, vagaId) {
+  const res = await apiFetch(`${API}/contratos-cursos/meus/${contratoId}/vagas/${vagaId}/convite`, { method: 'POST' });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+}
 
 // Convite pela licença escolhida (vagaId) ou só pelo perfil (o sistema reserva a próxima livre)
 function prepararModalConvite(k, { vagaId, perfil }) {
@@ -1244,7 +1329,7 @@ function origensCurso(c) {
   const chips = [];
   if (c.via_compra) chips.push(['#1d6fd8', c.compra_sem_fim || !c.compra_fim ? 'Seu' : `Seu até ${br(c.compra_fim)}`]);
   if (c.via_beneficio) chips.push(['#10b981', 'Incluso na licença do Conector']);
-  if (c.via_liberacao) chips.push(['#64748b', 'Liberado pela empresa']);
+  if (c.via_liberacao || c.via_contrato) chips.push(['#64748b', 'Liberado pela empresa']);
   return chips.map(([cor, txt]) => `<span class="chip" style="background:${cor}1a; color:${cor}">${escapeHtml(txt)}</span>`).join(' ');
 }
 

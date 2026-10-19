@@ -29,8 +29,9 @@ const VAGA_VIGENTE = `v.ativo AND v.estado = 'ativa' AND k.status = 'ativo' AND 
 
 /**
  * Origens de acesso a um curso (alias c), conferidas AO VIVO a cada pedido — a revogação vale na hora:
- *   liberacao  — curso liberado para a empresa do usuário (usuário de vaga, papel "aluno", não herda a liberação avulsa;
- *                a que vem de um contrato de cursos vale para todos do cliente)
+ *   liberacao  — curso liberado avulso para a empresa do usuário (Treinamentos); quem é usuário de vaga (papel "aluno")
+ *                não herda essa liberação
+ *   contrato   — vaga ocupada (convite aceito) de um contrato de cursos vigente que inclui o curso: só a pessoa da vaga
  *   beneficio  — licença do Conector ativa, de contrato vigente, cujo perfil inclui o curso (gratuito enquanto durar)
  *   compra     — direito próprio (compra individual ou concessão manual), com validade; não depende de licença
  * pCliente / pUsuario = placeholders ($1, $2...).
@@ -38,7 +39,15 @@ const VAGA_VIGENTE = `v.ativo AND v.estado = 'ativa' AND k.status = 'ativo' AND 
 function sqlViaLiberacao(pCliente, pUsuario) {
   return `EXISTS (SELECT 1 FROM cursos_liberacoes lb
              WHERE lb.curso_id = c.id AND lb.cliente_id = ${pCliente} AND (lb.data_fim IS NULL OR lb.data_fim >= CURRENT_DATE)
-               AND (lb.contrato_cursos_id IS NOT NULL OR COALESCE((SELECT portal_papel FROM usuarios WHERE id = ${pUsuario}), '') <> 'aluno'))`;
+               AND lb.contrato_cursos_id IS NULL AND COALESCE((SELECT portal_papel FROM usuarios WHERE id = ${pUsuario}), '') <> 'aluno')`;
+}
+// Vaga ativa de contrato de cursos vigente (alias cv = vaga, kc = contrato)
+const VAGA_CURSOS_VIGENTE = `cv.ativo AND cv.estado = 'ativa' AND kc.status = 'ativo' AND kc.data_inicio <= CURRENT_DATE
+  AND (kc.data_fim IS NULL OR kc.data_fim >= CURRENT_DATE)`;
+function sqlViaContratoCursos(pUsuario) {
+  return `EXISTS (SELECT 1 FROM contratos_cursos_vagas cv JOIN contratos_cursos kc ON kc.id = cv.contrato_id
+                  JOIN contratos_cursos_itens it ON it.contrato_id = kc.id AND it.curso_id = c.id
+                  WHERE cv.usuario_id = ${pUsuario} AND ${VAGA_CURSOS_VIGENTE})`;
 }
 function sqlViaBeneficio(pUsuario) {
   return `EXISTS (SELECT 1 FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
@@ -52,7 +61,7 @@ function sqlViaCompra(pUsuario) {
 /** Condição SQL de curso liberado: publicado, ativo e com ao menos uma origem válida agora. */
 function sqlCursoLiberado(pCliente, pUsuario) {
   return `c.ativo = TRUE AND c.status = 'publicado' AND (
-    ${sqlViaLiberacao(pCliente, pUsuario)} OR ${sqlViaBeneficio(pUsuario)} OR ${sqlViaCompra(pUsuario)})`;
+    ${sqlViaLiberacao(pCliente, pUsuario)} OR ${sqlViaContratoCursos(pUsuario)} OR ${sqlViaBeneficio(pUsuario)} OR ${sqlViaCompra(pUsuario)})`;
 }
 
 async function papelPortal(usuarioId) {
@@ -251,7 +260,7 @@ async function liberarVaga(contrato, vagaId, atorId = null, { acao } = {}) {
       // Sem outra vaga esperando aceite, o link de convite pendente deixa de valer
       await db.query(
         `UPDATE usuarios_tokens t SET usado_em = NOW() WHERE t.usuario_id = $1 AND t.tipo = 'convite' AND t.usado_em IS NULL
-           AND NOT EXISTS (SELECT 1 FROM contratos_conector_vagas v WHERE v.usuario_id = $1 AND v.ativo AND v.estado = 'convidada')`,
+           AND ${SEM_OUTRO_CONVITE('$1')}`,
         [vaga.usuario_id]);
     }
     await auditoria.registrar({ empresa_id: contrato.empresa_id, usuario_id: atorId,
@@ -277,8 +286,21 @@ async function ativarConvites(usuarioId) {
     await auditoria.registrar({ empresa_id: v.empresa_id, usuario_id: usuarioId, acao: 'vaga.convite_aceito', entidade: 'vaga_conector',
       entidade_id: v.id, depois: { contrato_id: v.contrato_id, perfil: v.perfil, usuario_id: usuarioId, estado: 'ativa' } });
   }
-  return r.rowCount;
+  // Vagas de contrato de cursos reservadas para a pessoa também passam a valer
+  const rc = await pool.query(
+    `UPDATE contratos_cursos_vagas v SET estado = 'ativa', convidado_em = NULL
+     FROM contratos_cursos k WHERE k.id = v.contrato_id AND v.usuario_id = $1 AND v.ativo AND v.estado = 'convidada'
+     RETURNING v.id, v.contrato_id, k.empresa_id`, [usuarioId]);
+  for (const v of rc.rows) {
+    await auditoria.registrar({ empresa_id: v.empresa_id, usuario_id: usuarioId, acao: 'vaga.convite_aceito', entidade: 'vaga_cursos',
+      entidade_id: v.id, depois: { contrato_cursos_id: v.contrato_id, usuario_id: usuarioId, estado: 'ativa' } });
+  }
+  return r.rowCount + rc.rowCount;
 }
+
+// Pessoa ainda tem alguma vaga (Conector ou cursos) esperando aceite? Se não, o link de convite pendente deixa de valer.
+const SEM_OUTRO_CONVITE = (p) => `NOT EXISTS (SELECT 1 FROM contratos_conector_vagas v WHERE v.usuario_id = ${p} AND v.ativo AND v.estado = 'convidada')
+  AND NOT EXISTS (SELECT 1 FROM contratos_cursos_vagas v WHERE v.usuario_id = ${p} AND v.ativo AND v.estado = 'convidada')`;
 
 /**
  * Convites que expiraram sem aceite: a vaga reservada volta a ficar livre.
@@ -598,7 +620,7 @@ function mesesAte(fimIso, hojeIso) {
  * pacote Empresa: a diferença da mensalidade × meses) e anuidade nova. Ciclo mensal: só a mensalidade muda.
  * Licença a menos: só a próxima cobrança diminui (sem estorno).
  */
-async function previaAlteracaoLicencas(db, k, delta, precosNovos = null) {
+async function previaAlteracaoLicencas(db, k, delta, precosNovos = null, { troca = null } = {}) {
   const atual = await quantidadesDoContrato(db, k.id);
   const novo = Object.fromEntries(Object.keys(PERFIS).map(p => [p, (atual[p] || 0) + (delta[p] || 0)]));
   if (Object.values(novo).some(n => n < 0)) throw new ErroRegra('O contrato não tem essas licenças para remover.');
@@ -611,7 +633,15 @@ async function previaAlteracaoLicencas(db, k, delta, precosNovos = null) {
   const vigente = k.status === 'ativo' && iso(k.data_inicio) <= hoje && iso(k.data_fim) >= hoje;
   const meses = vigente && ciclo === 'anual' ? mesesAte(iso(k.data_fim), hoje) : 0;
   let proporcional = [];
-  if (meses && Object.values(delta).some(n => n > 0)) {
+  if (troca) {
+    // Troca de perfil (ex.: Funcional → ABAP + Funcional): cobra só a diferença de preço, nos meses que faltam.
+    // No pacote Empresa o total de licenças não muda, então não há diferença. Troca para um perfil mais barato: sem estorno.
+    const dif = modalidade === 'empresa' ? 0 : r2((precos[troca.para] || 0) - (precos[troca.de] || 0));
+    if (meses && dif > 0) {
+      proporcional = [{ perfil: troca.para, rotulo: `${PERFIS[troca.de].nome} → ${PERFIS[troca.para].nome}`, quantidade: 1,
+        preco_mensal: dif, meses, total: r2(dif * meses) }];
+    }
+  } else if (meses && Object.values(delta).some(n => n > 0)) {
     if (modalidade === 'empresa') {
       const dif = r2(mensalidade(novo, precos, 'empresa') - mensalidade(atual, precos, 'empresa'));
       if (dif > 0) proporcional = [{ perfil: 'empresa', rotulo: 'diferença do pacote Empresa', quantidade: 1, preco_mensal: dif, meses, total: r2(dif * meses) }];
@@ -622,7 +652,7 @@ async function previaAlteracaoLicencas(db, k, delta, precosNovos = null) {
   }
   const cobrancaAtiva = cob && cob.status === 'ativo' ? cob : null;
   return {
-    atual, novo, precos, lista: base.lista, modalidade, ciclo, cobranca: cob,
+    atual, novo, precos, lista: base.lista, modalidade, ciclo, cobranca: cob, troca,
     valor_anual_atual: cob ? cob.valor : null,
     valor_anual_novo: valorCobranca(novo, precos, modalidade, ciclo),
     meses, proporcional,
@@ -664,7 +694,10 @@ async function aplicarNaCobranca(db, k, previa, usuarioId) {
   if (venc.getUTCDate() !== c.dia_vencimento || (venc - new Date(Date.UTC(a, m - 1, d))) / 86400000 < 5) venc = new Date(Date.UTC(a, m, c.dia_vencimento));
   const acrescentadas = Object.keys(PERFIS).filter(p => previa.novo[p] > (previa.atual[p] || 0))
     .map(p => `${previa.novo[p] - (previa.atual[p] || 0)} ${PERFIS[p].nome}`).join(', ');
-  const descricao = `Licenciamento do Conector SAP Marsh — licenças acrescentadas: ${acrescentadas}, proporcional a ${previa.meses} mês(es) até ${iso(k.data_fim).split('-').reverse().join('/')}.`;
+  const ate = `proporcional a ${previa.meses} mês(es) até ${iso(k.data_fim).split('-').reverse().join('/')}`;
+  const descricao = previa.troca
+    ? `Licenciamento do Conector SAP Marsh — mudança de perfil de licença (${PERFIS[previa.troca.de].nome} → ${PERFIS[previa.troca.para].nome}), diferença ${ate}.`
+    : `Licenciamento do Conector SAP Marsh — licenças acrescentadas: ${acrescentadas}, ${ate}.`;
   const { RETENCOES } = require('./faturamento');
   const f = await db.query(
     `INSERT INTO faturas (empresa_id, cliente_id, competencia, descricao, valor, data_vencimento, observacoes,
@@ -672,14 +705,53 @@ async function aplicarNaCobranca(db, k, previa, usuarioId) {
        ret_ir, ret_csll, ret_pis, ret_cofins, ret_inss)
      VALUES ($1, $2, date_trunc('month', $3::date)::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
     [k.empresa_id, k.cliente_id, hoje, descricao, previa.valor_proporcional, venc.toISOString().slice(0, 10),
-     `Proporcional das licenças acrescentadas ao contrato do Conector nº ${k.id} (${previa.proporcional
+     `Proporcional ${previa.troca ? 'da mudança de perfil de licença' : 'das licenças acrescentadas'} ao contrato do Conector nº ${k.id} (${previa.proporcional
        .map(l => `${l.quantidade} × R$ ${l.preco_mensal.toFixed(2)} × ${l.meses}`).join(' + ')}).`,
      c.emitir_nfse, c.codigo_servico || config.codigo_servico, c.nome_servico || config.nome_servico,
      c.aliquota_iss ?? config.aliquota_iss, c.reter_iss, usuarioId, ...RETENCOES.map(r => c[r] ?? config[r] ?? 0)]);
   return { fatura_id: f.rows[0].id };
 }
 
+/**
+ * Muda o perfil de uma licença (livre ou ocupada), ex.: Funcional → ABAP + Funcional. A pessoa continua na vaga e passa
+ * a ter os cursos do perfil novo; a licença do Conector dela (se já tiver) muda de plano. Cobrança: a anuidade/mensalidade
+ * passa ao preço do perfil novo e, no ciclo anual, sai uma fatura proporcional com a diferença (rascunho).
+ * Devolve { previa, fatura_id, usuario_id, de, para }.
+ */
+async function mudarPerfilVaga(k, vagaId, para, atorId) {
+  if (!PERFIS[para]) throw new ErroRegra('Perfil inválido.');
+  if (k.status === 'cancelado') throw new ErroRegra('Contrato cancelado não muda.');
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    await db.query('SELECT id FROM contratos_conector WHERE id = $1 FOR UPDATE', [k.id]);
+    const v = (await db.query(
+      'SELECT * FROM contratos_conector_vagas WHERE id = $1 AND contrato_id = $2 AND ativo FOR UPDATE', [vagaId, k.id])).rows[0];
+    if (!v) throw new ErroRegra('Licença não encontrada.');
+    if (v.perfil === para) throw new ErroRegra(`Esta licença já é ${PERFIS[para].nome}.`);
+    const de = v.perfil;
+    const previa = await previaAlteracaoLicencas(db, k, { [de]: -1, [para]: 1 }, null, { troca: { de, para } });
+    await db.query('UPDATE contratos_conector_vagas SET perfil = $2 WHERE id = $1', [v.id, para]);
+    if (v.usuario_id) {
+      await db.query(`UPDATE licencas SET plano = $3, data_atualizacao = NOW() WHERE vaga_id = $1 AND usuario_id = $2`,
+        [v.id, v.usuario_id, PERFIS[para].plano]);
+    }
+    const { fatura_id } = await aplicarNaCobranca(db, k, previa, atorId);
+    await auditoria.registrar({ empresa_id: k.empresa_id, usuario_id: atorId, acao: 'vaga.perfil_alterado', entidade: 'vaga_conector',
+      entidade_id: v.id, antes: { contrato_id: k.id, perfil: de, usuario_id: v.usuario_id },
+      depois: { contrato_id: k.id, perfil: para, usuario_id: v.usuario_id } }, db);
+    await db.query('COMMIT');
+    return { previa, fatura_id, usuario_id: v.usuario_id, de, para };
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    db.release();
+  }
+}
+
 module.exports = {
+  mudarPerfilVaga, sqlViaContratoCursos, VAGA_CURSOS_VIGENTE, SEM_OUTRO_CONVITE,
   PERFIS, TRILHAS, PERFIL_COBRE_CURSO, VAGA_VIGENTE, ErroRegra, sqlViaLiberacao, sqlViaBeneficio, sqlViaCompra,
   sqlCursoLiberado, papelPortal, acharOuCriarUsuario, enviarConvite, detalharContrato, cursosDoBeneficio,
   lerQuantidades, criarVagas, ocuparVaga, liberarVaga, ativarConvites, expirarConvites,

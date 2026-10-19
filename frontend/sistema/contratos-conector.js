@@ -195,11 +195,12 @@ async function abrirContratoConector(id, manterAberto) {
     const pessoa = v.usuario_id
       ? `<strong>${escapeHtml(v.usuario_nome)}</strong>${v.eh_gestor ? ' (gestor)' : ''}${v.estado === 'convidada' ? ' <span style="color:#b7791f">(convite pendente)</span>' : ''}<small class="fin-muted" style="display:block">${escapeHtml(v.usuario_email)}</small>`
       : '<span class="fin-muted">Livre</span>';
+    const mudar = k.status !== 'cancelado' ? `<button class="btn btn-secondary btn-sm" onclick="mudarPerfilVagaAdmin(${v.id}, '${v.perfil}')">Mudar perfil</button>` : '';
     const acoes = v.usuario_id
       ? `${v.eh_gestor ? '' : `<button class="btn btn-secondary btn-sm" onclick="conviteVagaAdmin(${v.id})">Reenviar convite</button>`}
-         <button class="btn btn-secondary btn-sm" onclick="liberarVagaAdmin(${v.id})">Liberar</button>`
+         <button class="btn btn-secondary btn-sm" onclick="liberarVagaAdmin(${v.id})">Liberar</button> ${mudar}`
       : `<button class="btn btn-secondary btn-sm" onclick="ocuparVagaAdmin(${v.id})">Passar para alguém</button>
-         <button class="btn btn-secondary btn-sm" onclick="ocuparVagaAdmin(${v.id}, true)">Gestor ocupa</button>
+         <button class="btn btn-secondary btn-sm" onclick="ocuparVagaAdmin(${v.id}, true)">Gestor ocupa</button> ${mudar}
          <button class="btn btn-icon btn-danger" title="Remover licença livre" aria-label="Remover licença livre" onclick="removerVagaAdmin(${v.id}, '${v.perfil}')">${iconSVG('trash')}</button>`;
     return `
       <tr>
@@ -427,6 +428,36 @@ async function removerVagaAdmin(vagaId, perfil) {
     : '';
   if (!confirm(`Remover esta licença livre do contrato?${efeito}`)) return;
   if (await acaoContrato(`/vagas/${vagaId}`, 'DELETE')) recarregarContrato();
+}
+
+// Mudar o perfil de uma licença (ex.: Funcional → ABAP + Funcional): mostra a conta e pede confirmação
+async function mudarPerfilVagaAdmin(vagaId, atual) {
+  const opcoes = PERFIS_CONECTOR.filter(([p]) => p !== atual);
+  const nomeAtual = (PERFIS_CONECTOR.find(([p]) => p === atual) || [, atual])[1];
+  const escolha = prompt(`Licença ${nomeAtual}. Mudar para:\n${opcoes.map(([, rotulo], i) => `${i + 1} = ${rotulo}`).join('\n')}\n\nDigite o número:`);
+  if (!escolha) return;
+  const op = opcoes[Number(escolha) - 1];
+  if (!op) { alert('Opção inválida.'); return; }
+  const [para, rotulo] = op;
+  const p = await acaoContrato(`/vagas/${vagaId}/perfil/previa?para=${para}`, 'GET');
+  if (!p) return;
+  let msg = `Mudar esta licença de ${nomeAtual} para ${rotulo}.\nA pessoa da vaga (se houver) passa a ver os cursos do perfil novo.`;
+  if (p.cobranca && p.cobranca.status === 'ativo') {
+    const nome = nomeCobrancaCiclo(p.ciclo);
+    msg += `\n\n• ${nome[0].toUpperCase() + nome.slice(1)}: ${formatMoeda(p.valor_anual_atual)} → ${formatMoeda(p.valor_anual_novo)} (a partir da próxima cobrança)`;
+    if (p.valor_proporcional > 0) {
+      msg += `\n• Fatura da diferença agora (rascunho no Faturamento):\n   ${p.proporcional.map(l => `${l.rotulo}: ${formatMoeda(l.preco_mensal)} × ${l.meses} mês(es) = ${formatMoeda(l.total)}`).join('\n   ')}`;
+    } else if (p.ciclo === 'mensal') {
+      msg += '\n• Cobrança mensal: a diferença já entra na próxima fatura.';
+    } else {
+      msg += '\n• Sem fatura agora (perfil mais barato ou sem diferença de preço; não há estorno).';
+    }
+  } else {
+    msg += '\n\nEste contrato não tem cobrança ativa: só o perfil muda.';
+  }
+  if (!confirm(msg + '\n\nConfirmar?')) return;
+  const r = await acaoContrato(`/vagas/${vagaId}/perfil`, 'POST', { perfil: para });
+  if (r) { alert(r.mensagem); recarregarContrato(); }
 }
 
 async function conviteVagaAdmin(vagaId) {
