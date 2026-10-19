@@ -115,8 +115,9 @@ const maisDias = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv
     // ===== Visão mensal: anual só no mês da cobrança (antes de existir contrato mensal do cliente) =====
     const vm = (await api(tokAdmin, `/financeiro/visao-mensal?inicio=${hoje().slice(0, 7)}&meses=12`)).body;
     const linha = vm.receitas.find(l => l.chave === `cli:${cli}`);
-    const mesesEstimados = linha ? Object.values(linha.celulas).filter(c => c.estimado).length : 0;
-    ok(linha && mesesEstimados === 1, `visão mensal: contratos anuais estimados em 1 mês só (${mesesEstimados})`);
+    // Anuais criados neste mês já ganham o rascunho real no mês da cobrança; os demais meses ficam vazios
+    const mesesComValor = linha ? Object.values(linha.celulas).filter(c => c.valor > 0).length : 0;
+    ok(linha && mesesComValor === 1, `visão mensal: contratos anuais aparecem em 1 mês só (${mesesComValor})`);
 
     // ===== Fase 3: pacote Empresa, ciclo mensal e proposta que vira contrato =====
     const gestorBase = { cliente_id: cli, gestor_nome: 'Gestor Unificado', gestor_email: `gestor-unif-${sufixo}@teste.com`, data_fim: fim };

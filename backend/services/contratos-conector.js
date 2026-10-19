@@ -678,6 +678,8 @@ async function aplicarNaCobranca(db, k, previa, usuarioId) {
     [cob.id, previa.valor_anual_novo, JSON.stringify(itensCobranca(previa.novo, previa.precos, modalidade, ciclo)),
      `Conector SAP — ${totalLicencas(previa.novo)} licença(s)${modalidade === 'empresa' ? ' (pacote Empresa)' : ''}`,
      descricaoCobranca(previa.novo, modalidade, ciclo), usuarioId]);
+  // Rascunhos ainda não aprovados passam a cobrar o valor novo
+  await require('./faturamento').atualizarRascunhosDoContrato(k.empresa_id, cob.id, db);
   if (previa.valor_anual_novo !== previa.valor_anual_atual) {
     await auditoria.registrar({ empresa_id: k.empresa_id, usuario_id: usuarioId, acao: 'contrato.alterado', entidade: 'contrato', entidade_id: cob.id,
       antes: { valor: previa.valor_anual_atual }, depois: { valor: previa.valor_anual_novo },

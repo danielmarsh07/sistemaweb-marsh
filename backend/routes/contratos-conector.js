@@ -391,6 +391,35 @@ router.delete('/clientes/:cid/admins/:uid', async (req, res) => {
   } catch (err) { responderErro(res, err, 'Erro ao remover administrador'); }
 });
 
+// POST /:id/cortesia — o contrato do Conector passa a não ter cobrança: rascunhos saem; o contrato financeiro é
+// apagado (sem outras faturas) ou encerrado (com faturas já aprovadas, para manter o histórico). Licenças continuam.
+router.post('/:id/cortesia', async (req, res) => {
+  const db = await pool.connect();
+  try {
+    const k = await contratoDaEmpresa(req);
+    if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
+    await db.query('BEGIN');
+    const cob = (await db.query('SELECT id FROM contratos WHERE contrato_conector_id = $1 FOR UPDATE', [k.id])).rows[0];
+    if (!cob) throw new cc.ErroRegra('Este contrato já está sem cobrança (cortesia).');
+    const rasc = await db.query(`DELETE FROM faturas WHERE contrato_id = $1 AND status = 'rascunho'`, [cob.id]);
+    const outras = (await db.query('SELECT COUNT(*)::int n FROM faturas WHERE contrato_id = $1', [cob.id])).rows[0].n;
+    if (outras) {
+      await db.query(`UPDATE contratos SET status = 'encerrado', contrato_conector_id = NULL, data_fim = COALESCE(data_fim, CURRENT_DATE), data_atualizacao = NOW() WHERE id = $1`, [cob.id]);
+    } else {
+      await db.query('DELETE FROM contratos WHERE id = $1', [cob.id]);
+    }
+    const auditoria = require('../services/auditoria');
+    await auditoria.registrar({ empresa_id: k.empresa_id, usuario_id: req.usuario.id, acao: 'contrato_conector.cortesia', entidade: 'contrato_conector',
+      entidade_id: k.id, antes: { contrato_financeiro_id: cob.id }, detalhe: `Sem cobrança: ${rasc.rowCount} rascunho(s) removido(s)` }, db);
+    await db.query('COMMIT');
+    res.json({ mensagem: `Contrato do Conector agora é cortesia (sem cobrança).${rasc.rowCount ? ` ${rasc.rowCount} rascunho(s) removido(s) do Faturamento.` : ''}`
+      + (outras ? ' O contrato financeiro foi encerrado (tinha faturas já aprovadas, que ficam no histórico).' : '') + ' As licenças continuam valendo.' });
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    responderErro(res, err, 'Erro ao tornar cortesia');
+  } finally { db.release(); }
+});
+
 // POST /:id/cobranca { valor_anual?, dia_vencimento? } — cria a cobrança (anual ou mensal, pelo ciclo) de um contrato que ainda não tem
 router.post('/:id/cobranca', async (req, res) => {
   const b = req.body || {};
@@ -401,7 +430,9 @@ router.post('/:id/cobranca', async (req, res) => {
     await db.query('BEGIN');
     const c = await cc.criarCobranca(db, k, { valor: b.valor_anual, dia_vencimento: b.dia_vencimento, usuarioId: req.usuario.id });
     await db.query('COMMIT');
-    res.status(201).json({ mensagem: `Cobrança ${c.ciclo === 'mensal' ? 'mensal' : 'anual'} de ${reais(c.valor)} criada. Veja em Financeiro → Contratos.`, contrato_financeiro_id: c.id });
+    const compRasc = await require('../services/faturamento').rascunhoDoMesAgora(emp(req), c.id).catch(() => null);
+    res.status(201).json({ mensagem: `Cobrança ${c.ciclo === 'mensal' ? 'mensal' : 'anual'} de ${reais(c.valor)} criada. Veja em Financeiro → Contratos.`
+      + (compRasc ? ' O rascunho deste mês já está no Faturamento.' : ''), contrato_financeiro_id: c.id });
   } catch (err) {
     await db.query('ROLLBACK').catch(() => {});
     responderErro(res, err, 'Erro ao criar a cobrança');
@@ -433,7 +464,9 @@ router.post('/', async (req, res) => {
 
     const { k, gestor, criado, cobranca } = r;
     const enviado = criado ? await cc.enviarConvite(gestor) : false;
-    const txtCobranca = cobranca ? ` Cobrança ${cobranca.ciclo === 'mensal' ? 'mensal' : 'anual'} de ${reais(cobranca.valor)} criada em Financeiro → Contratos.` : '';
+    const compRasc = cobranca ? await require('../services/faturamento').rascunhoDoMesAgora(emp(req), cobranca.id).catch(() => null) : null;
+    const txtCobranca = cobranca ? ` Cobrança ${cobranca.ciclo === 'mensal' ? 'mensal' : 'anual'} de ${reais(cobranca.valor)} criada em Financeiro → Contratos.`
+      + (compRasc ? ' O rascunho deste mês já está no Faturamento.' : '') : '';
     res.status(201).json({
       id: k.id, convite_enviado: enviado, contrato_financeiro_id: cobranca && cobranca.id,
       mensagem: (criado

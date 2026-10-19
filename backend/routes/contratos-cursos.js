@@ -231,6 +231,7 @@ router.post('/', async (req, res) => {
 
     // Depois do contrato gravado: convite ao gestor novo e as pessoas nas vagas (uma falha não desfaz o contrato)
     if (gestor && gestor.criado) gestor.convite_enviado = await cc.enviarConvite(gestor.usuario);
+    if (financeiroId) await require('../services/faturamento').rascunhoDoMesAgora(emp(req), financeiroId).catch(() => null);
     const resultados = [];
     for (const p of pessoas) {
       try {

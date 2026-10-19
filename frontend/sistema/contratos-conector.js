@@ -179,8 +179,9 @@ async function abrirContratoConector(id, manterAberto) {
     `${k.cpf_cnpj ? ` · CPF/CNPJ ${escapeHtml(k.cpf_cnpj)}` : ''} · origem: ${k.origem === 'loja' ? 'compra pelo site' : 'manual'}`;
   const mesesNome = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   document.getElementById('contrato-conector-cobranca').innerHTML = k.cobranca
-    ? `Cobrança: <strong>${formatMoeda(k.cobranca.valor)}${k.preco.ciclo === 'mensal' ? '/mês' : '/ano'}</strong> (${k.preco.ciclo === 'mensal' ? 'todo mês' : `em ${mesesNome[k.cobranca.mes_cobranca - 1]}`}, vencimento dia ${k.cobranca.dia_vencimento}) — contrato financeiro CT-${String(k.cobranca.id).padStart(4, '0')}${k.cobranca.status !== 'ativo' ? ` (${escapeHtml(k.cobranca.status)})` : ''}.`
-    : `<span style="color:#b7791f">Sem cobrança no Financeiro.</span> <button type="button" class="btn btn-secondary btn-sm" onclick="criarCobrancaConector()">Criar cobrança ${k.preco.ciclo === 'mensal' ? 'mensal' : 'anual'}</button>`;
+    ? `Cobrança: <strong>${formatMoeda(k.cobranca.valor)}${k.preco.ciclo === 'mensal' ? '/mês' : '/ano'}</strong> (${k.preco.ciclo === 'mensal' ? 'todo mês' : `em ${mesesNome[k.cobranca.mes_cobranca - 1]}`}, vencimento dia ${k.cobranca.dia_vencimento}) — contrato financeiro CT-${String(k.cobranca.id).padStart(4, '0')}${k.cobranca.status !== 'ativo' ? ` (${escapeHtml(k.cobranca.status)})` : ''}.
+       <button type="button" class="btn btn-secondary btn-sm" onclick="tornarCortesiaConector()">Tornar cortesia (sem cobrança)</button>`
+    : `<span style="color:#b7791f">Sem cobrança no Financeiro (cortesia).</span> <button type="button" class="btn btn-secondary btn-sm" onclick="criarCobrancaConector()">Criar cobrança ${k.preco.ciclo === 'mensal' ? 'mensal' : 'anual'}</button>`;
   const f = document.getElementById('form-contrato-conector');
   f.status.value = k.status;
   f.data_inicio.value = k.data_inicio;
@@ -344,6 +345,12 @@ async function verHistoricoContratoConector() {
     return `<li><strong>${escapeHtml(acao)}</strong> · ${escapeHtml(h.pessoa_nome || (h.dados && h.dados.email) || '')}${h.dados && h.dados.perfil ? ` (${escapeHtml(h.dados.perfil)})` : ''}
       <small class="fin-muted" style="display:block">${new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${h.feito_por ? ` · ${escapeHtml(h.feito_por)}` : ' · automático'}</small></li>`;
   }).join('')}</ul>` : '<span class="fin-muted">Nada registrado ainda.</span>';
+}
+
+async function tornarCortesiaConector() {
+  if (!confirm('Tornar este contrato do Conector cortesia?\n\n• Os rascunhos de fatura dele saem do Faturamento.\n• A cobrança para (faturas já aprovadas ficam no histórico).\n• As licenças continuam valendo normalmente.')) return;
+  const r = await acaoContrato('/cortesia');
+  if (r) { alert(r.mensagem); recarregarContrato(); }
 }
 
 async function criarCobrancaConector() {

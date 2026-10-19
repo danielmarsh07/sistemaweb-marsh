@@ -248,7 +248,7 @@ function descricaoFatura(c, inicio) {
  * automatico = true (rotina): também pula contrato cuja fatura do mês foi cancelada, para não recriar
  * o que o admin cancelou de propósito. Devolve o número de faturas criadas.
  */
-async function gerarRascunhos({ empresa_id, competencia, usuario_id = null, automatico = false }) {
+async function gerarRascunhos({ empresa_id, competencia, usuario_id = null, automatico = false, contratoId = null }) {
   const inicio = `${competencia}-01`;
   const config = await carregarConfig(empresa_id);
   const filtroFatura = automatico ? '' : `AND f.status <> 'cancelada'`;
@@ -257,8 +257,9 @@ async function gerarRascunhos({ empresa_id, competencia, usuario_id = null, auto
     const elegiveis = (await client.query(
       `SELECT ct.*, ${MES_COBRANCA} AS mes_cobranca_efetivo
        ${SQL_CONTRATOS_DA_COMPETENCIA}
-         AND NOT EXISTS (SELECT 1 FROM faturas f WHERE f.contrato_id = ct.id AND f.competencia = $2::date ${filtroFatura})`,
-      [empresa_id, inicio])).rows;
+         AND NOT EXISTS (SELECT 1 FROM faturas f WHERE f.contrato_id = ct.id AND f.competencia = $2::date ${filtroFatura})
+         ${contratoId ? 'AND ct.id = $3' : ''}`,
+      contratoId ? [empresa_id, inicio, contratoId] : [empresa_id, inicio])).rows;
     await client.query('BEGIN');
     let geradas = 0;
     for (const c of elegiveis) {
@@ -288,7 +289,45 @@ async function gerarRascunhos({ empresa_id, competencia, usuario_id = null, auto
   }
 }
 
+/**
+ * Contrato criado/editado depois que a geração automática do mês já rodou: o rascunho dele no mês corrente sai na hora
+ * (antes esperava a próxima volta da rotina ou o botão "Gerar faturas do mês"). Devolve a competência gerada ou null.
+ */
+async function rascunhoDoMesAgora(empresa_id, contratoId) {
+  const config = await carregarConfig(empresa_id);
+  if (config.geracao_automatica === false) return null;
+  const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  if (Number(hoje.slice(8, 10)) < Number(config.dia_geracao || 1)) return null;
+  const competencia = hoje.slice(0, 7);
+  return (await gerarRascunhos({ empresa_id, competencia, automatico: true, contratoId })) ? competencia : null;
+}
+
+/**
+ * Contrato editado: os rascunhos dele (ainda não aprovados) passam a seguir o contrato — valor, descrição,
+ * vencimento e dados fiscais. Fatura aprovada, paga ou cancelada não muda. Devolve quantos rascunhos mudaram.
+ */
+async function atualizarRascunhosDoContrato(empresa_id, contratoId, db = pool) {
+  const c = (await db.query('SELECT * FROM contratos WHERE id = $1 AND empresa_id = $2', [contratoId, empresa_id])).rows[0];
+  if (!c) return 0;
+  const config = await carregarConfig(empresa_id);
+  const rascunhos = (await db.query(
+    `SELECT id, to_char(competencia, 'YYYY-MM-DD') AS competencia FROM faturas WHERE contrato_id = $1 AND status = 'rascunho'`, [c.id])).rows;
+  for (const f of rascunhos) {
+    await db.query(
+      `UPDATE faturas SET valor = $2, descricao = $3,
+         data_vencimento = ($4::date + ($5::text || ' month')::interval + ($6::int - 1) * INTERVAL '1 day')::date,
+         emitir_nfse = $7, codigo_servico = $8, nome_servico = $9, aliquota_iss = $10, reter_iss = $11,
+         ret_ir = $12, ret_csll = $13, ret_pis = $14, ret_cofins = $15, ret_inss = $16, data_atualizacao = NOW()
+       WHERE id = $1 AND status = 'rascunho'`,
+      [f.id, c.valor, descricaoFatura(c, f.competencia), f.competencia, config.vencimento_mes_seguinte === false ? '0' : '1', c.dia_vencimento,
+       c.emitir_nfse, c.codigo_servico || config.codigo_servico, c.nome_servico || config.nome_servico,
+       c.aliquota_iss ?? config.aliquota_iss, c.reter_iss, ...RETENCOES.map(r => c[r] ?? config[r] ?? 0)]);
+  }
+  return rascunhos.length;
+}
+
 module.exports = {
+  rascunhoDoMesAgora, atualizarRascunhosDoContrato,
   SQL_CONTRATOS_DA_COMPETENCIA, MES_COBRANCA, gerarRascunhos,
   RETENCOES, sqlValorLiquido, COLUNAS_FATURA, carregarConfig, carregarFatura, carregarCliente,
   enviarEmailFatura, emitirNfse, sincronizarNfse, aposAtualizarNota, aprovarFatura,

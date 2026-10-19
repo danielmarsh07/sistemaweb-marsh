@@ -41,6 +41,7 @@ function validarRetencoes(b) {
   }
   return null;
 }
+const mesAnoBr = comp => `${['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][Number(comp.slice(5, 7)) - 1]}/${comp.slice(0, 4)}`;
 const competenciaValida = s => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(s || ''));
 const dataValida = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) && !isNaN(Date.parse(s));
 
@@ -250,7 +251,8 @@ router.post('/contratos', async (req, res) => {
       [...paramsContrato(b), emp(req), req.usuario.id]);
     await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'contrato.criado', entidade: 'contrato',
       entidade_id: r.rows[0].id, depois: diferenca({}, r.rows[0])?.depois });
-    res.status(201).json({ mensagem: 'Contrato criado!', id: r.rows[0].id });
+    const comp = await fat.rascunhoDoMesAgora(emp(req), r.rows[0].id).catch(err => { console.error('[financeiro] rascunho na criação:', err.message); return null; });
+    res.status(201).json({ mensagem: `Contrato criado!${comp ? ` O rascunho de ${mesAnoBr(comp)} já está no Faturamento.` : ''}`, id: r.rows[0].id });
   } catch (err) {
     if (err.code === '23505' && err.constraint === 'uq_contratos_conector_vinculo') return res.status(400).json({ erro: 'Este contrato do Conector já está ligado a outro contrato financeiro.' });
     erro500(res, 'Erro ao criar contrato', err);
@@ -279,7 +281,13 @@ router.put('/contratos/:id', async (req, res) => {
       await auditoria.registrar({ empresa_id: emp(req), usuario_id: req.usuario.id, acao: 'contrato.alterado', entidade: 'contrato',
         entidade_id: antes.id, ...dif });
     }
-    res.json({ mensagem: 'Contrato atualizado! Faturas já geradas não mudam.' });
+    // Rascunhos (ainda não aprovados) acompanham o contrato; o do mês sai na hora se ainda não existia
+    const atualizados = await fat.atualizarRascunhosDoContrato(emp(req), antes.id).catch(err => { console.error('[financeiro] rascunhos:', err.message); return 0; });
+    const comp = await fat.rascunhoDoMesAgora(emp(req), antes.id).catch(err => { console.error('[financeiro] rascunho na edição:', err.message); return null; });
+    res.json({ mensagem: 'Contrato atualizado!'
+      + (atualizados ? ` ${atualizados} rascunho(s) atualizado(s) com os dados novos.` : '')
+      + (comp ? ` O rascunho de ${mesAnoBr(comp)} foi criado no Faturamento.` : '')
+      + ' Faturas já aprovadas não mudam.' });
   } catch (err) {
     if (err.code === '23505' && err.constraint === 'uq_contratos_conector_vinculo') return res.status(400).json({ erro: 'Este contrato do Conector já está ligado a outro contrato financeiro.' });
     erro500(res, 'Erro ao atualizar contrato', err);

@@ -22,6 +22,12 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.7', data: '2026-10-19', destaques: [
+      'Contrato criado ou editado que já vale no mês ganha o rascunho de fatura na hora (antes só aparecia na próxima geração ou com "Gerar faturas do mês")',
+      'Editar o contrato (valor, vencimento, descrição) atualiza os rascunhos ainda não aprovados; faturas aprovadas não mudam',
+      'Mudar o preço ou as licenças do Conector também atualiza o rascunho do mês',
+      'Contrato do Conector ganhou o botão "Tornar cortesia (sem cobrança)": tira os rascunhos e a cobrança, e as licenças continuam'
+    ] },
     { versao: 'v5.6', data: '2026-10-19', destaques: [
       'Corrigido o erro ao excluir um usuário que ocupava uma licença do Conector: a licença (ou vaga de curso) fica livre e o usuário é excluído',
       'Quem é gestor de contrato, tem certificado, licença emitida ou compras na loja é desativado (com o motivo na mensagem) em vez de dar erro'
