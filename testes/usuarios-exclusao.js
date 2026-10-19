@@ -35,6 +35,30 @@ const BASE = 'http://localhost:3000/api/usuarios';
   }
   await api('DELETE', `/${b}/definitivo`);
 
+  // Usuário do portal numa vaga do Conector (com convite pendente) → apaga e a vaga fica livre;
+  // gestor do contrato → só desativa (o contrato precisa dele)
+  const cli = (await pool.query(`INSERT INTO clientes (nome, razao_social, email, empresa_id, ativo) VALUES ('TESTE Exclusao', 'TESTE EXCLUSAO LTDA', 'excl@exemplo.com', 1, TRUE) RETURNING id`)).rows[0].id;
+  const sufixo = Date.now();
+  const tokApi = async (p, m, b) => (await fetch('http://localhost:3000/api' + p, { method: m,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: b && JSON.stringify(b) })).json();
+  const k = await tokApi('/contratos-conector', 'POST', { cliente_id: cli, gestor_nome: 'TESTE Gestor Excl', gestor_email: `gestor-excl-${sufixo}@teste.local`,
+    vagas: { funcional: 1 }, data_fim: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10) });
+  const vaga = (await tokApi(`/contratos-conector/${k.id}`, 'GET')).body?.vagas?.[0] || (await tokApi(`/contratos-conector/${k.id}`, 'GET')).vagas[0];
+  await tokApi(`/contratos-conector/${k.id}/vagas/${vaga.id}/ocupar`, 'POST', { nome: 'TESTE Pessoa Vaga', email: `pessoa-excl-${sufixo}@teste.local` });
+  const pessoa = (await pool.query(`SELECT id FROM usuarios WHERE email = $1`, [`pessoa-excl-${sufixo}@teste.local`])).rows[0].id;
+  const r5 = await api('DELETE', `/${pessoa}/definitivo`);
+  const vagaDepois = (await pool.query('SELECT usuario_id, estado FROM contratos_conector_vagas WHERE id = $1', [vaga.id])).rows[0];
+  ok(r5.status === 200 && vagaDepois.usuario_id === null && vagaDepois.estado === 'livre', `usuário numa vaga: excluído e vaga livre (${r5.mensagem || r5.erro})`);
+  const gestor = (await pool.query(`SELECT id FROM usuarios WHERE email = $1`, [`gestor-excl-${sufixo}@teste.local`])).rows[0].id;
+  const r6 = await api('DELETE', `/${gestor}/definitivo`);
+  const g6 = (await pool.query('SELECT ativo FROM usuarios WHERE id = $1', [gestor])).rows[0];
+  ok(r6.status === 409 && g6 && g6.ativo === false && /gestor/.test(r6.erro), `gestor de contrato: desativado (${r6.erro})`);
+  await pool.query('DELETE FROM contratos_conector_vagas WHERE contrato_id = $1', [k.id]);
+  await pool.query('DELETE FROM contratos_conector WHERE id = $1', [k.id]);
+  await pool.query('DELETE FROM usuarios_tokens WHERE usuario_id = $1', [gestor]);
+  await pool.query('DELETE FROM usuarios WHERE id = $1', [gestor]);
+  await pool.query('DELETE FROM clientes WHERE id = $1', [cli]);
+
   // Não exclui a si mesmo
   const r3 = await api('DELETE', `/${eu.id}/definitivo`);
   ok(r3.status === 400, 'não exclui a própria conta');

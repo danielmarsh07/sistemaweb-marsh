@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.6', data: '2026-10-19', destaques: [
+      'Corrigido o erro ao excluir um usuário que ocupava uma licença do Conector: a licença (ou vaga de curso) fica livre e o usuário é excluído',
+      'Quem é gestor de contrato, tem certificado, licença emitida ou compras na loja é desativado (com o motivo na mensagem) em vez de dar erro'
+    ] },
     { versao: 'v5.5', data: '2026-10-19', destaques: [
       'Contrato de cursos agora é por pessoas: você define os cursos e o número de vagas, e só quem está numa vaga vê os cursos (antes valia para a empresa inteira)',
       'Ao criar o contrato de cursos já dá para informar as pessoas (nome e e-mail) e o gestor; quem é novo recebe o convite na hora',

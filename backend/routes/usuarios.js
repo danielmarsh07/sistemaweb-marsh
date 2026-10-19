@@ -279,26 +279,57 @@ router.delete('/:id/definitivo', apenasAdmin, async (req, res) => {
               (SELECT COUNT(*) FROM chamados_status_log WHERE usuario_id = $1)::int AS mudancas,
               (SELECT COUNT(*) FROM chamados_anexos WHERE usuario_id = $1)::int AS anexos,
               (SELECT COUNT(*) FROM chamados_avaliacao WHERE usuario_id = $1)::int AS avaliacoes,
-              (SELECT COUNT(*) FROM oportunidades_historico WHERE usuario_id = $1)::int AS notas`, [id])).rows[0];
+              (SELECT COUNT(*) FROM oportunidades_historico WHERE usuario_id = $1)::int AS notas,
+              (SELECT COUNT(*) FROM contratos_conector WHERE gestor_usuario_id = $1)::int AS gestor,
+              (SELECT COUNT(*) FROM certificados WHERE usuario_id = $1)::int AS certificados,
+              (SELECT COUNT(*) FROM licencas WHERE usuario_id = $1)::int AS licencas,
+              (SELECT COUNT(*) FROM pedidos WHERE usuario_id = $1)::int AS pedidos`, [id])).rows[0];
     const partes = [
       hist.chamados && `${hist.chamados} chamado(s)`, hist.comentarios && `${hist.comentarios} comentário(s)`,
       hist.mudancas && `${hist.mudancas} mudança(s) de status`, hist.anexos && `${hist.anexos} anexo(s)`,
-      hist.avaliacoes && `${hist.avaliacoes} avaliação(ões)`, hist.notas && `${hist.notas} registro(s) no funil`
+      hist.avaliacoes && `${hist.avaliacoes} avaliação(ões)`, hist.notas && `${hist.notas} registro(s) no funil`,
+      hist.gestor && `gestor de ${hist.gestor} contrato(s) do Conector`, hist.certificados && `${hist.certificados} certificado(s)`,
+      hist.licencas && `${hist.licencas} licença(s) do Conector emitida(s)`, hist.pedidos && `${hist.pedidos} compra(s) na loja`
     ].filter(Boolean);
-    if (partes.length) {
+    const desativar = async (motivo) => {
       await client.query('UPDATE usuarios SET ativo = FALSE WHERE id = $1', [id]);
       return res.status(409).json({
-        erro: `${alvo.nome} tem histórico no sistema (${partes.join(', ')}) e não pode ser apagado sem quebrar esse histórico. Ele foi desativado: não acessa mais o sistema.`,
+        erro: `${alvo.nome} tem histórico no sistema (${motivo}) e não pode ser apagado sem quebrar esse histórico. Ele foi desativado: não acessa mais o sistema.`,
         desativado: true
       });
-    }
+    };
+    if (partes.length) return desativar(partes.join(', '));
     await client.query('BEGIN');
+    // Vagas que a pessoa ocupa (ou convite pendente) voltam a ficar livres para outra pessoa
+    const vagas = (await client.query(
+      `UPDATE contratos_conector_vagas SET usuario_id = NULL, data_atribuicao = NULL, estado = 'livre', convidado_em = NULL
+       WHERE usuario_id = $1 RETURNING id, contrato_id, perfil`, [id])).rows;
+    const vagasCursos = (await client.query(
+      `UPDATE contratos_cursos_vagas SET usuario_id = NULL, data_atribuicao = NULL, estado = 'livre', convidado_em = NULL
+       WHERE usuario_id = $1 RETURNING id, contrato_id`, [id])).rows;
     await client.query('DELETE FROM cursos_progresso WHERE usuario_id = $1', [id]);
     await client.query('DELETE FROM atendimentos_lidos WHERE usuario_id = $1', [id]);
-    await client.query('DELETE FROM usuarios WHERE id = $1', [id]);
+    try {
+      await client.query('SAVEPOINT apagar');
+      await client.query('DELETE FROM usuarios WHERE id = $1', [id]);
+    } catch (err) {
+      // Outra ligação no banco que o sistema ainda não conhece: não apaga, desativa
+      if (err.code !== '23503') throw err;
+      await client.query('ROLLBACK');
+      return desativar(`ligado a ${err.table || 'outro registro'}`);
+    }
+    for (const v of vagas) {
+      await auditoria.registrar({ empresa_id, usuario_id: req.usuario.id, acao: 'vaga.liberada', entidade: 'vaga_conector', entidade_id: v.id,
+        antes: { contrato_id: v.contrato_id, perfil: v.perfil, usuario_id: id }, detalhe: 'Usuário excluído' }, client);
+    }
+    for (const v of vagasCursos) {
+      await auditoria.registrar({ empresa_id, usuario_id: req.usuario.id, acao: 'vaga.liberada', entidade: 'vaga_cursos', entidade_id: v.id,
+        antes: { contrato_cursos_id: v.contrato_id, usuario_id: id }, detalhe: 'Usuário excluído' }, client);
+    }
     await client.query('COMMIT');
     await auditoria.registrar({ empresa_id, usuario_id: req.usuario.id, acao: 'usuario.excluido', entidade: 'usuario', entidade_id: id, antes: { nome: alvo.nome, tipo: alvo.tipo } });
-    res.json({ mensagem: `Usuário ${alvo.nome} excluído.` });
+    const livres = vagas.length + vagasCursos.length;
+    res.json({ mensagem: `Usuário ${alvo.nome} excluído.${livres ? ` ${livres} vaga(s) que ele ocupava ficaram livres.` : ''}` });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     res.status(500).json({ erro: 'Erro ao excluir usuário', detalhe: err.message });
