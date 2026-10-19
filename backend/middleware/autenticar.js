@@ -29,6 +29,15 @@ async function autenticar(req, res, next) {
     if (!u || u.ativo === false || (u.sessao_versao || 0) !== (payload.sv || 0)) {
       return res.status(401).json({ erro: 'Sua sessão foi encerrada. Faça login novamente.' });
     }
+    // Simulador de acesso: o administrador vê o sistema como o usuário, mas não altera nada em nome dele
+    if (payload.simulado_por) {
+      const adm = (await pool.query(
+        `SELECT 1 FROM usuarios WHERE id = $1 AND ativo = TRUE AND tipo IN ('admin_empresa','admin_sistema')`, [payload.simulado_por])).rows[0];
+      if (!adm) return res.status(401).json({ erro: 'A simulação de acesso foi encerrada.' });
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        return res.status(403).json({ erro: 'Simulação de acesso: somente visualização. Volte ao seu acesso para fazer alterações.' });
+      }
+    }
   } catch (err) {
     return next(err);
   }

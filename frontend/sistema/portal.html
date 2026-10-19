@@ -396,6 +396,32 @@
 
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 
+    /* Novo chamado SAP: passos (servidor → tipo → detalhes), servidores em cartões e tipos em blocos */
+    .nc-bloco { border: 0; margin: 0 0 1.25rem; padding: 0; min-width: 0; }
+    .nc-bloco[hidden] { display: none; }
+    .nc-bloco legend { display: flex; align-items: center; gap: .5rem; font-size: .9rem; font-weight: 700;
+      color: var(--text-main); margin-bottom: .65rem; padding: 0; }
+    .nc-passo { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+      background: var(--primary); color: #fff; font-size: .72rem; font-weight: 700; flex-shrink: 0; }
+    .nc-servidores { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
+    .nc-servidor, .nc-tipo { position: relative; display: block; cursor: pointer; }
+    .nc-servidor input, .nc-tipo input { position: absolute; opacity: 0; pointer-events: none; }
+    .nc-servidor > span, .nc-tipo > span { display: flex; flex-direction: column; gap: 2px; height: 100%;
+      border: 1px solid var(--border-strong); border-radius: 10px; padding: .7rem .85rem; min-height: 44px;
+      transition: border-color .15s, box-shadow .15s, background .15s; }
+    .nc-servidor:hover > span, .nc-tipo:hover > span { border-color: var(--border-hover); }
+    .nc-servidor input:checked + span, .nc-tipo input:checked + span { border-color: var(--primary);
+      background: var(--bg-hover); box-shadow: 0 0 0 1px var(--primary); }
+    .nc-servidor input:focus-visible + span, .nc-tipo input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .nc-servidor strong { font-size: 1.05rem; letter-spacing: .04em; color: var(--text-main); }
+    .nc-servidor small, .nc-tipo small { font-size: .75rem; color: var(--text-muted); line-height: 1.3; }
+    .nc-servidor .nc-mandante { font-size: .7rem; color: var(--text-subtle); }
+    .nc-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: 1rem; }
+    .nc-tipo strong { font-size: .88rem; color: var(--text-main); }
+    .nc-dica { font-size: .78rem; color: var(--text-muted); margin-top: .5rem; }
+    .nc-dica:empty { display: none; }
+    @media (max-width: 480px) { .nc-tipos { grid-template-columns: 1fr; } }
+
     .btn-salvar {
       width: 100%;
       padding: 0.75rem;
@@ -2070,40 +2096,60 @@
   <div class="modal-overlay" id="modal-novo-chamado">
     <div class="modal-box">
       <div class="modal-top">
-        <h3>Abrir Novo Chamado</h3>
+        <h3>Abrir chamado SAP</h3>
         <button class="btn-fechar" onclick="fecharModal('modal-novo-chamado')">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- Servidores = sistemas SAP habilitados no contrato ativo do Conector (GET /api/chamados/sistemas-sap) -->
         <form id="form-novo-chamado" onsubmit="salvarNovoChamado(event)">
-          <div class="form-group">
-            <label>Título *</label>
-            <input type="text" name="titulo" required placeholder="Resumo do problema em uma frase">
-          </div>
-          <div class="form-row">
+          <fieldset class="nc-bloco" id="nc-bloco-servidor">
+            <legend><span class="nc-passo">1</span> Em qual servidor SAP acontece? <span class="obrig" title="Obrigatório">*</span></legend>
+            <div class="nc-servidores" id="nc-servidores" role="radiogroup" aria-label="Servidor SAP"></div>
+            <p class="nc-dica" id="nc-servidores-dica"></p>
+          </fieldset>
+
+          <fieldset class="nc-bloco">
+            <legend><span class="nc-passo" id="nc-passo-tipo">2</span> O que você precisa? <span class="obrig" title="Obrigatório">*</span></legend>
+            <div class="nc-tipos" role="radiogroup" aria-label="Tipo do chamado">
+              <label class="nc-tipo"><input type="radio" name="tipo_demanda" value="erro" required><span><strong>Erro</strong><small>Algo parou ou dá mensagem de erro</small></span></label>
+              <label class="nc-tipo"><input type="radio" name="tipo_demanda" value="duvida"><span><strong>Dúvida</strong><small>Como fazer algo no SAP</small></span></label>
+              <label class="nc-tipo"><input type="radio" name="tipo_demanda" value="melhoria"><span><strong>Melhoria</strong><small>Ajustar algo que já existe</small></span></label>
+              <label class="nc-tipo"><input type="radio" name="tipo_demanda" value="nova_funcionalidade"><span><strong>Nova funcionalidade</strong><small>Algo que ainda não existe</small></span></label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="nc-modulo">Módulo SAP</label>
+                <select name="modulo" id="nc-modulo">
+                  <option value="">Não sei / outro</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="nc-prioridade">Prioridade</label>
+                <select name="prioridade" id="nc-prioridade">
+                  <option value="baixa">Baixa: pode esperar</option>
+                  <option value="media" selected>Média: atrapalha o trabalho</option>
+                  <option value="alta">Alta: processo importante parado</option>
+                  <option value="critica">Crítica: produção parada</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="nc-bloco">
+            <legend><span class="nc-passo" id="nc-passo-detalhe">3</span> Conte o que aconteceu</legend>
             <div class="form-group">
-              <label>Prioridade</label>
-              <select name="prioridade">
-                <option value="baixa">Baixa</option>
-                <option value="media" selected>Média</option>
-                <option value="alta">Alta</option>
-                <option value="critica">Crítica</option>
-              </select>
+              <label for="nc-titulo">Título <span class="obrig" title="Obrigatório">*</span></label>
+              <input type="text" name="titulo" id="nc-titulo" required maxlength="200" placeholder="Ex.: Erro ao lançar a nota fiscal de entrada na MIGO">
             </div>
             <div class="form-group">
-              <label>Tecnologia</label>
-              <select name="tecnologia_id" id="select-tecnologia-portal">
-                <option value="">Nenhuma / Geral</option>
-              </select>
+              <label for="nc-transacao">Transação, programa ou relatório</label>
+              <input type="text" name="transacao" id="nc-transacao" maxlength="80" placeholder="Ex.: MIGO, VA01, ZFI_RELATORIO">
             </div>
-          </div>
-          <div class="form-group">
-            <label>Categoria</label>
-            <input type="text" name="categoria" placeholder="Ex: Bug, Dúvida, Solicitação, Acesso...">
-          </div>
-          <div class="form-group">
-            <label>Descrição detalhada</label>
-            <textarea name="descricao" rows="4" placeholder="O que aconteceu? Qual o erro? Quais passos para reproduzir? Anexe prints se possível."></textarea>
-          </div>
+            <div class="form-group">
+              <label for="nc-descricao">Descrição</label>
+              <textarea name="descricao" id="nc-descricao" rows="5" placeholder="O que você estava fazendo, a mensagem de erro (com o número, se aparecer) e os passos para repetir. Prints ajudam muito."></textarea>
+            </div>
+          </fieldset>
 
           <div class="form-group">
             <label>Anexos</label>
@@ -2190,6 +2236,7 @@
 
   <script src="chamado-conector.js"></script>
   <script src="portal-script.js"></script>
+  <script src="simulacao.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');

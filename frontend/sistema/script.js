@@ -1966,6 +1966,28 @@ async function preencherSelectsChamado() {
   const selTec = document.getElementById('select-tecnologia-chamado');
   selTec.innerHTML = '<option value="">Nenhuma tecnologia</option>' +
     tecnologias.map(t => `<option value="${t.id}">${t.nome} ${t.categoria ? '(' + t.categoria + ')' : ''}</option>`).join('');
+
+  if (!selCli.dataset.sapPronto) {
+    selCli.dataset.sapPronto = '1';
+    selCli.addEventListener('change', () => carregarServidoresChamado(selCli.value));
+  }
+  await carregarServidoresChamado('');
+}
+
+// Servidores SAP do chamado: os sistemas do contrato vigente do Conector do cliente (o servidor recusa outro SID).
+// manter = SID atual de um chamado em edição, mantido na lista mesmo que o contrato já tenha vencido.
+async function carregarServidoresChamado(clienteId, manter) {
+  const sel = document.getElementById('select-sid-chamado');
+  const selMod = document.getElementById('select-modulo-chamado');
+  const d = await apiFetch(`${API_URL}/chamados/sistemas-sap${clienteId ? `?cliente_id=${clienteId}` : ''}`)
+    .then(r => (r && r.ok ? r.json() : { sistemas: [], modulos: [] }));
+  if (selMod.options.length <= 1) selMod.insertAdjacentHTML('beforeend', d.modulos.map(m => `<option value="${m}">${m}</option>`).join(''));
+  const sistemas = d.sistemas.slice();
+  if (manter && !sistemas.some(s => s.sid === manter)) sistemas.push({ sid: manter, descricao: 'fora do contrato vigente' });
+  sel.innerHTML = !clienteId ? '<option value="">Escolha o cliente primeiro</option>'
+    : (sistemas.length ? '<option value="">Não informado</option>' : '<option value="">Sem servidor no contrato do Conector</option>') +
+      sistemas.map(s => `<option value="${escapeHtml(s.sid)}">${escapeHtml(s.sid)}${s.descricao ? ` · ${escapeHtml(s.descricao)}` : ''}</option>`).join('');
+  sel.value = manter || '';
 }
 
 let chamadosPaginacao = { page: 1, limit: 25 };
@@ -2023,7 +2045,8 @@ async function loadChamados() {
           ${escapeHtml(ch.titulo)}
           ${naoLidos > 0 ? `<span class="badge-novo-dash" title="${naoLidos} não lido(s)">${naoLidos}</span>` : ''}
         </div>
-        ${ch.origem === 'conector' ? `<div class="cc-selos-linha">${ChamadoConector.selos(ch)}</div>` : ''}
+        ${ch.origem === 'conector' ? `<div class="cc-selos-linha">${ChamadoConector.selos(ch)}</div>`
+          : ch.sid ? `<div class="cc-selos-linha"><span class="cc-selo" title="Servidor SAP">${escapeHtml(ch.sid)}${ch.modulo ? ` · ${escapeHtml(ch.modulo)}` : ''}</span></div>` : ''}
         ${auditMeta(ch)}
       </td>
       <td data-label="Cliente">${escapeHtml(ch.cliente_nome || '-')}</td>
@@ -2154,7 +2177,10 @@ async function salvarChamado() {
     cliente_id: form.cliente_id.value || null,
     tecnologia_id: form.tecnologia_id.value || null,
     prioridade: form.prioridade.value,
-    categoria: form.categoria.value
+    categoria: form.categoria.value,
+    sid: form.sid.value || null,
+    modulo: form.modulo.value || null,
+    tipo_demanda: form.tipo_demanda.value || null
   };
 
   if (chamadoEmEdicao) {
@@ -2222,6 +2248,9 @@ async function editarChamado(id) {
   form.tecnologia_id.value = ch.tecnologia_id || '';
   form.prioridade.value = ch.prioridade || 'media';
   form.categoria.value = ch.categoria || '';
+  await carregarServidoresChamado(ch.cliente_id || '', ch.sid || '');
+  form.modulo.value = ch.modulo || '';
+  form.tipo_demanda.value = ch.tipo_demanda || '';
 
   // Mostrar campo de status ao editar; esconder anexos (uso o painel do detalhe)
   document.getElementById('campo-status-chamado').style.display = 'block';
@@ -2258,6 +2287,9 @@ async function abrirDetalheChamado(id) {
     <div class="detalhe-chamado-grid">
       <div><strong>Cliente:</strong> ${escapeHtml(ch.cliente_nome || '-')}</div>
       <div><strong>Tecnologia:</strong> ${escapeHtml(ch.tecnologia_nome || '-')}</div>
+      ${ch.origem !== 'conector' && (ch.sid || ch.modulo || ch.tipo_demanda) ? `
+      <div><strong>Servidor SAP:</strong> ${escapeHtml(ch.sid || '-')}${ch.modulo ? ` · ${escapeHtml(ch.modulo)}` : ''}</div>
+      <div><strong>Tipo:</strong> ${escapeHtml({ erro: 'Erro', duvida: 'Dúvida', melhoria: 'Melhoria', nova_funcionalidade: 'Nova funcionalidade' }[ch.tipo_demanda] || '-')}</div>` : ''}
       <div><strong>Status:</strong> ${badgeStatus(ch.status)}</div>
       <div><strong>Prioridade:</strong> ${badgePrioridade(ch.prioridade)}</div>
       ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA:</strong> ${badgeSlaInlineDetalhe(ch.sla)}</div>` : ''}
@@ -3111,6 +3143,7 @@ function renderUsuarios() {
           : '<span style="background:#ef444420;color:#ef4444;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Inativo</span>'
         }</td>
         <td data-label="Ações" class="td-acoes">
+          ${ehVoce || u.ativo === false ? '' : `<button class="btn btn-icon" title="Simular acesso (ver o sistema como este usuário)" aria-label="Simular acesso" onclick="simularAcessoUsuario(${u.id})">${iconSVG('eye')}</button>`}
           <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="abrirEditarUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.tipo}', ${u.cliente_id || 'null'})">${iconSVG('edit')}</button>
           <button class="btn btn-icon btn-edit" title="Redefinir senha" aria-label="Redefinir senha" onclick="abrirResetSenha(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">${iconSVG('key')}</button>
           ${u.ativo !== false
@@ -3123,6 +3156,18 @@ function renderUsuarios() {
       </tr>
     `;
   }).join('');
+}
+
+// Simulador de acesso: entra como o usuário (só visualização) e volta pela faixa "Voltar ao meu acesso" (simulacao.js)
+async function simularAcessoUsuario(id) {
+  const u = _usuariosCache.find(x => x.id === id);
+  if (!u || !window.MarshSimulacao) return;
+  if (!confirm(`Simular o acesso de ${u.nome}?\n\nVocê vai ver o sistema exatamente como essa pessoa vê, por até 1 hora, só para visualizar (nada pode ser alterado). Para sair, use "Voltar ao meu acesso".`)) return;
+  const res = await apiFetch(`${API_URL}/usuarios/${id}/simular`, { method: 'POST' });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { alert(data.erro || 'Não foi possível simular o acesso.'); return; }
+  window.MarshSimulacao.iniciar(data.token, data.usuario);
 }
 
 let _filtroUsuariosTimer = null;

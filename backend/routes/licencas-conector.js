@@ -275,8 +275,7 @@ router.post('/uso', async (req, res) => {
 
 // ===== CHAMADOS PELO CONECTOR (ferramenta abrir_chamado) =====
 
-const TIPOS_DEMANDA = ['melhoria', 'erro', 'nova_funcionalidade', 'duvida'];
-const MODULOS = ['FI', 'CO', 'SD', 'MM', 'PP', 'PM', 'QM', 'HR', 'BASIS', 'ABAP', 'CPI', 'FISCAL', 'OUTRO'];
+const { TIPOS_DEMANDA, MODULOS } = require('../services/sap');
 const PRIORIDADES = ['baixa', 'media', 'alta', 'critica'];
 const RE_OBJETO = /^[A-Z0-9_/]+$/;
 const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

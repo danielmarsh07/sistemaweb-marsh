@@ -4,6 +4,7 @@ const pool = require('../db');
 const { notificarNovoChamado, notificarAtualizacaoStatus, notificarNovoAtendimento } = require('../services/email');
 const { calcularSla } = require('../services/sla');
 const storage = require('../services/storage');
+const sap = require('../services/sap');
 
 // Ordenação da listagem (?ordem=coluna&direcao=asc|desc). Lista fechada: nada do usuário entra cru no SQL.
 const ORDENS_CHAMADOS = {
@@ -323,6 +324,33 @@ router.post('/:id/aprovacao', async (req, res) => {
   }
 });
 
+// GET /sistemas-sap — servidores SAP que podem ser escolhidos no chamado (contratos vigentes do Conector) + listas SAP.
+// Cliente: sempre os da própria empresa. Equipe: ?cliente_id=.
+router.get('/sistemas-sap', async (req, res) => {
+  const cliente_id = req.usuario.tipo === 'cliente' ? req.usuario.cliente_id : parseInt(req.query.cliente_id) || null;
+  try {
+    res.json({ sistemas: await sap.sistemasDoCliente(cliente_id, req.usuario.empresa_id || 1), modulos: sap.MODULOS, tipos: sap.TIPOS_DEMANDA });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar os servidores SAP', detalhe: err.message });
+  }
+});
+
+// Confere servidor (SID), módulo e tipo do chamado. O servidor tem de ser um dos habilitados nos contratos vigentes
+// do cliente; para o cliente, escolher o servidor é obrigatório quando ele tem algum. Devolve { erro } ou os valores limpos.
+async function validarSap({ sid, modulo, tipo_demanda }, cliente_id, empresa_id, { exigirSid }) {
+  sid = String(sid || '').trim().toUpperCase() || null;
+  modulo = String(modulo || '').trim().toUpperCase() || null;
+  tipo_demanda = String(tipo_demanda || '').trim() || null;
+  if (modulo && !sap.MODULOS.includes(modulo)) return { erro: 'Módulo SAP inválido.' };
+  if (tipo_demanda && !sap.TIPOS_DEMANDA.includes(tipo_demanda)) return { erro: 'Tipo de chamado inválido.' };
+  const sistemas = await sap.sistemasDoCliente(cliente_id, empresa_id);
+  if (sid && !sistemas.some(s => s.sid === sid)) {
+    return { erro: `O servidor ${sid} não está habilitado no contrato ativo do Conector desta empresa.` };
+  }
+  if (!sid && exigirSid && sistemas.length) return { erro: 'Informe em qual servidor SAP o problema acontece.' };
+  return { sid, modulo, tipo_demanda };
+}
+
 // GET - Um chamado por ID (com atendimentos, status_log, avaliação, SLA)
 router.get('/:id', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
@@ -464,18 +492,22 @@ router.post('/', async (req, res) => {
   if (!cliente_id) return res.status(400).json({ erro: 'Cliente é obrigatório' });
 
   try {
+    const s = await validarSap(req.body, cliente_id, empresa_id, { exigirSid: isCliente });
+    if (s.erro) return res.status(400).json({ erro: s.erro });
     const result = await pool.query(
       `INSERT INTO chamados (
         empresa_id, cliente_id, tecnologia_id,
         aberto_por_usuario_id, atribuido_para_usuario_id,
-        titulo, descricao, prioridade, categoria, status, ativo
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aberto', TRUE)
+        titulo, descricao, prioridade, categoria, status, ativo,
+        sid, modulo, tipo_demanda
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aberto', TRUE, $10, $11, $12)
       RETURNING *`,
       [
         empresa_id, cliente_id || null, tecnologia_id || null,
         usuario_id, atribuido_para_usuario_id || null,
         titulo, descricao || null,
-        prioridade || 'media', categoria || null
+        prioridade || 'media', categoria || null,
+        s.sid, s.modulo, s.tipo_demanda
       ]
     );
     const chamado = result.rows[0];
@@ -521,12 +553,24 @@ router.put('/:id', async (req, res) => {
     const ch = atual.rows[0];
     const dataFechamento = (status === 'fechado' || status === 'resolvido') ? new Date() : ch.data_fechamento;
 
+    // Servidor/módulo/tipo SAP: só mexe no que veio no corpo; o servidor só é conferido se mudou
+    // (um chamado antigo continua com o SID dele mesmo que o contrato tenha vencido)
+    const b = req.body;
+    const sidNovo = 'sid' in b ? (String(b.sid || '').trim().toUpperCase() || null) : ch.sid;
+    const s = await validarSap({
+      sid: sidNovo !== ch.sid ? sidNovo : null,
+      modulo: 'modulo' in b ? b.modulo : ch.modulo,
+      tipo_demanda: 'tipo_demanda' in b ? b.tipo_demanda : ch.tipo_demanda
+    }, cliente_id || ch.cliente_id, empresa_id, { exigirSid: false });
+    if (s.erro) return res.status(400).json({ erro: s.erro });
+
     const result = await pool.query(
       `UPDATE chamados SET
         titulo=$1, descricao=$2, status=$3, prioridade=$4, categoria=$5,
         cliente_id=$6, tecnologia_id=$7, atribuido_para_usuario_id=$8,
         data_fechamento=$9,
-        atualizado_por_usuario_id=$10, data_atualizacao=NOW()
+        atualizado_por_usuario_id=$10, data_atualizacao=NOW(),
+        sid=$13, modulo=$14, tipo_demanda=$15
        WHERE id=$11 AND empresa_id=$12 RETURNING *`,
       [
         titulo || ch.titulo,
@@ -539,7 +583,8 @@ router.put('/:id', async (req, res) => {
         atribuido_para_usuario_id ?? ch.atribuido_para_usuario_id,
         dataFechamento,
         req.usuario.id,
-        req.params.id, empresa_id
+        req.params.id, empresa_id,
+        sidNovo, s.modulo, s.tipo_demanda
       ]
     );
     const chamado = result.rows[0];

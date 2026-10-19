@@ -103,7 +103,7 @@ Exclusiva do **super usuário** (`usuarios.super_usuario`, o dono do sistema): a
 
 - Acesso isolado: cada cliente vê apenas seus próprios chamados
 - Acompanhe status (aberto, em andamento, resolvido)
-- Abrir novos chamados
+- Abrir novos chamados, **focados em SAP** (desde a v5.8): servidor (SID), tipo (erro, dúvida, melhoria, nova funcionalidade), módulo, transação e descrição. Os servidores oferecidos são os sistemas do Conector (`contratos_conector.conexoes`) dos contratos **vigentes** do cliente (`status = 'ativo'` e dentro do período), vindos de `GET /api/chamados/sistemas-sap`; se a empresa tem algum, escolher o servidor é obrigatório e o servidor recusa SID fora dessa lista. Sem contrato com servidor, o chamado sai sem servidor. Teste: `testes/chamados-sap.js`.
 - Enviar comentários na timeline
 - **Mesmo visual do sistema** (desde a v4.6): usa o `styles.css` (menu lateral, cabeçalho, páginas, temas, barra de baixo e gaveta no celular). O CSS próprio do `portal.html` ficou só para os componentes do portal.
 - Telas (`TELAS_PORTAL` em `portal-script.js`): Início, Chamados, Treinamentos, Minha licença, Licenças da empresa, Conector SAP, Financeiro e Meus pedidos. Cada uma só aparece no menu se a pessoa tem aquilo (a seção `secao-*` deixa de estar `hidden`); quem só usa licença não vê Chamados. A barra de baixo do celular mostra as 4 primeiras + Menu. Teste: `testes/portal-tela.js`.
@@ -199,6 +199,7 @@ Authorization: Bearer <token>
 - `PUT /api/usuarios/:id` — Editar usuário
 - `PUT /api/usuarios/:id/senha` — Redefinir senha
 - `DELETE /api/usuarios/:id` — Desativar usuário
+- `POST /api/usuarios/:id/simular` — **Simulador de acesso** (v5.8): o administrador recebe um token de 1 h do usuário, marcado com `simulado_por`. O middleware `autenticar` só deixa ler (GET) com esse token e derruba a simulação se o administrador for desativado. Administrador comum não simula Admin Sistema; ninguém simula o super usuário. Fica na auditoria (`simular_acesso`). No navegador, `frontend/comum/simulacao.js` guarda o acesso do administrador, mostra a faixa "Voltar ao meu acesso" e o devolve no fim (ou quando o token vence). Teste: `testes/simulador-acesso.js`.
 
 ### Transações
 - `GET /api/transacoes` — Listar com resumo financeiro

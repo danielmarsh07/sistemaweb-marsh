@@ -260,7 +260,7 @@ async function carregarPortal() {
   }
   await Promise.all([
     carregarChamados(),
-    carregarTecnologias(),
+    carregarSistemasSap(),
     carregarTreinamentos(),
     carregarLicencasPortal(),
     carregarFinanceiroPortal(),
@@ -741,20 +741,36 @@ function filtrarLista(status) {
   return status ? todosOsChamados.filter(c => c.status === status) : todosOsChamados;
 }
 
-async function carregarTecnologias() {
-  const res = await apiFetch(`${API}/tecnologias`);
-  if (!res) return;
+// Servidores SAP do chamado: os sistemas habilitados para o Conector no contrato ativo da empresa.
+// Sem contrato ativo com servidor, o passo 1 some e o chamado vai sem servidor.
+let sistemasSap = [];
+async function carregarSistemasSap() {
+  const res = await apiFetch(`${API}/chamados/sistemas-sap`);
+  if (!res || !res.ok) return;
+  const d = await res.json();
+  sistemasSap = d.sistemas || [];
+  const sel = document.getElementById('nc-modulo');
+  if (sel) sel.insertAdjacentHTML('beforeend', (d.modulos || []).filter(m => m !== 'OUTRO')
+    .map(m => `<option value="${m}">${m}</option>`).join(''));
+}
 
-  const lista = await res.json();
-  const sel = document.getElementById('select-tecnologia-portal');
-  if (sel && Array.isArray(lista)) {
-    lista.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id;
-      opt.textContent = `${t.nome}${t.categoria ? ' (' + t.categoria + ')' : ''}`;
-      sel.appendChild(opt);
-    });
-  }
+function renderServidoresChamado() {
+  const temServidor = sistemasSap.length > 0;
+  document.getElementById('nc-bloco-servidor').hidden = !temServidor;
+  document.getElementById('nc-passo-tipo').textContent = temServidor ? '2' : '1';
+  document.getElementById('nc-passo-detalhe').textContent = temServidor ? '3' : '2';
+  document.getElementById('nc-servidores').innerHTML = sistemasSap.map((s, i) => `
+    <label class="nc-servidor">
+      <input type="radio" name="sid" value="${escapeHtml(s.sid)}"${i === 0 ? ' required' : ''}${sistemasSap.length === 1 ? ' checked' : ''}>
+      <span>
+        <strong>${escapeHtml(s.sid)}</strong>
+        <small>${escapeHtml(s.descricao || 'Sistema SAP')}</small>
+        ${s.mandante ? `<span class="nc-mandante">Mandante ${escapeHtml(s.mandante)}</span>` : ''}
+      </span>
+    </label>`).join('');
+  document.getElementById('nc-servidores-dica').textContent = temServidor
+    ? 'Esses são os servidores habilitados no contrato do Conector da sua empresa. Não achou o servidor? Fale com o administrador do contrato.'
+    : '';
 }
 
 // ===== STATS =====
@@ -801,6 +817,7 @@ function renderChamados(lista) {
         </div>
         ${ch.origem === 'conector' ? `<div class="cc-selos-linha">${ChamadoConector.selos(ch, true)}</div>` : ''}
         <div class="chamado-meta">
+          ${ch.origem !== 'conector' && ch.sid ? `<span title="Servidor SAP">🖥 ${escapeHtml(ch.sid)}${ch.modulo ? ` · ${escapeHtml(ch.modulo)}` : ''}</span>` : ''}
           ${ch.tecnologia_nome ? `<span>💻 ${escapeHtml(ch.tecnologia_nome)}</span>` : ''}
           <span>📅 ${formatData(ch.data_criacao)}</span>
           ${ch.total_atendimentos > 0 ? `<span>💬 ${ch.total_atendimentos} resposta(s)</span>` : ''}
@@ -830,6 +847,8 @@ function badgeSla(sla) {
   return '';
 }
 
+const ROTULO_TIPO_CHAMADO = { erro: 'Erro', duvida: 'Dúvida', melhoria: 'Melhoria', nova_funcionalidade: 'Nova funcionalidade' };
+
 // ===== DETALHE DO CHAMADO =====
 async function abrirDetalhe(id) {
   const res = await apiFetch(`${API}/chamados/${id}`);
@@ -845,12 +864,14 @@ async function abrirDetalhe(id) {
   document.getElementById('detalhe-info').innerHTML = `
     <div><strong>Status</strong>${badgeStatus(ch.status)}</div>
     <div><strong>Prioridade</strong>${badgePrioridade(ch.prioridade)}</div>
-    <div><strong>Tecnologia</strong>${escapeHtml(ch.tecnologia_nome || 'Geral')}</div>
+    ${ch.origem !== 'conector' && ch.sid ? `<div><strong>Servidor SAP</strong>${escapeHtml(ch.sid)}${ch.modulo ? ` · ${escapeHtml(ch.modulo)}` : ''}</div>` : ''}
+    ${ch.origem !== 'conector' && ch.tipo_demanda ? `<div><strong>Tipo</strong>${escapeHtml(ROTULO_TIPO_CHAMADO[ch.tipo_demanda] || ch.tipo_demanda)}</div>` : ''}
+    ${ch.tecnologia_nome || !ch.sid ? `<div><strong>Tecnologia</strong>${escapeHtml(ch.tecnologia_nome || 'Geral')}</div>` : ''}
     <div><strong>Aberto em</strong>${formatDataHora(ch.data_abertura)}</div>
     ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA</strong>${badgeSlaDetalhe(ch.sla)}</div>` : ''}
     ${ch.categoria ? `<div><strong>Categoria</strong>${escapeHtml(ch.categoria)}</div>` : ''}
     ${ch.data_fechamento ? `<div><strong>Fechado em</strong>${formatDataHora(ch.data_fechamento)}</div>` : ''}
-    ${ch.origem === 'conector' ? '' : `<div style="grid-column:1/-1"><strong>Descrição</strong>${escapeHtml(ch.descricao || '—')}</div>`}
+    ${ch.origem === 'conector' ? '' : `<div style="grid-column:1/-1;white-space:pre-line"><strong>Descrição</strong>${escapeHtml(ch.descricao || '—')}</div>`}
   `;
 
   // Chamado do Conector SAP: SID, módulo, objetos, pedido, especificação e a aprovação do gestor
@@ -1185,6 +1206,7 @@ let arquivosPendentes = []; // arquivos selecionados antes da criação do chama
 
 function abrirModalNovoChamado() {
   document.getElementById('form-novo-chamado').reset();
+  renderServidoresChamado();
   arquivosPendentes = [];
   renderListaPendentes();
   document.getElementById('upload-progresso').style.display = 'none';
@@ -1246,12 +1268,16 @@ async function salvarNovoChamado(e) {
   e.preventDefault();
   const form = e.target;
 
+  // A transação/programa vai no começo da descrição, para quem atende ver de cara onde olhar no SAP
+  const transacao = form.transacao.value.trim();
+  const descricao = form.descricao.value.trim();
   const dados = {
     titulo: form.titulo.value,
-    descricao: form.descricao.value,
+    descricao: [transacao && `Transação/programa: ${transacao}`, descricao].filter(Boolean).join('\n\n'),
     prioridade: form.prioridade.value,
-    tecnologia_id: form.tecnologia_id.value || null,
-    categoria: form.categoria ? form.categoria.value : null
+    sid: (form.querySelector('input[name="sid"]:checked') || {}).value || null,
+    modulo: form.modulo.value || null,
+    tipo_demanda: (form.querySelector('input[name="tipo_demanda"]:checked') || {}).value || null
     // cliente_id é inserido automaticamente pelo backend via usuario.cliente_id
   };
 

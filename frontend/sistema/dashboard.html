@@ -4030,6 +4030,31 @@
             </select>
           </div>
         </div>
+        <!-- Servidor SAP: só os sistemas do contrato vigente do Conector do cliente escolhido -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Servidor SAP</label>
+            <select name="sid" id="select-sid-chamado">
+              <option value="">Escolha o cliente primeiro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Módulo SAP</label>
+            <select name="modulo" id="select-modulo-chamado">
+              <option value="">—</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select name="tipo_demanda" id="select-tipo-chamado">
+            <option value="">—</option>
+            <option value="erro">Erro</option>
+            <option value="duvida">Dúvida</option>
+            <option value="melhoria">Melhoria</option>
+            <option value="nova_funcionalidade">Nova funcionalidade</option>
+          </select>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>Prioridade</label>
@@ -4511,6 +4536,7 @@
   <script src="loja.js"></script>
   <script src="tabela-ordenavel.js"></script>
   <script src="assistente-voz.js"></script>
+  <script src="simulacao.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');

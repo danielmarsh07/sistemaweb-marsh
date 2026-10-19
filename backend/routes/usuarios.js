@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const senhas = require('../services/senhas');
 const emailSvc = require('../services/email');
@@ -246,6 +247,52 @@ router.post('/:id/convite', apenasAdmin, async (req, res) => {
     res.json({ mensagem: `Link enviado para ${u.email} (vale ${senhas.PRAZO_H.convite} horas).` });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao enviar convite', detalhe: err.message });
+  }
+});
+
+// POST /:id/simular — o administrador entra como o usuário para ver o que ele vê (Simulador de acesso).
+// Gera um token curto (1 h) do usuário alvo marcado com simulado_por: o middleware autenticar deixa só ler
+// (GET) e confere a cada requisição se o administrador continua ativo. Fica registrado na auditoria.
+// Hierarquia: administrador comum não simula Admin Sistema; ninguém simula o super usuário.
+router.post('/:id/simular', apenasAdmin, async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  const id = parseInt(req.params.id);
+  if (id === req.usuario.id) return res.status(400).json({ erro: 'Você já está no seu próprio acesso.' });
+  try {
+    const admin = (await pool.query('SELECT id, nome, tipo, super_usuario FROM usuarios WHERE id = $1 AND ativo = TRUE', [req.usuario.id])).rows[0];
+    if (!admin) return res.status(403).json({ erro: 'Acesso restrito a administradores.' });
+    const alvo = (await pool.query(
+      `SELECT u.*, e.razao_social AS empresa_nome, e.nome_fantasia AS empresa_fantasia
+       FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id
+       WHERE u.id = $1 AND u.empresa_id = $2`, [id, empresa_id])).rows[0];
+    if (!alvo) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+    if (alvo.ativo === false) return res.status(400).json({ erro: 'Usuário desativado: reative para simular o acesso dele.' });
+    if (alvo.super_usuario) return res.status(403).json({ erro: 'O acesso do super usuário não pode ser simulado.' });
+    if (alvo.tipo === 'admin_sistema' && admin.tipo !== 'admin_sistema' && !admin.super_usuario) {
+      return res.status(403).json({ erro: 'Só um Admin Sistema pode simular outro Admin Sistema.' });
+    }
+
+    const tipo = alvo.tipo || 'admin_empresa';
+    const payload = {
+      id: alvo.id, nome: alvo.nome, email: alvo.email, empresa_id: alvo.empresa_id || 1, tipo,
+      cliente_id: alvo.cliente_id || null, sv: alvo.sessao_versao || 0,
+      simulado_por: admin.id
+    };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    await auditoria.registrar({ empresa_id, usuario_id: admin.id, acao: 'simular_acesso', entidade: 'usuario', entidade_id: alvo.id,
+      detalhe: `${admin.nome} simulou o acesso de ${alvo.nome} (${alvo.email})` });
+    res.json({
+      token,
+      usuario: {
+        id: alvo.id, nome: alvo.nome, email: alvo.email, empresa_id: alvo.empresa_id || 1, tipo,
+        cliente_id: alvo.cliente_id || null,
+        empresa_nome: alvo.empresa_fantasia || alvo.empresa_nome || 'Marsh Consultoria',
+        tema: alvo.tema || 'sereno',
+        simulado_por: admin.id, simulado_por_nome: admin.nome
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao simular o acesso', detalhe: err.message });
   }
 });
 

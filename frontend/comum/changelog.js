@@ -22,6 +22,12 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.8', data: '2026-10-19', destaques: [
+      'Novo Simulador de acesso: em Usuários, o botão do olho abre o sistema ou o portal exatamente como aquele usuário vê, só para visualizar (nada pode ser alterado), por até 1 hora',
+      'Durante a simulação uma faixa laranja mostra quem está sendo simulado, com o botão "Voltar ao meu acesso"; cada simulação fica registrada na auditoria',
+      'Abertura de chamado no portal focada em SAP: o cliente escolhe o servidor (só os habilitados no contrato ativo do Conector), o tipo (erro, dúvida, melhoria, nova funcionalidade), o módulo e a transação',
+      'O servidor SAP e o módulo aparecem na lista e no detalhe dos chamados, no portal e no sistema, e também no e-mail de chamado novo; a equipe pode escolher ou trocar o servidor ao cadastrar ou editar'
+    ] },
     { versao: 'v5.7', data: '2026-10-19', destaques: [
       'Contrato criado ou editado que já vale no mês ganha o rascunho de fatura na hora (antes só aparecia na próxima geração ou com "Gerar faturas do mês")',
       'Editar o contrato (valor, vencimento, descrição) atualiza os rascunhos ainda não aprovados; faturas aprovadas não mudam',

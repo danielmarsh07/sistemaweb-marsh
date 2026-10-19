@@ -173,7 +173,11 @@ async function notificarNovoChamado({ chamado, empresa_id, aberto_por }) {
           <tr>
             <td style="padding-right:16px;font-size:13px;color:#64748b">Prioridade:</td>
             <td style="font-size:13px;font-weight:600;color:#0f172a">${chamado.prioridade || 'Média'}</td>
-          </tr>
+          </tr>${chamado.sid ? `
+          <tr>
+            <td style="padding-right:16px;font-size:13px;color:#64748b">Servidor SAP:</td>
+            <td style="font-size:13px;font-weight:600;color:#0f172a">${esc(chamado.sid)}${chamado.modulo ? ` · ${esc(chamado.modulo)}` : ''}</td>
+          </tr>` : ''}
         </table>
       </div>
 
