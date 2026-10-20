@@ -323,7 +323,10 @@ function renderMinhasVagas() {
           ${l && st[0] === 'Ativa' ? `<button type="button" class="btn-curso" onclick="baixarPacoteVaga(this, ${v.id})">Baixar instalador</button>` : ''}
         </div>
         ${l && st[0] === 'Ativa' ? `<p class="ajuda">Descompacte o zip e execute <strong>Instalar.cmd</strong>. A sua chave já vai dentro do instalador:
-          você só informa o seu usuário e senha do SAP. A licença vale para 1 computador; para trocar, fale com o responsável pelo contrato.</p>` : ''}
+          você só informa o seu usuário e senha do SAP. A licença vale para 1 computador; para trocar, fale com o responsável pelo contrato.</p>
+          <p class="ajuda">O instalador é assinado pela Marsh Consultoria. <strong>Computador da empresa:</strong> a TI precisa confiar no
+          certificado da Marsh (arquivo <em>Marsh-Consultoria-assinatura.cer</em>, dentro do zip) ou instalar para você.
+          <strong>Computador sem TI:</strong> antes de descompactar, clique com o botão direito no zip, Propriedades, marque <em>Desbloquear</em> e OK.</p>` : ''}
       </div>`;
   }).join('');
 }

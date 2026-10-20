@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.6', data: '2026-10-20', destaques: [
+      'Instalador do Conector 0.5.0 assinado pela Marsh Consultoria, feito para não ser barrado por antivírus corporativo',
+      'O portal explica como instalar em computador de empresa (TI confia no certificado da Marsh) e em computador sem TI'
+    ] },
     { versao: 'v6.5', data: '2026-10-20', destaques: [
       'Licença do Conector mais protegida: cada validação exige a identificação do computador, então o limite de máquinas e a revogação sempre valem'
     ] },
