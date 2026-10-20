@@ -1414,7 +1414,7 @@ async function loadLicencas() {
       <td data-label="Status">${badgeLicenca(l)}</td>
       <td data-label="Último contato">${l.ultima_validacao ? new Date(l.ultima_validacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca'}</td>
       <td data-label="Ações" class="td-acoes">
-        <button class="btn btn-icon" title="Ver uso" aria-label="Ver uso" onclick="verUsoLicenca(${l.id})">${iconSVG('eye')}</button>
+        <button class="btn btn-icon" title="Ver licença (dados, servidores e uso)" aria-label="Ver licença" onclick="verUsoLicenca(${l.id})">${iconSVG('eye')}</button>
         <button class="btn btn-icon" title="Máquinas" aria-label="Máquinas" onclick="verMaquinasLicenca(${l.id})">${iconSVG('monitor')}</button>
         <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="editarLicenca(${l.id})">${iconSVG('edit')}</button>
         <button class="btn btn-icon" title="Gerar nova chave" aria-label="Gerar nova chave" onclick="novaChaveLicenca(${l.id})">${iconSVG('key')}</button>
@@ -1587,28 +1587,78 @@ async function cancelarLicenca(id) {
   loadLicencas();
 }
 
+// Ficha da licença (olho): dados, servidores SAP (os mesmos que aparecem ao abrir chamado), uso dos últimos 30 dias
+// e máquinas. Os dados vêm da listagem; o uso, de /licencas/:id/uso.
 async function verUsoLicenca(id) {
   const l = _licencasCache.find(x => x.id === id);
+  if (!l) return;
+  const modal = document.getElementById('modal-licenca-uso');
   const corpo = document.getElementById('licenca-uso-corpo');
-  document.getElementById('modal-licenca-uso-titulo').textContent = `Uso nos últimos 30 dias — ${l ? l.cliente_nome : ''}`;
-  corpo.textContent = 'Carregando...';
+  document.getElementById('modal-licenca-uso-titulo').textContent = l.cliente_nome;
+  document.getElementById('licenca-ficha-sub').textContent =
+    [`Licença ${PLANOS_LICENCA[l.plano] || l.plano}`, `${l.chave_prefixo}-••••-••••`, `válida até ${diaBr(l.data_fim)}`].join(' · ');
+  document.getElementById('licenca-ficha-editar').onclick = () => { closeModal(modal); editarLicenca(id); };
+
+  // Servidores SAP: as conexões cadastradas + SIDs da licença ainda sem dados de conexão
+  const conexoes = Array.isArray(l.conexoes) ? l.conexoes : [];
+  const semConexao = String(l.sids || '').split(',').map(s => s.trim().toUpperCase())
+    .filter(s => s && !conexoes.some(c => String(c.sid).toUpperCase() === s));
+  const linhasSap = [...conexoes.map(c => `
+      <tr>
+        <td data-label="SID"><strong>${escapeHtml(c.sid)}</strong></td>
+        <td data-label="Descrição">${escapeHtml(c.descricao || '—')}</td>
+        <td data-label="Mandante">${escapeHtml(c.mandante || '—')}</td>
+        <td data-label="Idioma">${escapeHtml(c.idioma || '—')}</td>
+        <td data-label="URL" class="licenca-url">${c.url ? escapeHtml(c.url) : '—'}</td>
+      </tr>`), ...semConexao.map(sid => `
+      <tr>
+        <td data-label="SID"><strong>${escapeHtml(sid)}</strong></td>
+        <td data-label="Descrição" colspan="4"><span class="fin-muted">sem dados de conexão (descrição, mandante, URL): complete em Editar licença</span></td>
+      </tr>`)];
+  const servidores = linhasSap.length ? `
+    <div class="table-container"><table>
+      <thead><tr><th>SID</th><th>Descrição</th><th>Mandante</th><th>Idioma</th><th>URL</th></tr></thead>
+      <tbody>${linhasSap.join('')}</tbody></table></div>
+    <p class="ficha-resumo">${linhasSap.length} servidor(es). Enquanto a licença estiver ativa, eles aparecem para o cliente ao abrir chamado.</p>`
+    : fichaVazio('Nenhum servidor cadastrado. Use Editar licença para incluir.');
+
+  corpo.innerHTML = [
+    fichaCaixa('Dados da licença', `
+      <div class="ficha-campos">
+        ${fichaLinha('Cliente', escapeHtml(l.cliente_nome))}
+        ${fichaLinha('Titular', escapeHtml([l.titular_nome, l.titular_email].filter(Boolean).join(' · ')) || '—')}
+        ${fichaLinha('Plano', escapeHtml(PLANOS_LICENCA[l.plano] || l.plano))}
+        ${fichaLinha('Status', badgeLicenca(l))}
+        ${fichaLinha('Vigência', `${diaBr(l.data_inicio)} a ${diaBr(l.data_fim)}`)}
+        ${fichaLinha('Chave', `${escapeHtml(l.chave_prefixo)}-••••-••••`)}
+        ${fichaLinha('Usuários (30 dias)', `${l.usuarios_ativos} de ${l.max_usuarios || 'ilimitados'}`)}
+        ${fichaLinha('Máquinas', `${l.maquinas_ativas} de ${l.max_maquinas || 'ilimitadas'} · ${l.maquinas_online_24h} online nas últimas 24h`)}
+        ${fichaLinha('Chamados do Conector', l.chamados_exigem_aprovacao !== false ? 'precisam da aprovação do cliente' : 'entram sem aprovação')}
+        ${fichaLinha('Último contato', l.ultima_validacao ? formatDataHora(l.ultima_validacao) + (l.versao_conector ? ` · versão ${escapeHtml(l.versao_conector)}` : '') : 'nunca')}
+        ${fichaLinha('Observações', escapeHtml(l.observacoes || ''))}
+      </div>`, null, 'ficha-caixa-larga'),
+    fichaCaixa('Servidores SAP', servidores, null, 'ficha-caixa-larga'),
+    fichaCaixa('Uso nos últimos 30 dias', '<div id="licenca-ficha-uso"><p class="fin-muted">Carregando...</p></div>',
+      { texto: 'Máquinas', acao: `closeModal(document.getElementById('modal-licenca-uso')); verMaquinasLicenca(${id})` }, 'ficha-caixa-larga')
+  ].join('');
   showModal('#modal-licenca-uso');
 
+  const alvo = document.getElementById('licenca-ficha-uso');
   const res = await apiFetch(`${API_URL}/licencas/${id}/uso`);
   if (!res) return;
   const u = await res.json();
-  if (!res.ok) { corpo.textContent = u.erro; return; }
+  if (!res.ok) { alvo.innerHTML = `<p class="fin-muted">${escapeHtml(u.erro)}</p>`; return; }
 
   const total = u.por_ferramenta.reduce((s, f) => s + f.chamadas, 0);
   const recusas = u.por_ferramenta.reduce((s, f) => s + f.recusas, 0);
-  corpo.innerHTML = `
+  alvo.innerHTML = `
     <div class="licenca-uso-resumo">
       <div><span>Chamadas</span><strong>${total.toLocaleString('pt-BR')}</strong></div>
-      <div><span>Usuários ativos</span><strong>${u.usuarios_ativos}${l && l.max_usuarios ? ' / ' + l.max_usuarios : ''}</strong></div>
+      <div><span>Usuários ativos</span><strong>${u.usuarios_ativos}${l.max_usuarios ? ' / ' + l.max_usuarios : ''}</strong></div>
       <div><span>Recusadas pelas travas</span><strong>${recusas.toLocaleString('pt-BR')}</strong></div>
-      <div><span>Sistemas</span><strong>${u.por_sid.map(s => escapeHtml(s.sid)).join(', ') || '-'}</strong></div>
+      <div><span>Sistemas usados</span><strong>${u.por_sid.map(s => escapeHtml(s.sid)).join(', ') || '-'}</strong></div>
     </div>
-    <p class="pagina-descricao">Somente contadores enviados pelo conector — nenhum código-fonte ou dado do SAP do cliente.</p>
+    <p class="ficha-resumo">Somente contadores enviados pelo conector — nenhum código-fonte ou dado do SAP do cliente.</p>
     ${u.por_ferramenta.length ? `
     <div class="table-container"><table>
       <thead><tr><th>Operação</th><th>Chamadas</th><th>Recusadas</th></tr></thead>
@@ -1618,8 +1668,7 @@ async function verUsoLicenca(id) {
           <td data-label="Chamadas">${f.chamadas.toLocaleString('pt-BR')}</td>
           <td data-label="Recusadas">${f.recusas.toLocaleString('pt-BR')}</td>
         </tr>`).join('')}
-      </tbody></table></div>` : '<p class="text-center">Nenhum uso registrado ainda.</p>'}
-  `;
+      </tbody></table></div>` : fichaVazio('Nenhum uso registrado ainda.')}`;
 }
 
 // Máquinas ativadas pelo instalador: revogar libera a vaga; reativar respeita o limite

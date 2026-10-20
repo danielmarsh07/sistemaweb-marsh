@@ -4000,14 +4000,20 @@
     </div>
   </div>
 
-  <!-- MODAL: USO DA LICENÇA (contadores dos últimos 30 dias) -->
+  <!-- MODAL: FICHA DA LICENÇA (olho): dados, servidores SAP, uso dos últimos 30 dias e máquinas -->
   <div id="modal-licenca-uso" class="modal">
-    <div class="modal-content modal-lg">
+    <div class="modal-content modal-ficha">
       <div class="modal-header">
-        <h3 id="modal-licenca-uso-titulo">Uso nos últimos 30 dias</h3>
-        <button class="btn-close">&times;</button>
+        <div class="ficha-titulo">
+          <h3 id="modal-licenca-uso-titulo">Licença</h3>
+          <span class="fin-sub" id="licenca-ficha-sub"></span>
+        </div>
+        <div class="ficha-acoes">
+          <button type="button" class="btn btn-secondary" id="licenca-ficha-editar">Editar licença</button>
+          <button class="btn-close">&times;</button>
+        </div>
       </div>
-      <div id="licenca-uso-corpo" class="licenca-uso-corpo">Carregando...</div>
+      <div id="licenca-uso-corpo" class="ficha-corpo">Carregando...</div>
     </div>
   </div>
 

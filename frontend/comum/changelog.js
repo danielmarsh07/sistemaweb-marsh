@@ -22,6 +22,11 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.2', data: '2026-10-19', destaques: [
+      'Em Licenças, o botão do olho agora abre a ficha completa da licença: titular, plano, status, vigência, limites de usuários e máquinas, último contato e os servidores SAP com descrição, mandante, idioma e URL',
+      'Servidor cadastrado na licença sem os dados de conexão aparece com um aviso para completar; a ficha também traz o uso dos últimos 30 dias e atalhos para Editar licença e Máquinas',
+      'Etiquetas de status nas fichas (cliente, usuário, licença) não ficam mais esticadas'
+    ] },
     { versao: 'v6.1', data: '2026-10-19', destaques: [
       'Os servidores SAP que aparecem ao abrir chamado agora vêm das licenças do Conector cadastradas para o cliente (tela Licenças), com descrição e mandante de lá; os sistemas do contrato vigente também continuam valendo',
       'Basta cadastrar um servidor novo (PI, S/4 DEV, PRD...) na licença ativa do cliente para ele aparecer no chamado, já na próxima vez que o formulário for aberto, sem precisar atualizar o portal; licença vencida ou suspensa não libera servidor'

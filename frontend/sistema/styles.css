@@ -3520,6 +3520,7 @@ svg.icon {
 }
 .licenca-uso-resumo span { display: block; font-size: 12px; color: var(--text-muted); }
 .licenca-uso-resumo strong { font-size: 20px; color: var(--text-main); font-variant-numeric: tabular-nums; }
+.licenca-url { word-break: break-all; font-size: 0.85em; }
 /* Grade editável de conexões SAP no modal da licença */
 .licenca-conexoes { overflow-x: auto; margin-bottom: 8px; }
 .licenca-conexoes table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -3904,7 +3905,7 @@ svg.icon {
 .ficha-caixa header a { font-size: 0.8rem; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; }
 .ficha-caixa header a:hover { text-decoration: underline; }
 .ficha-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px 20px; }
-.ficha-campo span { display: block; font-size: 0.75rem; color: var(--text-muted); }
+.ficha-campo > span { display: block; font-size: 0.75rem; color: var(--text-muted); }
 .ficha-campo strong { display: block; font-size: 0.88rem; font-weight: 500; color: var(--text-main); overflow-wrap: anywhere; }
 .ficha-aviso { margin: 12px 0 0; }
 .ficha-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
