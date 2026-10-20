@@ -1,6 +1,6 @@
 require('./_ambiente-local');
 // Licenças do conector: ativação por máquina (instalador), limite de máquinas, revogação,
-// conexões SAP pré-preenchidas, /validar com e sem maquina_hash, /minhas e /download do portal.
+// conexões SAP pré-preenchidas, /validar (maquina_hash obrigatório), /minhas e /download do portal.
 // O servidor local precisa de LICENCA_CHAVE_PRIVADA no ambiente para /validar assinar (senão 503).
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
@@ -150,18 +150,17 @@ const hash = s => crypto.createHash('sha256').update(s).digest('hex');
     const confere = b => pem && crypto.verify(null, Buffer.from(b.licenca_json, 'utf8'), crypto.createPublicKey(pem), Buffer.from(b.assinatura, 'base64'));
 
     const vSem = await conector('/validar', { chave, sid: 'DEV', versao: '1.0.1', usuario_hash: uh });
-    if (vSem.status === 503) {
+    ok(vSem.status === 400, `! /validar sem maquina_hash -> 400 (limite de máquinas e revogação sempre valem) (${vSem.status})`);
+    const vCom = await conector('/validar', { chave, sid: 'QAS', versao: '1.0.1', usuario_hash: uh, maquina_hash: M[1], nome_maquina: 'NB-TESTE-2' });
+    if (vCom.status === 503) {
       ok(false, '/validar 503: servidor sem LICENCA_CHAVE_PRIVADA (testes de assinatura não rodaram)');
     } else {
-      const p = JSON.parse(vSem.body.licenca_json);
-      ok(vSem.status === 200 && confere(vSem.body) && !('maquina_hash' in p), '/validar sem maquina_hash continua ok (assinado, sem maquina_hash)');
-      ok(JSON.stringify(p.conexoes) === JSON.stringify([
-           { sid: 'DEV', url: 'https://idce07.multi.dom:8011', mandante: '200' },
-           { sid: 'QAS', url: 'https://idcq07.multi.dom:8011', mandante: '300' }]),
-        `payload assinado traz conexoes {sid,url,mandante} só dos SIDs da licença (${JSON.stringify(p.conexoes)})`);
-      const vCom = await conector('/validar', { chave, sid: 'QAS', versao: '1.0.1', usuario_hash: uh, maquina_hash: M[1], nome_maquina: 'NB-TESTE-2' });
       const pc = vCom.status === 200 ? JSON.parse(vCom.body.licenca_json) : {};
       ok(vCom.status === 200 && confere(vCom.body) && pc.maquina_hash === M[1], '/validar com maquina_hash traz maquina_hash no payload assinado');
+      ok(JSON.stringify(pc.conexoes) === JSON.stringify([
+           { sid: 'DEV', url: 'https://idce07.multi.dom:8011', mandante: '200' },
+           { sid: 'QAS', url: 'https://idcq07.multi.dom:8011', mandante: '300' }]),
+        `payload assinado traz conexoes {sid,url,mandante} só dos SIDs da licença (${JSON.stringify(pc.conexoes)})`);
     }
     const vNova = await conector('/validar', { chave, sid: 'DEV', usuario_hash: uh, maquina_hash: M[3], nome_maquina: 'NB-TESTE-4' });
     ok(vNova.status === 403 && vNova.body?.motivo === 'maquinas', `! /validar máquina nova com limite cheio -> 403 maquinas (${vNova.body?.motivo})`);

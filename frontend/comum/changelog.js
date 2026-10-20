@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.5', data: '2026-10-20', destaques: [
+      'Licença do Conector mais protegida: cada validação exige a identificação do computador, então o limite de máquinas e a revogação sempre valem'
+    ] },
     { versao: 'v6.4', data: '2026-10-20', destaques: [
       'Sistemas SAP do contrato do Conector na mesma tabela das licenças, com até 10 sistemas (ex.: DEV, QAS, PRD, S/4HANA, Fiori)',
       'Saiu o campo "Máx. de SIDs" do contrato; no portal o gestor também cadastra até 10 sistemas',

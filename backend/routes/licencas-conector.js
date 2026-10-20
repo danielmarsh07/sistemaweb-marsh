@@ -4,7 +4,7 @@
  *
  * POST /ativar       { chave, maquina_hash, nome_maquina, usuario_windows?, versao? }
  *                                                        -> dados da licença + conexões SAP (instalador)
- * POST /validar      { chave, sid, versao, usuario_hash, maquina_hash?, nome_maquina? } -> licença assinada (Ed25519)
+ * POST /validar      { chave, sid, versao, usuario_hash, maquina_hash, nome_maquina? } -> licença assinada (Ed25519)
  * POST /uso          { chave, sid, usuario_hash, data, contadores: { ferramenta: {chamadas, recusas} } }
  * GET  /chave-publica                                    -> PEM para conferir a assinatura
  * POST /chamados          { chave, sid, usuario_hash, maquina_hash, titulo, tipo, modulo, pedido, especificacao, ... }
@@ -168,14 +168,9 @@ router.post('/validar', async (req, res) => {
   if (!RE_SID.test(sid) || !RE_HASH.test(usuario_hash)) {
     return res.status(400).json({ erro: 'sid e usuario_hash são obrigatórios.' });
   }
-  // maquina_hash é opcional: conectores antigos não mandam e seguem funcionando como antes
-  let maquina = null;
-  const mh = req.body?.maquina_hash;
-  if (mh !== undefined && mh !== null && mh !== '') {
-    const lido = lerMaquina(req.body, false);
-    if (lido.erro) return res.status(400).json({ erro: lido.erro });
-    maquina = lido.maquina;
-  }
+  // maquina_hash é obrigatório (conector 0.4.0+): sem ele o limite de máquinas e a revogação não valeriam
+  const { erro: erroMaquina, maquina } = lerMaquina(req.body, false);
+  if (erroMaquina) return res.status(400).json({ erro: 'Conector desatualizado: reinstale pelo portal da Marsh.' });
   try {
     const l = await buscarLicenca(chave);
     if (!l) return negar(res, 'chave', 'Licença inválida.');
@@ -198,10 +193,8 @@ router.post('/validar', async (req, res) => {
       }
     }
 
-    if (maquina) {
-      const recusaMaquina = await registrarMaquina(l, maquina);
-      if (recusaMaquina) return negar(res, ...recusaMaquina);
-    }
+    const recusaMaquina = await registrarMaquina(l, maquina);
+    if (recusaMaquina) return negar(res, ...recusaMaquina);
 
     await pool.query('UPDATE licencas SET ultima_validacao = NOW(), versao_conector = $1 WHERE id = $2',
       [String(versao || '').slice(0, 30) || null, l.id]);
@@ -222,10 +215,10 @@ router.post('/validar', async (req, res) => {
       // Sistemas SAP do próprio cliente: o conector recusa URL/mandante fora desta lista
       conexoes: conexoesDosSids(l.conexoes, sids).map(c => ({ sid: c.sid, url: c.url, mandante: c.mandante })),
       emitida_em: agora.toISOString(),
-      expira_em: expira.toISOString()
+      expira_em: expira.toISOString(),
+      // A licença assinada fica presa àquela máquina (cache copiado para outra não serve)
+      maquina_hash: maquina.maquina_hash
     };
-    // Só entra no payload assinado quando o conector mandou: a licença fica presa àquela máquina
-    if (maquina) payload.maquina_hash = maquina.maquina_hash;
     try {
       res.json(assinar(payload));
     } catch (e) {
