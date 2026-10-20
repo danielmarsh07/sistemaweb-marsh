@@ -64,6 +64,8 @@ const bloquearAluno = require('./backend/middleware/bloquear-aluno');
 const chamadosDoAluno = require('./backend/middleware/chamados-do-aluno');
 const lojaRoutes = require('./backend/routes/loja');
 const agenteRoutes = require('./backend/routes/agente');
+const consumoIaRoutes = require('./backend/routes/consumo-ia');
+const consumoIa = require('./backend/services/consumo-ia');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
@@ -88,6 +90,7 @@ app.use('/api/usuarios', autenticar, usuariosRoutes);
 app.use('/api/assistente', autenticar, bloquearAluno, assistenteRoutes);
 app.use('/api/licencas', autenticar, bloquearAluno, licencasRoutes);
 app.use('/api/agente', autenticar, apenasEquipe, agenteRoutes.equipe); // análise interna e chave do agente ABAP
+app.use('/api/consumo-ia', autenticar, apenasEquipe, consumoIaRoutes); // Financeiro → Consumo de IA (só admin)
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/contratos-conector', autenticar, contratosConectorRoutes);
 app.use('/api/contratos-cursos', autenticar, contratosCursosRoutes); // portal: só o gestor (/meus); o resto é admin (o router confere)
@@ -1534,6 +1537,44 @@ async function iniciar() {
         atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );`);
 
+    // 44. Consumo de IA (Financeiro): chave de ADMINISTRADOR de cada provedor (cifrada; só lê os custos), o gasto
+    //     diário buscado nas APIs de custos e as recargas lançadas à mão — nenhum provedor informa o saldo por API,
+    //     então saldo estimado = recargas − gasto desde a primeira recarga.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ia_provedores (
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        provedor VARCHAR(20) NOT NULL CHECK (provedor IN ('openai', 'anthropic')),
+        admin_chave_cifrada TEXT,
+        chave_prefixo VARCHAR(20),
+        limite_alerta_usd NUMERIC(12,2),
+        alerta_enviado_em TIMESTAMPTZ,
+        ultima_sincronizacao TIMESTAMPTZ,
+        ultimo_erro TEXT,
+        atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (empresa_id, provedor)
+      );`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ia_recargas (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        provedor VARCHAR(20) NOT NULL CHECK (provedor IN ('openai', 'anthropic')),
+        data DATE NOT NULL,
+        valor_usd NUMERIC(12,2) NOT NULL CHECK (valor_usd > 0),
+        observacao VARCHAR(200),
+        criado_por_usuario_id INTEGER,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ia_custos_diarios (
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        provedor VARCHAR(20) NOT NULL,
+        dia DATE NOT NULL,
+        valor_usd NUMERIC(14,6) NOT NULL DEFAULT 0,
+        detalhe JSONB,
+        atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (empresa_id, provedor, dia)
+      );`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);
@@ -1547,6 +1588,7 @@ async function iniciar() {
     console.log(`📊 Dashboard: http://localhost:${PORT}`);
     financeiroJobs.iniciar(); // NFS-e pendentes + lembretes de faturas vencidas, a cada hora
     marketingJobs.iniciar();  // Instagram: posts agendados a cada 5 min + token/seguidores/métricas 1x por dia
+    consumoIa.iniciar();      // Consumo de IA: gasto na OpenAI/Anthropic a cada 6 h + alerta de saldo baixo
   });
 }
 

@@ -3531,6 +3531,19 @@ svg.icon {
 .licenca-conexoes .cx-mandante { width: 76px; }
 .licenca-conexoes .cx-url { min-width: 200px; }
 .licenca-conexoes .cx-porta { width: 76px; }
+/* Financeiro → Consumo de IA (consumo-ia.js) */
+.ia-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+.ia-card { display: flex; flex-direction: column; gap: 8px; }
+.ia-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ia-topo h3 { margin: 0; font-size: 1.1rem; }
+.ia-sinc { margin-left: auto; font-size: 12px; }
+.ia-onde { margin: 0; font-size: 13px; }
+.ia-erro { margin: 0; padding: 6px 10px; border-radius: 8px; background: #fbebeb; color: #b91c1c; font-size: 13px; }
+.ia-alerta strong { color: #dc2626; }
+.ia-sub { margin: 10px 0 2px; font-size: 13px; color: var(--text-muted); font-weight: 600; }
+.ia-grafico { min-height: 170px; }
+.ia-form { align-items: end; flex-wrap: wrap; }
+@media (max-width: 768px) { .ia-cards { grid-template-columns: 1fr; } .ia-sinc { margin-left: 0; width: 100%; } }
 .licenca-conexoes .cx-producao-cel { text-align: center; }
 .licenca-conexoes .cx-producao { width: 18px; height: 18px; padding: 0; accent-color: #dc2626; cursor: pointer; }
 .licenca-conexoes .cx-vazio { color: var(--text-muted); font-size: 12.5px; padding: 6px 4px; }

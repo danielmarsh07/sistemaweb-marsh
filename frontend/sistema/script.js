@@ -490,6 +490,7 @@ function showPage(page, opcoes = {}) {
     roteiro: 'Roteiro de uso',
     versoes: 'Versões',
     'visao-mensal': 'Visão mensal',
+    'consumo-ia': 'Consumo de IA',
     'contas-financeiras': 'Contas e cartões',
     'categorias-despesa': 'Categorias de despesa',
     alertas: 'Alertas do sistema',
@@ -524,6 +525,7 @@ function showPage(page, opcoes = {}) {
   if (page === 'contratos-conector') loadContratosConector();
   if (page === 'relatorios') loadRelatorios();
   if (page === 'visao-mensal') loadVisaoMensal();
+  if (page === 'consumo-ia') loadConsumoIa();
   if (page === 'contas-financeiras') loadPaginaContasFinanceiras();
   if (page === 'categorias-despesa') loadPaginaCategoriasDespesa();
   if (page === 'alertas') loadAlertas();

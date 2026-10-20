@@ -134,6 +134,9 @@
         </button>
         <div class="nav-group-itens" id="nav-grupo-financeiro">
           <div class="nav-group-inner">
+          <a href="#" data-page="consumo-ia" class="nav-link">
+            <svg class="icon"><use href="#i-dash"/></svg> Consumo de IA
+          </a>
           <a href="#" data-page="contas-pagar" class="nav-link">
             <svg class="icon"><use href="#i-trend-down"/></svg> Contas a pagar
           </a>
@@ -1538,6 +1541,22 @@
       </section>
 
       <!-- ========== ALERTAS DO SISTEMA (cadastros.js) ========== -->
+      <!-- ========== CONSUMO DE IA (consumo-ia.js): gasto OpenAI/Anthropic e saldo estimado pelas recargas ========== -->
+      <section id="consumo-ia-page" class="page">
+        <div class="page-header">
+          <h2>Consumo de IA</h2>
+          <div class="page-header-acoes">
+            <button type="button" class="btn btn-secondary" onclick="sincronizarConsumoIa(this)">Atualizar agora</button>
+          </div>
+        </div>
+        <p class="pagina-descricao">
+          Quanto a Marsh gasta com a OpenAI (Ivy) e com a Anthropic (sap_analytics e Agente ABAP). O gasto vem das APIs de custos de cada
+          provedor, atualizado a cada 6 horas. Nenhum dos dois informa o saldo por API: lance cada recarga e o sistema calcula o saldo estimado
+          e avisa por e-mail quando ele ficar abaixo do limite.
+        </p>
+        <div id="consumo-ia-cards" class="ia-cards"></div>
+      </section>
+
       <section id="alertas-page" class="page">
         <div class="page-header">
           <h2>Alertas do sistema</h2>
@@ -4573,6 +4592,7 @@
   <script src="contratos-cursos.js"></script>
   <script src="relatorios.js"></script>
   <script src="visao-mensal.js"></script>
+  <script src="consumo-ia.js"></script>
   <script src="marketing.js"></script>
   <script src="cadastros.js"></script>
   <script src="loja.js"></script>

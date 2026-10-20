@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.2', data: '2026-10-20', destaques: [
+      'Financeiro → Consumo de IA: gasto diário e do mês na OpenAI e na Anthropic, buscado direto nas contas a cada 6 horas',
+      'Saldo estimado de crédito pelas recargas lançadas, com aviso por e-mail quando ficar abaixo do limite'
+    ] },
     { versao: 'v7.1', data: '2026-10-20', destaques: [
       'Agente ABAP: analisa sozinho os chamados novos do Conector e deixa no chamado a "Análise da Marsh" (causa, correção sugerida, horas, riscos), que só a equipe vê, com aviso por e-mail',
       'Licenças → Agente ABAP: gerar e revogar a chave que o agente usa'
