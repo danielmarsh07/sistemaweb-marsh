@@ -1343,7 +1343,7 @@ async function loadInstaladorConector() {
     info.textContent = 'Storage (S3/R2) não configurado no servidor: configure as variáveis S3_* no Render para publicar.';
   } else if (atual) {
     const mb = (Number(atual.tamanho_bytes) / 1048576).toFixed(1);
-    const quando = new Date(atual.data_publicacao).toLocaleString('pt-BR');
+    const quando = new Date(atual.data_publicacao).toLocaleString('pt-BR', { timeZone: FUSO_BR });
     info.innerHTML = `Versão <strong>${escapeHtml(atual.versao)}</strong> (${mb} MB), publicada em ${escapeHtml(quando)}. ` +
       `É a que o portal entrega aos clientes com licença ativa. SHA-256: <code>${escapeHtml(atual.sha256.slice(0, 16))}…</code>`;
   } else {
@@ -1412,7 +1412,7 @@ async function loadLicencas() {
       <td data-label="Sistemas">${escapeHtml(l.sids.replace(/,/g, ', '))}</td>
       <td data-label="Validade">${diaBr(l.data_fim)}</td>
       <td data-label="Status">${badgeLicenca(l)}</td>
-      <td data-label="Último contato">${l.ultima_validacao ? new Date(l.ultima_validacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca'}</td>
+      <td data-label="Último contato">${l.ultima_validacao ? new Date(l.ultima_validacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR }) : 'nunca'}</td>
       <td data-label="Ações" class="td-acoes">
         <button class="btn btn-icon" title="Ver licença (dados, servidores e uso)" aria-label="Ver licença" onclick="verUsoLicenca(${l.id})">${iconSVG('eye')}</button>
         <button class="btn btn-icon" title="Máquinas" aria-label="Máquinas" onclick="verMaquinasLicenca(${l.id})">${iconSVG('monitor')}</button>
@@ -1705,7 +1705,7 @@ async function verUsoLicenca(id) {
 
 // Máquinas ativadas pelo instalador: revogar libera a vaga; reativar respeita o limite
 let licencaMaquinasAtual = null;
-const dataHoraBr = v => (v ? new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca');
+const dataHoraBr = v => (v ? new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR }) : 'nunca');
 
 async function verMaquinasLicenca(id) {
   licencaMaquinasAtual = id;

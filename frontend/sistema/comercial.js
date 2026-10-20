@@ -204,7 +204,7 @@ async function abrirOportunidade(id) {
   renderPropostasOportunidade(o);
   document.getElementById('op-historico').innerHTML = o.historico.map(h => `
     <div class="op-hist-item op-hist-${h.tipo}">
-      <span class="op-hist-data">${new Date(h.data_criacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${h.usuario_nome ? ` · ${escapeHtml(h.usuario_nome)}` : ''}</span>
+      <span class="op-hist-data">${new Date(h.data_criacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR })}${h.usuario_nome ? ` · ${escapeHtml(h.usuario_nome)}` : ''}</span>
       <div class="op-hist-texto">${escapeHtml(h.texto)}</div>
     </div>`).join('') || '<p class="fin-muted">Sem registros.</p>';
   if (!jaAberto) showModal('#modal-oportunidade');

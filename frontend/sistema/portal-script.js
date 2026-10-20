@@ -621,7 +621,7 @@ async function abrirHistoricoLicencas(contratoId) {
   if (!res || !res.ok) { lista.innerHTML = '<li>Não foi possível carregar.</li>'; return; }
   const itens = await res.json();
   lista.innerHTML = itens.length ? itens.map(h => {
-    const quando = new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    const quando = new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR });
     const perfil = h.dados && h.dados.perfil ? ` (${escapeHtml(h.dados.perfil)})` : '';
     const acao = h.acao === 'vaga.ocupada' && h.dados && h.dados.estado === 'convidada' ? 'Convite enviado' : (ACOES_LICENCA[h.acao] || h.acao);
     return `<li><strong>${escapeHtml(acao)}</strong>${perfil} · ${escapeHtml(h.pessoa_nome || h.dados?.email || '')}

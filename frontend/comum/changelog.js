@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.8', data: '2026-10-20', destaques: [
+      'Corrigidas as horas que apareciam no fuso do computador e não no de Brasília: último contato e máquinas do Conector, histórico das licenças, comercial, cadastros, financeiro e loja'
+    ] },
     { versao: 'v6.7', data: '2026-10-20', destaques: [
       'Sistemas SAP com campo Porta (contrato, licença e portal do gestor): o instalador do Conector já recebe o servidor com a porta certa',
       'A ficha da licença mostra a porta de cada servidor SAP ("padrão" quando não informada)'

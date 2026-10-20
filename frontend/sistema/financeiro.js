@@ -706,7 +706,7 @@ async function carregarHistoricoContrato(id) {
   const linhas = await res.json();
   if (!linhas.length) { box.textContent = 'Sem alterações registradas (o histórico começou na versão 3.6).'; return; }
   box.innerHTML = `<ul class="fin-lista-itens">${linhas.map(h => {
-    const quando = new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    const quando = new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR });
     let detalhe = '';
     if (h.acao === 'contrato.reajustado' && h.depois) {
       detalhe = `${formatMoeda(h.antes.valor)} → ${formatMoeda(h.depois.valor)} (${h.depois.percentual}%)`;

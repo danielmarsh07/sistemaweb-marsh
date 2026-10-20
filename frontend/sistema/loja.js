@@ -124,7 +124,7 @@ async function loadPedidosLoja() {
       p.cliente_id && `<button class="btn btn-secondary btn-sm" onclick="abrirFichaCliente(${p.cliente_id})">Ficha</button>`
     ].filter(Boolean).join(' ');
     return `<tr>
-      <td data-label="Pedido"><strong>#${p.id}</strong><span class="loja-sub">${new Date(p.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${p.origem ? ' · ' + escapeHtml(p.origem) : ''}</span></td>
+      <td data-label="Pedido"><strong>#${p.id}</strong><span class="loja-sub">${new Date(p.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR })}${p.origem ? ' · ' + escapeHtml(p.origem) : ''}</span></td>
       <td data-label="Comprador"><strong>${escapeHtml(p.nome)}</strong><span class="loja-sub">${escapeHtml(p.email)} · ${escapeHtml(p.cpf_cnpj || '')}</span></td>
       <td data-label="Oferta">${escapeHtml(p.oferta)}${p.cupom ? `<span class="loja-sub">cupom ${escapeHtml(p.cupom)}</span>` : ''}
         ${p.itens ? `<span class="loja-sub">${Object.entries(p.itens).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${{ abap: 'ABAP', funcional: 'Funcional', ambos: 'Ambos' }[k] || k}`).join(' · ')}</span>` : ''}

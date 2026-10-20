@@ -339,7 +339,7 @@ async function verHistoricoContratoConector() {
   box.innerHTML = itens.length ? `<ul class="fin-lista-itens">${itens.map(h => {
     const acao = h.acao === 'vaga.ocupada' && h.dados && h.dados.estado === 'convidada' ? 'Convite enviado' : (ACOES_LICENCA_ADMIN[h.acao] || h.acao);
     return `<li><strong>${escapeHtml(acao)}</strong> · ${escapeHtml(h.pessoa_nome || (h.dados && h.dados.email) || '')}${h.dados && h.dados.perfil ? ` (${escapeHtml(h.dados.perfil)})` : ''}
-      <small class="fin-muted" style="display:block">${new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${h.feito_por ? ` · ${escapeHtml(h.feito_por)}` : ' · automático'}</small></li>`;
+      <small class="fin-muted" style="display:block">${new Date(h.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR })}${h.feito_por ? ` · ${escapeHtml(h.feito_por)}` : ' · automático'}</small></li>`;
   }).join('')}</ul>` : '<span class="fin-muted">Nada registrado ainda.</span>';
 }
 

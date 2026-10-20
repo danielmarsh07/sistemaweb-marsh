@@ -247,7 +247,7 @@ async function abrirFichaCliente(id) {
       : fichaVazio('Nenhuma oportunidade.'), { texto: 'Funil', acao: "irPara('funil')" }));
 
     // O que mudou por último na empresa (contratos, licenças, administradores, usuários)
-    const quando = v => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    const quando = v => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR });
     caixas.push(fichaCaixa('Atividade recente', d.atividade.length ? `<ul class="ficha-lista">${d.atividade.map(a => {
       const extra = (a.contrato_desc ? ` · ${escapeHtml(a.contrato_desc)}` : '')
         + (a.acao === 'contrato.reajustado' && a.depois ? ` ${formatMoeda(a.antes.valor)} → ${formatMoeda(a.depois.valor)}` : '')
@@ -327,7 +327,7 @@ async function loadAlertas() {
   if (!res.ok) { box.innerHTML = `<p class="fin-muted">${escapeHtml(d.erro)}</p>`; return; }
   _alertas = d.alertas;
   atualizarBadgeAlertas(d.nao_lidos);
-  const dataHora = v => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const dataHora = v => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR });
   box.innerHTML = _alertas.length ? _alertas.map(a => `
     <article class="alerta-item alerta-${escapeHtml(a.nivel)}${a.lido ? ' alerta-lido' : ''}">
       <div class="alerta-topo">
