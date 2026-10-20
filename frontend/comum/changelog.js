@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.1', data: '2026-10-20', destaques: [
+      'Agente ABAP: analisa sozinho os chamados novos do Conector e deixa no chamado a "Análise da Marsh" (causa, correção sugerida, horas, riscos), que só a equipe vê, com aviso por e-mail',
+      'Licenças → Agente ABAP: gerar e revogar a chave que o agente usa'
+    ] },
     { versao: 'v7.0', data: '2026-10-20', destaques: [
       'Conector 0.6.0: chamados abertos no nome da pessoa da licença, com prints e evidências anexados, e nova skill que guia da análise em QAS e PRD até o chamado com a correção ABAP',
       'Sistemas de produção sempre somente leitura no Conector, com cada consulta registrada no log da Marsh'

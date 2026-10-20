@@ -63,12 +63,14 @@ const contratosCursosRoutes = require('./backend/routes/contratos-cursos');
 const bloquearAluno = require('./backend/middleware/bloquear-aluno');
 const chamadosDoAluno = require('./backend/middleware/chamados-do-aluno');
 const lojaRoutes = require('./backend/routes/loja');
+const agenteRoutes = require('./backend/routes/agente');
 
 // Rotas públicas
 app.use('/api/auth', authRoutes);
 app.use('/api/licencas-conector', licencasConectorRoutes); // conector SAP: autentica pela chave da licença
 app.use('/api/asaas/webhook', asaasWebhookRoutes); // Asaas: autentica pelo header asaas-access-token
 app.use('/api/publico', publicoRoutes); // lead do site e proposta por link (token), com limite de requisições
+app.use('/api/agente-servico', agenteRoutes.servico); // agente ABAP: autentica pela chave do agente (MRSH-AG-...)
 
 // Rotas protegidas
 app.use('/api/empresas', autenticar, apenasEquipe, empresasRoutes); // portal do cliente não acessa
@@ -85,6 +87,7 @@ app.use('/api/atendimentos', autenticar, chamadosDoAluno, atendimentosRoutes);
 app.use('/api/usuarios', autenticar, usuariosRoutes);
 app.use('/api/assistente', autenticar, bloquearAluno, assistenteRoutes);
 app.use('/api/licencas', autenticar, bloquearAluno, licencasRoutes);
+app.use('/api/agente', autenticar, apenasEquipe, agenteRoutes.equipe); // análise interna e chave do agente ABAP
 app.use('/api/treinamentos', autenticar, treinamentosRoutes);
 app.use('/api/contratos-conector', autenticar, contratosConectorRoutes);
 app.use('/api/contratos-cursos', autenticar, contratosCursosRoutes); // portal: só o gestor (/meus); o resto é admin (o router confere)
@@ -1504,6 +1507,32 @@ async function iniciar() {
       );`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_log_producao_cliente ON conector_log_producao(cliente_id, ts DESC);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_log_producao_licenca ON conector_log_producao(licenca_id, ts DESC);`);
+
+    // 43. Agente ABAP (Claude Code agendado na máquina da Marsh): chave de serviço própria (hash; texto só na criação)
+    //     e a análise de cada chamado do Conector em tabela SEPARADA — as rotas de chamado fazem SELECT ch.* e o
+    //     cliente não pode ver a análise interna.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agente_chaves (
+        id SERIAL PRIMARY KEY,
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        nome VARCHAR(100) NOT NULL,
+        chave_hash VARCHAR(64) NOT NULL UNIQUE,
+        prefixo VARCHAR(20) NOT NULL,
+        criado_por_usuario_id INTEGER,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        ultimo_uso TIMESTAMPTZ,
+        revogada BOOLEAN NOT NULL DEFAULT FALSE
+      );`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chamados_analises (
+        chamado_id INTEGER PRIMARY KEY REFERENCES chamados(id),
+        empresa_id INTEGER NOT NULL DEFAULT 1,
+        analise TEXT NOT NULL,
+        resumo JSONB,
+        agente_chave_id INTEGER REFERENCES agente_chaves(id),
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );`);
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

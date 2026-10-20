@@ -1,0 +1,88 @@
+require('./_ambiente-local');
+// Agente ABAP: chave de serviço (criar, usar, revogar), chamados do Conector pendentes de análise, link de anexo,
+// gravação da análise interna (não volta a ser pendente) e isolamento: o cliente nunca lê a análise.
+// Servidor local: npm run dev:local (com storage s3mock para o link de anexo; sem ele o teste aceita 503).
+const jwt = require('jsonwebtoken');
+const pool = require('../backend/db');
+const { usuarioTeste, apagarUsuariosTeste } = require('./_usuarios-teste');
+const BASE = 'http://localhost:3000/api';
+
+let falhas = 0;
+const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg); };
+
+(async () => {
+  const cli = (await pool.query(`INSERT INTO clientes (nome, razao_social, email, empresa_id, ativo)
+    VALUES ('TESTE Agente', 'TESTE AGENTE LTDA', 'agente@exemplo.com', 1, TRUE) RETURNING id`)).rows[0].id;
+  const tokAdmin = jwt.sign({ id: 1, tipo: 'admin_empresa', empresa_id: 1 }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  const tokCliente = jwt.sign({ id: await usuarioTeste(pool, { cliente_id: cli }), tipo: 'cliente', empresa_id: 1, cliente_id: cli },
+    process.env.JWT_SECRET, { expiresIn: '5m' });
+  const api = async (auth, p, m = 'GET', body) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (auth) headers.Authorization = `Bearer ${auth}`;
+    const r = await fetch(BASE + p, { method: m, headers, body: body && JSON.stringify(body) });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const ins = (titulo, status = 'aberto', origem = 'conector') => pool.query(
+    `INSERT INTO chamados (empresa_id, cliente_id, titulo, descricao, prioridade, categoria, status, ativo, origem, sid, modulo,
+       tipo_demanda, pedido_original, especificacao, objetos_sap, solicitante_nome, aprovacao_cliente)
+     VALUES (1, $1, $2, 'x', 'media', 'Conector SAP', $3, TRUE, $4, 'QAS', 'FISCAL', 'erro', 'Cálculo do ISS errado',
+       '# Spec', '[{"tipo":"PROG","nome":"ZNFSE_PROC"}]', 'Renan', 'pendente') RETURNING id`, [cli, titulo, status, origem]);
+  const chave = { id: null, texto: null };
+
+  try {
+    ok((await api(null, '/agente-servico/chamados/pendentes')).status === 401, '! sem chave -> 401');
+    ok((await api('MRSH-AG-' + '0'.repeat(32), '/agente-servico/chamados/pendentes')).status === 401, '! chave desconhecida -> 401');
+    ok((await api(tokCliente, '/agente/chaves', 'POST', {})).status === 403, '! cliente não cria chave');
+    const cria = await api(tokAdmin, '/agente/chaves', 'POST', { nome: 'Agente teste' });
+    ok(cria.status === 201 && /^MRSH-AG-[a-f0-9]{32}$/.test(cria.body?.chave || ''), 'admin cria a chave do agente (texto só agora)');
+    chave.texto = cria.body.chave;
+    const lista = await api(tokAdmin, '/agente/chaves');
+    chave.id = lista.body.find(k => k.nome === 'Agente teste')?.id;
+    ok(chave.id && !('chave_hash' in lista.body[0]), 'lista de chaves sem o hash');
+
+    const c1 = (await ins('Ajuste ISS ZNFSE')).rows[0].id;
+    const c2 = (await ins('Já fechado', 'fechado')).rows[0].id;
+    const c3 = (await ins('Chamado comum', 'aberto', 'portal')).rows[0].id;
+    await pool.query(`INSERT INTO chamados_anexos (chamado_id, empresa_id, nome_original, storage_key, tamanho_bytes, mime_type)
+      VALUES ($1, 1, 'tela.png', 'chamados/teste/tela.png', 10, 'image/png')`, [c1]);
+    let p = await api(chave.texto, '/agente-servico/chamados/pendentes');
+    const ids = (p.body || []).map(c => c.id);
+    ok(p.status === 200 && ids.includes(c1) && !ids.includes(c2) && !ids.includes(c3),
+      'pendentes: só o chamado do Conector em aberto (não o fechado nem o do portal)');
+    const item = p.body.find(c => c.id === c1);
+    ok(item && item.especificacao === '# Spec' && item.anexos.length === 1 && item.cliente_nome === 'TESTE AGENTE LTDA',
+      'pendente traz especificação, cliente e anexos');
+    const lk = await api(chave.texto, `/agente-servico/chamados/${c1}/anexos/${item.anexos[0].id}`);
+    ok(lk.status === 200 ? /^https?:\/\//.test(lk.body.url) : lk.status === 503, `link temporário do anexo (${lk.status})`);
+    ok((await api(chave.texto, `/agente-servico/chamados/${c3}/analise`, 'POST', { analise: 'x'.repeat(30) })).status === 404,
+      '! análise em chamado que não é do Conector -> 404');
+    ok((await api(chave.texto, `/agente-servico/chamados/${c1}/analise`, 'POST', { analise: 'curta' })).status === 400, '! análise curta -> 400');
+    const a = await api(chave.texto, `/agente-servico/chamados/${c1}/analise`, 'POST', {
+      analise: '## Causa confirmada\nA base do ISS ignora o desconto (ZNFSE_PROC_F01, linha 212).',
+      resumo: { complexidade: 'media', horas: 6.5, risco: 'Notas já emitidas no mês', cerebro: 'DEM-0003', lixo: 'x' } });
+    ok(a.status === 201, `agente grava a análise (${a.status})`);
+    p = await api(chave.texto, '/agente-servico/chamados/pendentes');
+    ok(!(p.body || []).some(c => c.id === c1), 'chamado analisado sai dos pendentes');
+    ok((await api(chave.texto, `/agente-servico/chamados/${c1}/analise`, 'POST', { analise: 'Reanálise com mais detalhes do caso.' })).status === 200,
+      'regravar substitui a análise (200)');
+    const ver = await api(tokAdmin, `/agente/chamados/${c1}/analise`);
+    ok(ver.status === 200 && ver.body.analise.startsWith('Reanálise') && ver.body.agente === 'Agente teste', 'equipe lê a análise');
+    ok((await api(tokCliente, `/agente/chamados/${c1}/analise`)).status === 403, '! cliente não lê a análise -> 403');
+    const det = await api(tokCliente, `/chamados/${c1}`);
+    ok(det.status !== 200 || !JSON.stringify(det.body).includes('Reanálise'), 'detalhe do chamado para o cliente não traz a análise');
+
+    ok((await api(tokAdmin, `/agente/chaves/${chave.id}`, 'DELETE')).status === 200, 'admin revoga a chave');
+    ok((await api(chave.texto, '/agente-servico/chamados/pendentes')).status === 401, '! chave revogada -> 401');
+  } finally {
+    const chs = (await pool.query('SELECT id FROM chamados WHERE cliente_id = $1', [cli])).rows.map(c => c.id);
+    await pool.query('DELETE FROM chamados_analises WHERE chamado_id = ANY($1)', [chs]);
+    await pool.query('DELETE FROM chamados_anexos WHERE chamado_id = ANY($1)', [chs]);
+    await pool.query('DELETE FROM chamados WHERE id = ANY($1)', [chs]);
+    if (chave.id) await pool.query('DELETE FROM agente_chaves WHERE id = $1', [chave.id]);
+    await apagarUsuariosTeste(pool);
+    await pool.query('DELETE FROM clientes WHERE id = $1', [cli]);
+    await pool.end();
+  }
+  console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo.');
+  process.exit(falhas ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });

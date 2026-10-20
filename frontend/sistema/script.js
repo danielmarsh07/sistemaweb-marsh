@@ -1384,8 +1384,71 @@ document.getElementById('instalador-conector-arquivo')?.addEventListener('change
   if (arq) publicarInstaladorConector(arq);
 });
 
+// Agente ABAP: chave de serviço (MRSH-AG-...) que o agente agendado usa para ler os chamados do Conector
+// e gravar a análise interna. Aparece em texto só na criação; revogar corta o acesso na hora.
+async function loadAgenteAbap() {
+  const caixa = document.getElementById('agente-abap');
+  if (!caixa || !usuarioEhAdmin()) return;
+  caixa.hidden = false;
+  const info = document.getElementById('agente-abap-info');
+  const res = await apiFetch(`${API_URL}/agente/chaves`);
+  if (!res || !res.ok) { info.textContent = 'Não foi possível consultar as chaves do agente.'; return; }
+  const ativas = (await res.json()).filter(k => !k.revogada);
+  info.innerHTML = ativas.length
+    ? ativas.map(k => `<strong>${escapeHtml(k.nome)}</strong> (${escapeHtml(k.prefixo)}…) · último uso: ${k.ultimo_uso ? formatDataHora(k.ultimo_uso) : 'nunca'}
+        <a href="#" onclick="revogarChaveAgente(${k.id}); return false;">revogar</a>`).join('<br>')
+    : 'Nenhuma chave ativa: o agente não consegue ler os chamados. Gere uma e coloque no .env da pasta SAP (MARSH_AGENTE_CHAVE).';
+}
+
+async function gerarChaveAgente() {
+  const nome = prompt('Nome da chave (ex.: Agente ABAP - notebook Daniel):', 'Agente ABAP');
+  if (nome === null) return;
+  const res = await apiFetch(`${API_URL}/agente/chaves`, { method: 'POST', body: JSON.stringify({ nome }) });
+  if (!res) return;
+  const r = await res.json();
+  if (!res.ok) { alert(r.erro); return; }
+  prompt(`${r.mensagem}\nCole no .env da pasta SAP como MARSH_AGENTE_CHAVE=`, r.chave);
+  loadAgenteAbap();
+}
+
+async function revogarChaveAgente(id) {
+  if (!confirm('Revogar esta chave? O agente para de ler os chamados até receber uma chave nova.')) return;
+  const res = await apiFetch(`${API_URL}/agente/chaves/${id}`, { method: 'DELETE' });
+  if (!res) return;
+  const r = await res.json();
+  alert(r.mensagem || r.erro);
+  loadAgenteAbap();
+}
+
+// Análise interna do agente no detalhe do chamado do Conector
+async function carregarAnaliseAgente(ch) {
+  const alvo = document.getElementById('detalhe-chamado-analise');
+  if (!alvo) return;
+  alvo.innerHTML = '';
+  if (ch.origem !== 'conector') return;
+  const res = await apiFetch(`${API_URL}/agente/chamados/${ch.id}/analise`);
+  if (!res || !res.ok) return;
+  const a = await res.json();
+  const r = (a && a.resumo) || {};
+  const chips = [
+    r.complexidade && chipLicenca(`Complexidade ${r.complexidade}`, r.complexidade === 'alta' ? '#dc2626' : r.complexidade === 'media' ? '#f59e0b' : '#10b981'),
+    r.horas != null && chipLicenca(`${String(r.horas).replace('.', ',')} h estimadas`, '#1d6fd8'),
+    r.cerebro && chipLicenca(`Cérebro: ${escapeHtml(r.cerebro)}`, '#7c3aed')
+  ].filter(Boolean).join(' ');
+  alvo.innerHTML = a ? `
+    <div class="cc-bloco">
+      <div class="cc-topo"><span class="cc-titulo">Análise da Marsh (agente ABAP)</span>
+        <span class="cc-selo" title="Só a equipe Marsh vê">interno</span></div>
+      <p class="fin-muted" style="margin:4px 0 8px">${escapeHtml(a.agente || 'Agente')} · ${formatDataHora(a.atualizado_em)} ${chips}</p>
+      ${r.risco ? `<p><strong>Risco:</strong> ${escapeHtml(r.risco)}</p>` : ''}
+      <div class="cc-md">${ChamadoConector.markdownSeguro(a.analise)}</div>
+    </div>`
+    : `<p class="fin-muted" style="margin:8px 0">Análise do agente ABAP: ainda não feita (ele confere os chamados novos a cada 2 horas).</p>`;
+}
+
 async function loadLicencas() {
   loadInstaladorConector();
+  loadAgenteAbap();
   const tbody = document.getElementById('licencas-tbody');
   if (tbody && tbody.querySelector('.text-center')) tbody.innerHTML = skeletonRows(10);
   const res = await apiFetch(`${API_URL}/licencas`);
@@ -2453,6 +2516,7 @@ async function abrirDetalheChamado(id) {
   });
   // Depois de aprovar/recusar: recarrega o detalhe e a lista
   ChamadoConector.aoDecidir = async (cid) => { await abrirDetalheChamado(cid); loadChamados(); };
+  carregarAnaliseAgente(ch);
 
   renderTimeline(ch.atendimentos || []);
   renderAnexosDashboard(ch);

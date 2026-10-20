@@ -533,6 +533,15 @@
           <button type="button" id="btn-publicar-instalador" class="btn btn-secondary">Publicar instalador</button>
         </div>
 
+        <!-- Agente ABAP (Claude Code agendado na máquina da Marsh): chave de serviço para ler chamados e gravar a análise -->
+        <div class="instalador-conector" id="agente-abap" hidden>
+          <div>
+            <strong>Agente ABAP</strong>
+            <p id="agente-abap-info">Carregando...</p>
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="gerarChaveAgente()">Gerar chave do agente</button>
+        </div>
+
         <div class="table-container">
           <table>
             <thead>
@@ -4153,6 +4162,8 @@
       </div>
       <!-- Chamado do Conector SAP: SID, objetos, pedido, especificação e aprovação (chamado-conector.js) -->
       <div id="detalhe-chamado-conector" style="padding:0 0.5rem;"></div>
+      <!-- Análise do agente ABAP: só a equipe Marsh vê (tabela própria, nunca vai para o portal) -->
+      <div id="detalhe-chamado-analise" style="padding:0 0.5rem;"></div>
 
       <div style="padding:0 0.5rem;">
         <h4 class="detalhe-chamado-section-title">Timeline de Atendimentos</h4>
