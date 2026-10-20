@@ -1474,6 +1474,10 @@ async function iniciar() {
       console.log(`[migração 40] contrato de cursos nº ${k.id}: agora por pessoas (vagas livres).`);
     }
 
+    // 41. Exceção no contrato do Conector: quem ocupa vaga recebe a licença (e o instalador) sem concluir os cursos
+    //     (services/certificacao.js). O certificado continua só para quem conclui.
+    await pool.query(`ALTER TABLE contratos_conector ADD COLUMN IF NOT EXISTS licenca_sem_curso BOOLEAN NOT NULL DEFAULT FALSE;`);
+
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {
     console.error('❌ Erro na migração do banco:', err.message);

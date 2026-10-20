@@ -99,7 +99,14 @@ async function avaliarUsuario(usuarioId) {
     let cert = (await pool.query('SELECT * FROM certificados WHERE usuario_id = $1 AND vaga_id = $2', [usuarioId, vaga.id])).rows[0];
     if (!cert) {
       const prog = await progressoPerfil(pool, vaga.perfil, usuarioId);
-      if (!prog.completo) continue;
+      if (!prog.completo) {
+        // Exceção do contrato: licença sem os cursos (o certificado sai quando concluir)
+        if (k.licenca_sem_curso) {
+          const lic = (await pool.query(`SELECT status FROM licencas WHERE vaga_id = $1 AND usuario_id = $2`, [vaga.id, usuarioId])).rows[0];
+          if (!lic || lic.status === 'cancelada') await garantirLicenca(pool, k, vaga, usuario);
+        }
+        continue;
+      }
       const cursos = prog.trilhas.flatMap(t => t.cursos.map(c => ({ titulo: c.titulo, carga_horaria: c.carga_horaria, trilha: t.trilha })));
       const db = await pool.connect();
       try {

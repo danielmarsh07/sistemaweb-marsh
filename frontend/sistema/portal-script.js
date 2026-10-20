@@ -267,7 +267,8 @@ async function carregarPortal() {
 }
 
 // ===== MINHA LICENÇA DO CONECTOR (quem ocupa vaga) =====
-// Antes do certificado: o que falta por trilha. Depois: certificado, chave, máquina e o instalador já configurado.
+// Antes do certificado: o que falta por trilha. Depois (ou antes, se o contrato libera a licença sem curso):
+// certificado, chave, máquina e o instalador já configurado.
 function renderMinhasVagas() {
   const vagas = acessoPortal.vagas || [];
   const secao = document.getElementById('secao-minha-licenca');
@@ -282,7 +283,7 @@ function renderMinhasVagas() {
     const pct = p.total ? Math.round(100 * p.feitas / p.total) : 0;
     const titulo = `<h4>Perfil ${escapeHtml(v.perfil_nome)}
       ${v.vigente ? '' : '<span class="chip" style="background:#ef444420; color:#ef4444">Contrato inativo</span>'}</h4>`;
-    if (!v.certificado) {
+    if (!v.certificado && !v.licenca) {
       return `
         <div class="licenca-card minha-vaga">
           ${titulo}
@@ -305,7 +306,7 @@ function renderMinhasVagas() {
     return `
       <div class="licenca-card minha-vaga">
         ${titulo}
-        <div class="linha"><span>Certificado</span><strong>✓ ${escapeHtml(v.certificado.codigo)}</strong></div>
+        <div class="linha"><span>Certificado</span><strong>${v.certificado ? `✓ ${escapeHtml(v.certificado.codigo)}` : `ao concluir os cursos (${p.feitas} de ${p.total} aulas)`}</strong></div>
         ${l ? `
           <div class="linha"><span>Licença</span><strong><span class="chip" style="background:${st[1]}20; color:${st[1]}">${st[0]}</span></strong></div>
           <div class="linha"><span>Plano</span><strong>${escapeHtml(planos[l.plano] || l.plano)}</strong></div>
@@ -318,7 +319,7 @@ function renderMinhasVagas() {
           </div>
           ${l.chave ? '' : '<p class="ajuda">A chave completa não está disponível aqui; peça à Marsh.</p>'}` : ''}
         <div class="acoes">
-          <a class="btn-curso secundario" href="/certificado.html?c=${encodeURIComponent(v.certificado.codigo)}" target="_blank" rel="noopener">Ver certificado</a>
+          ${v.certificado ? `<a class="btn-curso secundario" href="/certificado.html?c=${encodeURIComponent(v.certificado.codigo)}" target="_blank" rel="noopener">Ver certificado</a>` : ''}
           ${l && st[0] === 'Ativa' ? `<button type="button" class="btn-curso" onclick="baixarPacoteVaga(this, ${v.id})">Baixar instalador</button>` : ''}
         </div>
         ${l && st[0] === 'Ativa' ? `<p class="ajuda">Descompacte o zip e execute <strong>Instalar.cmd</strong>. A sua chave já vai dentro do instalador:

@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.3', data: '2026-10-20', destaques: [
+      'Contrato do Conector pode liberar a licença sem os cursos: quem ocupa a vaga já recebe a chave e o instalador no portal',
+      'O certificado continua saindo só quando a pessoa conclui as aulas do perfil'
+    ] },
     { versao: 'v6.2', data: '2026-10-19', destaques: [
       'Em Licenças, o botão do olho agora abre a ficha completa da licença: titular, plano, status, vigência, limites de usuários e máquinas, último contato e os servidores SAP com descrição, mandante, idioma e URL',
       'Servidor cadastrado na licença sem os dados de conexão aparece com um aviso para completar; a ficha também traz o uso dos últimos 30 dias e atalhos para Editar licença e Máquinas',
