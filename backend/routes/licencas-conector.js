@@ -209,6 +209,8 @@ router.post('/validar', async (req, res) => {
     const payload = {
       licenca_id: l.id,
       cliente: l.cliente_nome,
+      titular: l.titular_nome || null, // conector 0.6.0+: solicitante padrão dos chamados
+
       plano: l.plano,
       permite_escrita: !!PLANOS[l.plano]?.permite_escrita,
       sids,
