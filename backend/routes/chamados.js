@@ -327,7 +327,7 @@ router.post('/:id/aprovacao', async (req, res) => {
   }
 });
 
-// GET /sistemas-sap — servidores SAP que podem ser escolhidos no chamado (contratos vigentes do Conector) + listas SAP.
+// GET /sistemas-sap — servidores SAP que podem ser escolhidos no chamado (licenças ativas do Conector e contrato vigente) + listas SAP.
 // Cliente: sempre os da própria empresa. Equipe: ?cliente_id=.
 router.get('/sistemas-sap', async (req, res) => {
   const cliente_id = req.usuario.tipo === 'cliente' ? req.usuario.cliente_id : parseInt(req.query.cliente_id) || null;
@@ -338,8 +338,8 @@ router.get('/sistemas-sap', async (req, res) => {
   }
 });
 
-// Confere servidor (SID), módulo e tipo do chamado. O servidor tem de ser um dos habilitados nos contratos vigentes
-// do cliente; para o cliente, escolher o servidor é obrigatório quando ele tem algum. Devolve { erro } ou os valores limpos.
+// Confere servidor (SID), módulo e tipo do chamado. O servidor tem de ser um dos habilitados para o cliente
+// (sap.sistemasDoCliente); para o cliente, escolher o servidor é obrigatório quando ele tem algum. Devolve { erro } ou os valores limpos.
 async function validarSap({ sid, modulo, tipo_demanda }, cliente_id, empresa_id, { exigirSid }) {
   sid = String(sid || '').trim().toUpperCase() || null;
   modulo = String(modulo || '').trim().toUpperCase() || null;
@@ -348,7 +348,7 @@ async function validarSap({ sid, modulo, tipo_demanda }, cliente_id, empresa_id,
   if (tipo_demanda && !sap.TIPOS_DEMANDA.includes(tipo_demanda)) return { erro: 'Tipo de chamado inválido.' };
   const sistemas = await sap.sistemasDoCliente(cliente_id, empresa_id);
   if (sid && !sistemas.some(s => s.sid === sid)) {
-    return { erro: `O servidor ${sid} não está habilitado no contrato ativo do Conector desta empresa.` };
+    return { erro: `O servidor ${sid} não está habilitado nas licenças ativas do Conector desta empresa.` };
   }
   if (!sid && exigirSid && sistemas.length) return { erro: 'Informe em qual servidor SAP o problema acontece.' };
   return { sid, modulo, tipo_demanda };

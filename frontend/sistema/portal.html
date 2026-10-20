@@ -2099,7 +2099,7 @@
         <button class="btn-fechar" onclick="fecharModal('modal-novo-chamado')">&times;</button>
       </div>
       <div class="modal-body">
-        <!-- Servidores = sistemas SAP habilitados no contrato ativo do Conector (GET /api/chamados/sistemas-sap) -->
+        <!-- Servidores = sistemas SAP das licenças ativas do Conector do cliente (GET /api/chamados/sistemas-sap) -->
         <form id="form-novo-chamado" onsubmit="salvarNovoChamado(event)">
           <fieldset class="nc-bloco" id="nc-bloco-servidor">
             <legend><span class="nc-passo">1</span> Em qual servidor SAP acontece? <span class="obrig" title="Obrigatório">*</span></legend>

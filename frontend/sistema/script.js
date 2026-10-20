@@ -1983,7 +1983,7 @@ async function preencherSelectsChamado() {
   await carregarServidoresChamado('');
 }
 
-// Servidores SAP do chamado: os sistemas do contrato vigente do Conector do cliente (o servidor recusa outro SID).
+// Servidores SAP do chamado: os das licenças ativas do Conector do cliente e do contrato vigente (o servidor recusa outro SID).
 // manter = SID atual de um chamado em edição, mantido na lista mesmo que o contrato já tenha vencido.
 async function carregarServidoresChamado(clienteId, manter) {
   const sel = document.getElementById('select-sid-chamado');
@@ -1994,7 +1994,7 @@ async function carregarServidoresChamado(clienteId, manter) {
   const sistemas = d.sistemas.slice();
   if (manter && !sistemas.some(s => s.sid === manter)) sistemas.push({ sid: manter, descricao: 'fora do contrato vigente' });
   sel.innerHTML = !clienteId ? '<option value="">Escolha o cliente primeiro</option>'
-    : (sistemas.length ? '<option value="">Não informado</option>' : '<option value="">Sem servidor no contrato do Conector</option>') +
+    : (sistemas.length ? '<option value="">Não informado</option>' : '<option value="">Sem servidor nas licenças do Conector</option>') +
       sistemas.map(s => `<option value="${escapeHtml(s.sid)}">${escapeHtml(s.sid)}${s.descricao ? ` · ${escapeHtml(s.descricao)}` : ''}</option>`).join('');
   sel.value = manter || '';
 }

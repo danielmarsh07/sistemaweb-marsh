@@ -46,6 +46,23 @@ const API = process.env.API_TESTE || 'http://localhost:3000/api';
     r = await chamar(tPessoa, 'GET', `/chamados/sistemas-sap?cliente_id=${semContrato}`);
     ok(r.body.sistemas.length === 2, 'cliente não consegue ver servidores de outra empresa (cliente_id da URL ignorado)');
 
+    // Licenças (tela Licenças) são a fonte principal: ativa entra (inclusive SID sem dados de conexão); vencida e suspensa não
+    const novaLicenca = (sids, conexoes, status, fim) => pool.query(`INSERT INTO licencas (cliente_id, sids, conexoes, status, data_fim, chave_hash, chave_prefixo)
+      VALUES ($1, $2, $3, $4, CURRENT_DATE + $5::int, $6, 'TESTE')`, [cli, sids, conexoes, status, fim, `teste-${Date.now()}-${Math.random()}`]);
+    await novaLicenca('DEV,PID,PRX', JSON.stringify([{ sid: 'DEV', descricao: 'S4 DEV', mandante: '200' }, { sid: 'PID', descricao: 'PI', mandante: '001' }]), 'ativa', 300);
+    await novaLicenca('OLD', '[]', 'ativa', -1);
+    await novaLicenca('SUS', '[]', 'suspensa', 300);
+    r = await chamar(tPessoa, 'GET', '/chamados/sistemas-sap');
+    ok(r.body.sistemas.map(s => s.sid).join() === 'DEV,PID,PRX,QAS', 'servidores = licenças ativas + contrato vigente (sem vencida/suspensa): ' + r.body.sistemas.map(s => s.sid).join());
+    const dev = r.body.sistemas.find(s => s.sid === 'DEV');
+    ok(dev.descricao === 'S4 DEV' && dev.mandante === '200', 'dados do servidor vêm da licença (S4 DEV, mandante 200)');
+    r = await chamar(tPessoa, 'POST', '/chamados', { titulo: 'TESTE PI', sid: 'PID', tipo_demanda: 'erro' });
+    ok(r.status === 201 && r.body.chamado.sid === 'PID', 'chamado no servidor PI da licença');
+    r = await chamar(tPessoa, 'POST', '/chamados', { titulo: 'TESTE licença vencida', sid: 'OLD' });
+    ok(r.status === 400, 'servidor de licença vencida é recusado');
+    r = await chamar(tPessoa, 'POST', '/chamados', { titulo: 'TESTE licença suspensa', sid: 'SUS' });
+    ok(r.status === 400, 'servidor de licença suspensa é recusado');
+
     r = await chamar(tPessoa, 'POST', '/chamados', { titulo: 'TESTE sem servidor', tipo_demanda: 'erro' });
     ok(r.status === 400 && /servidor/i.test(r.body.erro), 'cliente com servidor habilitado precisa escolher o servidor');
     r = await chamar(tPessoa, 'POST', '/chamados', { titulo: 'TESTE servidor vencido', sid: 'PRD' });
@@ -73,7 +90,7 @@ const API = process.env.API_TESTE || 'http://localhost:3000/api';
     const tGestor = tok(gestor, 'cliente', { cliente_id: cli });
     await pool.query(`UPDATE usuarios SET portal_papel = 'gestor' WHERE id = $1`, [gestor]);
     r = await chamar(tAluno, 'GET', '/chamados/sistemas-sap');
-    ok(r.status === 200 && r.body.sistemas.length === 2, 'aluno vê os servidores do contrato');
+    ok(r.status === 200 && r.body.sistemas.length === 4, 'aluno vê os servidores habilitados da empresa');
     r = await chamar(tAluno, 'POST', '/chamados', { titulo: 'TESTE do aluno', sid: 'DEV', tipo_demanda: 'duvida' });
     ok(r.status === 201, 'aluno abre chamado');
     const idAluno = r.body.chamado.id;
@@ -112,7 +129,7 @@ const API = process.env.API_TESTE || 'http://localhost:3000/api';
 
     // Equipe: escolhe pelo cliente; servidor opcional; edição mantém SID antigo mesmo com contrato vencido
     r = await chamar(tAdmin, 'GET', `/chamados/sistemas-sap?cliente_id=${cli}`);
-    ok(r.body.sistemas.length === 2, 'equipe vê os servidores do cliente escolhido');
+    ok(r.body.sistemas.length === 4, 'equipe vê os servidores do cliente escolhido');
     r = await chamar(tAdmin, 'POST', '/chamados', { titulo: 'TESTE equipe', cliente_id: cli });
     ok(r.status === 201, 'equipe abre chamado sem servidor');
     r = await chamar(tAdmin, 'PUT', `/chamados/${idCh}`, { sid: 'DEV', modulo: 'FI' });
@@ -130,6 +147,7 @@ const API = process.env.API_TESTE || 'http://localhost:3000/api';
       const chs = (await pool.query('SELECT id FROM chamados WHERE cliente_id = ANY($1)', [clientes])).rows.map(c => c.id);
       for (const t of ['chamados_status_log', 'atendimentos']) await pool.query(`DELETE FROM ${t} WHERE chamado_id = ANY($1)`, [chs]).catch(() => {});
       await pool.query('DELETE FROM chamados WHERE id = ANY($1)', [chs]);
+      await pool.query('DELETE FROM licencas WHERE cliente_id = ANY($1)', [clientes]);
       await pool.query('DELETE FROM contratos_conector WHERE cliente_id = ANY($1)', [clientes]);
     }
     await apagarUsuariosTeste(pool);

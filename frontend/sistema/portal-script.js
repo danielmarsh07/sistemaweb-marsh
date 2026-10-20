@@ -738,8 +738,8 @@ function filtrarLista(status) {
   return status ? todosOsChamados.filter(c => c.status === status) : todosOsChamados;
 }
 
-// Servidores SAP do chamado: os sistemas habilitados para o Conector no contrato ativo da empresa.
-// Sem contrato ativo com servidor, o passo 1 some e o chamado vai sem servidor.
+// Servidores SAP do chamado: os sistemas das licenças ativas do Conector da empresa (e do contrato vigente).
+// Sem nenhum servidor habilitado, o passo 1 some e o chamado vai sem servidor.
 let sistemasSap = [];
 async function carregarSistemasSap() {
   const res = await apiFetch(`${API}/chamados/sistemas-sap`);
@@ -766,7 +766,7 @@ function renderServidoresChamado() {
       </span>
     </label>`).join('');
   document.getElementById('nc-servidores-dica').textContent = temServidor
-    ? 'Esses são os servidores habilitados no contrato do Conector da sua empresa. Não achou o servidor? Fale com o administrador do contrato.'
+    ? 'Esses são os servidores habilitados nas licenças do Conector da sua empresa. Não achou o servidor? Fale com a Marsh ou com o administrador do contrato.'
     : '';
 }
 
