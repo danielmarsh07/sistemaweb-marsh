@@ -22,6 +22,11 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.9', data: '2026-10-20', destaques: [
+      'Sistemas SAP com a marca "Produção": o Conector só lê nesse sistema, em qualquer perfil',
+      'Log das consultas à produção na ficha da licença (quem, máquina, operação e o que foi consultado), com exportação em CSV do log do cliente',
+      'Chamados abertos pelo Conector podem levar anexos: prints de tela, evidências e planilhas'
+    ] },
     { versao: 'v6.8', data: '2026-10-20', destaques: [
       'Corrigidas as horas que apareciam no fuso do computador e não no de Brasília: último contato e máquinas do Conector, histórico das licenças, comercial, cadastros, financeiro e loja'
     ] },

@@ -3530,6 +3530,9 @@ svg.icon {
 .licenca-conexoes .cx-sid, .licenca-conexoes .cx-idioma { width: 64px; text-transform: uppercase; }
 .licenca-conexoes .cx-mandante { width: 76px; }
 .licenca-conexoes .cx-url { min-width: 200px; }
+.licenca-conexoes .cx-porta { width: 76px; }
+.licenca-conexoes .cx-producao-cel { text-align: center; }
+.licenca-conexoes .cx-producao { width: 18px; height: 18px; padding: 0; accent-color: #dc2626; cursor: pointer; }
 .licenca-conexoes .cx-vazio { color: var(--text-muted); font-size: 12.5px; padding: 6px 4px; }
 /* Bolinha de "online nas últimas 24h" na coluna Máquinas */
 .licenca-online { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #94a3b8; vertical-align: middle; }

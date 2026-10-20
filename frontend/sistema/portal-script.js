@@ -704,6 +704,8 @@ function adicionarLinhaSid(c = {}) {
     <div class="form-group"><label>Porta</label><input name="porta" maxlength="5" inputmode="numeric" placeholder="44300" value="${escapeHtml(porta)}"></div>
     <div class="form-group"><label>Mandante</label><input name="mandante" maxlength="3" placeholder="100" value="${escapeHtml(c.mandante || '')}"></div>
     <div class="form-group"><label>Idioma</label><input name="idioma" maxlength="2" placeholder="PT" value="${escapeHtml(c.idioma || 'PT')}"></div>
+    <div class="form-group sid-producao" title="Produção: o Conector só lê e registra cada consulta no log"><label>Produção</label>
+      <input type="checkbox" name="producao" ${c.producao ? 'checked' : ''} aria-label="Produção (somente leitura, com log)"></div>
     <button type="button" class="btn-remover" title="Remover" aria-label="Remover sistema" onclick="this.parentElement.remove()">×</button>`;
   box.appendChild(div);
 }
@@ -713,7 +715,8 @@ async function salvarSids(e) {
   if (!contratoSids) return;
   const conexoes = [...document.querySelectorAll('#sids-linhas .sid-linha')].map(l => {
     const v = n => l.querySelector(`[name="${n}"]`).value.trim();
-    return { sid: v('sid'), descricao: v('descricao'), url: v('url'), porta: v('porta'), mandante: v('mandante'), idioma: v('idioma') };
+    return { sid: v('sid'), descricao: v('descricao'), url: v('url'), porta: v('porta'), mandante: v('mandante'), idioma: v('idioma'),
+             producao: l.querySelector('[name="producao"]').checked };
   }).filter(c => c.sid || c.url);
   const res = await apiFetch(`${API}/contratos-conector/meus/${contratoSids.id}/conexoes`, {
     method: 'PUT', body: JSON.stringify({ conexoes }) });

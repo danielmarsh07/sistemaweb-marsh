@@ -3,6 +3,7 @@
  *
  * Admin (admin_empresa / admin_sistema): listar, criar, editar, nova chave, cancelar, uso.
  * Admin: máquinas ativadas pelo instalador (listar, revogar, reativar).
+ * Admin: GET /log-producao — consultas aos sistemas de produção (por cliente ou licença; formato=csv exporta).
  * chamados_exigem_aprovacao (padrão true): chamado aberto pelo conector fica 'pendente' até o gestor
  * do cliente aprovar no portal; false = já entra aprovado na fila da Marsh.
  * Cliente: GET /minhas — só as licenças do próprio cliente, sem dados de chave.
@@ -198,6 +199,40 @@ router.get('/', async (req, res) => {
     res.json(r.rows);
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao buscar licenças', detalhe: err.message });
+  }
+});
+
+// GET /log-producao?cliente_id=&licenca_id=&formato=csv — consultas a sistemas de produção feitas pelo conector
+// (um log único por cliente, de todas as licenças dele; licenca_id filtra uma só). JSON: as 300 mais recentes.
+router.get('/log-producao', async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  const clienteId = parseInt(req.query.cliente_id, 10) || null;
+  const licencaId = parseInt(req.query.licenca_id, 10) || null;
+  if (!clienteId && !licencaId) return res.status(400).json({ erro: 'Informe cliente_id ou licenca_id.' });
+  const csv = req.query.formato === 'csv';
+  try {
+    const r = await pool.query(
+      `SELECT g.ts, g.sid, g.usuario_sap, g.ferramenta, g.parametros, g.linhas, g.status, g.erro, g.ms,
+              g.nome_maquina, l.id AS licenca_id, l.titular_nome
+       FROM conector_log_producao g JOIN licencas l ON l.id = g.licenca_id
+       WHERE l.empresa_id = $1 AND ($2::int IS NULL OR g.cliente_id = $2) AND ($3::int IS NULL OR g.licenca_id = $3)
+       ORDER BY g.ts DESC ${csv ? '' : 'LIMIT 300'}`, [empresa_id, clienteId, licencaId]);
+    if (!csv) return res.json(r.rows);
+    const quando = d => new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const linhas = [['Data/hora (Brasília)', 'SID', 'Usuário SAP', 'Titular da licença', 'Máquina', 'Ferramenta',
+      'Consulta', 'Linhas', 'Status', 'Erro'].map(cel).join(';')];
+    for (const g of r.rows) {
+      const consulta = Object.entries(g.parametros || {}).filter(([, v]) => v !== '' && v != null)
+        .map(([k, v]) => `${k}=${v}`).join(' | ');
+      linhas.push([quando(g.ts), g.sid, g.usuario_sap, g.titular_nome, g.nome_maquina, g.ferramenta, consulta,
+        g.linhas, g.status, g.erro].map(cel).join(';'));
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="log-producao-${clienteId ? `cliente-${clienteId}` : `licenca-${licencaId}`}.csv"`);
+    res.send('﻿' + linhas.join('\r\n'));
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar o log de produção', detalhe: err.message });
   }
 });
 

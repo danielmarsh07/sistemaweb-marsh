@@ -14,6 +14,7 @@ app.set('trust proxy', 1);
 app.use(cors());
 // Chamado do Conector SAP traz a especificação em markdown (até 200 mil caracteres): limite maior só nessa rota
 app.use('/api/licencas-conector/chamados', express.json({ limit: '2mb' }));
+app.use('/api/licencas-conector/log-producao', express.json({ limit: '1mb' }));
 app.use(express.json());
 
 // Toda resposta 5xx vira alerta (Sistema → Alertas + e-mail aos administradores, agrupado)
@@ -1477,6 +1478,32 @@ async function iniciar() {
     // 41. Exceção no contrato do Conector: quem ocupa vaga recebe a licença (e o instalador) sem concluir os cursos
     //     (services/certificacao.js). O certificado continua só para quem conclui.
     await pool.query(`ALTER TABLE contratos_conector ADD COLUMN IF NOT EXISTS licenca_sem_curso BOOLEAN NOT NULL DEFAULT FALSE;`);
+
+    // 42. Log das consultas a sistemas de PRODUÇÃO feitas pelo Conector (conexão marcada "producao"): quem, máquina,
+    //     ferramenta e o texto da consulta (nunca os dados retornados). registro_id = id gerado no conector: reenvio
+    //     depois de falha de rede não duplica a linha.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conector_log_producao (
+        id SERIAL PRIMARY KEY,
+        licenca_id INTEGER NOT NULL REFERENCES licencas(id),
+        cliente_id INTEGER,
+        registro_id VARCHAR(40) NOT NULL,
+        ts TIMESTAMPTZ NOT NULL,
+        sid VARCHAR(3) NOT NULL,
+        usuario_sap VARCHAR(40),
+        ferramenta VARCHAR(50) NOT NULL,
+        parametros JSONB,
+        linhas INTEGER,
+        status VARCHAR(10),
+        erro TEXT,
+        ms INTEGER,
+        maquina_hash VARCHAR(64),
+        nome_maquina VARCHAR(100),
+        recebido_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (licenca_id, registro_id)
+      );`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_log_producao_cliente ON conector_log_producao(cliente_id, ts DESC);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_log_producao_licenca ON conector_log_producao(licenca_id, ts DESC);`);
 
     console.log('✅ Banco de dados migrado e tabelas verificadas com sucesso!');
   } catch (err) {

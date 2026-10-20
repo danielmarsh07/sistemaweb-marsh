@@ -10,10 +10,14 @@
  * POST /chamados          { chave, sid, usuario_hash, maquina_hash, titulo, tipo, modulo, pedido, especificacao, ... }
  *                                                        -> abre chamado (ferramenta abrir_chamado do conector)
  * POST /chamados/listar   { chave, usuario_hash, maquina_hash, todos? } -> chamados do conector desta licença
+ * POST /chamados/:id/anexos  multipart: arquivo + chave, usuario_hash, maquina_hash -> anexo no chamado do consultor
+ * POST /log-producao     { chave, usuario_hash, maquina_hash, registros } -> log das consultas a sistemas de produção
  *
  * Nunca recebe código-fonte nem dados do SAP: só contadores, hash do usuário e identificação da máquina.
  * Exceção consciente: /chamados recebe o texto que o consultor do cliente aprovou enviar (pedido +
- * especificação em markdown + nomes dos objetos Z) — é o próprio conteúdo do chamado.
+ * especificação em markdown + nomes dos objetos Z) — é o próprio conteúdo do chamado — e os anexos que ele envia.
+ * /log-producao recebe, só de sistemas marcados como produção, O QUE foi consultado (ferramenta e parâmetros,
+ * ex.: o SELECT) para a auditoria do cliente; os dados retornados nunca saem da máquina.
  */
 const express = require('express');
 const router = express.Router();
@@ -213,7 +217,9 @@ router.post('/validar', async (req, res) => {
       sid,
       usuario_hash,
       // Sistemas SAP do próprio cliente: o conector recusa URL/mandante fora desta lista
-      conexoes: conexoesDosSids(l.conexoes, sids).map(c => ({ sid: c.sid, url: c.url, mandante: c.mandante })),
+      // producao (assinada): o conector 0.6.0+ trata o SID como produção, sempre só leitura, com log na Marsh
+      conexoes: conexoesDosSids(l.conexoes, sids).map(c => ({ sid: c.sid, url: c.url, mandante: c.mandante,
+        ...(c.producao ? { producao: true } : {}) })),
       emitida_em: agora.toISOString(),
       expira_em: expira.toISOString(),
       // A licença assinada fica presa àquela máquina (cache copiado para outra não serve)
@@ -450,6 +456,93 @@ router.post('/chamados', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao abrir chamado', detalhe: err.message });
+  }
+});
+
+// POST /chamados/:id/anexos — multipart (campo "arquivo" + chave, usuario_hash, maquina_hash): print, PDF,
+// planilha ou evidência do chamado que ESTE consultor abriu pelo conector. O tipo vem da extensão (não do cliente).
+const multer = require('multer');
+const storage = require('../services/storage');
+const ANEXO_MAX_MB = parseInt(process.env.ANEXO_MAX_MB || '10', 10);
+const ANEXOS_POR_CHAMADO = 20;
+const TIPOS_ANEXO = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+  txt: 'text/plain', md: 'text/markdown', csv: 'text/csv', log: 'text/plain', json: 'application/json',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+};
+const uploadAnexo = multer({ storage: multer.memoryStorage(), limits: { fileSize: ANEXO_MAX_MB * 1024 * 1024, files: 1 } });
+
+router.post('/chamados/:id/anexos', (req, res) => {
+  uploadAnexo.single('arquivo')(req, res, async (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ erro: `Arquivo maior que ${ANEXO_MAX_MB} MB.` });
+      return res.status(400).json({ erro: 'Erro no upload.', detalhe: err.message });
+    }
+    try {
+      const auth = await autenticarConector(req, res, false);
+      if (!auth) return;
+      if (!storage.disponivel) return res.status(503).json({ erro: 'Anexos indisponíveis no momento. Anexe pelo portal da Marsh.' });
+      const f = req.file;
+      if (!f) return res.status(400).json({ erro: 'Nenhum arquivo enviado (campo "arquivo").' });
+      const nome = String(f.originalname || '').replace(/[\\/]/g, '_').slice(-200);
+      const mime = TIPOS_ANEXO[(nome.split('.').pop() || '').toLowerCase()];
+      if (!mime) return res.status(400).json({ erro: `Tipo de arquivo não aceito (${Object.keys(TIPOS_ANEXO).join(', ')}).` });
+      const ch = (await pool.query(
+        `SELECT id, empresa_id, usuario_hash,
+                (SELECT COUNT(*)::int FROM chamados_anexos a WHERE a.chamado_id = ch.id) AS anexos
+         FROM chamados ch WHERE ch.id = $1 AND ch.licenca_id = $2 AND ch.origem = 'conector' AND ch.ativo = TRUE`,
+        [req.params.id, auth.l.id])).rows[0];
+      if (!ch || ch.usuario_hash !== auth.usuario_hash) return res.status(404).json({ erro: 'Chamado não encontrado entre os seus chamados.' });
+      if (ch.anexos >= ANEXOS_POR_CHAMADO) return res.status(400).json({ erro: `No máximo ${ANEXOS_POR_CHAMADO} anexos por chamado.` });
+      const key = await storage.upload({ chamadoId: ch.id, nomeOriginal: nome, buffer: f.buffer, mimeType: mime });
+      const a = (await pool.query(
+        `INSERT INTO chamados_anexos (chamado_id, empresa_id, usuario_id, nome_original, storage_key, tamanho_bytes, mime_type)
+         VALUES ($1, $2, NULL, $3, $4, $5, $6) RETURNING id, nome_original, tamanho_bytes`,
+        [ch.id, ch.empresa_id, nome, key, f.size, mime])).rows[0];
+      res.status(201).json({ mensagem: `Anexo ${a.nome_original} incluído no chamado #${ch.id}.`, anexo: a });
+    } catch (e) {
+      if (!res.headersSent) res.status(500).json({ erro: 'Erro ao anexar arquivo', detalhe: e.message });
+    }
+  });
+});
+
+// POST /log-producao — { chave, usuario_hash, maquina_hash, registros: [{ id, ts, sid, usuario, ferramenta,
+// parametros, linhas, status, erro, ms }] }: consultas feitas em sistemas marcados "producao" (até 200 por envio).
+// Guarda o que foi consultado (ferramenta + parâmetros, ex.: o SELECT); nunca recebe os dados retornados.
+const RE_REGISTRO = /^[A-Za-z0-9-]{8,40}$/;
+router.post('/log-producao', async (req, res) => {
+  try {
+    const regs = req.body?.registros;
+    if (!Array.isArray(regs) || !regs.length || regs.length > 200) {
+      return res.status(400).json({ erro: 'registros deve ser uma lista de 1 a 200 itens.' });
+    }
+    const auth = await autenticarConector(req, res, false);
+    if (!auth) return;
+    const sids = listaSids(auth.l.sids);
+    let gravados = 0;
+    for (const r of regs) {
+      const sid = String(r?.sid || '').toUpperCase();
+      const ts = Date.parse(r?.ts);
+      const parametros = r?.parametros && typeof r.parametros === 'object' && !Array.isArray(r.parametros) ? r.parametros : {};
+      const json = JSON.stringify(parametros);
+      if (!RE_REGISTRO.test(String(r?.id || '')) || !sids.includes(sid) || !RE_FERRAMENTA.test(String(r?.ferramenta || ''))
+          || !Number.isFinite(ts) || Math.abs(Date.now() - ts) > 31 * 86400000 || json.length > 8000) continue;
+      const ins = await pool.query(
+        `INSERT INTO conector_log_producao (licenca_id, cliente_id, registro_id, ts, sid, usuario_sap, ferramenta, parametros,
+           linhas, status, erro, ms, maquina_hash, nome_maquina)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14)
+         ON CONFLICT (licenca_id, registro_id) DO NOTHING`,
+        [auth.l.id, auth.l.cliente_id, r.id, new Date(ts).toISOString(), sid,
+         String(r.usuario || '').toUpperCase().slice(0, 40) || null, r.ferramenta, json,
+         Number.isInteger(r.linhas) ? r.linhas : null, r.status === 'erro' ? 'erro' : 'ok',
+         r.erro ? String(r.erro).slice(0, 500) : null, Number.isInteger(r.ms) ? r.ms : null,
+         auth.maquina_hash, auth.nome_maquina]);
+      gravados += ins.rowCount;
+    }
+    res.json({ ok: true, recebidos: regs.length, gravados });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao registrar o log de produção', detalhe: err.message });
   }
 });
 

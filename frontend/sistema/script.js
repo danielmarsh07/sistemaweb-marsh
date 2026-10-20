@@ -1301,7 +1301,8 @@ const FERRAMENTAS_CONECTOR = {
   get_table_structure: 'Estrutura de tabela', get_data_element: 'Elemento de dados', get_domain: 'Domínio',
   read_table_data: 'Consulta a dados', run_select: 'Consulta SQL', syntax_check: 'Verificação de sintaxe',
   check_update: 'Prévia de gravação', update_source: 'Gravação com request', activate: 'Ativação',
-  connection_info: 'Conexão'
+  connection_info: 'Conexão', abrir_chamado: 'Abertura de chamado', meus_chamados: 'Consulta de chamados',
+  anexar_chamado: 'Anexo em chamado'
 };
 
 // Datas: DATE do Postgres chega como "AAAA-MM-DD" ou ISO à meia-noite UTC; TIMESTAMP chega como instante (UTC).
@@ -1326,8 +1327,11 @@ function badgeLicenca(l) {
   else if (fim < hoje) { txt = 'Vencida'; cor = '#ef4444'; }
   else if (dias <= 30) { txt = `Renova em ${dias} dia(s)`; cor = '#f59e0b'; }
   else { txt = 'Ativa'; cor = '#10b981'; }
-  return `<span style="background:${cor}20; color:${cor}; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">${txt}</span>`;
+  return chipLicenca(txt, cor);
 }
+
+const chipLicenca = (txt, cor) =>
+  `<span style="background:${cor}20; color:${cor}; padding:2px 8px; border-radius:20px; font-size:0.78rem; font-weight:600">${txt}</span>`;
 
 // ===== Instalador do conector: versão publicada e envio de um zip novo =====
 async function loadInstaladorConector() {
@@ -1544,6 +1548,8 @@ function linhaConexaoLicenca(c = {}) {
       <td><input class="cx-porta" maxlength="5" inputmode="numeric" placeholder="44300" value="${escapeHtml(porta)}" aria-label="Porta"></td>
       <td><input class="cx-mandante" maxlength="3" inputmode="numeric" placeholder="100" value="${escapeHtml(c.mandante || '')}" aria-label="Mandante"></td>
       <td><input class="cx-idioma" maxlength="2" placeholder="PT" value="${escapeHtml(c.idioma || 'PT')}" aria-label="Idioma"></td>
+      <td class="cx-producao-cel"><input type="checkbox" class="cx-producao" ${c.producao ? 'checked' : ''}
+            title="Produção: o Conector só lê e registra cada consulta no log da Marsh" aria-label="Produção"></td>
       <td><button type="button" class="btn btn-icon btn-danger" title="Remover conexão" aria-label="Remover conexão"
             onclick="removerConexaoLicenca(this)">${iconSVG('x')}</button></td>
     </tr>`;
@@ -1553,7 +1559,7 @@ function renderConexoesLicenca(lista, tbodyId = TBODY_CONEXOES_LICENCA) {
   const tbody = document.getElementById(tbodyId);
   tbody.innerHTML = lista.length
     ? lista.map(linhaConexaoLicenca).join('')
-    : '<tr class="cx-vazio-linha"><td colspan="7" class="cx-vazio">Nenhuma conexão. Use "+ Conexão".</td></tr>';
+    : '<tr class="cx-vazio-linha"><td colspan="8" class="cx-vazio">Nenhuma conexão. Use "+ Conexão".</td></tr>';
 }
 
 function adicionarConexaoLicenca(tbodyId = TBODY_CONEXOES_LICENCA) {
@@ -1582,7 +1588,8 @@ function lerConexoesLicenca(tbodyId = TBODY_CONEXOES_LICENCA) {
     url: tr.querySelector('.cx-url').value.trim(),
     porta: tr.querySelector('.cx-porta').value.trim(),
     mandante: tr.querySelector('.cx-mandante').value.trim(),
-    idioma: tr.querySelector('.cx-idioma').value.trim().toUpperCase()
+    idioma: tr.querySelector('.cx-idioma').value.trim().toUpperCase(),
+    producao: tr.querySelector('.cx-producao').checked
   })).filter(c => c.sid || c.descricao || c.url || c.porta || c.mandante);
 }
 
@@ -1641,15 +1648,17 @@ async function verUsoLicenca(id) {
         <td data-label="Idioma">${escapeHtml(c.idioma || '—')}</td>
         <td data-label="URL" class="licenca-url">${base ? escapeHtml(base) : '—'}</td>
         <td data-label="Porta">${porta ? escapeHtml(porta) : '<span class="fin-muted">padrão</span>'}</td>
+        <td data-label="Produção">${c.producao ? chipLicenca('Produção · só leitura', '#dc2626') : '—'}</td>
       </tr>`;
   }), ...semConexao.map(sid => `
       <tr>
         <td data-label="SID"><strong>${escapeHtml(sid)}</strong></td>
-        <td data-label="Descrição" colspan="5"><span class="fin-muted">sem dados de conexão (descrição, mandante, URL): complete em Editar licença</span></td>
+        <td data-label="Descrição" colspan="6"><span class="fin-muted">sem dados de conexão (descrição, mandante, URL): complete em Editar licença</span></td>
       </tr>`)];
+  const temProducao = conexoes.some(c => c.producao);
   const servidores = linhasSap.length ? `
     <div class="table-container"><table>
-      <thead><tr><th>SID</th><th>Descrição</th><th>Mandante</th><th>Idioma</th><th>URL</th><th>Porta</th></tr></thead>
+      <thead><tr><th>SID</th><th>Descrição</th><th>Mandante</th><th>Idioma</th><th>URL</th><th>Porta</th><th>Produção</th></tr></thead>
       <tbody>${linhasSap.join('')}</tbody></table></div>
     <p class="ficha-resumo">${linhasSap.length} servidor(es). Enquanto a licença estiver ativa, eles aparecem para o cliente ao abrir chamado.</p>`
     : fichaVazio('Nenhum servidor cadastrado. Use Editar licença para incluir.');
@@ -1670,10 +1679,13 @@ async function verUsoLicenca(id) {
         ${fichaLinha('Observações', escapeHtml(l.observacoes || ''))}
       </div>`, null, 'ficha-caixa-larga'),
     fichaCaixa('Servidores SAP', servidores, null, 'ficha-caixa-larga'),
+    temProducao ? fichaCaixa('Consultas à produção', '<div id="licenca-ficha-producao"><p class="fin-muted">Carregando...</p></div>',
+      { texto: 'Exportar log do cliente (CSV)', acao: `exportarLogProducao(${l.cliente_id})` }, 'ficha-caixa-larga') : '',
     fichaCaixa('Uso nos últimos 30 dias', '<div id="licenca-ficha-uso"><p class="fin-muted">Carregando...</p></div>',
       { texto: 'Máquinas', acao: `closeModal(document.getElementById('modal-licenca-uso')); verMaquinasLicenca(${id})` }, 'ficha-caixa-larga')
   ].join('');
   showModal('#modal-licenca-uso');
+  if (temProducao) carregarLogProducaoLicenca(id);
 
   const alvo = document.getElementById('licenca-ficha-uso');
   const res = await apiFetch(`${API_URL}/licencas/${id}/uso`);
@@ -1701,6 +1713,48 @@ async function verUsoLicenca(id) {
           <td data-label="Recusadas">${f.recusas.toLocaleString('pt-BR')}</td>
         </tr>`).join('')}
       </tbody></table></div>` : fichaVazio('Nenhum uso registrado ainda.')}`;
+}
+
+// Consultas aos sistemas de produção (conexão marcada "Produção"): o que foi consultado, por quem e onde.
+// Nunca os dados retornados — esses não saem da máquina do consultor.
+async function carregarLogProducaoLicenca(id) {
+  const alvo = document.getElementById('licenca-ficha-producao');
+  const res = await apiFetch(`${API_URL}/licencas/log-producao?licenca_id=${id}`);
+  if (!res || !alvo) return;
+  const lista = await res.json();
+  if (!res.ok) { alvo.innerHTML = `<p class="fin-muted">${escapeHtml(lista.erro)}</p>`; return; }
+  const consulta = p => Object.entries(p || {}).filter(([, v]) => v !== '' && v != null)
+    .map(([k, v]) => `${k}=${v}`).join(' · ');
+  alvo.innerHTML = lista.length ? `
+    <div class="table-container"><table>
+      <thead><tr><th>Quando</th><th>SID</th><th>Usuário SAP</th><th>Operação</th><th>Consulta</th><th>Linhas</th></tr></thead>
+      <tbody>${lista.slice(0, 50).map(g => `
+        <tr>
+          <td data-label="Quando">${formatDataHora(g.ts)}</td>
+          <td data-label="SID"><strong>${escapeHtml(g.sid)}</strong></td>
+          <td data-label="Usuário SAP">${escapeHtml(g.usuario_sap || '—')}<small class="fin-muted" style="display:block">${escapeHtml(g.nome_maquina || '')}</small></td>
+          <td data-label="Operação">${escapeHtml(FERRAMENTAS_CONECTOR[g.ferramenta] || g.ferramenta)}${g.status === 'erro' ? ' ' + chipLicenca('erro', '#dc2626') : ''}</td>
+          <td data-label="Consulta" class="licenca-url">${escapeHtml(consulta(g.parametros)) || '—'}</td>
+          <td data-label="Linhas">${g.linhas ?? '—'}</td>
+        </tr>`).join('')}
+      </tbody></table></div>
+    <p class="ficha-resumo">${lista.length >= 300 ? 'As 300 consultas mais recentes' : `${lista.length} consulta(s)`} desta licença
+      (as 50 últimas acima). O que foi consultado, nunca os dados retornados. O CSV traz o log completo do cliente.</p>`
+    : fichaVazio('Nenhuma consulta à produção registrada ainda.');
+}
+
+async function exportarLogProducao(clienteId) {
+  const res = await apiFetch(`${API_URL}/licencas/log-producao?cliente_id=${clienteId}&formato=csv`);
+  if (!res) return;
+  if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.erro || 'Não foi possível exportar o log.'); return; }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `log-producao-cliente-${clienteId}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 // Máquinas ativadas pelo instalador: revogar libera a vaga; reativar respeita o limite
