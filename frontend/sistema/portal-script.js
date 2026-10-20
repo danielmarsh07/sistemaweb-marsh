@@ -1532,7 +1532,7 @@ async function carregarLicencasPortal() {
   document.getElementById('secao-licenca').hidden = !lista.length;
   if (lista.length) carregarDownloadConector();
   const planos = { leitura: 'Leitura', desenvolvimento: 'Desenvolvimento', empresa: 'Empresa' };
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = isoLocal();
   document.getElementById('lista-licencas').innerHTML = lista.map(l => {
     const fim = String(l.data_fim).slice(0, 10);
     const vencida = fim < hoje;
@@ -1680,14 +1680,26 @@ function escapeHtml(s) {
 }
 
 // ===== FORMATTERS =====
+// Datas: DATE do Postgres chega como "AAAA-MM-DD" ou ISO à meia-noite UTC; TIMESTAMP chega como instante (UTC).
+// Data pura fica como está; instante vira o dia/hora de Brasília (senão, depois das 21h aparece o dia seguinte).
+const FUSO_BR = 'America/Sao_Paulo';
+const ehDataPura = s => /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(s);
+const isoLocal = (d = new Date()) => d.toLocaleDateString('sv-SE', { timeZone: FUSO_BR });
+const diaIso = v => {
+  if (!v) return '';
+  const s = v instanceof Date ? v.toISOString() : String(v);
+  const d = new Date(s);
+  return ehDataPura(s) || isNaN(d) ? s.slice(0, 10) : isoLocal(d);
+};
+
 function formatData(val) {
-  if (!val) return '-';
-  return new Date(val).toLocaleDateString('pt-BR');
+  const d = diaIso(val);
+  return d ? d.split('-').reverse().join('/') : '-';
 }
 
 function formatDataHora(val) {
   if (!val) return '-';
-  return new Date(val).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return new Date(val).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR });
 }
 
 function badgeStatus(status) {

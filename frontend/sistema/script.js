@@ -1304,12 +1304,21 @@ const FERRAMENTAS_CONECTOR = {
   connection_info: 'Conexão'
 };
 
-// Datas DATE do Postgres chegam como ISO; usar só AAAA-MM-DD evita "voltar um dia" no fuso BR
-const diaIso = v => (v ? String(v).slice(0, 10) : '');
+// Datas: DATE do Postgres chega como "AAAA-MM-DD" ou ISO à meia-noite UTC; TIMESTAMP chega como instante (UTC).
+// Data pura fica como está; instante vira o dia/hora de Brasília (senão, depois das 21h aparece o dia seguinte).
+const FUSO_BR = 'America/Sao_Paulo';
+const ehDataPura = s => /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(s);
+const isoLocal = (d = new Date()) => d.toLocaleDateString('sv-SE', { timeZone: FUSO_BR });
+const diaIso = v => {
+  if (!v) return '';
+  const s = v instanceof Date ? v.toISOString() : String(v);
+  const d = new Date(s);
+  return ehDataPura(s) || isNaN(d) ? s.slice(0, 10) : isoLocal(d);
+};
 const diaBr = v => { const d = diaIso(v); return d ? d.split('-').reverse().join('/') : '-'; };
 
 function badgeLicenca(l) {
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = isoLocal();
   const fim = diaIso(l.data_fim);
   const dias = Math.round((Date.parse(fim) - Date.parse(hoje)) / 86400000);
   let txt, cor;
@@ -1430,9 +1439,9 @@ async function abrirNovaLicenca() {
   resetForm('#form-licenca');
   const form = document.getElementById('form-licenca');
   form.sids.value = 'DEV';
-  form.data_inicio.value = new Date().toISOString().slice(0, 10);
+  form.data_inicio.value = isoLocal();
   const fim = new Date(); fim.setFullYear(fim.getFullYear() + 1);
-  form.data_fim.value = fim.toISOString().slice(0, 10);
+  form.data_fim.value = isoLocal(fim);
   form.cliente_id.disabled = false;
   form.chamados_exigem_aprovacao.checked = true;
   renderConexoesLicenca([]);
@@ -2586,8 +2595,8 @@ function sincronizarDatasComMesAno() {
     const mesNum = parseInt(mes, 10);
     const inicio = new Date(anoNum, mesNum - 1, 1);
     const fim = new Date(anoNum, mesNum, 0); // último dia do mês
-    elDe.value = inicio.toISOString().slice(0, 10);
-    elAte.value = fim.toISOString().slice(0, 10);
+    elDe.value = isoLocal(inicio);
+    elAte.value = isoLocal(fim);
   } else {
     // Ano inteiro
     elDe.value = `${anoNum}-01-01`;
@@ -2809,7 +2818,7 @@ function atualizarPreviewRepetir() {
   if (!check || !check.checked) return;
 
   const form = document.getElementById('form-transacao');
-  const dataBase = form.data?.value || new Date().toISOString().slice(0, 10);
+  const dataBase = form.data?.value || isoLocal();
   const periodicidade = document.getElementById('repetir-periodicidade').value;
   const dataFinalStr = document.getElementById('repetir-data-final').value;
 
@@ -3406,13 +3415,12 @@ function formatMoeda(valor) {
 }
 
 function formatData(val) {
-  if (!val) return '-';
-  return new Date(val).toLocaleDateString('pt-BR');
+  return diaBr(val);
 }
 
 function formatDataHora(val) {
   if (!val) return '-';
-  return new Date(val).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return new Date(val).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_BR });
 }
 
 function capitalize(str) {

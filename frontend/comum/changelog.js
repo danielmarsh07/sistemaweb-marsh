@@ -22,6 +22,11 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.0', data: '2026-10-19', destaques: [
+      'Corrigidas as datas que apareciam com o dia seguinte depois das 21h (abertura de chamados, fichas e listas): agora tudo segue o horário de Brasília',
+      'Datas e horas dos chamados, inclusive os abertos pelo Conector, aparecem no horário de Brasília mesmo para quem acessa de outro fuso',
+      'O "hoje" usado nas telas (vencimento de licenças, datas sugeridas em formulários e filtros por mês) também segue o dia de Brasília'
+    ] },
     { versao: 'v5.9', data: '2026-10-19', destaques: [
       'Quem usa uma licença do Conector agora tem a aba Chamados no portal: abre chamado escolhendo o servidor SAP e acompanha só os chamados dele (os que abriu e os que o Conector abriu pela licença dele)',
       'O gestor do contrato continua vendo todos os chamados da empresa, agora com quem abriu cada um; aprovar chamado do Conector segue sendo só do gestor',

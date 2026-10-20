@@ -23,7 +23,7 @@ const RETENCOES = ['ret_ir', 'ret_csll', 'ret_pis', 'ret_cofins', 'ret_inss'];
 const IMPOSTOS_EMPRESA = ['pis', 'cofins', 'presuncao', 'irpj', 'csll', 'irpj_adicional', 'limite_adicional'];
 const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const mesAnoBr = iso => { const [a, m] = String(iso).slice(0, 7).split('-'); return `${MESES_CURTOS[Number(m) - 1]}/${a}`; };
-const hojeIso = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const hojeIso = () => isoLocal(); // dia de Brasília (script.js)
 
 function competenciaAtual() {
   const el = document.getElementById('fin-competencia');

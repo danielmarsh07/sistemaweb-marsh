@@ -73,7 +73,7 @@ function textoPacote(q, precos) {
 async function abrirNovoContratoConector(clienteId) {
   resetForm('#form-novo-contrato-conector');
   const f = document.getElementById('form-novo-contrato-conector');
-  const umAno = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
+  const umAno = isoLocal(new Date(Date.now() + 365 * 86400000));
   f.data_fim.value = umAno;
   f.max_sids.value = 3;
   PERFIS_CONECTOR.forEach(([p]) => {

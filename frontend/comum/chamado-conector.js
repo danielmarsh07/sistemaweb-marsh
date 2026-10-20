@@ -17,7 +17,7 @@
   function dataHora(v) {
     if (!v) return '-';
     const d = new Date(v);
-    return isNaN(d) ? '-' : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    return isNaN(d) ? '-' : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' });
   }
 
   // Inline: `código` e **negrito**. O texto é escapado por trecho; código não recebe negrito.
