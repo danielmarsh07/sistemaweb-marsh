@@ -63,6 +63,7 @@ const MAX_CONEXOES = 10;
 /**
  * Valida e normaliza as conexões SAP da licença (o instalador recebe pré-preenchidas).
  * Só guarda { sid, descricao, url, mandante, idioma }: qualquer outro campo (usuário, senha...) é descartado.
+ * `porta` (opcional) é gravada dentro da URL (https://host:porta); porta padrão do protocolo fica fora da URL.
  * Devolve { erro } ou { lista }.
  */
 function validarConexoes(conexoes) {
@@ -75,7 +76,19 @@ function validarConexoes(conexoes) {
     if (!c || typeof c !== 'object') return { erro: `Conexão ${n}: formato inválido.` };
     const sid = String(c.sid || '').trim().toUpperCase();
     const descricao = String(c.descricao || '').trim().slice(0, 100);
-    const url = String(c.url || '').trim();
+    let url = String(c.url || '').trim();
+    // Porta em campo próprio (tela): entra na URL, que é o que o instalador e o conector usam (https://host:porta)
+    const porta = String(c.porta ?? '').trim();
+    if (porta) {
+      if (!/^\d{1,5}$/.test(porta) || Number(porta) < 1 || Number(porta) > 65535) {
+        return { erro: `Conexão ${n} (${sid || '?'}): porta deve ser um número de 1 a 65535.` };
+      }
+      try {
+        const u = new URL(url);
+        u.port = porta;
+        url = u.origin + (u.pathname === '/' ? '' : u.pathname);
+      } catch (e) { /* URL inválida: a regra abaixo responde */ }
+    }
     const mandante = String(c.mandante || '').trim();
     const idioma = String(c.idioma || '').trim().toUpperCase();
     if (!/^[A-Z0-9]{3}$/.test(sid)) return { erro: `Conexão ${n}: SID deve ter 3 letras/números.` };

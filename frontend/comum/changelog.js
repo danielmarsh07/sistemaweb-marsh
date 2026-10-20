@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.7', data: '2026-10-20', destaques: [
+      'Sistemas SAP com campo Porta (contrato, licença e portal do gestor): o instalador do Conector já recebe o servidor com a porta certa',
+      'A ficha da licença mostra a porta de cada servidor SAP ("padrão" quando não informada)'
+    ] },
     { versao: 'v6.6', data: '2026-10-20', destaques: [
       'Instalador do Conector 0.5.0 assinado pela Marsh Consultoria, feito para não ser barrado por antivírus corporativo',
       'O portal explica como instalar em computador de empresa (TI confia no certificado da Marsh) e em computador sem TI'

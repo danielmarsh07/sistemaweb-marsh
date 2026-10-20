@@ -1524,12 +1524,24 @@ async function salvarLicenca() {
 const MAX_CONEXOES_LICENCA = 10;
 const TBODY_CONEXOES_LICENCA = 'licenca-conexoes-tbody';
 
+// URL gravada com a porta (https://host:porta) -> { base, porta } para a tela; porta padrão do protocolo = vazia
+function separarPortaUrl(url) {
+  try {
+    const u = new URL(url);
+    const porta = u.port;
+    u.port = '';
+    return { base: u.origin + (u.pathname === '/' ? '' : u.pathname), porta };
+  } catch (e) { return { base: url || '', porta: '' }; }
+}
+
 function linhaConexaoLicenca(c = {}) {
+  const { base, porta } = separarPortaUrl(c.url);
   return `
     <tr>
       <td><input class="cx-sid" maxlength="3" placeholder="DEV" value="${escapeHtml(c.sid || '')}" aria-label="SID"></td>
       <td><input class="cx-descricao" maxlength="100" placeholder="Desenvolvimento" value="${escapeHtml(c.descricao || '')}" aria-label="Descrição"></td>
-      <td><input class="cx-url" placeholder="https://servidor:8000" value="${escapeHtml(c.url || '')}" aria-label="URL"></td>
+      <td><input class="cx-url" placeholder="https://servidor" value="${escapeHtml(base)}" aria-label="URL"></td>
+      <td><input class="cx-porta" maxlength="5" inputmode="numeric" placeholder="44300" value="${escapeHtml(porta)}" aria-label="Porta"></td>
       <td><input class="cx-mandante" maxlength="3" inputmode="numeric" placeholder="100" value="${escapeHtml(c.mandante || '')}" aria-label="Mandante"></td>
       <td><input class="cx-idioma" maxlength="2" placeholder="PT" value="${escapeHtml(c.idioma || 'PT')}" aria-label="Idioma"></td>
       <td><button type="button" class="btn btn-icon btn-danger" title="Remover conexão" aria-label="Remover conexão"
@@ -1541,7 +1553,7 @@ function renderConexoesLicenca(lista, tbodyId = TBODY_CONEXOES_LICENCA) {
   const tbody = document.getElementById(tbodyId);
   tbody.innerHTML = lista.length
     ? lista.map(linhaConexaoLicenca).join('')
-    : '<tr class="cx-vazio-linha"><td colspan="6" class="cx-vazio">Nenhuma conexão. Use "+ Conexão".</td></tr>';
+    : '<tr class="cx-vazio-linha"><td colspan="7" class="cx-vazio">Nenhuma conexão. Use "+ Conexão".</td></tr>';
 }
 
 function adicionarConexaoLicenca(tbodyId = TBODY_CONEXOES_LICENCA) {
@@ -1568,9 +1580,10 @@ function lerConexoesLicenca(tbodyId = TBODY_CONEXOES_LICENCA) {
     sid: tr.querySelector('.cx-sid').value.trim().toUpperCase(),
     descricao: tr.querySelector('.cx-descricao').value.trim(),
     url: tr.querySelector('.cx-url').value.trim(),
+    porta: tr.querySelector('.cx-porta').value.trim(),
     mandante: tr.querySelector('.cx-mandante').value.trim(),
     idioma: tr.querySelector('.cx-idioma').value.trim().toUpperCase()
-  })).filter(c => c.sid || c.descricao || c.url || c.mandante);
+  })).filter(c => c.sid || c.descricao || c.url || c.porta || c.mandante);
 }
 
 function mostrarChaveLicenca(chave) {
@@ -1618,21 +1631,25 @@ async function verUsoLicenca(id) {
   const conexoes = Array.isArray(l.conexoes) ? l.conexoes : [];
   const semConexao = String(l.sids || '').split(',').map(s => s.trim().toUpperCase())
     .filter(s => s && !conexoes.some(c => String(c.sid).toUpperCase() === s));
-  const linhasSap = [...conexoes.map(c => `
+  const linhasSap = [...conexoes.map(c => {
+    const { base, porta } = separarPortaUrl(c.url);
+    return `
       <tr>
         <td data-label="SID"><strong>${escapeHtml(c.sid)}</strong></td>
         <td data-label="Descrição">${escapeHtml(c.descricao || '—')}</td>
         <td data-label="Mandante">${escapeHtml(c.mandante || '—')}</td>
         <td data-label="Idioma">${escapeHtml(c.idioma || '—')}</td>
-        <td data-label="URL" class="licenca-url">${c.url ? escapeHtml(c.url) : '—'}</td>
-      </tr>`), ...semConexao.map(sid => `
+        <td data-label="URL" class="licenca-url">${base ? escapeHtml(base) : '—'}</td>
+        <td data-label="Porta">${porta ? escapeHtml(porta) : '<span class="fin-muted">padrão</span>'}</td>
+      </tr>`;
+  }), ...semConexao.map(sid => `
       <tr>
         <td data-label="SID"><strong>${escapeHtml(sid)}</strong></td>
-        <td data-label="Descrição" colspan="4"><span class="fin-muted">sem dados de conexão (descrição, mandante, URL): complete em Editar licença</span></td>
+        <td data-label="Descrição" colspan="5"><span class="fin-muted">sem dados de conexão (descrição, mandante, URL): complete em Editar licença</span></td>
       </tr>`)];
   const servidores = linhasSap.length ? `
     <div class="table-container"><table>
-      <thead><tr><th>SID</th><th>Descrição</th><th>Mandante</th><th>Idioma</th><th>URL</th></tr></thead>
+      <thead><tr><th>SID</th><th>Descrição</th><th>Mandante</th><th>Idioma</th><th>URL</th><th>Porta</th></tr></thead>
       <tbody>${linhasSap.join('')}</tbody></table></div>
     <p class="ficha-resumo">${linhasSap.length} servidor(es). Enquanto a licença estiver ativa, eles aparecem para o cliente ao abrir chamado.</p>`
     : fichaVazio('Nenhum servidor cadastrado. Use Editar licença para incluir.');

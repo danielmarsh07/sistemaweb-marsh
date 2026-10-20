@@ -147,6 +147,16 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     ok(r.status === 400, `! mais de 10 sistemas (${r.body?.erro})`);
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [cx('DEV'), cx('DEV')] });
     ok(r.status === 400, `! SID repetido (${r.body?.erro})`);
+    // Porta em campo próprio: entra na URL (o instalador e o conector usam https://host:porta)
+    const semPorta = s => ({ ...cx(s), url: `https://${s.toLowerCase()}.exemplo` });
+    r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT',
+      { conexoes: [{ ...semPorta('DEV'), porta: '44300' }, { ...cx('QAS'), porta: '8011' }, { ...semPorta('PRD'), porta: '443' }] });
+    ok(r.status === 200 && r.body.conexoes[0].url === 'https://dev.exemplo:44300' && r.body.conexoes[1].url === 'https://qas.exemplo:8011'
+      && r.body.conexoes[2].url === 'https://prd.exemplo', `porta vai para a URL; a padrão (443) fica de fora (${r.body?.conexoes?.map(c => c.url).join(' ')})`);
+    r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [{ ...semPorta('DEV'), porta: '70000' }] });
+    ok(r.status === 400, `! porta fora de 1-65535 (${r.body?.erro})`);
+    r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [{ ...semPorta('DEV'), porta: 'abc' }] });
+    ok(r.status === 400, `! porta não numérica (${r.body?.erro})`);
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [cx('DEV'), { ...cx('QAS'), mandante: '1' }] });
     ok(r.status === 400, `! mandante inválido (${r.body?.erro})`);
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [cx('DEV'), cx('QAS')] });

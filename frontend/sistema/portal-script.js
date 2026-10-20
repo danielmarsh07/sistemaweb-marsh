@@ -678,18 +678,30 @@ function abrirSids(contratoId) {
   abrirModal('modal-sids');
 }
 
+// URL gravada com a porta (https://host:porta) -> { base, porta } para a tela; porta padrão do protocolo = vazia
+function separarPortaUrl(url) {
+  try {
+    const u = new URL(url);
+    const porta = u.port;
+    u.port = '';
+    return { base: u.origin + (u.pathname === '/' ? '' : u.pathname), porta };
+  } catch (e) { return { base: url || '', porta: '' }; }
+}
+
 function adicionarLinhaSid(c = {}) {
   const box = document.getElementById('sids-linhas');
   if (box.children.length >= MAX_SISTEMAS_SAP) {
     alert(`No máximo ${MAX_SISTEMAS_SAP} sistemas SAP.`);
     return;
   }
+  const { base, porta } = separarPortaUrl(c.url);
   const div = document.createElement('div');
   div.className = 'sid-linha';
   div.innerHTML = `
     <div class="form-group"><label>SID</label><input name="sid" maxlength="3" placeholder="DEV" value="${escapeHtml(c.sid || '')}"></div>
     <div class="form-group"><label>Descrição</label><input name="descricao" maxlength="100" placeholder="Desenvolvimento" value="${escapeHtml(c.descricao || '')}"></div>
-    <div class="form-group"><label>URL</label><input name="url" maxlength="255" placeholder="https://servidor:8000" value="${escapeHtml(c.url || '')}"></div>
+    <div class="form-group"><label>URL</label><input name="url" maxlength="255" placeholder="https://servidor" value="${escapeHtml(base)}"></div>
+    <div class="form-group"><label>Porta</label><input name="porta" maxlength="5" inputmode="numeric" placeholder="44300" value="${escapeHtml(porta)}"></div>
     <div class="form-group"><label>Mandante</label><input name="mandante" maxlength="3" placeholder="100" value="${escapeHtml(c.mandante || '')}"></div>
     <div class="form-group"><label>Idioma</label><input name="idioma" maxlength="2" placeholder="PT" value="${escapeHtml(c.idioma || 'PT')}"></div>
     <button type="button" class="btn-remover" title="Remover" aria-label="Remover sistema" onclick="this.parentElement.remove()">×</button>`;
@@ -701,7 +713,7 @@ async function salvarSids(e) {
   if (!contratoSids) return;
   const conexoes = [...document.querySelectorAll('#sids-linhas .sid-linha')].map(l => {
     const v = n => l.querySelector(`[name="${n}"]`).value.trim();
-    return { sid: v('sid'), descricao: v('descricao'), url: v('url'), mandante: v('mandante'), idioma: v('idioma') };
+    return { sid: v('sid'), descricao: v('descricao'), url: v('url'), porta: v('porta'), mandante: v('mandante'), idioma: v('idioma') };
   }).filter(c => c.sid || c.url);
   const res = await apiFetch(`${API}/contratos-conector/meus/${contratoSids.id}/conexoes`, {
     method: 'PUT', body: JSON.stringify({ conexoes }) });
