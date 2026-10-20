@@ -24,7 +24,7 @@
   const CHANGELOG = [
     { versao: 'v6.1', data: '2026-10-19', destaques: [
       'Os servidores SAP que aparecem ao abrir chamado agora vêm das licenças do Conector cadastradas para o cliente (tela Licenças), com descrição e mandante de lá; os sistemas do contrato vigente também continuam valendo',
-      'Basta cadastrar um servidor novo (PI, S/4 DEV, PRD...) na licença ativa do cliente para ele aparecer no chamado; licença vencida ou suspensa não libera servidor'
+      'Basta cadastrar um servidor novo (PI, S/4 DEV, PRD...) na licença ativa do cliente para ele aparecer no chamado, já na próxima vez que o formulário for aberto, sem precisar atualizar o portal; licença vencida ou suspensa não libera servidor'
     ] },
     { versao: 'v6.0', data: '2026-10-19', destaques: [
       'Corrigidas as datas que apareciam com o dia seguinte depois das 21h (abertura de chamados, fichas e listas): agora tudo segue o horário de Brasília',

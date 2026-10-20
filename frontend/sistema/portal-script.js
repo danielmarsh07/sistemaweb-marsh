@@ -747,7 +747,7 @@ async function carregarSistemasSap() {
   const d = await res.json();
   sistemasSap = d.sistemas || [];
   const sel = document.getElementById('nc-modulo');
-  if (sel) sel.insertAdjacentHTML('beforeend', (d.modulos || []).filter(m => m !== 'OUTRO')
+  if (sel && sel.options.length <= 1) sel.insertAdjacentHTML('beforeend', (d.modulos || []).filter(m => m !== 'OUTRO')
     .map(m => `<option value="${m}">${m}</option>`).join(''));
 }
 
@@ -1202,8 +1202,10 @@ async function enviarComentario(e) {
 // ===== NOVO CHAMADO =====
 let arquivosPendentes = []; // arquivos selecionados antes da criação do chamado
 
-function abrirModalNovoChamado() {
+// Recarrega os servidores a cada abertura: servidor novo cadastrado na licença aparece sem atualizar o portal
+async function abrirModalNovoChamado() {
   document.getElementById('form-novo-chamado').reset();
+  await carregarSistemasSap();
   renderServidoresChamado();
   arquivosPendentes = [];
   renderListaPendentes();
