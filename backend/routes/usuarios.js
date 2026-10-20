@@ -250,6 +250,54 @@ router.post('/:id/convite', apenasAdmin, async (req, res) => {
   }
 });
 
+// GET /:id/ficha — ficha do usuário (tela Usuários): dados, acesso no portal (licença do Conector, vagas de cursos),
+// cursos liberados agora (a mesma conta do "Meus cursos" do portal) e os chamados da pessoa.
+// Chamados: cliente = os que abriu ou que o Conector abriu pela licença dele; equipe = abertos por ele ou atribuídos a ele.
+router.get('/:id/ficha', apenasAdmin, async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  try {
+    const u = (await pool.query(
+      `SELECT u.id, u.nome, u.email, u.tipo, u.ativo, u.cliente_id, u.portal_papel, u.data_criacao, u.super_usuario,
+              COALESCE(c.razao_social, c.nome) AS cliente_nome,
+              EXISTS (SELECT 1 FROM clientes_admins ca WHERE ca.usuario_id = u.id AND ca.cliente_id = u.cliente_id) AS admin_empresa
+       FROM usuarios u LEFT JOIN clientes c ON c.id = u.cliente_id
+       WHERE u.id = $1 AND u.empresa_id = $2`, [req.params.id, empresa_id])).rows[0];
+    if (!u) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+    const cliente = u.tipo === 'cliente';
+
+    const vagas = cliente ? (await pool.query(
+      `SELECT v.id, v.perfil, v.estado, v.contrato_id, k.status AS contrato_status, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
+              (k.status = 'ativo' AND k.data_inicio <= CURRENT_DATE AND k.data_fim >= CURRENT_DATE) AS vigente,
+              l.chave_prefixo, l.status AS licenca_status, to_char(l.data_fim, 'YYYY-MM-DD') AS licenca_fim, l.sids
+       FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
+       LEFT JOIN licencas l ON l.vaga_id = v.id AND l.usuario_id = v.usuario_id AND l.ativo
+       WHERE v.usuario_id = $1 AND v.ativo AND k.status <> 'cancelado'
+       ORDER BY k.data_fim DESC`, [u.id])).rows : [];
+    const vagasCursos = cliente ? (await pool.query(
+      `SELECT cv.contrato_id, cv.estado FROM contratos_cursos_vagas cv JOIN contratos_cursos kc ON kc.id = cv.contrato_id
+       WHERE cv.usuario_id = $1 AND cv.ativo AND kc.status = 'ativo'`, [u.id])).rows : [];
+    const cursos = cliente ? await require('../services/acessos').cursosDoUsuario(u.id, u.cliente_id) : [];
+
+    const filtro = cliente
+      ? `(ch.aberto_por_usuario_id = $1 OR ch.licenca_id IN (SELECT id FROM licencas WHERE usuario_id = $1))`
+      : `(ch.aberto_por_usuario_id = $1 OR ch.atribuido_para_usuario_id = $1)`;
+    const chamados = (await pool.query(
+      `SELECT ch.id, ch.titulo, ch.status, ch.prioridade, ch.sid, ch.modulo, ch.origem, ch.data_abertura,
+              COALESCE(c.razao_social, c.nome) AS cliente_nome,
+              (ch.atribuido_para_usuario_id = $1) AS atribuido
+       FROM chamados ch LEFT JOIN clientes c ON c.id = ch.cliente_id
+       WHERE ch.empresa_id = $2 AND ch.ativo AND ${filtro}
+       ORDER BY ch.data_abertura DESC LIMIT 30`, [u.id, empresa_id])).rows;
+    const totais = (await pool.query(
+      `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE ch.status NOT IN ('resolvido', 'fechado'))::int AS abertos
+       FROM chamados ch WHERE ch.empresa_id = $2 AND ch.ativo AND ${filtro}`, [u.id, empresa_id])).rows[0];
+
+    res.json({ usuario: u, vagas, vagas_cursos: vagasCursos, cursos, chamados: { ...totais, lista: chamados } });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao montar a ficha do usuário', detalhe: err.message });
+  }
+});
+
 // POST /:id/simular — o administrador entra como o usuário para ver o que ele vê (Simulador de acesso).
 // Gera um token curto (1 h) do usuário alvo marcado com simulado_por: o middleware autenticar deixa só ler
 // (GET) e confere a cada requisição se o administrador continua ativo. Fica registrado na auditoria.

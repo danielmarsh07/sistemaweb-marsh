@@ -3134,7 +3134,7 @@ function renderUsuarios() {
     const ehVoce = u.id === usuario?.id;
     return `
       <tr>
-        <td data-label="Nome"><strong>${escapeHtml(u.nome)}</strong>${ehVoce ? ' <small style="color:#94a3b8">(você)</small>' : ''}</td>
+        <td data-label="Nome"><a href="#" class="link-ficha" onclick="event.preventDefault(); abrirFichaUsuario(${u.id})"><strong>${escapeHtml(u.nome)}</strong></a>${ehVoce ? ' <small style="color:#94a3b8">(você)</small>' : ''}</td>
         <td data-label="Email">${escapeHtml(u.email)}</td>
         <td data-label="Perfil"><span style="background:${t.color}20;color:${t.color};padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">${t.label}</span></td>
         <td data-label="Vinculado a">${escapeHtml(u.cliente_nome || '') || (u.tipo === 'cliente' ? '<span style="color:#ef4444">⚠ sem vínculo</span>' : '—')}</td>
@@ -3143,7 +3143,8 @@ function renderUsuarios() {
           : '<span style="background:#ef444420;color:#ef4444;padding:2px 8px;border-radius:20px;font-size:0.78rem;font-weight:600">Inativo</span>'
         }</td>
         <td data-label="Ações" class="td-acoes">
-          ${ehVoce || u.ativo === false ? '' : `<button class="btn btn-icon" title="Simular acesso (ver o sistema como este usuário)" aria-label="Simular acesso" onclick="simularAcessoUsuario(${u.id})">${iconSVG('eye')}</button>`}
+          <button class="btn btn-icon" title="Ver ficha (dados, cursos e chamados)" aria-label="Ver ficha" onclick="abrirFichaUsuario(${u.id})">${iconSVG('eye')}</button>
+          ${ehVoce || u.ativo === false ? '' : `<button class="btn btn-icon" title="Simular acesso (ver o sistema como este usuário)" aria-label="Simular acesso" onclick="simularAcessoUsuario(${u.id})">${iconSVG('login')}</button>`}
           <button class="btn btn-icon btn-edit" title="Editar" aria-label="Editar" onclick="abrirEditarUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}', '${u.email}', '${u.tipo}', ${u.cliente_id || 'null'})">${iconSVG('edit')}</button>
           <button class="btn btn-icon btn-edit" title="Redefinir senha" aria-label="Redefinir senha" onclick="abrirResetSenha(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">${iconSVG('key')}</button>
           ${u.ativo !== false
@@ -3429,7 +3430,8 @@ const _ICONS = {
   ban: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
   check: '<polyline points="20 6 9 17 4 12"/>',
   monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
-  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'
 };
 function iconSVG(name, size = 16) {
   const body = _ICONS[name];

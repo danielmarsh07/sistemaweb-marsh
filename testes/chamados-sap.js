@@ -67,6 +67,49 @@ const API = process.env.API_TESTE || 'http://localhost:3000/api';
     r = await chamar(tSem, 'POST', '/chamados', { titulo: 'TESTE geral', sid: 'DEV' });
     ok(r.status === 400, 'empresa sem contrato não usa servidor de outra');
 
+    // Consultor com vaga do Conector (papel aluno): abre e acompanha só os próprios chamados
+    const aluno = await usuarioTeste(pool, { tipo: 'cliente', cliente_id: cli, papel: 'aluno' });
+    const tAluno = tok(aluno, 'cliente', { cliente_id: cli });
+    const tGestor = tok(gestor, 'cliente', { cliente_id: cli });
+    await pool.query(`UPDATE usuarios SET portal_papel = 'gestor' WHERE id = $1`, [gestor]);
+    r = await chamar(tAluno, 'GET', '/chamados/sistemas-sap');
+    ok(r.status === 200 && r.body.sistemas.length === 2, 'aluno vê os servidores do contrato');
+    r = await chamar(tAluno, 'POST', '/chamados', { titulo: 'TESTE do aluno', sid: 'DEV', tipo_demanda: 'duvida' });
+    ok(r.status === 201, 'aluno abre chamado');
+    const idAluno = r.body.chamado.id;
+    const lic = (await pool.query(`INSERT INTO licencas (cliente_id, usuario_id, data_fim, chave_hash, chave_prefixo)
+      VALUES ($1, $2, CURRENT_DATE + 30, $3, 'TESTE') RETURNING id`, [cli, aluno, `teste-hash-${aluno}`])).rows[0].id;
+    const idConector = (await pool.query(`INSERT INTO chamados (empresa_id, cliente_id, titulo, status, ativo, origem, licenca_id, sid, aprovacao_cliente)
+      VALUES (1, $1, 'TESTE pelo Conector', 'aberto', TRUE, 'conector', $2, 'DEV', 'pendente') RETURNING id`, [cli, lic])).rows[0].id;
+    r = await chamar(tAluno, 'GET', '/chamados');
+    const idsAluno = (r.body.chamados || r.body).map(c => c.id).sort();
+    ok(idsAluno.join() === [idAluno, idConector].sort().join(), 'aluno lista só o dele e o do Conector pela licença dele');
+    r = await chamar(tAluno, 'GET', `/chamados/${idCh}`);
+    ok(r.status === 404, 'aluno não abre chamado de outra pessoa da empresa');
+    r = await chamar(tAluno, 'GET', `/atendimentos/chamado/${idCh}`);
+    ok(r.status === 404, 'aluno não lê comentários de chamado de outra pessoa');
+    r = await chamar(tAluno, 'POST', '/atendimentos', { chamado_id: idCh, descricao: 'intruso' });
+    ok(r.status === 404, 'aluno não comenta chamado de outra pessoa');
+    r = await chamar(tAluno, 'POST', '/atendimentos', { chamado_id: idAluno, descricao: 'mais detalhes' });
+    ok(r.status === 201 || r.status === 200, 'aluno comenta o próprio chamado');
+    r = await chamar(tAluno, 'GET', `/chamados/${idCh}/anexos/1/download`);
+    ok(r.status === 404, 'aluno não baixa anexo de chamado de outra pessoa');
+    r = await chamar(tAluno, 'POST', `/chamados/${idConector}/aprovacao`, { decisao: 'aprovado' });
+    ok(r.status === 403, 'aluno não aprova chamado do Conector (é do gestor)');
+    r = await chamar(tGestor, 'GET', '/chamados');
+    const idsGestor = (r.body.chamados || r.body).map(c => c.id);
+    ok([idCh, idAluno, idConector].every(id => idsGestor.includes(id)), 'gestor vê todos os chamados da empresa, inclusive os do aluno');
+    // Ficha do usuário (tela Usuários): dados, cursos liberados e os chamados da pessoa
+    r = await chamar(tAdmin, 'GET', `/usuarios/${aluno}/ficha`);
+    const fichaIds = (r.body.chamados?.lista || []).map(c => c.id).sort();
+    ok(r.status === 200 && r.body.usuario.portal_papel === 'aluno' && Array.isArray(r.body.cursos) && Array.isArray(r.body.vagas),
+      'ficha do usuário traz dados, licenças/vagas e cursos');
+    ok(fichaIds.join() === [idAluno, idConector].sort().join() && r.body.chamados.total === 2, 'ficha lista os chamados da pessoa (portal + Conector)');
+    r = await chamar(tAluno, 'GET', `/usuarios/${aluno}/ficha`);
+    ok(r.status === 403, 'cliente não abre ficha de usuário');
+    await pool.query('DELETE FROM chamados WHERE id = $1', [idConector]);
+    await pool.query('DELETE FROM licencas WHERE id = $1', [lic]);
+
     // Equipe: escolhe pelo cliente; servidor opcional; edição mantém SID antigo mesmo com contrato vencido
     r = await chamar(tAdmin, 'GET', `/chamados/sistemas-sap?cliente_id=${cli}`);
     ok(r.body.sistemas.length === 2, 'equipe vê os servidores do cliente escolhido');

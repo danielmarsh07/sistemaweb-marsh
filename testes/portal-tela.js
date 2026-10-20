@@ -139,7 +139,7 @@ const SO_FOTOS = process.argv.includes('--antes'); // só fotografa (portal anti
     // Quem só usa licença não vê chamados nem financeiro
     if (!SO_FOTOS) {
       const lista = await telas();
-      ok(!lista.includes('chamados') && !lista.includes('financeiro'), 'pessoa com licença: sem chamados e financeiro no menu');
+      ok(lista.includes('chamados') && !lista.includes('financeiro'), 'pessoa com licença: com Chamados (só os dela) e sem Financeiro no menu');
     }
     ok(errosJs.length === 0, `sem erros de JavaScript${errosJs.length ? ': ' + errosJs.join(' | ') : ''}`);
   } finally {

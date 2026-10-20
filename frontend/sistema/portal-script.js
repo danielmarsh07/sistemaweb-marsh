@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== NAVEGAÇÃO (mesmo desenho do sistema: menu lateral, páginas, barra de baixo e gaveta no celular) =====
 // Cada tela do menu só aparece se a pessoa tem aquilo: a seção correspondente (secao-*) deixa de estar hidden
-// quando os dados chegam. Quem só usa licença (papel "aluno") não vê chamados.
+// quando os dados chegam. Quem só usa licença (papel "aluno") vê só os próprios chamados.
 const TELAS_PORTAL = {
   inicio:          { titulo: 'Início' },
   chamados:        { titulo: 'Chamados', resumo: 'Abra e acompanhe chamados de suporte' },
@@ -68,8 +68,7 @@ function atualizarMenuPortal() {
   const aluno = acessoPortal.papel === 'aluno';
   document.querySelectorAll('.sidebar .nav-link[data-page]').forEach(l => {
     const t = TELAS_PORTAL[l.dataset.page];
-    if (l.dataset.page === 'chamados') l.hidden = aluno;
-    else if (t.secao) l.hidden = document.getElementById(t.secao).hidden;
+    if (t.secao) l.hidden = document.getElementById(t.secao).hidden;
   });
   document.getElementById('usuario-papel').textContent = aluno ? 'Usuário de licença'
     : acessoPortal.gestor ? 'Administrador da empresa' : 'Portal do Cliente';
@@ -229,7 +228,7 @@ function sair() {
 }
 
 // ===== CARREGAR PORTAL =====
-// Usuário de vaga do Conector (papel "aluno") vê só os próprios treinamentos;
+// Usuário de vaga do Conector (papel "aluno") vê os próprios treinamentos e só os chamados que ele abriu;
 // o gestor do contrato vê tudo da empresa e mais a seção do contrato (vagas e sistemas SAP).
 let acessoPortal = { papel: null, gestor: false, vagas: [] };
 
@@ -242,14 +241,12 @@ async function carregarAcesso() {
 async function carregarPortal() {
   await carregarAcesso();
   if (acessoPortal.papel === 'aluno') {
+    // Quem tem vaga vê os próprios treinamentos e abre/acompanha só os próprios chamados (o servidor filtra)
     document.body.classList.add('so-aluno');
-    // style (não hidden): o CSS dos blocos define display e venceria o atributo
-    document.getElementById('stats-chamados').style.display = 'none';
-    document.getElementById('bloco-chamados').style.display = 'none';
     const perfis = [...new Set(acessoPortal.vagas.map(v => v.perfil_nome))].join(' e ');
     document.getElementById('welcome-empresa').textContent = perfis
       ? `Seus treinamentos do Conector SAP — perfil ${perfis}` : 'Seus treinamentos do Conector SAP';
-    await Promise.all([carregarTreinamentos(), carregarPedidosPortal()]);
+    await Promise.all([carregarTreinamentos(), carregarPedidosPortal(), carregarChamados(), carregarSistemasSap()]);
     if (!cursosPortal.length) {
       const secao = document.getElementById('secao-treinamentos');
       secao.hidden = false;
@@ -868,6 +865,7 @@ async function abrirDetalhe(id) {
     ${ch.origem !== 'conector' && ch.tipo_demanda ? `<div><strong>Tipo</strong>${escapeHtml(ROTULO_TIPO_CHAMADO[ch.tipo_demanda] || ch.tipo_demanda)}</div>` : ''}
     ${ch.tecnologia_nome || !ch.sid ? `<div><strong>Tecnologia</strong>${escapeHtml(ch.tecnologia_nome || 'Geral')}</div>` : ''}
     <div><strong>Aberto em</strong>${formatDataHora(ch.data_abertura)}</div>
+    ${acessoPortal.papel !== 'aluno' && (ch.aberto_por_nome || ch.solicitante_nome) ? `<div><strong>Aberto por</strong>${escapeHtml(ch.aberto_por_nome || ch.solicitante_nome)}</div>` : ''}
     ${ch.sla && ch.sla.sla_status !== 'concluido' ? `<div><strong>SLA</strong>${badgeSlaDetalhe(ch.sla)}</div>` : ''}
     ${ch.categoria ? `<div><strong>Categoria</strong>${escapeHtml(ch.categoria)}</div>` : ''}
     ${ch.data_fechamento ? `<div><strong>Fechado em</strong>${formatDataHora(ch.data_fechamento)}</div>` : ''}
@@ -876,7 +874,7 @@ async function abrirDetalhe(id) {
 
   // Chamado do Conector SAP: SID, módulo, objetos, pedido, especificação e a aprovação do gestor
   document.getElementById('detalhe-conector').innerHTML =
-    ChamadoConector.blocoHtml(ch, { podeAprovar: true, podeRecusar: true });
+    ChamadoConector.blocoHtml(ch, { podeAprovar: acessoPortal.papel !== 'aluno', podeRecusar: acessoPortal.papel !== 'aluno' });
   ChamadoConector.aoDecidir = async (cid) => { await carregarChamados(); await abrirDetalhe(cid); };
 
   // Timeline

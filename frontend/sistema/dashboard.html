@@ -2928,6 +2928,24 @@
     </div>
   </div>
 
+  <!-- Ficha do usuário (Usuários → olho): dados, acesso no portal, cursos liberados e chamados (cadastros.js) -->
+  <div id="modal-ficha-usuario" class="modal">
+    <div class="modal-content modal-ficha">
+      <div class="modal-header">
+        <div class="ficha-titulo">
+          <h3 id="ficha-usuario-nome">Usuário</h3>
+          <span class="fin-sub" id="ficha-usuario-sub"></span>
+        </div>
+        <div class="ficha-acoes">
+          <button type="button" class="btn btn-secondary" id="ficha-usuario-simular" hidden>Simular acesso</button>
+          <button type="button" class="btn btn-secondary" id="ficha-usuario-editar">Editar cadastro</button>
+          <button class="btn-close">&times;</button>
+        </div>
+      </div>
+      <div id="ficha-usuario-corpo" class="ficha-corpo"><p class="fin-muted">Carregando...</p></div>
+    </div>
+  </div>
+
   <div id="modal-contas-financeiras" class="modal">
     <div class="modal-content">
       <div class="modal-header">

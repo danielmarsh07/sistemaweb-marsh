@@ -5,6 +5,7 @@ const { notificarNovoChamado, notificarAtualizacaoStatus, notificarNovoAtendimen
 const { calcularSla } = require('../services/sla');
 const storage = require('../services/storage');
 const sap = require('../services/sap');
+const { condicaoProprios } = require('../middleware/chamados-do-aluno');
 
 // Ordenação da listagem (?ordem=coluna&direcao=asc|desc). Lista fechada: nada do usuário entra cru no SQL.
 const ORDENS_CHAMADOS = {
@@ -118,6 +119,8 @@ router.get('/', async (req, res) => {
       where += ` AND ch.cliente_id = $${idx++}`;
       whereParams.push(req.usuario.cliente_id || null);
     }
+    // Usuário de vaga do Conector: só os próprios chamados (middleware chamados-do-aluno)
+    if (req.soProprios) { where += ` AND ${condicaoProprios(idx++)}`; whereParams.push(req.usuario.id); }
     if (status) { where += ` AND ch.status = $${idx++}`; whereParams.push(status); }
     if (prioridade) { where += ` AND ch.prioridade = $${idx++}`; whereParams.push(prioridade); }
     if (!isCliente && cliente_id) { where += ` AND ch.cliente_id = $${idx++}`; whereParams.push(cliente_id); }

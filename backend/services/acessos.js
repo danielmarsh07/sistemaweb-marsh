@@ -209,7 +209,31 @@ async function incluirNoBeneficioPelaTrilha(cursoId, trilha, empresaId = 1) {
   return n;
 }
 
+/** Cursos que a pessoa vê agora no portal ("Meus cursos"), com a origem do acesso e o progresso.
+ *  Mesma consulta do portal e da ficha do usuário no sistema. */
+async function cursosDoUsuario(usuarioId, clienteId) {
+  const r = await pool.query(
+    `SELECT c.id, c.titulo, c.descricao, c.capa, c.carga_horaria, c.trilha,
+       ${cc.sqlViaLiberacao('$1', '$2')} AS via_liberacao,
+       ${cc.sqlViaContratoCursos('$2')} AS via_contrato,
+       ${cc.sqlViaBeneficio('$2')} AS via_beneficio,
+       ${cc.sqlViaCompra('$2')} AS via_compra,
+       (SELECT to_char(MAX(d.fim), 'YYYY-MM-DD') FROM direitos_acesso d WHERE d.usuario_id = $2 AND d.curso_id = c.id
+         AND d.origem IN ('compra', 'manual') AND d.status = 'ativo') AS compra_fim,
+       (SELECT bool_or(d.fim IS NULL) FROM direitos_acesso d WHERE d.usuario_id = $2 AND d.curso_id = c.id
+         AND d.origem IN ('compra', 'manual') AND d.status = 'ativo') AS compra_sem_fim,
+       (SELECT COUNT(*)::int FROM cursos_aulas a WHERE a.curso_id = c.id AND a.ativo) AS total_aulas,
+       (SELECT COUNT(*)::int FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
+         WHERE a.curso_id = c.id AND a.ativo AND p.usuario_id = $2) AS concluidas,
+       (SELECT MAX(p.concluida_em) FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
+         WHERE a.curso_id = c.id AND a.ativo AND p.usuario_id = $2) AS ultima_conclusao
+     FROM cursos c WHERE ${cc.sqlCursoLiberado('$1', '$2')}
+     ORDER BY c.ordem, c.titulo`,
+    [clienteId || null, usuarioId]);
+  return r.rows;
+}
+
 module.exports = {
-  origensVivas, sincronizarUsuario, sincronizarTodos, conceder, revogarDireito, atualizarConclusao,
+  cursosDoUsuario, origensVivas, sincronizarUsuario, sincronizarTodos, conceder, revogarDireito, atualizarConclusao,
   incluirNoBeneficioPelaTrilha, garantirMatricula
 };

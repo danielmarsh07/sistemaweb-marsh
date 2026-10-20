@@ -22,6 +22,12 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v5.9', data: '2026-10-19', destaques: [
+      'Quem usa uma licença do Conector agora tem a aba Chamados no portal: abre chamado escolhendo o servidor SAP e acompanha só os chamados dele (os que abriu e os que o Conector abriu pela licença dele)',
+      'O gestor do contrato continua vendo todos os chamados da empresa, agora com quem abriu cada um; aprovar chamado do Conector segue sendo só do gestor',
+      'Nova ficha do usuário em Usuários (botão do olho ou clique no nome): dados da pessoa, licença do Conector e vagas, cursos liberados com o progresso e a lista de chamados, com atalhos para simular o acesso e editar o cadastro',
+      'O botão de simular acesso ganhou um ícone próprio (entrar como), já que o olho agora abre a ficha'
+    ] },
     { versao: 'v5.8', data: '2026-10-19', destaques: [
       'Novo Simulador de acesso: em Usuários, o botão do olho abre o sistema ou o portal exatamente como aquele usuário vê, só para visualizar (nada pode ser alterado), por até 1 hora',
       'Durante a simulação uma faixa laranja mostra quem está sendo simulado, com o botão "Voltar ao meu acesso"; cada simulação fica registrada na auditoria',

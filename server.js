@@ -60,6 +60,7 @@ const alertasRoutes = require('./backend/routes/alertas');
 const contratosConectorRoutes = require('./backend/routes/contratos-conector');
 const contratosCursosRoutes = require('./backend/routes/contratos-cursos');
 const bloquearAluno = require('./backend/middleware/bloquear-aluno');
+const chamadosDoAluno = require('./backend/middleware/chamados-do-aluno');
 const lojaRoutes = require('./backend/routes/loja');
 
 // Rotas públicas
@@ -75,10 +76,11 @@ app.use('/api/fornecedores', autenticar, apenasEquipe, fornecedoresRoutes); // p
 app.use('/api/transacoes', autenticar, apenasEquipe, transacoesRoutes); // portal do cliente não acessa
 app.use('/api/categorias-transacao', autenticar, apenasEquipe, categoriasTransacaoRoutes); // portal do cliente não acessa
 app.use('/api/tecnologias', autenticar, tecnologiasRoutes);
-// bloquearAluno: usuário de vaga do Conector só usa os próprios treinamentos
-app.use('/api/chamados', autenticar, bloquearAluno, chamadosRoutes);
-app.use('/api/chamados', autenticar, bloquearAluno, anexosRoutes); // anexos sob /api/chamados/:id/anexos
-app.use('/api/atendimentos', autenticar, bloquearAluno, atendimentosRoutes);
+// bloquearAluno: usuário de vaga do Conector só usa os próprios treinamentos;
+// chamadosDoAluno: nos chamados, ele abre e acompanha só os próprios (os da empresa ficam com o gestor)
+app.use('/api/chamados', autenticar, chamadosDoAluno, chamadosRoutes);
+app.use('/api/chamados', autenticar, chamadosDoAluno, anexosRoutes); // anexos sob /api/chamados/:id/anexos
+app.use('/api/atendimentos', autenticar, chamadosDoAluno, atendimentosRoutes);
 app.use('/api/usuarios', autenticar, usuariosRoutes);
 app.use('/api/assistente', autenticar, bloquearAluno, assistenteRoutes);
 app.use('/api/licencas', autenticar, bloquearAluno, licencasRoutes);

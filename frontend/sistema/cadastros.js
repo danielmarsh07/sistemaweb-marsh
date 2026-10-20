@@ -369,3 +369,96 @@ async function resolverTodosAlertas() {
 }
 
 document.addEventListener('DOMContentLoaded', () => { setTimeout(carregarContadorAlertas, 1500); });
+
+// ----- Ficha do usuário (Usuários → olho) -----
+// Dados da pessoa, acesso no portal (licença do Conector, vagas de cursos), cursos liberados agora (a mesma conta do
+// "Meus cursos" do portal) e os chamados dela: cliente = os que abriu ou que o Conector abriu pela licença dele;
+// equipe = abertos por ele ou atribuídos a ele.
+const PERFIS_USUARIO_FICHA = { admin_sistema: 'Admin Sistema', admin_empresa: 'Administrador', tecnico: 'Técnico', cliente: 'Cliente' };
+const PAPEL_PORTAL_FICHA = { gestor: 'Gestor do contrato', aluno: 'Usuário de licença' };
+
+function fecharFichaUsuario() { closeModal(document.getElementById('modal-ficha-usuario')); }
+function fichaUsuarioAbrirChamado(id) { fecharFichaUsuario(); abrirDetalheChamado(id); }
+function fichaUsuarioAbrirCliente(id) { fecharFichaUsuario(); abrirFichaCliente(id); }
+
+async function abrirFichaUsuario(id) {
+  const corpo = document.getElementById('ficha-usuario-corpo');
+  corpo.innerHTML = '<p class="fin-muted">Carregando...</p>';
+  document.getElementById('ficha-usuario-nome').textContent = 'Usuário';
+  document.getElementById('ficha-usuario-sub').textContent = '';
+  const btnSimular = document.getElementById('ficha-usuario-simular');
+  btnSimular.hidden = true;
+  showModal('#modal-ficha-usuario');
+  const res = await apiFetch(`${API_URL}/usuarios/${id}/ficha`);
+  if (!res) return;
+  const d = await res.json();
+  if (!res.ok) { corpo.innerHTML = `<p class="fin-muted">${escapeHtml(d.erro)}</p>`; return; }
+  const u = d.usuario;
+  const cliente = u.tipo === 'cliente';
+
+  document.getElementById('ficha-usuario-nome').textContent = u.nome;
+  document.getElementById('ficha-usuario-sub').textContent = [u.email, PERFIS_USUARIO_FICHA[u.tipo] || u.tipo, u.cliente_nome].filter(Boolean).join(' · ');
+  document.getElementById('ficha-usuario-editar').onclick = () => {
+    fecharFichaUsuario();
+    abrirEditarUsuario(u.id, u.nome, u.email, u.tipo, u.cliente_id || null);
+  };
+  if (u.id !== usuario?.id && u.ativo !== false && !u.super_usuario) {
+    btnSimular.hidden = false;
+    btnSimular.onclick = () => simularAcessoUsuario(u.id);
+  }
+
+  // Acesso no portal: o que a pessoa é ali (define o que ela vê)
+  const acesso = !cliente ? 'Equipe Marsh (sistema interno)'
+    : [u.admin_empresa && 'Administrador da empresa', PAPEL_PORTAL_FICHA[u.portal_papel]].filter(Boolean).join(' · ') || 'Usuário do portal (acesso amplo)';
+  const caixas = [fichaCaixa('Dados do usuário', `
+    <div class="ficha-campos">
+      ${fichaLinha('Nome', escapeHtml(u.nome))}
+      ${fichaLinha('E-mail', escapeHtml(u.email))}
+      ${fichaLinha('Perfil', escapeHtml(PERFIS_USUARIO_FICHA[u.tipo] || u.tipo) + (u.super_usuario ? ' · super usuário' : ''))}
+      ${fichaLinha('Situação', u.ativo !== false ? 'Ativo' : '<span style="color:#b42318">Inativo</span>')}
+      ${cliente ? fichaLinha('Empresa', u.cliente_id
+        ? `<a href="#" onclick="fichaUsuarioAbrirCliente(${u.cliente_id}); return false;">${escapeHtml(u.cliente_nome || 'cliente')}</a>`
+        : '<span style="color:#b42318">sem vínculo com cliente</span>') : ''}
+      ${fichaLinha('Acesso', escapeHtml(acesso))}
+      ${fichaLinha('Cadastrado em', formatData(u.data_criacao))}
+    </div>`, null, 'ficha-caixa-larga')];
+
+  if (cliente) {
+    // Licença do Conector (vaga) e vagas de contratos de cursos
+    const itensLic = d.vagas.map(v => {
+      const st = v.estado === 'convidada' ? pill('Convite pendente', '#b7791f')
+        : v.vigente ? pill(`Ativa até ${diaBr(v.licenca_fim || v.data_fim)}`, '#2e7d4f')
+        : v.contrato_status === 'suspenso' ? pill('Contrato suspenso', '#b7791f') : pill(`Vencida ${diaBr(v.data_fim)}`, '#b42318');
+      return `<li><div><strong>Conector SAP · ${escapeHtml(PERFIL_FICHA[v.perfil] || v.perfil)}</strong>
+        <span>Contrato nº ${v.contrato_id}${v.chave_prefixo ? ` · chave ${escapeHtml(v.chave_prefixo)}…` : ''}${v.sids ? ` · servidores ${escapeHtml(String(v.sids).replace(/,/g, ', '))}` : ''}</span></div>
+        <div class="ficha-dir">${st}</div></li>`;
+    }).concat(d.vagas_cursos.map(v => `<li><div><strong>Vaga de cursos</strong><span>Contrato de cursos nº ${v.contrato_id}</span></div>
+        <div class="ficha-dir">${v.estado === 'convidada' ? pill('Convite pendente', '#b7791f') : pill('Ocupada', '#1d6fd8')}</div></li>`));
+    caixas.push(fichaCaixa('Licenças e vagas', itensLic.length ? `<ul class="ficha-lista">${itensLic.join('')}</ul>`
+      : fichaVazio('Sem licença do Conector nem vaga de cursos.')));
+
+    // Cursos liberados agora, com a origem e o progresso
+    caixas.push(fichaCaixa(`Cursos liberados (${d.cursos.length})`, d.cursos.length ? `<ul class="ficha-lista">${d.cursos.map(c => {
+      const origens = [c.via_beneficio && 'licença do Conector', c.via_contrato && 'contrato de cursos', c.via_liberacao && 'liberado p/ empresa',
+        c.via_compra && (c.compra_sem_fim ? 'compra/concessão' : `compra até ${diaBr(c.compra_fim)}`)].filter(Boolean).join(' · ');
+      const pct = c.total_aulas ? Math.round((c.concluidas / c.total_aulas) * 100) : 0;
+      return `<li><div><strong>${escapeHtml(c.titulo)}</strong><span>${escapeHtml(origens || 'liberado')}${c.ultima_conclusao ? ` · última aula em ${diaBr(c.ultima_conclusao)}` : ''}</span></div>
+        <div class="ficha-dir">${pill(`${c.concluidas}/${c.total_aulas} aulas · ${pct}%`, pct >= 100 ? '#2e7d4f' : pct > 0 ? '#1d6fd8' : '#64748b')}</div></li>`;
+    }).join('')}</ul>` : fichaVazio('Nenhum curso liberado para esta pessoa.'), { texto: 'Treinamentos', acao: "fecharFichaUsuario(); showPage('treinamentos')" }));
+  }
+
+  // Chamados da pessoa (clique abre o chamado)
+  const ch = d.chamados;
+  caixas.push(fichaCaixa(cliente ? 'Chamados abertos pela pessoa' : 'Chamados abertos ou atribuídos', `
+    <p class="ficha-resumo">${ch.abertos} em aberto de ${ch.total}${ch.total > ch.lista.length ? ` · mostrando os ${ch.lista.length} mais recentes` : ''}</p>
+    ${ch.lista.length ? `<ul class="ficha-lista">${ch.lista.map(c => {
+      const [txt, cor] = STATUS_CHAMADO_FICHA[c.status] || [String(c.status || '').replace(/_/g, ' '), '#64748b'];
+      const detalhes = [formatData(c.data_abertura), !cliente && c.cliente_nome, c.sid && `servidor ${c.sid}${c.modulo ? ' · ' + c.modulo : ''}`,
+        c.origem === 'conector' && 'pelo Conector', `prioridade ${({ baixa: 'baixa', media: 'média', alta: 'alta', critica: 'crítica' })[c.prioridade] || '-'}`, !cliente && c.atribuido && 'atribuído a ele'].filter(Boolean);
+      return `<li class="ficha-clicavel" role="button" tabindex="0" title="Abrir o chamado" onclick="fichaUsuarioAbrirChamado(${c.id})" onkeydown="if(event.key==='Enter')fichaUsuarioAbrirChamado(${c.id})">
+        <div><strong>#${c.id} ${escapeHtml(c.titulo)}</strong><span>${detalhes.map(escapeHtml).join(' · ')}</span></div>
+        <div class="ficha-dir">${pill(txt, cor)}</div></li>`;
+    }).join('')}</ul>` : fichaVazio('Nenhum chamado.')}`, { texto: 'Chamados', acao: "fecharFichaUsuario(); showPage('chamados')" }, 'ficha-caixa-larga'));
+
+  corpo.innerHTML = caixas.join('');
+}

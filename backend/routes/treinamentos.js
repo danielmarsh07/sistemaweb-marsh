@@ -65,25 +65,7 @@ const LIBERADO = cc.sqlCursoLiberado('$1', '$2');
 router.get('/meus', async (req, res) => {
   if (req.usuario.tipo !== 'cliente') return res.json([]);
   try {
-    const r = await pool.query(
-      `SELECT c.id, c.titulo, c.descricao, c.capa, c.carga_horaria, c.trilha,
-         ${cc.sqlViaLiberacao('$1', '$2')} AS via_liberacao,
-         ${cc.sqlViaContratoCursos('$2')} AS via_contrato,
-         ${cc.sqlViaBeneficio('$2')} AS via_beneficio,
-         ${cc.sqlViaCompra('$2')} AS via_compra,
-         (SELECT to_char(MAX(d.fim), 'YYYY-MM-DD') FROM direitos_acesso d WHERE d.usuario_id = $2 AND d.curso_id = c.id
-           AND d.origem IN ('compra', 'manual') AND d.status = 'ativo') AS compra_fim,
-         (SELECT bool_or(d.fim IS NULL) FROM direitos_acesso d WHERE d.usuario_id = $2 AND d.curso_id = c.id
-           AND d.origem IN ('compra', 'manual') AND d.status = 'ativo') AS compra_sem_fim,
-         (SELECT COUNT(*)::int FROM cursos_aulas a WHERE a.curso_id = c.id AND a.ativo) AS total_aulas,
-         (SELECT COUNT(*)::int FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
-           WHERE a.curso_id = c.id AND a.ativo AND p.usuario_id = $2) AS concluidas,
-         (SELECT MAX(p.concluida_em) FROM cursos_progresso p JOIN cursos_aulas a ON a.id = p.aula_id
-           WHERE a.curso_id = c.id AND a.ativo AND p.usuario_id = $2) AS ultima_conclusao
-       FROM cursos c WHERE ${LIBERADO}
-       ORDER BY c.ordem, c.titulo`,
-      [req.usuario.cliente_id || null, req.usuario.id]);
-    res.json(r.rows);
+    res.json(await acessos.cursosDoUsuario(req.usuario.id, req.usuario.cliente_id));
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao buscar cursos', detalhe: err.message });
   }

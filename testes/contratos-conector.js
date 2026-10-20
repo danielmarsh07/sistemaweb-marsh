@@ -1,6 +1,6 @@
 require('./_ambiente-local');
 // Contratos do Conector por vagas: admin cria contrato com gestor e vagas por perfil; o gestor passa vagas
-// no portal; o aluno vê só os cursos das trilhas do perfil e fica fora de chamados/financeiro/licenças;
+// no portal; o aluno vê só os cursos das trilhas do perfil, só os próprios chamados e fica fora de financeiro/licenças;
 // SIDs do contrato até o limite; liberar vaga e suspender contrato cortam o acesso.
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
@@ -17,7 +17,7 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
   const sufixo = Date.now();
   const cliA = (await pool.query(
     `INSERT INTO clientes (nome, razao_social, cpf_cnpj, email, empresa_id, ativo)
-     VALUES ('TESTE Vagas A', 'TESTE VAGAS A LTDA', '11222333000181', 'vagas-a@exemplo.com', 1, TRUE) RETURNING id`)).rows[0].id;
+     VALUES ('TESTE Vagas A', 'TESTE VAGAS A LTDA', '98765001000121', 'vagas-a@exemplo.com', 1, TRUE) RETURNING id`)).rows[0].id;
   const cliB = (await pool.query(
     `INSERT INTO clientes (nome, razao_social, email, empresa_id, ativo)
      VALUES ('TESTE Vagas B', 'TESTE VAGAS B LTDA', 'vagas-b@exemplo.com', 1, TRUE) RETURNING id`)).rows[0].id;
@@ -110,9 +110,12 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     ok((await api(tokAluno, `/treinamentos/meus/${cursos.abap}`)).status === 200, 'aluno abre curso do perfil');
     ok((await api(tokAluno, `/treinamentos/aulas/${aulas.funcional[0]}/concluir`, 'POST', {})).status === 404, 'aluno não conclui aula fora do perfil');
     ok((await api(tokAluno, `/treinamentos/aulas/${aulas.abap[0]}/concluir`, 'POST', {})).status === 200, 'aluno conclui aula do perfil');
-    for (const p of ['/chamados', '/licencas/minhas', '/licencas/download', '/atendimentos/1']) {
+    for (const p of ['/licencas/minhas', '/licencas/download']) {
       ok((await api(tokAluno, p)).status === 403, `aluno bloqueado em ${p}`);
     }
+    // Chamados: o aluno entra, mas só vê os próprios (detalhes em testes/chamados-sap.js)
+    const chAluno = await api(tokAluno, '/chamados');
+    ok(chAluno.status === 200 && (chAluno.body.chamados || chAluno.body).length === 0, 'aluno acessa chamados e não vê os da empresa');
     // Financeiro: faturas da empresa só para o gestor; aluno e usuário comum do cliente (cadastrado pela equipe) não veem
     const fatId = (await pool.query(
       `INSERT INTO faturas (empresa_id, cliente_id, competencia, descricao, valor, data_vencimento, status)
