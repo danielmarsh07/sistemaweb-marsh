@@ -68,7 +68,7 @@ const MAX_CONEXOES = 10;
 function validarConexoes(conexoes) {
   if (conexoes === null || conexoes === '') return { lista: [] };
   if (!Array.isArray(conexoes)) return { erro: 'Conexões SAP devem ser uma lista.' };
-  if (conexoes.length > MAX_CONEXOES) return { erro: `No máximo ${MAX_CONEXOES} conexões SAP por licença.` };
+  if (conexoes.length > MAX_CONEXOES) return { erro: `No máximo ${MAX_CONEXOES} sistemas SAP.` };
   const lista = [];
   for (const [i, c] of conexoes.entries()) {
     const n = i + 1;

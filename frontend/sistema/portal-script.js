@@ -379,7 +379,7 @@ async function carregarContratosPortal() {
           ${k.suspenso_por_fatura_id ? '<p style="color:#b42318"><strong>Suspenso por pagamento em atraso.</strong> As licenças e os cursos inclusos voltam assim que a fatura for paga.</p>' : ''}
           <p><strong>${k.vagas.length}</strong> licença(s) contratada(s) · <strong>${ativas}</strong> em uso ·
              <strong>${convites}</strong> convite(s) pendente(s) · <strong>${livres}</strong> disponível(is)</p>
-          <p class="sids">Sistemas SAP: <strong>${sids ? escapeHtml(sids) : 'nenhum cadastrado'}</strong> (até ${k.max_sids})</p>
+          <p class="sids">Sistemas SAP: <strong>${sids ? escapeHtml(sids) : 'nenhum cadastrado'}</strong></p>
         </div>
         <div class="acoes">
           ${livres && k.vigente ? `<button type="button" class="btn-curso" onclick="abrirConvidar(${k.id})">Convidar pessoa</button>` : ''}
@@ -660,11 +660,13 @@ async function removerAdminPortal(id, nome) {
 }
 
 // Sistemas SAP do contrato: SID, descrição, URL, mandante e idioma (nunca usuário/senha do SAP)
+const MAX_SISTEMAS_SAP = 10; // o mesmo limite das licenças no servidor
+
 function abrirSids(contratoId) {
   contratoSids = contratosPortal.find(x => x.id === contratoId);
   if (!contratoSids) return;
   document.getElementById('sids-ajuda').textContent =
-    `Até ${contratoSids.max_sids} sistemas. Todas as vagas usam estes sistemas; o conector chega à máquina de cada pessoa já configurado — ` +
+    `Até ${MAX_SISTEMAS_SAP} sistemas, cada um com seu SID de 3 letras (ex.: DEV, QAS, PRD; S/4HANA e Fiori com SID próprio). Todas as vagas usam estes sistemas; o conector chega à máquina de cada pessoa já configurado — ` +
     'ela só informa o próprio usuário e senha do SAP na instalação.';
   const box = document.getElementById('sids-linhas');
   box.innerHTML = '';
@@ -675,8 +677,8 @@ function abrirSids(contratoId) {
 
 function adicionarLinhaSid(c = {}) {
   const box = document.getElementById('sids-linhas');
-  if (contratoSids && box.children.length >= contratoSids.max_sids) {
-    alert(`Este contrato permite até ${contratoSids.max_sids} sistemas SAP.`);
+  if (box.children.length >= MAX_SISTEMAS_SAP) {
+    alert(`No máximo ${MAX_SISTEMAS_SAP} sistemas SAP.`);
     return;
   }
   const div = document.createElement('div');

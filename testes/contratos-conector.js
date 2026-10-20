@@ -141,8 +141,12 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
 
     // --- Sistemas SAP do contrato ---
     const cx = s => ({ sid: s, descricao: s, url: `https://${s.toLowerCase()}.exemplo:8000/`, mandante: '100', idioma: 'pt', usuario: 'NAO', senha: 'NAO' });
-    r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: ['DEV', 'QAS', 'TST', 'HML'].map(cx) });
-    ok(r.status === 400, `! mais SIDs que o limite (${r.body?.erro})`);
+    r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: ['DEV', 'QAS', 'PRD', 'HDV', 'FIO'].map(cx) });
+    ok(r.status === 200, `contrato aceita 5 sistemas SAP, como as licenças (${r.body?.erro || 'ok'})`);
+    r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: Array.from({ length: 11 }, (_, i) => cx(`S${String(i).padStart(2, '0')}`)) });
+    ok(r.status === 400, `! mais de 10 sistemas (${r.body?.erro})`);
+    r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [cx('DEV'), cx('DEV')] });
+    ok(r.status === 400, `! SID repetido (${r.body?.erro})`);
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [cx('DEV'), { ...cx('QAS'), mandante: '1' }] });
     ok(r.status === 400, `! mandante inválido (${r.body?.erro})`);
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/conexoes`, 'PUT', { conexoes: [cx('DEV'), cx('QAS')] });
@@ -160,8 +164,6 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     const ocupada = det.vagas.find(v => v.usuario_id && !v.eh_gestor);
     ok((await api(tokAdmin, `/contratos-conector/${kid}/vagas/${ocupada.id}`, 'DELETE')).status === 400, '! não remove vaga ocupada');
     ok((await api(tokAdmin, `/contratos-conector/${kid}/vagas/${livre.id}`, 'DELETE')).status === 200, 'admin remove vaga livre');
-    r = await api(tokAdmin, `/contratos-conector/${kid}`, 'PUT', { max_sids: 1 });
-    ok(r.status === 400, `! limite de SIDs abaixo do já cadastrado (${r.body?.erro})`);
 
     // --- Liberar vaga: o aluno perde o acesso ---
     r = await api(tokGestor, `/contratos-conector/meus/${kid}/vagas/${vaga('abap').id}/liberar`, 'POST');

@@ -1,6 +1,7 @@
 require('./_ambiente-local');
 // Exceção do contrato do Conector (licenca_sem_curso): quem ocupa a vaga recebe a licença e o instalador
 // sem concluir os cursos; o certificado não é emitido. Sem a marcação, nada muda (sem licença antes dos cursos).
+// Os sistemas SAP do contrato (até 10) chegam à licença da pessoa.
 // Precisa do servidor local: npm run dev:local
 const jwt = require('jsonwebtoken');
 const pool = require('../backend/db');
@@ -64,6 +65,14 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     await api(tokRenan, '/contratos-conector/eu');
     const n = (await pool.query('SELECT COUNT(*)::int AS n FROM licencas WHERE usuario_id = $1', [renan.id])).rows[0].n;
     ok(n === 1, `uma licença só (${n})`);
+
+    // Contrato ganha sistemas: a licença da pessoa acompanha e a lista de contratos traz os sistemas (licença nova usa)
+    const cinco = ['DEV', 'QAS', 'PRD', 'HDV', 'FIO'].map(cx);
+    ok((await api(tokAdmin, `/contratos-conector/${kid}/conexoes`, 'PUT', { conexoes: cinco })).status === 200, 'admin salva 5 sistemas no contrato');
+    const l2 = (await pool.query('SELECT sids, conexoes FROM licencas WHERE vaga_id = $1 AND usuario_id = $2', [v1.id, renan.id])).rows[0];
+    ok(l2.sids === 'DEV,QAS,PRD,HDV,FIO' && l2.conexoes.length === 5, `licença da pessoa com os 5 sistemas (${l2.sids})`);
+    const naLista = (await api(tokAdmin, '/contratos-conector')).body.find(c => c.id === kid);
+    ok(naLista && naLista.conexoes.length === 5, 'lista de contratos traz os sistemas do contrato');
   } finally {
     const users = (await pool.query('SELECT id FROM usuarios WHERE cliente_id = $1', [cli])).rows.map(u => u.id);
     const lics = (await pool.query('SELECT id FROM licencas WHERE cliente_id = $1', [cli])).rows.map(l => l.id);

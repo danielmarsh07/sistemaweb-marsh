@@ -10,7 +10,7 @@
  *   POST /meus/:id/vagas/:vid/ocupar           { eu: true } ou { nome, email } (convite por e-mail)
  *   POST /meus/:id/vagas/:vid/liberar          revoga a licença ou cancela o convite
  *   POST /meus/:id/vagas/:vid/convite          reenvia o convite ao ocupante
- *   PUT  /meus/:id/conexoes                    { conexoes: [{ sid, descricao, url, mandante, idioma }] } até max_sids
+ *   PUT  /meus/:id/conexoes                    { conexoes: [{ sid, descricao, url, mandante, idioma }] } até 10, como nas licenças
  * Admin: GET /, GET /:id, POST /, PUT /:id, POST /:id/vagas, DELETE /:id/vagas/:vid, POST /:id/convidar, GET /:id/historico,
  *        POST /:id/vagas/:vid/ocupar|liberar, PUT /:id/conexoes, POST /:id/gestor/convite, GET|POST|DELETE /clientes/:cid/admins
  */
@@ -57,10 +57,10 @@ function mensagemOcupacao(r) {
     : `Vaga passada para ${r.usuario.nome}, mas o convite não pôde ser enviado. Use "Reenviar convite".`;
 }
 
-function lerConexoes(body, maxSids) {
+// Mesmo limite das licenças (MAX_CONEXOES); a coluna max_sids do contrato não limita mais
+function lerConexoes(body) {
   const v = validarConexoes(body && body.conexoes);
   if (v.erro) throw new cc.ErroRegra(v.erro);
-  if (v.lista.length > maxSids) throw new cc.ErroRegra(`Este contrato permite até ${maxSids} sistemas SAP (SIDs).`);
   return v.lista;
 }
 
@@ -227,7 +227,7 @@ router.put('/meus/:id/conexoes', async (req, res) => {
   try {
     const k = await contratoDoGestor(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    const lista = lerConexoes(req.body, k.max_sids);
+    const lista = lerConexoes(req.body);
     await pool.query('UPDATE contratos_conector SET conexoes = $1::jsonb, data_atualizacao = NOW() WHERE id = $2',
       [JSON.stringify(lista), k.id]);
     await cert.sincronizarContrato(k.id); // as licenças das vagas passam a usar os sistemas novos
@@ -268,7 +268,7 @@ router.get('/', async (req, res) => {
               (k.status = 'ativo' AND k.data_inicio <= CURRENT_DATE AND k.data_fim >= CURRENT_DATE) AS vigente,
               COALESCE(cl.nome_fantasia, cl.razao_social, cl.nome) AS cliente_nome,
               g.nome AS gestor_nome, g.email AS gestor_email,
-              jsonb_array_length(k.conexoes) AS total_sids,
+              jsonb_array_length(k.conexoes) AS total_sids, k.conexoes,
               (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo) AS vagas,
               (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.usuario_id IS NOT NULL) AS ocupadas,
               (SELECT COUNT(*)::int FROM contratos_conector_vagas v WHERE v.contrato_id = k.id AND v.ativo AND v.perfil = 'abap') AS vagas_abap,
@@ -440,7 +440,7 @@ router.post('/:id/cobranca', async (req, res) => {
 });
 
 // POST / — { cliente_id, gestor_nome, gestor_email, vagas: { abap, funcional, ambos }, precos?, modalidade? (licenca | empresa),
-//   ciclo? (anual | mensal), data_inicio?, data_fim, max_sids?, observacoes?, cobranca?: { gerar, valor_anual?, dia_vencimento? } }
+//   ciclo? (anual | mensal), data_inicio?, data_fim, observacoes?, cobranca?: { gerar, valor_anual?, dia_vencimento? } }
 router.post('/', async (req, res) => {
   const b = req.body || {};
   const db = await pool.connect();
@@ -451,12 +451,10 @@ router.post('/', async (req, res) => {
     const { q, total } = cc.lerQuantidades(b.vagas);
     if (total < 1) throw new cc.ErroRegra('Informe ao menos 1 vaga.');
     const { inicio, fim } = lerDatas(b);
-    const maxSids = b.max_sids === undefined || b.max_sids === '' ? 3 : Number(b.max_sids);
-    if (!Number.isInteger(maxSids) || maxSids < 1 || maxSids > 10) throw new cc.ErroRegra('Máximo de SIDs: 1 a 10.');
 
     await db.query('BEGIN');
     const r = await cc.criarContrato(db, {
-      empresaId: emp(req), clienteId: cliente.id, gestorNome: b.gestor_nome, gestorEmail: b.gestor_email, q, inicio, fim, maxSids,
+      empresaId: emp(req), clienteId: cliente.id, gestorNome: b.gestor_nome, gestorEmail: b.gestor_email, q, inicio, fim,
       observacoes: b.observacoes, precos: cc.lerPrecos(b.precos), modalidade: cc.lerModalidade(b.modalidade), ciclo: cc.lerCiclo(b.ciclo),
       cobranca: b.cobranca && b.cobranca.gerar ? { gerar: true, valor: b.cobranca.valor_anual, dia_vencimento: b.cobranca.dia_vencimento } : null,
       usuarioId: req.usuario.id });
@@ -482,7 +480,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /:id — { status?, data_inicio?, data_fim?, max_sids?, observacoes? }
+// PUT /:id — { status?, data_inicio?, data_fim?, observacoes? }
 router.put('/:id', async (req, res) => {
   const b = req.body || {};
   try {
@@ -492,15 +490,12 @@ router.put('/:id', async (req, res) => {
       throw new cc.ErroRegra('Status inválido (ativo, suspenso ou cancelado).');
     }
     const { inicio, fim } = lerDatas(b, k);
-    const maxSids = b.max_sids === undefined || b.max_sids === '' ? k.max_sids : Number(b.max_sids);
-    if (!Number.isInteger(maxSids) || maxSids < 1 || maxSids > 10) throw new cc.ErroRegra('Máximo de SIDs: 1 a 10.');
-    if (maxSids < (k.conexoes || []).length) throw new cc.ErroRegra(`O contrato já tem ${k.conexoes.length} SIDs cadastrados; remova antes de baixar o limite.`);
     await pool.query(
       // Mudou o status à mão: a suspensão automática por atraso deixa de valer (o admin decidiu)
-      `UPDATE contratos_conector SET status = $1::varchar, data_inicio = COALESCE($2::date, data_inicio), data_fim = $3, max_sids = $4, observacoes = $5,
+      `UPDATE contratos_conector SET status = $1::varchar, data_inicio = COALESCE($2::date, data_inicio), data_fim = $3, observacoes = $4,
          suspenso_por_fatura_id = CASE WHEN status <> $1::varchar THEN NULL ELSE suspenso_por_fatura_id END,
-         data_atualizacao = NOW() WHERE id = $6`,
-      [b.status || k.status, inicio, fim, maxSids,
+         data_atualizacao = NOW() WHERE id = $5`,
+      [b.status || k.status, inicio, fim,
        b.observacoes !== undefined ? (String(b.observacoes).trim() || null) : k.observacoes, k.id]);
     await cert.sincronizarContrato(k.id);
     // Suspender, cancelar, vencer ou renovar o contrato muda os cursos gratuitos de todas as vagas
@@ -622,7 +617,7 @@ router.put('/:id/conexoes', async (req, res) => {
   try {
     const k = await contratoDaEmpresa(req);
     if (!k) return res.status(404).json({ erro: 'Contrato não encontrado.' });
-    const lista = lerConexoes(req.body, k.max_sids);
+    const lista = lerConexoes(req.body);
     await pool.query('UPDATE contratos_conector SET conexoes = $1::jsonb, data_atualizacao = NOW() WHERE id = $2',
       [JSON.stringify(lista), k.id]);
     await cert.sincronizarContrato(k.id); // as licenças das vagas passam a usar os sistemas novos

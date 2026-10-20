@@ -3626,7 +3626,6 @@
         <div class="form-row">
           <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
           <div class="form-group"><label>Fim <span class="obrig" title="Obrigatório">*</span></label><input type="date" name="data_fim" required></div>
-          <div class="form-group"><label>Máx. de SIDs</label><input type="number" name="max_sids" min="1" max="10" value="3"></div>
         </div>
         <div class="form-section-title">Cobrança</div>
         <label class="check-linha"><input type="checkbox" name="gerar_cobranca" checked> Criar a cobrança no Financeiro (o valor acima, no ciclo escolhido)</label>
@@ -3667,7 +3666,6 @@
             </div>
             <div class="form-group"><label>Início</label><input type="date" name="data_inicio"></div>
             <div class="form-group"><label>Fim</label><input type="date" name="data_fim" required></div>
-            <div class="form-group"><label>Máx. de SIDs</label><input type="number" name="max_sids" min="1" max="10"></div>
           </div>
           <div class="form-group">
             <label>Observações</label>
@@ -3715,9 +3713,17 @@
         <div id="contrato-conector-historico"></div>
 
         <div class="form-section-title">Sistemas SAP (o gestor também edita no portal)</div>
-        <div id="contrato-conector-sids"></div>
+        <div class="licenca-conexoes">
+          <table>
+            <thead>
+              <tr><th>SID</th><th>Descrição</th><th>URL</th><th>Mandante</th><th>Idioma</th><th></th></tr>
+            </thead>
+            <tbody id="contrato-conector-conexoes-tbody"></tbody>
+          </table>
+        </div>
+        <small class="form-hint">Até 10 sistemas, cada um com seu SID de 3 letras/números (ex.: ECC DEV, QAS e PRD; S/4HANA HDV e HPR; Fiori FIO — o nome vai na descrição). As licenças das pessoas e o instalador do Conector usam esta lista.</small>
         <div class="form-actions">
-          <button type="button" class="btn btn-secondary" onclick="adicionarSidAdmin()">+ Adicionar sistema</button>
+          <button type="button" class="btn btn-secondary" onclick="adicionarConexaoLicenca('contrato-conector-conexoes-tbody')">+ Conexão</button>
           <button type="button" class="btn btn-primary" onclick="salvarSidsAdmin()">Salvar sistemas</button>
         </div>
       </div>
@@ -3752,7 +3758,8 @@
         <div class="form-row">
           <div class="form-group">
             <label>Cliente <span class="obrig" title="Obrigatório">*</span></label>
-            <select name="cliente_id" required></select>
+            <select name="cliente_id" required onchange="sistemasDoContratoNaLicenca()"></select>
+            <small class="form-hint">Os sistemas SAP vêm do contrato do Conector do cliente.</small>
           </div>
           <div class="form-group">
             <label>Plano <span class="obrig" title="Obrigatório">*</span></label>
@@ -3767,7 +3774,7 @@
           <div class="form-group">
             <label>Sistemas SAP (SIDs) <span class="obrig" title="Obrigatório">*</span></label>
             <input type="text" name="sids" placeholder="DEV, QAS" required>
-            <small class="form-hint">Somente DEV/QAS. Separe por vírgula.</small>
+            <small class="form-hint">Separe por vírgula. Vem do contrato do cliente ao escolhê-lo.</small>
           </div>
           <div class="form-group">
             <label>Máximo de usuários</label>

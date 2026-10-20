@@ -120,7 +120,7 @@ Exclusiva do **super usuário** (`usuarios.super_usuario`, o dono do sistema): a
 
 ### Contratos do Conector por vagas (abertos pela lista de Contratos ou pela ficha)
 
-- Quem compra (CPF ou CNPJ) é o **gestor** (`usuarios.portal_papel = 'gestor'`): no portal vê o contrato, passa cada vaga para uma pessoa (convite por e-mail), pode ocupar uma vaga ele mesmo e cadastra os sistemas SAP (até `max_sids`).
+- Quem compra (CPF ou CNPJ) é o **gestor** (`usuarios.portal_papel = 'gestor'`): no portal vê o contrato, passa cada vaga para uma pessoa (convite por e-mail), pode ocupar uma vaga ele mesmo e cadastra os sistemas SAP (até 10, como nas licenças; `max_sids` não limita mais). A licença nova da tela Licenças já vem com os sistemas do contrato do cliente.
 - Vagas por perfil (`contratos_conector_vagas.perfil`): **abap** (IA no ABAP + Portal + Conector), **funcional** (IA para Funcionais + Portal + Conector), **ambos** (os quatro). Os cursos seguem `cursos.trilha` (abap | funcional | portal | conector), marcada no modal do curso.
 - Quem ocupa uma vaga (`portal_papel = 'aluno'`) vê os próprios cursos; licenças da empresa e assistente respondem 403 (`middleware/bloquear-aluno.js`) e o financeiro mostra só as compras dele. **Chamados** (desde a v5.9): abre e acompanha só os próprios — os que abriu no portal e os que o Conector abriu pela licença dele (`middleware/chamados-do-aluno.js`); não aprova chamado do Conector (é do gestor). Teste: `testes/chamados-sap.js`. Liberar a vaga desativa o aluno sem outra vaga (o progresso fica guardado).
 - Contrato suspenso, cancelado ou fora da validade corta os cursos das vagas. Regras em `backend/services/contratos-conector.js`; rotas em `/api/contratos-conector` (portal: `/eu`, `/meus/...`; admin: o resto).

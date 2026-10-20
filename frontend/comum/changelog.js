@@ -22,6 +22,12 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v6.4', data: '2026-10-20', destaques: [
+      'Sistemas SAP do contrato do Conector na mesma tabela das licenças, com até 10 sistemas (ex.: DEV, QAS, PRD, S/4HANA, Fiori)',
+      'Saiu o campo "Máx. de SIDs" do contrato; no portal o gestor também cadastra até 10 sistemas',
+      'Licença nova já vem com os sistemas do contrato do cliente ao escolhê-lo',
+      'As licenças das pessoas e o instalador do Conector recebem os sistemas novos do contrato na hora'
+    ] },
     { versao: 'v6.3', data: '2026-10-20', destaques: [
       'Contrato do Conector pode liberar a licença sem os cursos: quem ocupa a vaga já recebe a chave e o instalador no portal',
       'O certificado continua saindo só quando a pessoa conclui as aulas do perfil'

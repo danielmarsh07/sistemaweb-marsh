@@ -75,7 +75,6 @@ async function abrirNovoContratoConector(clienteId) {
   const f = document.getElementById('form-novo-contrato-conector');
   const umAno = isoLocal(new Date(Date.now() + 365 * 86400000));
   f.data_fim.value = umAno;
-  f.max_sids.value = 3;
   PERFIS_CONECTOR.forEach(([p]) => {
     f[p].value = 0;
     f[p].oninput = recalcularNovoConector;
@@ -153,7 +152,7 @@ async function salvarNovoContratoConector() {
     cliente_id: f.cliente_id.value, gestor_nome: f.gestor_nome.value, gestor_email: f.gestor_email.value,
     vagas: { abap: f.abap.value, funcional: f.funcional.value, ambos: f.ambos.value },
     modalidade: f.modalidade.value, ciclo: f.ciclo.value, precos: precosDoForm(f),
-    data_inicio: f.data_inicio.value || undefined, data_fim: f.data_fim.value, max_sids: f.max_sids.value,
+    data_inicio: f.data_inicio.value || undefined, data_fim: f.data_fim.value,
     observacoes: f.observacoes.value,
     cobranca: { gerar: f.gerar_cobranca.checked, dia_vencimento: f.dia_vencimento.value }
   };
@@ -186,7 +185,6 @@ async function abrirContratoConector(id, manterAberto) {
   f.status.value = k.status;
   f.data_inicio.value = k.data_inicio;
   f.data_fim.value = k.data_fim;
-  f.max_sids.value = k.max_sids;
   f.observacoes.value = k.observacoes || '';
   document.getElementById('form-contrato-mais-vagas').reset();
   renderPrecosContrato(k);
@@ -214,9 +212,7 @@ async function abrirContratoConector(id, manterAberto) {
       </tr>`;
   }).join('') : '<tr><td colspan="4" class="text-center">Nenhuma vaga.</td></tr>';
 
-  const box = document.getElementById('contrato-conector-sids');
-  box.innerHTML = '';
-  (k.conexoes || []).forEach(c => adicionarSidAdmin(c));
+  renderConexoesLicenca(k.conexoes || [], 'contrato-conector-conexoes-tbody');
   carregarAdminsCliente(k.cliente_id);
   document.getElementById('contrato-conector-historico').innerHTML = '';
   if (!manterAberto) showModal('#modal-contrato-conector');
@@ -365,24 +361,6 @@ async function criarCobrancaConector() {
   if (res.ok) { abrirContratoConector(k.id, true); loadContratosConector(); }
 }
 
-function adicionarSidAdmin(c = {}) {
-  const box = document.getElementById('contrato-conector-sids');
-  if (_contratoAberto && box.children.length >= _contratoAberto.max_sids) {
-    alert(`Este contrato permite até ${_contratoAberto.max_sids} sistemas SAP.`);
-    return;
-  }
-  const div = document.createElement('div');
-  div.className = 'form-row sid-admin';
-  div.innerHTML = `
-    <div class="form-group"><label>SID</label><input name="sid" maxlength="3" placeholder="DEV" value="${escapeHtml(c.sid || '')}"></div>
-    <div class="form-group"><label>Descrição</label><input name="descricao" maxlength="100" value="${escapeHtml(c.descricao || '')}"></div>
-    <div class="form-group"><label>URL</label><input name="url" maxlength="255" placeholder="https://servidor:8000" value="${escapeHtml(c.url || '')}"></div>
-    <div class="form-group"><label>Mandante</label><input name="mandante" maxlength="3" value="${escapeHtml(c.mandante || '')}"></div>
-    <div class="form-group"><label>Idioma</label><input name="idioma" maxlength="2" value="${escapeHtml(c.idioma || 'PT')}"></div>
-    <div class="form-group"><button type="button" class="btn btn-icon btn-danger" title="Remover sistema" aria-label="Remover sistema" onclick="this.closest('.sid-admin').remove()">${iconSVG('trash')}</button></div>`;
-  box.appendChild(div);
-}
-
 async function acaoContrato(caminho, metodo = 'POST', corpo) {
   const res = await apiFetch(`${API_URL}/contratos-conector/${_contratoAberto.id}${caminho}`, {
     method: metodo, body: corpo ? JSON.stringify(corpo) : undefined });
@@ -399,10 +377,7 @@ async function recarregarContrato() {
 }
 
 async function salvarSidsAdmin() {
-  const conexoes = [...document.querySelectorAll('#contrato-conector-sids .sid-admin')].map(l => {
-    const v = n => l.querySelector(`[name="${n}"]`).value.trim();
-    return { sid: v('sid'), descricao: v('descricao'), url: v('url'), mandante: v('mandante'), idioma: v('idioma') };
-  }).filter(c => c.sid || c.url);
+  const conexoes = lerConexoesLicenca('contrato-conector-conexoes-tbody');
   if (await acaoContrato('/conexoes', 'PUT', { conexoes })) { alert('Sistemas SAP salvos.'); recarregarContrato(); }
 }
 
@@ -483,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
   sub('form-contrato-conector', async f => {
     const r = await acaoContrato('', 'PUT', {
       status: f.status.value, data_inicio: f.data_inicio.value, data_fim: f.data_fim.value,
-      max_sids: f.max_sids.value, observacoes: f.observacoes.value });
+      observacoes: f.observacoes.value });
     if (r) { alert(r.mensagem); recarregarContrato(); }
   });
   sub('form-contrato-mais-vagas', acrescentarLicencas);

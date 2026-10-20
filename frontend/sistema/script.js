@@ -1434,6 +1434,18 @@ async function preencherClientesLicenca(selecionado) {
   if (selecionado) sel.value = selecionado;
 }
 
+// Licença nova: os sistemas SAP vêm do contrato do Conector vigente do cliente (se a grade ainda estiver vazia)
+async function sistemasDoContratoNaLicenca() {
+  const form = document.getElementById('form-licenca');
+  if (licencaEmEdicao || !form.cliente_id.value || lerConexoesLicenca().length) return;
+  const res = await apiFetch(`${API_URL}/contratos-conector`);
+  if (!res || !res.ok) return;
+  const k = (await res.json()).find(c => String(c.cliente_id) === form.cliente_id.value && c.vigente && (c.conexoes || []).length);
+  if (!k || licencaEmEdicao || lerConexoesLicenca().length) return;
+  renderConexoesLicenca(k.conexoes);
+  form.sids.value = k.conexoes.map(c => c.sid).join(', ');
+}
+
 async function abrirNovaLicenca() {
   licencaEmEdicao = null;
   resetForm('#form-licenca');
@@ -1507,8 +1519,10 @@ async function salvarLicenca() {
   }
 }
 
-// Grade de conexões SAP do modal (SID, descrição, URL, mandante, idioma — sem usuário/senha)
+// Grade de conexões SAP (SID, descrição, URL, mandante, idioma — sem usuário/senha). A mesma grade serve
+// à licença e ao contrato do Conector: tbodyId escolhe qual (padrão: a da licença).
 const MAX_CONEXOES_LICENCA = 10;
+const TBODY_CONEXOES_LICENCA = 'licenca-conexoes-tbody';
 
 function linhaConexaoLicenca(c = {}) {
   return `
@@ -1523,17 +1537,17 @@ function linhaConexaoLicenca(c = {}) {
     </tr>`;
 }
 
-function renderConexoesLicenca(lista) {
-  const tbody = document.getElementById('licenca-conexoes-tbody');
+function renderConexoesLicenca(lista, tbodyId = TBODY_CONEXOES_LICENCA) {
+  const tbody = document.getElementById(tbodyId);
   tbody.innerHTML = lista.length
     ? lista.map(linhaConexaoLicenca).join('')
     : '<tr class="cx-vazio-linha"><td colspan="6" class="cx-vazio">Nenhuma conexão. Use "+ Conexão".</td></tr>';
 }
 
-function adicionarConexaoLicenca() {
-  const tbody = document.getElementById('licenca-conexoes-tbody');
+function adicionarConexaoLicenca(tbodyId = TBODY_CONEXOES_LICENCA) {
+  const tbody = document.getElementById(tbodyId);
   if (tbody.querySelectorAll('tr:not(.cx-vazio-linha)').length >= MAX_CONEXOES_LICENCA) {
-    alert(`No máximo ${MAX_CONEXOES_LICENCA} conexões por licença.`);
+    alert(`No máximo ${MAX_CONEXOES_LICENCA} sistemas SAP.`);
     return;
   }
   const vazio = tbody.querySelector('.cx-vazio-linha');
@@ -1543,13 +1557,14 @@ function adicionarConexaoLicenca() {
 }
 
 function removerConexaoLicenca(btn) {
+  const tbody = btn.closest('tbody');
   btn.closest('tr').remove();
-  if (!document.querySelector('#licenca-conexoes-tbody tr')) renderConexoesLicenca([]);
+  if (!tbody.querySelector('tr')) renderConexoesLicenca([], tbody.id);
 }
 
 // Linhas totalmente vazias são ignoradas; o resto o servidor valida
-function lerConexoesLicenca() {
-  return [...document.querySelectorAll('#licenca-conexoes-tbody tr:not(.cx-vazio-linha)')].map(tr => ({
+function lerConexoesLicenca(tbodyId = TBODY_CONEXOES_LICENCA) {
+  return [...document.querySelectorAll(`#${tbodyId} tr:not(.cx-vazio-linha)`)].map(tr => ({
     sid: tr.querySelector('.cx-sid').value.trim().toUpperCase(),
     descricao: tr.querySelector('.cx-descricao').value.trim(),
     url: tr.querySelector('.cx-url').value.trim(),
