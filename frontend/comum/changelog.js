@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.3', data: '2026-10-21', destaques: [
+      'Licença do Conector excluída por engano na tela Licenças volta a valer sozinha enquanto a pessoa ocupa a vaga do contrato: o instalador deixa de pedir os cursos de quem já tem a licença liberada',
+      'Atualizar os sistemas SAP do contrato não reativa mais, pela metade, uma licença que foi excluída'
+    ] },
     { versao: 'v7.2', data: '2026-10-20', destaques: [
       'Financeiro → Consumo de IA: gasto diário e do mês na OpenAI e na Anthropic, buscado direto nas contas a cada 6 horas',
       'Saldo estimado de crédito pelas recargas lançadas, com aviso por e-mail quando ficar abaixo do limite'

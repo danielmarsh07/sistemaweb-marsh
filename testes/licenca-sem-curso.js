@@ -73,6 +73,24 @@ const tok = p => jwt.sign({ empresa_id: 1, ...p }, process.env.JWT_SECRET, { exp
     ok(l2.sids === 'DEV,QAS,PRD,HDV,FIO' && l2.conexoes.length === 5, `licença da pessoa com os 5 sistemas (${l2.sids})`);
     const naLista = (await api(tokAdmin, '/contratos-conector')).body.find(c => c.id === kid);
     ok(naLista && naLista.conexoes.length === 5, 'lista de contratos traz os sistemas do contrato');
+
+    // Licença excluída na tela Licenças (cancelada, ativo = false) e contrato sincronizado depois:
+    // a sincronização não devolve o status "ativa" para a excluída e o portal religa a licença da vaga
+    await pool.query(`UPDATE licencas SET status = 'cancelada', ativo = FALSE WHERE id = $1`, [l.id]);
+    await api(tokAdmin, `/contratos-conector/${kid}/conexoes`, 'PUT', { conexoes: [cx('DEV'), cx('QAS')] });
+    const l3 = (await pool.query('SELECT status, ativo FROM licencas WHERE id = $1', [l.id])).rows[0];
+    ok(l3.status === 'cancelada' && !l3.ativo, `sincronização não mexe na licença excluída (${l3.status}/${l3.ativo})`);
+    ok((await api(tokRenan, `/contratos-conector/eu/vagas/${v1.id}/pacote`)).status === 403, 'licença excluída: instalador bloqueado');
+    await api(tokRenan, '/contratos-conector/eu');
+    const l4 = (await pool.query('SELECT status, ativo, sids FROM licencas WHERE id = $1', [l.id])).rows[0];
+    ok(l4.status === 'ativa' && l4.ativo && l4.sids === 'DEV,QAS', `portal religa a licença da vaga (${l4.status}/${l4.ativo} · ${l4.sids})`);
+    ok((await api(tokRenan, `/contratos-conector/eu/vagas/${v1.id}/pacote`)).status === 200, 'licença religada: instalador liberado');
+
+    // Caso real (Multiterminais): status voltou para "ativa" mas ativo ficou false
+    await pool.query(`UPDATE licencas SET ativo = FALSE WHERE id = $1`, [l.id]);
+    await api(tokRenan, '/contratos-conector/eu');
+    const l5 = (await pool.query('SELECT ativo FROM licencas WHERE id = $1', [l.id])).rows[0];
+    ok(l5.ativo, 'status ativa com ativo = false: portal religa');
   } finally {
     const users = (await pool.query('SELECT id FROM usuarios WHERE cliente_id = $1', [cli])).rows.map(u => u.id);
     const lics = (await pool.query('SELECT id FROM licencas WHERE cliente_id = $1', [cli])).rows.map(l => l.id);

@@ -102,8 +102,8 @@ async function avaliarUsuario(usuarioId) {
       if (!prog.completo) {
         // Exceção do contrato: licença sem os cursos (o certificado sai quando concluir)
         if (k.licenca_sem_curso) {
-          const lic = (await pool.query(`SELECT status FROM licencas WHERE vaga_id = $1 AND usuario_id = $2`, [vaga.id, usuarioId])).rows[0];
-          if (!lic || lic.status === 'cancelada') await garantirLicenca(pool, k, vaga, usuario);
+          const lic = (await pool.query(`SELECT status, ativo FROM licencas WHERE vaga_id = $1 AND usuario_id = $2`, [vaga.id, usuarioId])).rows[0];
+          if (precisaReativar(lic)) await garantirLicenca(pool, k, vaga, usuario);
         }
         continue;
       }
@@ -127,10 +127,18 @@ async function avaliarUsuario(usuarioId) {
       continue;
     }
     // Já certificado: a licença precisa estar valendo (ex.: a pessoa voltou para a vaga)
-    const lic = (await pool.query(`SELECT status FROM licencas WHERE vaga_id = $1 AND usuario_id = $2`, [vaga.id, usuarioId])).rows[0];
-    if (!lic || lic.status === 'cancelada') await garantirLicenca(pool, k, vaga, usuario);
+    const lic = (await pool.query(`SELECT status, ativo FROM licencas WHERE vaga_id = $1 AND usuario_id = $2`, [vaga.id, usuarioId])).rows[0];
+    if (precisaReativar(lic)) await garantirLicenca(pool, k, vaga, usuario);
   }
   return emitidos;
+}
+
+/**
+ * A vaga está ocupada e o contrato vale, então a licença da pessoa tem que estar valendo: falta, foi cancelada
+ * ou foi excluída na tela Licenças (ativo = false, mesmo que o status tenha voltado para "ativa").
+ */
+function precisaReativar(lic) {
+  return !lic || lic.status === 'cancelada' || !lic.ativo;
 }
 
 /** Copia SIDs, conexões, fim e status do contrato para as licenças das vagas ocupadas por quem as tem. */
@@ -141,7 +149,7 @@ async function sincronizarContrato(contratoId) {
   await pool.query(
     `UPDATE licencas l SET sids = $1, conexoes = $2::jsonb, data_fim = $3, status = $4, data_atualizacao = NOW()
      FROM contratos_conector_vagas v
-     WHERE l.vaga_id = v.id AND v.contrato_id = $5 AND l.usuario_id = v.usuario_id AND v.ativo`,
+     WHERE l.vaga_id = v.id AND v.contrato_id = $5 AND l.usuario_id = v.usuario_id AND v.ativo AND l.ativo`,
     [d.sids, d.conexoes, d.data_fim, d.status, k.id]);
 }
 
