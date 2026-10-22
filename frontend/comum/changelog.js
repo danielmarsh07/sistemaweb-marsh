@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.9', data: '2026-10-22', destaques: [
+      'E-mails do sistema com a identidade da tela de login: cabeçalho azul com o símbolo e o nome Marsh, botões no azul do portal',
+      'Resposta ao solicitante por e-mail: o texto chega em parágrafos, com subtítulos e listas (antes vinha tudo emendado), e assinatura com o e-mail de contato',
+    ] },
     { versao: 'v7.8', data: '2026-10-22', destaques: [
       'Resposta ao solicitante (chamados do Conector): o e-mail vai só para quem abriu o chamado, nunca para os demais usuários da empresa. O painel mostra o destinatário antes de enviar e bloqueia o envio quando não há e-mail de quem abriu',
     ] },

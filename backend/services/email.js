@@ -2,6 +2,8 @@ const { Resend } = require('resend');
 const pool = require('../db');
 
 const FROM = 'Marsh Consultoria <noreply@marshconsultoria.com.br>';
+// PNG (e-mail não mostra SVG no Gmail/Outlook): o mesmo símbolo da tela de login, servido de frontend/comum/img
+const LOGO_URL = `${(process.env.APP_URL || 'https://marshconsultoria.com.br').replace(/\/$/, '')}/img/logo-simbolo-512.png`;
 
 // Inicialização lazy — não quebra o servidor se a chave não estiver configurada
 function getResend() {
@@ -94,29 +96,25 @@ function templateBase({ titulo, preheader, corpo }) {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
 
-        <!-- Header -->
-        <tr><td style="background:#0f172a;border-radius:12px 12px 0 0;padding:24px 32px">
-          <table width="100%"><tr>
-            <td>
-              <div style="width:40px;height:40px;background:linear-gradient(135deg,#0ea5e9,#0066cc);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;text-align:center;line-height:40px">M</div>
-            </td>
-            <td style="padding-left:12px;vertical-align:middle">
-              <span style="color:#fff;font-weight:700;font-size:16px">Marsh Consultoria</span><br/>
-              <span style="color:#94a3b8;font-size:12px">Portal de Atendimento</span>
-            </td>
-          </tr></table>
+        <!-- Header: mesma identidade da tela de login (azul profundo, símbolo, MARSH espaçado, linha ciano).
+             bgcolor = cor sólida para quem não mostra gradiente (Outlook) -->
+        <tr><td align="center" bgcolor="#0b2a55" style="background-color:#0b2a55;background-image:linear-gradient(160deg,#1d6fd8 0%,#0b2a55 60%,#081a36 100%);border-radius:14px 14px 0 0;padding:28px 32px 24px">
+          <img src="${LOGO_URL}" width="52" height="52" alt="Marsh" style="display:block;margin:0 auto 12px;border:0;width:52px;height:52px"/>
+          <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:6px;line-height:1">MARSH</div>
+          <div style="color:#cfe0f5;font-size:10px;letter-spacing:5px;margin-top:6px">CONSULTORIA</div>
+          <div style="width:40px;height:2px;background-color:#13a8e0;margin:14px auto 0;line-height:2px;font-size:0">&nbsp;</div>
         </td></tr>
 
         <!-- Corpo -->
-        <tr><td style="background:#fff;padding:32px">
+        <tr><td style="background:#ffffff;padding:32px">
           ${corpo}
         </td></tr>
 
         <!-- Footer -->
-        <tr><td style="background:#f8fafc;border-radius:0 0 12px 12px;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0">
-          <p style="margin:0;color:#94a3b8;font-size:12px">
-            Marsh Consultoria · Bragança Paulista – SP<br/>
-            <a href="mailto:daniel.marsh@marshconsultoria.com.br" style="color:#0ea5e9;text-decoration:none">daniel.marsh@marshconsultoria.com.br</a>
+        <tr><td style="background:#f8fafc;border-radius:0 0 14px 14px;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0">
+          <p style="margin:0;color:#64748b;font-size:12px;line-height:1.6">
+            Marsh Consultoria · Seu time e a IA trabalhando juntos no SAP<br/>
+            <a href="mailto:daniel.marsh@marshconsultoria.com.br" style="color:#1d6fd8;text-decoration:none">daniel.marsh@marshconsultoria.com.br</a>
           </p>
         </td></tr>
 
@@ -532,6 +530,43 @@ async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, l
 }
 
 /**
+ * Texto simples -> HTML de e-mail (o Gmail ignora white-space:pre-line, então as quebras viram tags):
+ * linha em branco separa parágrafos; linhas com "- " viram lista; linha curta terminada em ":" vira subtítulo.
+ * Tudo escapado antes; só gera <p>, <ul>/<li>, <br> e <strong>.
+ */
+function textoParaHtml(texto) {
+  const P = 'margin:0 0 14px;color:#334155;font-size:15px;line-height:1.65';
+  const blocos = String(texto || '').replace(/\r\n?/g, '\n').split(/\n\s*\n/);
+  return blocos.map(bloco => {
+    const linhas = bloco.split('\n').map(l => l.trim()).filter(Boolean);
+    const out = [];
+    let lista = [];
+    const fecharLista = () => {
+      if (!lista.length) return;
+      out.push(`<ul style="margin:0 0 14px;padding-left:20px;color:#334155;font-size:15px;line-height:1.65">${lista.map(i =>
+        `<li style="margin:0 0 6px">${i}</li>`).join('')}</ul>`);
+      lista = [];
+    };
+    let paragrafo = [];
+    const fecharParagrafo = () => { if (paragrafo.length) { out.push(`<p style="${P}">${paragrafo.join('<br/>')}</p>`); paragrafo = []; } };
+    for (const l of linhas) {
+      const item = /^[-*•]\s+(.*)$/.exec(l);
+      if (item) { fecharParagrafo(); lista.push(esc(item[1])); continue; }
+      fecharLista();
+      if (l.endsWith(':') && l.length <= 60) {
+        fecharParagrafo();
+        out.push(`<p style="margin:18px 0 8px;color:#0b2a55;font-size:15px;font-weight:700">${esc(l.slice(0, -1))}</p>`);
+        continue;
+      }
+      paragrafo.push(esc(l));
+    }
+    fecharParagrafo();
+    fecharLista();
+    return out.join('');
+  }).join('');
+}
+
+/**
  * Resposta da Marsh ao solicitante de um chamado do Conector (rascunho do agente ABAP revisado pela equipe).
  * Sai do domínio da Marsh, assinada por quem enviou; replyTo = e-mail do consultor no cliente, para a resposta
  * do solicitante cair direto com ele. texto = texto simples (parágrafos e listas com "-").
@@ -541,16 +576,23 @@ async function enviarRespostaSolicitante({ para, chamado, assinatura, replyTo, t
   const html = templateBase({
     titulo: `Chamado #${chamado.id}`, preheader: `Retorno do chamado #${chamado.id}: ${esc(chamado.titulo)}`,
     corpo: `
-      <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">Retorno do seu chamado</h2>
-      <p style="margin:0 0 20px;color:#64748b;font-size:14px">#${chamado.id} — ${esc(chamado.titulo)}</p>
-      <div style="color:#334155;font-size:14px;line-height:1.6;white-space:pre-line">${esc(texto)}</div>
+      <p style="margin:0 0 6px;color:#1d6fd8;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Retorno do seu chamado</p>
+      <h2 style="margin:0 0 24px;color:#0b2a55;font-size:20px;line-height:1.35">#${chamado.id} — ${esc(chamado.titulo)}</h2>
+      ${textoParaHtml(texto)}
       ${request ? '' : `
-      <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;margin:20px 0;border-left:4px solid #1d6fd8;font-size:14px;color:#334155;line-height:1.6">
-        <strong>Como informar a request:</strong> abra o chamado no portal, clique em <em>Informar request</em> e digite o
-        número da request de workbench do DEV (ex.: UPDK955200). Com ela informada, o desenvolvimento entra na fila.
-      </div>`}
-      <p style="margin:20px 0;color:#334155;font-size:14px">${esc(assinatura)}${replyTo ? `<br><span style="color:#64748b">${esc(replyTo)}</span>` : ''}</p>
-      <a href="${esc(base)}/login.html" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Abrir o chamado no portal →</a>`
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0"><tr>
+        <td bgcolor="#eef5fd" style="background:#eef5fd;border-left:4px solid #1d6fd8;border-radius:8px;padding:16px 20px;font-size:14px;color:#334155;line-height:1.6">
+          <strong style="color:#0b2a55">Como informar a request</strong><br/>
+          Abra o chamado no portal, clique em <strong>Informar request</strong> e digite o número da request de workbench
+          do DEV (ex.: UPDK955200). Com ela informada, o desenvolvimento entra na fila.
+        </td></tr></table>`}
+      <table cellpadding="0" cellspacing="0" style="margin:24px 0 26px;border-top:1px solid #e2e8f0;width:100%"><tr><td style="padding-top:16px;font-size:14px;color:#334155;line-height:1.5">
+        <strong style="color:#0b2a55">${esc(assinatura)}</strong><br/>
+        <span style="color:#64748b">Marsh Consultoria</span>${replyTo ? `<br/><a href="mailto:${esc(replyTo)}" style="color:#1d6fd8;text-decoration:none">${esc(replyTo)}</a>` : ''}
+      </td></tr></table>
+      <table cellpadding="0" cellspacing="0"><tr><td bgcolor="#1d6fd8" style="background:#1d6fd8;border-radius:10px">
+        <a href="${esc(base)}/login.html" style="display:inline-block;color:#ffffff;font-weight:600;font-size:15px;padding:13px 28px;text-decoration:none;border-radius:10px">Abrir o chamado no portal</a>
+      </td></tr></table>`
   });
   return enviar({ to: para, replyTo: replyTo || undefined, subject: `[Marsh] Chamado #${chamado.id} — ${chamado.titulo}`, html });
 }
