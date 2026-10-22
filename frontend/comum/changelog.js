@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.8', data: '2026-10-22', destaques: [
+      'Resposta ao solicitante (chamados do Conector): o e-mail vai só para quem abriu o chamado, nunca para os demais usuários da empresa. O painel mostra o destinatário antes de enviar e bloqueia o envio quando não há e-mail de quem abriu',
+    ] },
     { versao: 'v7.7', data: '2026-10-22', destaques: [
       'Chamados do Conector: o agente ABAP deixa pronto um rascunho de resposta ao solicitante; a equipe revisa, ajusta e clica em "Enviar ao solicitante": a resposta aparece no chamado e chega por e-mail assinada por quem enviou, com "responder para" no e-mail do consultor',
       'Chamados do Conector: campo "Request SAP" com o botão "Informar request", no portal e no painel; com a request informada, o agente ABAP prepara o desenvolvimento e a equipe recebe o aviso para revisar e gravar',

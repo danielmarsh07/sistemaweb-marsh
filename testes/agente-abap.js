@@ -81,9 +81,16 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     ok((await api(tokCliente, `/agente/chamados/${c1}/resposta`, 'POST', { texto: 'x'.repeat(30) })).status === 403, '! cliente não envia resposta');
     ok((await api(tokAdmin, `/agente/chamados/${c1}/resposta`, 'POST', { texto: 'x'.repeat(30), reply_to: 'nao-e-email' })).status === 400,
       '! reply_to inválido -> 400');
-    const env = await api(tokAdmin, `/agente/chamados/${c1}/resposta`, 'POST',
-      { texto: 'Renan, analisamos o chamado: ENVIADO-OK procede. Informe a request.', reply_to: 'Daniel.Lopes@Cliente.com.br' });
+    const corpoResp = { texto: 'Renan, analisamos o chamado: ENVIADO-OK procede. Informe a request.', reply_to: 'Daniel.Lopes@Cliente.com.br' };
+    const semDestino = await api(tokAdmin, `/agente/chamados/${c1}/resposta`, 'POST', corpoResp);
+    ok(semDestino.status === 409 && !JSON.stringify((await api(tokCliente, `/chamados/${c1}`)).body).includes('ENVIADO-OK'),
+      '! sem e-mail de quem abriu (nem na licença) -> 409 e nada enviado (nunca para os demais usuários do cliente)');
+    await pool.query(`UPDATE chamados SET solicitante_email = 'renan.teste@exemplo.com' WHERE id = $1`, [c1]);
+    ok((await api(tokAdmin, `/agente/chamados/${c1}/analise`)).body.destino_email === 'renan.teste@exemplo.com', 'painel mostra o destinatário real');
+    const env = await api(tokAdmin, `/agente/chamados/${c1}/resposta`, 'POST', corpoResp);
     ok(env.status === 200, `equipe envia a resposta (${env.status}; e-mail ${env.body?.enviado ? 'saiu' : 'desligado no local'})`);
+    const reg = (await pool.query(`SELECT para FROM emails_enviados WHERE assunto LIKE $1 ORDER BY id DESC LIMIT 1`, [`%Chamado #${c1} %`])).rows[0];
+    ok(reg && reg.para === 'renan.teste@exemplo.com', `e-mail só para quem abriu (${reg && reg.para})`);
     const detEnv = await api(tokCliente, `/chamados/${c1}`);
     ok(JSON.stringify(detEnv.body).includes('ENVIADO-OK') && detEnv.body.status === 'em_andamento', 'resposta vira atendimento visível e chamado em andamento');
     v2 = await api(tokAdmin, `/agente/chamados/${c1}/analise`);

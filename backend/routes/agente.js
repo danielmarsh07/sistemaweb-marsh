@@ -183,7 +183,9 @@ equipe.get('/chamados/:id/analise', async (req, res) => {
       `SELECT x.analise, x.resumo, x.criado_em, x.atualizado_em, k.nome AS agente,
               x.resposta_rascunho, x.resposta_enviada, x.resposta_enviada_em, ue.nome AS resposta_enviada_por_nome,
               x.preparo, x.preparo_request, x.preparo_em,
-              ch.solicitante_email, cl.email_resposta_marsh
+              ch.solicitante_email, cl.email_resposta_marsh,
+              COALESCE(ch.solicitante_email, (SELECT u.email FROM licencas l JOIN usuarios u ON u.id = l.usuario_id
+                WHERE l.id = ch.licenca_id)) AS destino_email
        FROM chamados_analises x LEFT JOIN agente_chaves k ON k.id = x.agente_chave_id
        JOIN chamados ch ON ch.id = x.chamado_id JOIN clientes cl ON cl.id = ch.cliente_id
        LEFT JOIN usuarios ue ON ue.id = x.resposta_enviada_por
@@ -195,8 +197,9 @@ equipe.get('/chamados/:id/analise', async (req, res) => {
 });
 
 // Envia a resposta (revisada) ao solicitante: atendimento visível no portal + e-mail com Reply-To do consultor
-// no cliente (guardado no cliente para o próximo envio). Não usa notificarNovoAtendimento para não mandar a
-// todos os usuários do cliente: vai para o solicitante (ou, sem e-mail dele, para os usuários do cliente).
+// no cliente (guardado no cliente para o próximo envio). Vai SÓ para quem abriu o chamado: o e-mail do
+// solicitante ou, sem ele, o do dono da licença do Conector que abriu. Nunca para os demais usuários do
+// cliente (por isso não usa notificarNovoAtendimento). Sem nenhum dos dois, não envia.
 equipe.post('/chamados/:id/resposta', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   const texto = typeof req.body?.texto === 'string' ? req.body.texto.trim() : '';
@@ -210,9 +213,13 @@ equipe.post('/chamados/:id/resposta', async (req, res) => {
     if (!ch) return res.status(404).json({ erro: 'Chamado do Conector não encontrado.' });
     if (!ch.tem_analise) return res.status(409).json({ erro: 'O chamado ainda não tem análise do agente.' });
     const nome = (await pool.query('SELECT nome FROM usuarios WHERE id = $1', [req.usuario.id])).rows[0]?.nome || 'Equipe Marsh';
-    const para = ch.solicitante_email ? [ch.solicitante_email]
-      : (await pool.query(`SELECT email FROM usuarios WHERE cliente_id = $1 AND tipo = 'cliente' AND ativo = TRUE`, [ch.cliente_id])).rows.map(u => u.email);
-    if (!para.length) return res.status(409).json({ erro: 'O solicitante não tem e-mail e o cliente não tem usuários no portal.' });
+    const dono = ch.solicitante_email ? null : (await pool.query(
+      `SELECT u.email FROM licencas l JOIN usuarios u ON u.id = l.usuario_id WHERE l.id = $1`, [ch.licenca_id])).rows[0]?.email;
+    const destino = ch.solicitante_email || dono;
+    if (!destino) {
+      return res.status(409).json({ erro: 'Não há e-mail de quem abriu o chamado (nem no chamado, nem na licença do Conector). Nada foi enviado.' });
+    }
+    const para = [destino];
 
     const statusNovo = ch.status === 'aberto' ? 'em_andamento' : ch.status;
     const client = await pool.connect();

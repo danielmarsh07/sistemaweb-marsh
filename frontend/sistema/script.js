@@ -1468,18 +1468,21 @@ function blocoRespostaSolicitante(ch, a) {
     </div>`;
   }
   if (!a.resposta_rascunho) return '';
-  const para = ch.solicitante_email || 'usuários do cliente no portal';
+  // Só quem abriu o chamado (e-mail do solicitante ou do dono da licença do Conector); sem ele, não envia
+  const para = a.destino_email;
   return `
     <div class="cc-bloco">
       <div class="cc-topo"><span class="cc-titulo">Resposta ao solicitante (rascunho do agente)</span>
         <span class="cc-selo" title="Só sai quando você enviar">não enviada</span></div>
-      <p class="fin-muted" style="margin:4px 0 8px">Para: ${escapeHtml(para)}. Revise o texto: ele vira comentário no chamado e e-mail assinado com o seu nome.</p>
+      <p class="fin-muted" style="margin:4px 0 8px">${para
+        ? `Para: <strong>${escapeHtml(para)}</strong> (só quem abriu o chamado). Revise o texto: ele vira comentário no chamado e e-mail assinado com o seu nome.`
+        : '<strong>Sem e-mail de quem abriu o chamado</strong> (nem no chamado, nem na licença do Conector): o envio fica bloqueado.'}</p>
       <textarea id="resposta-solicitante-texto" rows="12" style="width:100%;font:inherit;padding:8px;box-sizing:border-box">${escapeHtml(a.resposta_rascunho)}</textarea>
       <label style="display:block;margin:8px 0 4px;font-size:13px">Responder para (o solicitante responde a este e-mail)</label>
       <input id="resposta-solicitante-replyto" type="email" style="width:100%;padding:6px;box-sizing:border-box"
         value="${escapeHtml(a.email_resposta_marsh || '')}" placeholder="seu e-mail no cliente, ex.: nome@cliente.com.br">
       <div class="cc-acoes" style="margin-top:8px">
-        <button type="button" class="cc-btn cc-btn-primario" onclick="enviarRespostaSolicitante(${ch.id})">Enviar ao solicitante</button>
+        <button type="button" class="cc-btn cc-btn-primario" onclick="enviarRespostaSolicitante(${ch.id})"${para ? '' : ' disabled'}>Enviar ao solicitante</button>
       </div>
     </div>`;
 }
