@@ -1866,6 +1866,24 @@ tbody tr:last-child td {
   max-height: 92vh;
   overflow-y: auto;
 }
+/* Janela grande rola por dentro: o título (e o X) ficam fixos no topo.
+   Só background-color, para não apagar o degradê que os temas põem no cabeçalho */
+.modal-lg > .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--bg-card-solid, #fff);
+}
+/* Contratos (Conector e cursos): mais largos, e os botões de ação das licenças quebram linha
+   dentro da coluna em vez de sair da janela */
+@media (min-width: 769px) {
+  #modal-contrato-conector .modal-lg,
+  #modal-contrato-cursos .modal-lg { max-width: 980px !important; width: 96vw; }
+}
+#modal-contrato-conector .td-acoes,
+#modal-contrato-cursos .td-acoes { white-space: normal; }
+#modal-contrato-conector .td-acoes .btn,
+#modal-contrato-cursos .td-acoes .btn { margin: 2px 0; }
 
 /* ===== FORM SECTION TITLE ===== */
 .form-section-title {

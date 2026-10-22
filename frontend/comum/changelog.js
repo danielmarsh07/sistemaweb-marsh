@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.6', data: '2026-10-22', destaques: [
+      'Contratos do Conector e de cursos: a janela ficou mais larga e os botões das licenças (Passar para alguém, Liberar, Mudar perfil...) não ficam mais cortados para fora da tela',
+      'Janelas grandes mantêm o título e o botão de fechar fixos no topo enquanto você rola até o fim',
+    ] },
     { versao: 'v7.5', data: '2026-10-22', destaques: [
       'Chamados do Conector: o usuário de licença autorizado pela empresa passa a ver "Aprovar" e "Recusar" nos próprios chamados, sem depender do gestor'
     ] },
