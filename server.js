@@ -1539,6 +1539,24 @@ async function iniciar() {
         atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );`);
 
+    // 45. Agente ABAP, retorno ao solicitante: o agente grava um RASCUNHO de resposta (interno); a equipe revisa e
+    //     envia (vira atendimento + e-mail ao solicitante com Reply-To do consultor no cliente). A request SAP é
+    //     informada no chamado (cliente ou equipe); o agente prepara o desenvolvimento para ela e grava o preparo
+    //     (interno). preparo_request = request para a qual o preparo foi feito (nova request -> novo preparo).
+    await pool.query(`ALTER TABLE chamados_analises
+      ADD COLUMN IF NOT EXISTS resposta_rascunho TEXT,
+      ADD COLUMN IF NOT EXISTS resposta_enviada TEXT,
+      ADD COLUMN IF NOT EXISTS resposta_enviada_em TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS resposta_enviada_por INTEGER,
+      ADD COLUMN IF NOT EXISTS preparo TEXT,
+      ADD COLUMN IF NOT EXISTS preparo_request VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS preparo_em TIMESTAMPTZ;`);
+    await pool.query(`ALTER TABLE chamados
+      ADD COLUMN IF NOT EXISTS request_sap VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS request_sap_em TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS request_sap_por_usuario_id INTEGER;`);
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email_resposta_marsh VARCHAR(150);`);
+
     // 44. Consumo de IA (Financeiro): chave de ADMINISTRADOR de cada provedor (cifrada; só lê os custos), o gasto
     //     diário buscado nas APIs de custos e as recargas lançadas à mão — nenhum provedor informa o saldo por API,
     //     então saldo estimado = recargas − gasto desde a primeira recarga.

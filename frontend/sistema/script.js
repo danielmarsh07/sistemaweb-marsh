@@ -1444,8 +1444,58 @@ async function carregarAnaliseAgente(ch) {
       <p class="fin-muted" style="margin:4px 0 8px">${escapeHtml(a.agente || 'Agente')} · ${formatDataHora(a.atualizado_em)} ${chips}</p>
       ${r.risco ? `<p><strong>Risco:</strong> ${escapeHtml(r.risco)}</p>` : ''}
       <div class="cc-md">${ChamadoConector.markdownSeguro(a.analise)}</div>
-    </div>`
+    </div>
+    ${blocoRespostaSolicitante(ch, a)}
+    ${a.preparo ? `
+    <div class="cc-bloco">
+      <div class="cc-topo"><span class="cc-titulo">Desenvolvimento preparado pelo agente</span>
+        <span class="cc-selo" title="Só a equipe Marsh vê">interno</span></div>
+      <p class="fin-muted" style="margin:4px 0 8px">Request <code>${escapeHtml(a.preparo_request || '-')}</code> · ${formatDataHora(a.preparo_em)}
+        ${a.preparo_request && ch.request_sap && a.preparo_request !== ch.request_sap ? ' · <strong>request trocada: novo preparo na próxima rodada</strong>' : ''}</p>
+      <div class="cc-md">${ChamadoConector.markdownSeguro(a.preparo)}</div>
+    </div>` : ''}`
     : `<p class="fin-muted" style="margin:8px 0">Análise do agente ABAP: ainda não feita (ele confere os chamados novos a cada 2 horas).</p>`;
+}
+
+// Resposta ao solicitante: rascunho do agente, editável; só sai quando a equipe clica em Enviar
+function blocoRespostaSolicitante(ch, a) {
+  if (a.resposta_enviada) {
+    return `
+    <div class="cc-bloco">
+      <div class="cc-topo"><span class="cc-titulo">Resposta enviada ao solicitante</span></div>
+      <p class="fin-muted" style="margin:4px 0 8px">${escapeHtml(a.resposta_enviada_por_nome || '-')} · ${formatDataHora(a.resposta_enviada_em)}</p>
+      <div class="cc-pedido">${escapeHtml(a.resposta_enviada)}</div>
+    </div>`;
+  }
+  if (!a.resposta_rascunho) return '';
+  const para = ch.solicitante_email || 'usuários do cliente no portal';
+  return `
+    <div class="cc-bloco">
+      <div class="cc-topo"><span class="cc-titulo">Resposta ao solicitante (rascunho do agente)</span>
+        <span class="cc-selo" title="Só sai quando você enviar">não enviada</span></div>
+      <p class="fin-muted" style="margin:4px 0 8px">Para: ${escapeHtml(para)}. Revise o texto: ele vira comentário no chamado e e-mail assinado com o seu nome.</p>
+      <textarea id="resposta-solicitante-texto" rows="12" style="width:100%;font:inherit;padding:8px;box-sizing:border-box">${escapeHtml(a.resposta_rascunho)}</textarea>
+      <label style="display:block;margin:8px 0 4px;font-size:13px">Responder para (o solicitante responde a este e-mail)</label>
+      <input id="resposta-solicitante-replyto" type="email" style="width:100%;padding:6px;box-sizing:border-box"
+        value="${escapeHtml(a.email_resposta_marsh || '')}" placeholder="seu e-mail no cliente, ex.: nome@cliente.com.br">
+      <div class="cc-acoes" style="margin-top:8px">
+        <button type="button" class="cc-btn cc-btn-primario" onclick="enviarRespostaSolicitante(${ch.id})">Enviar ao solicitante</button>
+      </div>
+    </div>`;
+}
+
+async function enviarRespostaSolicitante(id) {
+  const texto = document.getElementById('resposta-solicitante-texto').value.trim();
+  const reply_to = document.getElementById('resposta-solicitante-replyto').value.trim();
+  if (texto.length < 20) { alert('Escreva a resposta (mínimo 20 caracteres).'); return; }
+  if (!confirm('Enviar esta resposta ao solicitante? Ela vira comentário no chamado e sai por e-mail.')) return;
+  const res = await apiFetch(`${API_URL}/agente/chamados/${id}/resposta`, { method: 'POST', body: JSON.stringify({ texto, reply_to }) });
+  if (!res) return;
+  const r = await res.json().catch(() => ({}));
+  if (!res.ok) { alert(r.erro || 'Erro ao enviar a resposta.'); return; }
+  alert(r.mensagem);
+  await abrirDetalheChamado(id);
+  loadChamados();
 }
 
 async function loadLicencas() {

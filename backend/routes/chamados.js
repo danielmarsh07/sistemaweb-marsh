@@ -329,6 +329,43 @@ router.post('/:id/aprovacao', async (req, res) => {
   }
 });
 
+// POST - Request SAP (ordem de transporte de workbench do DEV) do chamado do conector: { request } ex. UPDK955200.
+// Cliente (do próprio chamado) ou equipe. Com a request informada, o agente ABAP prepara o desenvolvimento.
+router.post('/:id/request', async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  const isCliente = req.usuario.tipo === 'cliente';
+  const request = String(req.body?.request || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{3}K\d{6}$/.test(request)) {
+    return res.status(400).json({ erro: 'Request inválida: use o número da SE09/SE10, ex.: UPDK955200.' });
+  }
+  try {
+    const ch = await buscarChamadoCompleto(req.params.id, empresa_id);
+    if (!ch) return res.status(404).json({ erro: 'Chamado não encontrado' });
+    if (isCliente && (!req.usuario.cliente_id || ch.cliente_id !== req.usuario.cliente_id)) {
+      return res.status(403).json({ erro: 'Este chamado é de outra empresa.' });
+    }
+    if (ch.origem !== 'conector') return res.status(409).json({ erro: 'Só chamados do Conector SAP recebem request.' });
+    if (['resolvido', 'fechado'].includes(ch.status)) return res.status(409).json({ erro: 'Chamado encerrado.' });
+    if (ch.request_sap === request) return res.json({ mensagem: 'Esta request já está no chamado.', request });
+
+    const nome = req.usuario.nome || (await pool.query('SELECT nome FROM usuarios WHERE id = $1', [req.usuario.id])).rows[0]?.nome || 'usuário';
+    const texto = ch.request_sap ? `Request SAP trocada de ${ch.request_sap} para ${request}.` : `Request SAP informada: ${request}.`;
+    await pool.query(
+      `UPDATE chamados SET request_sap = $1, request_sap_em = NOW(), request_sap_por_usuario_id = $2,
+         atualizado_por_usuario_id = $2, data_atualizacao = NOW() WHERE id = $3`, [request, req.usuario.id, ch.id]);
+    const atendimento = (await pool.query(
+      `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, data_atendimento)
+       VALUES ($1, $2, 'atualizacao', $3, NOW()) RETURNING *`, [ch.id, req.usuario.id, texto])).rows[0];
+    // Cliente informou: avisa a equipe. A equipe informando não manda e-mail ao cliente.
+    if (isCliente) {
+      notificarNovoAtendimento({ atendimento, chamado: ch, remetente_tipo: 'cliente', remetente_nome: nome, empresa_id }).catch(() => {});
+    }
+    res.json({ mensagem: `${texto} O desenvolvimento entra na fila do agente ABAP.`, request });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao gravar a request', detalhe: err.message });
+  }
+});
+
 // GET /sistemas-sap — servidores SAP que podem ser escolhidos no chamado (licenças ativas do Conector e contrato vigente) + listas SAP.
 // Cliente: sempre os da própria empresa. Equipe: ?cliente_id=.
 router.get('/sistemas-sap', async (req, res) => {

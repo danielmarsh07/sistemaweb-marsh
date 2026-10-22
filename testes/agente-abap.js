@@ -71,11 +71,49 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     const det = await api(tokCliente, `/chamados/${c1}`);
     ok(det.status !== 200 || !JSON.stringify(det.body).includes('Reanálise'), 'detalhe do chamado para o cliente não traz a análise');
 
+    // Resposta ao solicitante: rascunho interno até a equipe enviar
+    await api(chave.texto, `/agente-servico/chamados/${c1}/analise`, 'POST', {
+      analise: 'Reanálise com resposta ao solicitante.', resposta: 'Renan, analisamos o chamado: RASCUNHO-SECRETO procede.' });
+    await api(chave.texto, `/agente-servico/chamados/${c1}/analise`, 'POST', { analise: 'Reanálise sem resposta nova no corpo.' });
+    let v2 = await api(tokAdmin, `/agente/chamados/${c1}/analise`);
+    ok(v2.body?.resposta_rascunho?.includes('RASCUNHO-SECRETO') && !v2.body.resposta_enviada, 'rascunho gravado e mantido na reanálise');
+    ok(!JSON.stringify((await api(tokCliente, `/chamados/${c1}`)).body).includes('RASCUNHO-SECRETO'), 'cliente não vê o rascunho');
+    ok((await api(tokCliente, `/agente/chamados/${c1}/resposta`, 'POST', { texto: 'x'.repeat(30) })).status === 403, '! cliente não envia resposta');
+    ok((await api(tokAdmin, `/agente/chamados/${c1}/resposta`, 'POST', { texto: 'x'.repeat(30), reply_to: 'nao-e-email' })).status === 400,
+      '! reply_to inválido -> 400');
+    const env = await api(tokAdmin, `/agente/chamados/${c1}/resposta`, 'POST',
+      { texto: 'Renan, analisamos o chamado: ENVIADO-OK procede. Informe a request.', reply_to: 'Daniel.Lopes@Cliente.com.br' });
+    ok(env.status === 200, `equipe envia a resposta (${env.status}; e-mail ${env.body?.enviado ? 'saiu' : 'desligado no local'})`);
+    const detEnv = await api(tokCliente, `/chamados/${c1}`);
+    ok(JSON.stringify(detEnv.body).includes('ENVIADO-OK') && detEnv.body.status === 'em_andamento', 'resposta vira atendimento visível e chamado em andamento');
+    v2 = await api(tokAdmin, `/agente/chamados/${c1}/analise`);
+    ok(v2.body.resposta_enviada?.includes('ENVIADO-OK') && v2.body.email_resposta_marsh === 'daniel.lopes@cliente.com.br',
+      'resposta enviada registrada e reply_to guardado no cliente');
+
+    // Request SAP -> preparo do agente
+    ok((await api(tokCliente, `/chamados/${c1}/request`, 'POST', { request: 'ABC123' })).status === 400, '! request inválida -> 400');
+    ok((await api(tokCliente, `/chamados/${c3}/request`, 'POST', { request: 'UPDK955200' })).status === 409, '! chamado fora do Conector -> 409');
+    ok((await api(chave.texto, '/agente-servico/chamados/preparar')).body.every(c => c.id !== c1), 'sem request: nada a preparar');
+    ok((await api(tokCliente, `/chamados/${c1}/request`, 'POST', { request: 'updk955200' })).status === 200, 'cliente informa a request');
+    let prep = await api(chave.texto, '/agente-servico/chamados/preparar');
+    const itemPrep = (prep.body || []).find(c => c.id === c1);
+    ok(itemPrep && itemPrep.request_sap === 'UPDK955200' && itemPrep.analise, 'chamado com request entra em "preparar" (com a análise)');
+    ok((await api(chave.texto, `/agente-servico/chamados/${c1}/preparo`, 'POST', { request: 'UPDK999999', preparo: 'y'.repeat(30) })).status === 409,
+      '! preparo para outra request -> 409');
+    ok((await api(chave.texto, `/agente-servico/chamados/${c1}/preparo`, 'POST', { request: 'UPDK955200', preparo: '## Diff\nPREPARO-OK no nó %CODE4.' })).status === 200,
+      'agente grava o preparo');
+    ok((await api(chave.texto, '/agente-servico/chamados/preparar')).body.every(c => c.id !== c1), 'preparado sai da fila');
+    await api(tokAdmin, `/chamados/${c1}/request`, 'POST', { request: 'UPDK955201' });
+    ok((await api(chave.texto, '/agente-servico/chamados/preparar')).body.some(c => c.id === c1), 'request trocada volta para a fila');
+    ok(!JSON.stringify((await api(tokCliente, `/chamados/${c1}`)).body).includes('PREPARO-OK'), 'cliente não vê o preparo');
+
     ok((await api(tokAdmin, `/agente/chaves/${chave.id}`, 'DELETE')).status === 200, 'admin revoga a chave');
     ok((await api(chave.texto, '/agente-servico/chamados/pendentes')).status === 401, '! chave revogada -> 401');
   } finally {
     const chs = (await pool.query('SELECT id FROM chamados WHERE cliente_id = $1', [cli])).rows.map(c => c.id);
     await pool.query('DELETE FROM chamados_analises WHERE chamado_id = ANY($1)', [chs]);
+    await pool.query('DELETE FROM atendimentos WHERE chamado_id = ANY($1)', [chs]);
+    await pool.query('DELETE FROM chamados_status_log WHERE chamado_id = ANY($1)', [chs]);
     await pool.query('DELETE FROM chamados_anexos WHERE chamado_id = ANY($1)', [chs]);
     await pool.query('DELETE FROM chamados WHERE id = ANY($1)', [chs]);
     if (chave.id) await pool.query('DELETE FROM agente_chaves WHERE id = $1', [chave.id]);

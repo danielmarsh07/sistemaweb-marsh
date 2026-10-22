@@ -46,7 +46,7 @@ async function enviar(opcoes) {
   return ok;
 }
 
-async function enviarSemRegistro({ to, subject, html, cc, semAlerta }) {
+async function enviarSemRegistro({ to, subject, html, cc, replyTo, semAlerta }) {
   const resend = getResend();
   if (!resend) {
     // Fora do ar no servidor (Render define RENDER=true) é problema; no ambiente local é de propósito
@@ -61,7 +61,8 @@ async function enviarSemRegistro({ to, subject, html, cc, semAlerta }) {
   try {
     const destinatarios = Array.isArray(to) ? to.map(u => (typeof u === 'string' ? u : u.email)) : [to];
     if (!destinatarios.length) return { ok: false, erro: 'sem destinatário' };
-    const r = await resend.emails.send({ from: FROM, to: destinatarios, subject, html, ...(cc ? { cc } : {}) });
+    const r = await resend.emails.send({ from: FROM, to: destinatarios, subject, html, ...(cc ? { cc } : {}),
+      ...(replyTo ? { replyTo } : {}) });
     if (r && r.error) throw new Error(r.error.message);
     return { ok: true, erro: null };
   } catch (err) {
@@ -530,6 +531,30 @@ async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, l
   return enviar({ to: admins, subject: `[Marsh] ${assunto}`, html });
 }
 
+/**
+ * Resposta da Marsh ao solicitante de um chamado do Conector (rascunho do agente ABAP revisado pela equipe).
+ * Sai do domínio da Marsh, assinada por quem enviou; replyTo = e-mail do consultor no cliente, para a resposta
+ * do solicitante cair direto com ele. texto = texto simples (parágrafos e listas com "-").
+ */
+async function enviarRespostaSolicitante({ para, chamado, assinatura, replyTo, texto, request }) {
+  const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
+  const html = templateBase({
+    titulo: `Chamado #${chamado.id}`, preheader: `Retorno do chamado #${chamado.id}: ${esc(chamado.titulo)}`,
+    corpo: `
+      <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px">Retorno do seu chamado</h2>
+      <p style="margin:0 0 20px;color:#64748b;font-size:14px">#${chamado.id} — ${esc(chamado.titulo)}</p>
+      <div style="color:#334155;font-size:14px;line-height:1.6;white-space:pre-line">${esc(texto)}</div>
+      ${request ? '' : `
+      <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;margin:20px 0;border-left:4px solid #1d6fd8;font-size:14px;color:#334155;line-height:1.6">
+        <strong>Como informar a request:</strong> abra o chamado no portal, clique em <em>Informar request</em> e digite o
+        número da request de workbench do DEV (ex.: UPDK955200). Com ela informada, o desenvolvimento entra na fila.
+      </div>`}
+      <p style="margin:20px 0;color:#334155;font-size:14px">${esc(assinatura)}${replyTo ? `<br><span style="color:#64748b">${esc(replyTo)}</span>` : ''}</p>
+      <a href="${esc(base)}/login.html" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Abrir o chamado no portal →</a>`
+  });
+  return enviar({ to: para, replyTo: replyTo || undefined, subject: `[Marsh] Chamado #${chamado.id} — ${chamado.titulo}`, html });
+}
+
 /** Licenças do Conector perto do fim: aviso aos administradores da empresa. */
 async function enviarAvisoVencimentoLicencas({ para, cliente, fim, dias, renova }) {
   const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
@@ -601,5 +626,6 @@ module.exports = {
   enviarLinkSenha,
   enviarBoasVindas,
   notificarAdminsComercial,
+  enviarRespostaSolicitante,
   emailConfigurado: () => !!process.env.RESEND_API_KEY
 };

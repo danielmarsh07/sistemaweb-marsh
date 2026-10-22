@@ -138,6 +138,10 @@
       campos.push([ch.aprovacao_cliente === 'aprovado' ? 'Aprovado por' : 'Recusado por',
         esc(ch.aprovado_por_nome || '-') + `<small>${esc(dataHora(ch.data_aprovacao))}</small>`]);
     }
+    // Request SAP: com ela informada, o agente ABAP prepara o desenvolvimento
+    const encerrado = ch.status === 'resolvido' || ch.status === 'fechado' || ch.aprovacao_cliente === 'recusado';
+    campos.push(['Request SAP', (ch.request_sap ? `<code>${esc(ch.request_sap)}</code><small>${esc(dataHora(ch.request_sap_em))}</small>` : '-') +
+      (encerrado ? '' : `<button type="button" class="cc-btn" style="margin-top:4px" onclick="ChamadoConector.informarRequest(${ch.id})">${ch.request_sap ? 'Trocar request' : 'Informar request'}</button>`)]);
 
     let aviso = '';
     if (pendente) {
@@ -256,5 +260,21 @@
     decidir(id, 'recusado', comentario.trim());
   }
 
-  window.ChamadoConector = { markdownSeguro, selos, blocoHtml, baixar, copiar, aprovar, recusar, aoDecidir: null };
+  async function informarRequest(id) {
+    const valor = prompt('Número da request de workbench do DEV (SE09/SE10), ex.: UPDK955200:', '');
+    if (valor === null) return;
+    const request = valor.trim().toUpperCase();
+    if (!/^[A-Z0-9]{3}K\d{6}$/.test(request)) { alert('Request inválida. Formato: 3 letras/números + K + 6 dígitos (ex.: UPDK955200).'); return; }
+    const res = await fetch(`/api/chamados/${id}/request`, {
+      method: 'POST',
+      headers: { ...cabecalhoAuth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request })
+    });
+    const r = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(r.erro || 'Erro ao gravar a request.'); return; }
+    alert(r.mensagem);
+    if (typeof ChamadoConector.aoDecidir === 'function') await ChamadoConector.aoDecidir(id);
+  }
+
+  window.ChamadoConector = { markdownSeguro, selos, blocoHtml, baixar, copiar, aprovar, recusar, informarRequest, aoDecidir: null };
 })();
