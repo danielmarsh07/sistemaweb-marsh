@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.7', data: '2026-10-22', destaques: [
+      'Chamados do Conector: o agente ABAP deixa pronto um rascunho de resposta ao solicitante; a equipe revisa, ajusta e clica em "Enviar ao solicitante": a resposta aparece no chamado e chega por e-mail assinada por quem enviou, com "responder para" no e-mail do consultor',
+      'Chamados do Conector: campo "Request SAP" com o botão "Informar request", no portal e no painel; com a request informada, o agente ABAP prepara o desenvolvimento e a equipe recebe o aviso para revisar e gravar',
+    ] },
     { versao: 'v7.6', data: '2026-10-22', destaques: [
       'Contratos do Conector e de cursos: a janela ficou mais larga e os botões das licenças (Passar para alguém, Liberar, Mudar perfil...) não ficam mais cortados para fora da tela',
       'Janelas grandes mantêm o título e o botão de fechar fixos no topo enquanto você rola até o fim',
