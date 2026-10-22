@@ -91,7 +91,9 @@ router.get('/eu', async (req, res) => {
          FROM licencas l WHERE l.vaga_id = $1 AND l.usuario_id = $2`, [v.id, req.usuario.id])).rows[0];
       v.licenca = cert.licencaParaPortal(l);
     }
-    res.json({ papel, gestor, vagas });
+    const aprova_chamados = !!(await pool.query(
+      'SELECT aprova_chamados_conector FROM usuarios WHERE id = $1', [req.usuario.id])).rows[0]?.aprova_chamados_conector;
+    res.json({ papel, gestor, vagas, aprova_chamados });
   } catch (err) { responderErro(res, err, 'Erro ao buscar seu acesso'); }
 });
 

@@ -25,8 +25,12 @@ async function chamadosDoAluno(req, res, next) {
   try {
     if (await papelPortal(req.usuario.id) !== 'aluno') return next();
     req.soProprios = true;
+    // Aprovar é do gestor; o aluno só aprova os próprios chamados se o cliente o autorizou (aprova_chamados_conector)
     if (/^\/\d+\/aprovacao$/.test(req.path)) {
-      return res.status(403).json({ erro: 'A aprovação de chamados do Conector é feita pelo gestor do contrato.' });
+      const u = await pool.query('SELECT aprova_chamados_conector FROM usuarios WHERE id = $1', [req.usuario.id]);
+      if (!u.rows[0]?.aprova_chamados_conector) {
+        return res.status(403).json({ erro: 'A aprovação de chamados do Conector é feita pelo gestor do contrato.' });
+      }
     }
     const id = chamadoDaRequisicao(req);
     if (id) {

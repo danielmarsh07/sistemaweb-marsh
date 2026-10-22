@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.5', data: '2026-10-22', destaques: [
+      'Chamados do Conector: o usuário de licença autorizado pela empresa passa a ver "Aprovar" e "Recusar" nos próprios chamados, sem depender do gestor'
+    ] },
     { versao: 'v7.4', data: '2026-10-22', destaques: [
       'Licenças do Conector: depois de "Nova chave", o portal da pessoa e o instalador baixado passam a trazer a chave nova, e não mais a antiga, que o instalador recusava como "Licença inválida"'
     ] },

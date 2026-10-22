@@ -729,6 +729,8 @@ async function iniciar() {
         ADD COLUMN IF NOT EXISTS chave_cifrada TEXT;
     `);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_licencas_vaga_usuario ON licencas(vaga_id, usuario_id) WHERE vaga_id IS NOT NULL;`);
+    // Usuário de vaga (aluno) autorizado pelo cliente a aprovar/recusar os próprios chamados do Conector
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS aprova_chamados_conector BOOLEAN NOT NULL DEFAULT FALSE;`);
 
     // Uma vez: trilha dos cursos que já existem, pelo título (o painel corrige se precisar)
     const migTrilhas = await pool.query(

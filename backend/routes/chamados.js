@@ -272,7 +272,9 @@ router.post('/:id/aprovacao', async (req, res) => {
     }
 
     const nome = req.usuario.nome || (await pool.query('SELECT nome FROM usuarios WHERE id = $1', [req.usuario.id])).rows[0]?.nome || 'usuário';
-    const quem = isCliente ? `pelo gestor do cliente (${nome})` : `pela Marsh em nome do cliente (${nome})`;
+    // req.soProprios = usuário de vaga autorizado a aprovar os próprios chamados (chamados-do-aluno)
+    const quem = !isCliente ? `pela Marsh em nome do cliente (${nome})`
+      : req.soProprios ? `pelo cliente (${nome}, autorizado a aprovar os próprios chamados)` : `pelo gestor do cliente (${nome})`;
     const texto = decisao === 'aprovado'
       ? `Chamado aprovado ${quem}.${comentario ? `\n\n${comentario}` : ''}`
       : `Chamado recusado ${quem}: ${comentario}`;

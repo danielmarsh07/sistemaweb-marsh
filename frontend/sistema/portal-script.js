@@ -894,8 +894,10 @@ async function abrirDetalhe(id) {
   `;
 
   // Chamado do Conector SAP: SID, módulo, objetos, pedido, especificação e a aprovação do gestor
+  // (ou do próprio usuário de vaga, se o cliente o autorizou a aprovar os próprios chamados)
+  const podeDecidir = acessoPortal.papel !== 'aluno' || !!acessoPortal.aprova_chamados;
   document.getElementById('detalhe-conector').innerHTML =
-    ChamadoConector.blocoHtml(ch, { podeAprovar: acessoPortal.papel !== 'aluno', podeRecusar: acessoPortal.papel !== 'aluno' });
+    ChamadoConector.blocoHtml(ch, { podeAprovar: podeDecidir, podeRecusar: podeDecidir });
   ChamadoConector.aoDecidir = async (cid) => { await carregarChamados(); await abrirDetalhe(cid); };
 
   // Timeline
