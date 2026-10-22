@@ -17,6 +17,7 @@ const multer = require('multer');
 const pool = require('../db');
 const storage = require('../services/storage');
 const { PLANOS, gerarChave, hashChave, prefixoChave, listaSids, validarConexoes } = require('../services/licenca');
+const cifra = require('../services/cifra');
 
 // Instalador do conector (~30 MB com o Python embutido)
 const INSTALADOR_MAX_MB = parseInt(process.env.CONECTOR_INSTALADOR_MAX_MB || '100', 10);
@@ -407,15 +408,18 @@ router.put('/:id', async (req, res) => {
 });
 
 // POST /:id/nova-chave — invalida a chave antiga e gera outra (única exibição)
+// A cópia cifrada (portal da pessoa e licenca.json do instalador) acompanha a chave nova; sem cifra fica vazia,
+// para nunca mostrar a chave antiga, que o servidor já recusa.
 router.post('/:id/nova-chave', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   try {
     const chave = gerarChave();
     const r = await pool.query(
-      `UPDATE licencas SET chave_hash = $1, chave_prefixo = $2, atualizado_por_usuario_id = $3,
+      `UPDATE licencas SET chave_hash = $1, chave_prefixo = $2, chave_cifrada = $6, atualizado_por_usuario_id = $3,
          data_atualizacao = NOW()
        WHERE id = $4 AND empresa_id = $5 AND ativo = TRUE RETURNING id`,
-      [hashChave(chave), prefixoChave(chave), req.usuario.id, req.params.id, empresa_id]
+      [hashChave(chave), prefixoChave(chave), req.usuario.id, req.params.id, empresa_id,
+       cifra.configurada() ? cifra.cifrar(chave) : null]
     );
     if (!r.rows.length) return res.status(404).json({ erro: 'Licença não encontrada' });
     res.json({ mensagem: 'Nova chave gerada. A anterior deixou de funcionar.', chave });

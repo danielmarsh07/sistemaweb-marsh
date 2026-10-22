@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v7.4', data: '2026-10-22', destaques: [
+      'Licenças do Conector: depois de "Nova chave", o portal da pessoa e o instalador baixado passam a trazer a chave nova, e não mais a antiga, que o instalador recusava como "Licença inválida"'
+    ] },
     { versao: 'v7.3', data: '2026-10-21', destaques: [
       'Licença do Conector excluída por engano na tela Licenças volta a valer sozinha enquanto a pessoa ocupa a vaga do contrato: o instalador deixa de pedir os cursos de quem já tem a licença liberada',
       'Atualizar os sistemas SAP do contrato não reativa mais, pela metade, uma licença que foi excluída'
