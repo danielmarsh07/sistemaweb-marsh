@@ -1557,6 +1557,23 @@ async function iniciar() {
       ADD COLUMN IF NOT EXISTS request_sap_por_usuario_id INTEGER;`);
     await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email_resposta_marsh VARCHAR(150);`);
 
+    // 46. ABAP responsável pelo chamado: chamados.atribuido_para_usuario_id. Todo e-mail do chamado vai SÓ para
+    //     quem abriu e para esse responsável (nunca para a equipe toda). empresas.abap_padrao_usuario_id = quem
+    //     recebe os chamados novos; começa com quem gerou a chave do agente ABAP. Chamados em aberto sem
+    //     responsável passam para o padrão.
+    await pool.query(`ALTER TABLE empresas ADD COLUMN IF NOT EXISTS abap_padrao_usuario_id INTEGER;`);
+    await pool.query(`ALTER TABLE emails_enviados ADD COLUMN IF NOT EXISTS copia TEXT;`);
+    await pool.query(`
+      UPDATE empresas e SET abap_padrao_usuario_id = (
+        SELECT k.criado_por_usuario_id FROM agente_chaves k JOIN usuarios u ON u.id = k.criado_por_usuario_id
+         WHERE k.empresa_id = e.id AND u.ativo = TRUE ORDER BY k.revogada, k.id LIMIT 1)
+      WHERE e.abap_padrao_usuario_id IS NULL;`);
+    await pool.query(`
+      UPDATE chamados ch SET atribuido_para_usuario_id = e.abap_padrao_usuario_id
+        FROM empresas e
+       WHERE e.id = ch.empresa_id AND ch.atribuido_para_usuario_id IS NULL AND e.abap_padrao_usuario_id IS NOT NULL
+         AND ch.ativo = TRUE AND ch.status NOT IN ('resolvido', 'fechado');`);
+
     // 44. Consumo de IA (Financeiro): chave de ADMINISTRADOR de cada provedor (cifrada; só lê os custos), o gasto
     //     diário buscado nas APIs de custos e as recargas lançadas à mão — nenhum provedor informa o saldo por API,
     //     então saldo estimado = recargas − gasto desde a primeira recarga.

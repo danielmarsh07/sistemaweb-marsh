@@ -419,9 +419,11 @@ router.post('/chamados', async (req, res) => {
         `INSERT INTO chamados (
            empresa_id, cliente_id, aberto_por_usuario_id, titulo, descricao, prioridade, categoria, status, ativo,
            origem, licenca_id, sid, modulo, tipo_demanda, pedido_original, especificacao, objetos_sap,
-           solicitante_nome, solicitante_email, usuario_hash, maquina_hash, aprovacao_cliente
+           solicitante_nome, solicitante_email, usuario_hash, maquina_hash, aprovacao_cliente,
+           atribuido_para_usuario_id
          ) VALUES ($1, $2, NULL, $3, $4, $5, 'Conector SAP', 'aberto', TRUE,
-           'conector', $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16, $17)
+           'conector', $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16, $17,
+           (SELECT abap_padrao_usuario_id FROM empresas WHERE id = $1))
          RETURNING *`,
         [l.empresa_id || 1, l.cliente_id, d.titulo, descricaoCurta(d.pedido, !!d.especificacao, sid), d.prioridade,
          l.id, sid, d.modulo, d.tipo, d.pedido, d.especificacao, JSON.stringify(d.objetos),

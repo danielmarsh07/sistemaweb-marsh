@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.2', data: '2026-10-23', destaques: [
+      'Chamados: cada chamado tem um ABAP responsável (no detalhe do chamado, campo "ABAP responsável", com a opção de definir o padrão dos chamados novos). Todo e-mail do chamado vai só para quem abriu e para esse responsável: chamado novo, comentário do cliente, mudança de status, comentário da equipe e avisos do agente ABAP. A equipe toda não recebe mais',
+    ] },
     { versao: 'v8.1', data: '2026-10-23', destaques: [
       'Chamados: o e-mail de mudança de status (inclusive fechar e resolver) e o de comentário da equipe vão só para quem abriu o chamado, com cópia para quem fez a ação na Marsh. Os demais usuários da empresa do cliente não recebem mais',
     ] },

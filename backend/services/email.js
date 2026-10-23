@@ -35,10 +35,19 @@ async function emailDonoChamado(chamado) {
   return r.rows[0]?.email || null;
 }
 
-// Cópia para quem fez a ação na Marsh (ex.: quem fechou o chamado), se for outra pessoa e tiver e-mail
-async function copiaDoAutor(usuario_id, para) {
-  if (!usuario_id) return undefined;
-  const email = (await pool.query('SELECT email FROM usuarios WHERE id = $1 AND ativo = TRUE', [usuario_id])).rows[0]?.email;
+// ABAP responsável pelo chamado: o atribuído; sem atribuído, o responsável padrão da empresa
+// (empresas.abap_padrao_usuario_id). É o único da Marsh que recebe e-mail do chamado.
+async function emailResponsavelChamado(chamado) {
+  const r = await pool.query(
+    `SELECT email FROM usuarios
+      WHERE id = COALESCE($1, (SELECT abap_padrao_usuario_id FROM empresas WHERE id = $2)) AND ativo = TRUE`,
+    [chamado.atribuido_para_usuario_id || null, chamado.empresa_id || 1]);
+  return r.rows[0]?.email || null;
+}
+
+// Cópia para o ABAP responsável, quando ele não é o próprio destinatário
+async function copiaResponsavel(chamado, para) {
+  const email = await emailResponsavelChamado(chamado);
   return email && email.toLowerCase() !== String(para).toLowerCase() ? [email] : undefined;
 }
 
@@ -53,18 +62,21 @@ async function emailsCliente(cliente_id) {
 
 // --- Envio genérico com tratamento de erro silencioso ---
 
-// Registro de cada envio (para quem, assunto, se saiu). Falhar ao registrar nunca impede o e-mail.
-function registrarEnvio(to, subject, ok, erro) {
-  const para = (Array.isArray(to) ? to.map(u => (typeof u === 'string' ? u : u.email)) : [to]).filter(Boolean).join(', ');
+// Registro de cada envio (para quem, cópia, assunto, se saiu). Falhar ao registrar nunca impede o e-mail.
+function registrarEnvio(to, subject, ok, erro, cc) {
+  const lista = v => (Array.isArray(v) ? v.map(u => (typeof u === 'string' ? u : u.email)) : [v]).filter(Boolean).join(', ');
+  const para = lista(to);
   if (!para) return;
-  require('../db').query('INSERT INTO emails_enviados (para, assunto, ok, erro) VALUES ($1, $2, $3, $4)',
-    [para.slice(0, 2000), String(subject || '').slice(0, 300), ok, erro ? String(erro).slice(0, 1000) : null]).catch(() => {});
+  const copia = cc ? lista(cc) : '';
+  require('../db').query('INSERT INTO emails_enviados (para, assunto, ok, erro, copia) VALUES ($1, $2, $3, $4, $5)',
+    [para.slice(0, 2000), String(subject || '').slice(0, 300), ok, erro ? String(erro).slice(0, 1000) : null,
+     copia ? copia.slice(0, 2000) : null]).catch(() => {});
 }
 
 // Retorna true só quando o Resend aceitou o envio. Cada tentativa fica registrada em emails_enviados.
 async function enviar(opcoes) {
   const { ok, erro } = await enviarSemRegistro(opcoes);
-  registrarEnvio(opcoes.to, opcoes.subject, ok, erro);
+  registrarEnvio(opcoes.to, opcoes.subject, ok, erro, opcoes.cc);
   return ok;
 }
 
@@ -168,11 +180,11 @@ function badgeStatus(status) {
 // --- Notificações ---
 
 /**
- * Chamado aberto — avisa os admins/técnicos
+ * Chamado aberto — avisa só o ABAP responsável (atribuído ou padrão da empresa), nunca a equipe toda
  */
 async function notificarNovoChamado({ chamado, empresa_id, aberto_por }) {
-  const admins = await emailsAdmins(empresa_id);
-  if (!admins.length) return;
+  const responsavel = await emailResponsavelChamado({ ...chamado, empresa_id: chamado.empresa_id || empresa_id });
+  if (!responsavel) return;
 
   const html = templateBase({
     titulo: `Novo chamado #${chamado.id}`,
@@ -208,7 +220,7 @@ async function notificarNovoChamado({ chamado, empresa_id, aberto_por }) {
   });
 
   await enviar({
-    to: admins,
+    to: [responsavel],
     subject: `[Marsh] Novo chamado #${chamado.id}: ${chamado.titulo}`,
     html
   });
@@ -216,9 +228,9 @@ async function notificarNovoChamado({ chamado, empresa_id, aberto_por }) {
 
 /**
  * Status do chamado atualizado (inclusive fechado/resolvido) — avisa só quem abriu o chamado,
- * com cópia para quem fez a mudança na Marsh. Nunca para os demais usuários do cliente.
+ * com cópia para o ABAP responsável. Ninguém mais (nem os demais usuários do cliente, nem a equipe).
  */
-async function notificarAtualizacaoStatus({ chamado, statusAnterior, empresa_id, autor_usuario_id }) {
+async function notificarAtualizacaoStatus({ chamado, statusAnterior, empresa_id }) {
   const dono = await emailDonoChamado(chamado);
   if (!dono) return;
 
@@ -252,18 +264,18 @@ async function notificarAtualizacaoStatus({ chamado, statusAnterior, empresa_id,
 
   await enviar({
     to: [dono],
-    cc: await copiaDoAutor(autor_usuario_id, dono),
+    cc: await copiaResponsavel(chamado, dono),
     subject: `[Marsh] Chamado #${chamado.id} — Status atualizado: ${labelStatus[chamado.status] || chamado.status}`,
     html
   });
 }
 
 /**
- * Novo comentário/atendimento:
- * - Se quem comentou é admin/tecnico → avisa o cliente
- * - Se quem comentou é cliente → avisa os admins
+ * Novo comentário/atendimento (só quem abriu e o ABAP responsável recebem):
+ * - Se quem comentou é admin/tecnico → avisa quem abriu, com cópia para o responsável
+ * - Se quem comentou é cliente → avisa o ABAP responsável
  */
-async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, remetente_nome, empresa_id, autor_usuario_id }) {
+async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, remetente_nome, empresa_id }) {
   const ehCliente = remetente_tipo === 'cliente';
 
   const tipoLabel = {
@@ -301,20 +313,21 @@ async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, 
   });
 
   if (ehCliente) {
-    // Cliente comentou → avisa admins
-    const admins = await emailsAdmins(empresa_id);
+    // Cliente comentou → avisa só o ABAP responsável
+    const responsavel = await emailResponsavelChamado({ ...chamado, empresa_id: chamado.empresa_id || empresa_id });
+    if (!responsavel) return;
     await enviar({
-      to: admins,
+      to: [responsavel],
       subject: `[Marsh] ${labelTipo} do cliente — Chamado #${chamado.id}: ${chamado.titulo}`,
       html
     });
   } else {
-    // Admin/tecnico comentou (ou registrou a solução) → avisa só quem abriu o chamado, com cópia para o autor
+    // Admin/tecnico comentou (ou registrou a solução) → avisa só quem abriu, com cópia para o responsável
     const dono = await emailDonoChamado(chamado);
     if (!dono) return;
     await enviar({
       to: [dono],
-      cc: await copiaDoAutor(autor_usuario_id, dono),
+      cc: await copiaResponsavel({ ...chamado, empresa_id: chamado.empresa_id || empresa_id }, dono),
       subject: `[Marsh] ${labelTipo} no seu chamado #${chamado.id}: ${chamado.titulo}`,
       html
     });
@@ -542,16 +555,19 @@ async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, l
 }
 
 /**
- * Aviso do agente ABAP (análise, preparo): vai SÓ para quem gerou a chave do agente (Sistema → Licenças →
- * Agente ABAP), nunca para toda a equipe. Sem esse usuário ativo na empresa da chave, não envia.
+ * Aviso do agente ABAP (análise, preparo): vai SÓ para o ABAP responsável pelo chamado; sem responsável,
+ * para quem gerou a chave do agente (Sistema → Licenças → Agente ABAP). Nunca para toda a equipe.
  */
-async function notificarDonoAgente({ agente_chave_id, assunto, titulo, linhas, link }) {
-  const dono = (await pool.query(
-    `SELECT u.email, u.nome FROM agente_chaves k JOIN usuarios u ON u.id = k.criado_por_usuario_id
-     WHERE k.id = $1 AND u.ativo = TRUE AND u.empresa_id = k.empresa_id AND u.email IS NOT NULL`,
-    [agente_chave_id])).rows[0];
-  if (!dono) return false;
-  return enviar({ to: [dono], subject: `[Marsh] ${assunto}`, html: htmlAvisoInterno({ assunto, titulo, linhas, link }) });
+async function notificarDonoAgente({ agente_chave_id, chamado, assunto, titulo, linhas, link }) {
+  let para = chamado ? await emailResponsavelChamado(chamado) : null;
+  if (!para) {
+    para = (await pool.query(
+      `SELECT u.email FROM agente_chaves k JOIN usuarios u ON u.id = k.criado_por_usuario_id
+       WHERE k.id = $1 AND u.ativo = TRUE AND u.empresa_id = k.empresa_id AND u.email IS NOT NULL`,
+      [agente_chave_id])).rows[0]?.email;
+  }
+  if (!para) return false;
+  return enviar({ to: [para], subject: `[Marsh] ${assunto}`, html: htmlAvisoInterno({ assunto, titulo, linhas, link }) });
 }
 
 function htmlAvisoInterno({ assunto, titulo, linhas, link }) {

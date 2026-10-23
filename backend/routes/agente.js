@@ -50,7 +50,7 @@ servico.use(async (req, res, next) => {
 
 async function chamadoDoAgente(req) {
   return (await pool.query(
-    `SELECT ch.id, ch.empresa_id, ch.titulo FROM chamados ch
+    `SELECT ch.id, ch.empresa_id, ch.titulo, ch.atribuido_para_usuario_id FROM chamados ch
      WHERE ch.id = $1 AND ch.empresa_id = $2 AND ch.origem = 'conector' AND ch.ativo = TRUE`,
     [req.params.id, req.agente.empresa_id])).rows[0] || null;
 }
@@ -111,9 +111,10 @@ servico.post('/chamados/:id/analise', async (req, res) => {
        RETURNING (xmax = 0) AS nova`,
       [ch.id, ch.empresa_id, analise, JSON.stringify(resumo), req.agente.id, resposta]);
     const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
-    // Aviso só para quem gerou a chave do agente (não para toda a equipe)
+    // Aviso só para o ABAP responsável pelo chamado (ou quem gerou a chave), não para toda a equipe
     email.notificarDonoAgente({
       agente_chave_id: req.agente.id,
+      chamado: ch,
       assunto: `Agente ABAP: análise do chamado #${ch.id} — ${ch.titulo}`,
       titulo: `Análise do chamado #${ch.id}`,
       linhas: [['Chamado', `#${ch.id} — ${ch.titulo}`], ['Complexidade', resumo.complexidade],
@@ -162,6 +163,7 @@ servico.post('/chamados/:id/preparo', async (req, res) => {
     const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
     email.notificarDonoAgente({
       agente_chave_id: req.agente.id,
+      chamado: ch,
       assunto: `Agente ABAP: desenvolvimento do chamado #${ch.id} preparado (${request})`,
       titulo: `Preparo do chamado #${ch.id}`,
       linhas: [['Chamado', `#${ch.id} — ${ch.titulo}`], ['Request', request],

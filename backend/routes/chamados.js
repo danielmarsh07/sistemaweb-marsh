@@ -315,8 +315,7 @@ router.post('/:id/aprovacao', async (req, res) => {
     }
 
     notificarNovoAtendimento({
-      atendimento, chamado, remetente_tipo: req.usuario.tipo, remetente_nome: nome, empresa_id,
-      autor_usuario_id: req.usuario.id
+      atendimento, chamado, remetente_tipo: req.usuario.tipo, remetente_nome: nome, empresa_id
     }).catch(() => {});
 
     res.json({
@@ -364,6 +363,49 @@ router.post('/:id/request', async (req, res) => {
     res.json({ mensagem: `${texto} O desenvolvimento entra na fila do agente ABAP.`, request });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao gravar a request', detalhe: err.message });
+  }
+});
+
+// GET /responsaveis — ABAP da equipe (admin/técnico ativos) que podem ser responsáveis pelo chamado, e o padrão
+// da empresa. O responsável é, com quem abriu, o único que recebe e-mail do chamado.
+router.get('/responsaveis', async (req, res) => {
+  if (req.usuario.tipo === 'cliente') return res.status(403).json({ erro: 'Acesso restrito à equipe.' });
+  const empresa_id = req.usuario.empresa_id || 1;
+  try {
+    const lista = (await pool.query(
+      `SELECT id, nome, email FROM usuarios
+        WHERE empresa_id = $1 AND tipo IN ('admin_empresa', 'tecnico') AND ativo = TRUE ORDER BY nome`, [empresa_id])).rows;
+    const padrao = (await pool.query('SELECT abap_padrao_usuario_id FROM empresas WHERE id = $1', [empresa_id])).rows[0]?.abap_padrao_usuario_id || null;
+    res.json({ responsaveis: lista, padrao_usuario_id: padrao });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao listar responsáveis', detalhe: err.message });
+  }
+});
+
+// PUT /:id/responsavel { usuario_id, padrao } — troca o ABAP responsável pelo chamado. padrao = true (só
+// administrador) também o define como responsável dos chamados novos da empresa.
+router.put('/:id/responsavel', async (req, res) => {
+  if (req.usuario.tipo === 'cliente') return res.status(403).json({ erro: 'Acesso restrito à equipe.' });
+  const empresa_id = req.usuario.empresa_id || 1;
+  const usuario_id = parseInt(req.body?.usuario_id) || null;
+  const padrao = req.body?.padrao === true;
+  if (!usuario_id) return res.status(400).json({ erro: 'Escolha o ABAP responsável.' });
+  if (padrao && !['admin_empresa', 'admin_sistema'].includes(req.usuario.tipo)) {
+    return res.status(403).json({ erro: 'Só administrador define o responsável padrão.' });
+  }
+  try {
+    const abap = (await pool.query(
+      `SELECT id, nome FROM usuarios WHERE id = $1 AND empresa_id = $2 AND tipo IN ('admin_empresa', 'tecnico') AND ativo = TRUE`,
+      [usuario_id, empresa_id])).rows[0];
+    if (!abap) return res.status(400).json({ erro: 'Usuário não é da equipe ou está inativo.' });
+    const r = await pool.query(
+      `UPDATE chamados SET atribuido_para_usuario_id = $1, atualizado_por_usuario_id = $2, data_atualizacao = NOW()
+        WHERE id = $3 AND empresa_id = $4 AND ativo = TRUE RETURNING id`, [abap.id, req.usuario.id, req.params.id, empresa_id]);
+    if (!r.rows.length) return res.status(404).json({ erro: 'Chamado não encontrado' });
+    if (padrao) await pool.query('UPDATE empresas SET abap_padrao_usuario_id = $1 WHERE id = $2', [abap.id, empresa_id]);
+    res.json({ mensagem: `Responsável: ${abap.nome}${padrao ? ' (também padrão dos chamados novos)' : ''}.` });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao trocar o responsável', detalhe: err.message });
   }
 });
 
@@ -538,16 +580,18 @@ router.post('/', async (req, res) => {
     const s = await validarSap(req.body, cliente_id, empresa_id, { exigirSid: isCliente });
     if (s.erro) return res.status(400).json({ erro: s.erro });
     const result = await pool.query(
+      // Sem responsável informado, o chamado nasce com o ABAP responsável padrão da empresa
       `INSERT INTO chamados (
         empresa_id, cliente_id, tecnologia_id,
         aberto_por_usuario_id, atribuido_para_usuario_id,
         titulo, descricao, prioridade, categoria, status, ativo,
         sid, modulo, tipo_demanda
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aberto', TRUE, $10, $11, $12)
+      ) VALUES ($1, $2, $3, $4, COALESCE($5, (SELECT abap_padrao_usuario_id FROM empresas WHERE id = $1)),
+        $6, $7, $8, $9, 'aberto', TRUE, $10, $11, $12)
       RETURNING *`,
       [
         empresa_id, cliente_id || null, tecnologia_id || null,
-        usuario_id, atribuido_para_usuario_id || null,
+        usuario_id, (!isCliente && atribuido_para_usuario_id) || null,
         titulo, descricao || null,
         prioridade || 'media', categoria || null,
         s.sid, s.modulo, s.tipo_demanda
@@ -642,8 +686,7 @@ router.put('/:id', async (req, res) => {
       notificarAtualizacaoStatus({
         chamado,
         statusAnterior: ch.status,
-        empresa_id,
-        autor_usuario_id: req.usuario.id
+        empresa_id
       }).catch(() => {});
     }
 

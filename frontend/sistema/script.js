@@ -2558,7 +2558,7 @@ async function abrirDetalheChamado(id) {
       <div><strong>Categoria:</strong> ${escapeHtml(ch.categoria || '-')}</div>
       <div><strong>Abertura:</strong> ${formatData(ch.data_abertura)}</div>
       <div><strong>Aberto por:</strong> ${escapeHtml(ch.aberto_por_nome || '-')}</div>
-      <div><strong>Atribuído para:</strong> ${escapeHtml(ch.atribuido_para_nome || '-')}</div>
+      <div id="detalhe-responsavel"><strong>ABAP responsável:</strong> ${escapeHtml(ch.atribuido_para_nome || '-')}</div>
       ${ch.avaliacao ? `<div><strong>Avaliação:</strong> <span class="detalhe-chamado-stars">${'★'.repeat(ch.avaliacao.nota)}${'☆'.repeat(5 - ch.avaliacao.nota)}</span></div>` : ''}
     </div>
     ${ch.descricao && ch.origem !== 'conector' ? `<div class="detalhe-chamado-descricao"><strong>Descrição:</strong><br>${escapeHtml(ch.descricao)}</div>` : ''}
@@ -2572,6 +2572,7 @@ async function abrirDetalheChamado(id) {
   // Depois de aprovar/recusar: recarrega o detalhe e a lista
   ChamadoConector.aoDecidir = async (cid) => { await abrirDetalheChamado(cid); loadChamados(); };
   carregarAnaliseAgente(ch);
+  carregarResponsavel(ch);
 
   renderTimeline(ch.atendimentos || []);
   renderAnexosDashboard(ch);
@@ -2582,6 +2583,39 @@ async function abrirDetalheChamado(id) {
 
   // Marca atendimentos como lidos para o usuário atual
   apiFetch(`${API_URL}/chamados/${id}/marcar-lido`, { method: 'POST' }).catch(() => {});
+}
+
+// ABAP responsável pelo chamado: com quem abriu, é o único que recebe os e-mails do chamado
+async function carregarResponsavel(ch) {
+  const el = document.getElementById('detalhe-responsavel');
+  if (!el) return;
+  const res = await apiFetch(`${API_URL}/chamados/responsaveis`);
+  if (!res || !res.ok) return;
+  const { responsaveis, padrao_usuario_id } = await res.json();
+  const atual = ch.atribuido_para_usuario_id || padrao_usuario_id;
+  const padrao = responsaveis.find(u => u.id === padrao_usuario_id);
+  el.innerHTML = `<strong>ABAP responsável:</strong>
+    <select id="detalhe-responsavel-sel" style="padding:2px 4px">
+      ${atual ? '' : '<option value="">(escolha)</option>'}
+      ${responsaveis.map(u => `<option value="${u.id}"${u.id === atual ? ' selected' : ''}>${escapeHtml(u.nome)}</option>`).join('')}
+    </select>
+    <button type="button" class="cc-btn" style="padding:2px 10px" onclick="salvarResponsavel(${ch.id})">Salvar</button>
+    ${usuarioEhAdmin() ? `<label style="display:block;font-size:12px;margin-top:4px;font-weight:normal">
+      <input type="checkbox" id="detalhe-responsavel-padrao"> também padrão dos chamados novos
+      (hoje: ${escapeHtml(padrao ? padrao.nome : 'nenhum')})</label>` : ''}`;
+}
+
+async function salvarResponsavel(id) {
+  const usuario_id = document.getElementById('detalhe-responsavel-sel').value;
+  if (!usuario_id) { alert('Escolha o ABAP responsável.'); return; }
+  const padrao = !!document.getElementById('detalhe-responsavel-padrao')?.checked;
+  const res = await apiFetch(`${API_URL}/chamados/${id}/responsavel`, { method: 'PUT', body: JSON.stringify({ usuario_id, padrao }) });
+  if (!res) return;
+  const r = await res.json().catch(() => ({}));
+  if (!res.ok) { alert(r.erro || 'Erro ao trocar o responsável.'); return; }
+  alert(r.mensagem);
+  await abrirDetalheChamado(id);
+  loadChamados();
 }
 
 function renderAnexosDashboard(ch) {
