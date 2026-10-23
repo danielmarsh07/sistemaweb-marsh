@@ -61,6 +61,19 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
       analise: '## Causa confirmada\nA base do ISS ignora o desconto (ZNFSE_PROC_F01, linha 212).',
       resumo: { complexidade: 'media', horas: 6.5, risco: 'Notas já emitidas no mês', cerebro: 'DEM-0003', lixo: 'x' } });
     ok(a.status === 201, `agente grava a análise (${a.status})`);
+    // Aviso da análise: só para quem gerou a chave (usuário 1), nunca para o restante da equipe
+    const tecnico = await usuarioTeste(pool, { tipo: 'tecnico' });
+    const emailTec = (await pool.query('SELECT email FROM usuarios WHERE id = $1', [tecnico])).rows[0].email;
+    const emailDono = (await pool.query('SELECT email FROM usuarios WHERE id = 1')).rows[0].email;
+    await api(chave.texto, `/agente-servico/chamados/${c1}/analise`, 'POST', { analise: 'Reanálise para conferir o aviso.' });
+    let aviso;
+    for (let i = 0; i < 20 && !aviso; i++) {
+      await new Promise(r => setTimeout(r, 150));
+      aviso = (await pool.query(`SELECT para FROM emails_enviados WHERE assunto LIKE $1 ORDER BY id DESC LIMIT 1`,
+        [`%análise do chamado #${c1} %`])).rows[0];
+    }
+    ok(aviso && aviso.para === emailDono && !aviso.para.includes(emailTec),
+      `aviso da análise só para quem gerou a chave (${aviso && aviso.para})`);
     p = await api(chave.texto, '/agente-servico/chamados/pendentes');
     ok(!(p.body || []).some(c => c.id === c1), 'chamado analisado sai dos pendentes');
     ok((await api(chave.texto, `/agente-servico/chamados/${c1}/analise`, 'POST', { analise: 'Reanálise com mais detalhes do caso.' })).status === 200,
@@ -89,7 +102,12 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     ok((await api(tokAdmin, `/agente/chamados/${c1}/analise`)).body.destino_email === 'renan.teste@exemplo.com', 'painel mostra o destinatário real');
     const env = await api(tokAdmin, `/agente/chamados/${c1}/resposta`, 'POST', corpoResp);
     ok(env.status === 200, `equipe envia a resposta (${env.status}; e-mail ${env.body?.enviado ? 'saiu' : 'desligado no local'})`);
-    const reg = (await pool.query(`SELECT para FROM emails_enviados WHERE assunto LIKE $1 ORDER BY id DESC LIMIT 1`, [`%Chamado #${c1} %`])).rows[0];
+    // O registro em emails_enviados é gravado sem esperar (não atrasa a resposta): aguarda ele aparecer
+    let reg;
+    for (let i = 0; i < 20 && !reg; i++) {
+      await new Promise(r => setTimeout(r, 150));
+      reg = (await pool.query(`SELECT para FROM emails_enviados WHERE assunto LIKE $1 ORDER BY id DESC LIMIT 1`, [`%] Chamado #${c1} %`])).rows[0];
+    }
     ok(reg && reg.para === 'renan.teste@exemplo.com', `e-mail só para quem abriu (${reg && reg.para})`);
     const detEnv = await api(tokCliente, `/chamados/${c1}`);
     ok(JSON.stringify(detEnv.body).includes('ENVIADO-OK') && detEnv.body.status === 'em_andamento', 'resposta vira atendimento visível e chamado em andamento');

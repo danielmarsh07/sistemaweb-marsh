@@ -516,7 +516,24 @@ async function enviarProposta({ proposta, para, nomeContato, link, copia }) {
 async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, link }) {
   const admins = await emailsAdmins(empresa_id);
   if (!admins.length) return false;
-  const html = templateBase({
+  return enviar({ to: admins, subject: `[Marsh] ${assunto}`, html: htmlAvisoInterno({ assunto, titulo, linhas, link }) });
+}
+
+/**
+ * Aviso do agente ABAP (análise, preparo): vai SÓ para quem gerou a chave do agente (Sistema → Licenças →
+ * Agente ABAP), nunca para toda a equipe. Sem esse usuário ativo na empresa da chave, não envia.
+ */
+async function notificarDonoAgente({ agente_chave_id, assunto, titulo, linhas, link }) {
+  const dono = (await pool.query(
+    `SELECT u.email, u.nome FROM agente_chaves k JOIN usuarios u ON u.id = k.criado_por_usuario_id
+     WHERE k.id = $1 AND u.ativo = TRUE AND u.empresa_id = k.empresa_id AND u.email IS NOT NULL`,
+    [agente_chave_id])).rows[0];
+  if (!dono) return false;
+  return enviar({ to: [dono], subject: `[Marsh] ${assunto}`, html: htmlAvisoInterno({ assunto, titulo, linhas, link }) });
+}
+
+function htmlAvisoInterno({ assunto, titulo, linhas, link }) {
+  return templateBase({
     titulo, preheader: assunto,
     corpo: `
       <h2 style="margin:0 0 16px;color:#0f172a;font-size:20px">${esc(titulo)}</h2>
@@ -526,7 +543,6 @@ async function notificarAdminsComercial({ empresa_id, assunto, titulo, linhas, l
       </div>
       ${link ? `<a href="${esc(link)}" style="display:inline-block;background:#1d6fd8;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none">Abrir no sistema →</a>` : ''}`
   });
-  return enviar({ to: admins, subject: `[Marsh] ${assunto}`, html });
 }
 
 /**
@@ -668,6 +684,7 @@ module.exports = {
   enviarLinkSenha,
   enviarBoasVindas,
   notificarAdminsComercial,
+  notificarDonoAgente,
   enviarRespostaSolicitante,
   emailConfigurado: () => !!process.env.RESEND_API_KEY
 };

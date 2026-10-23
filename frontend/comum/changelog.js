@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.0', data: '2026-10-23', destaques: [
+      'Agente ABAP: os avisos de análise e de desenvolvimento preparado chegam só para quem gerou a chave do agente, e não mais para toda a equipe',
+    ] },
     { versao: 'v7.9', data: '2026-10-22', destaques: [
       'E-mails do sistema com a identidade da tela de login: cabeçalho azul com o símbolo e o nome Marsh, botões no azul do portal',
       'Resposta ao solicitante por e-mail: o texto chega em parágrafos, com subtítulos e listas (antes vinha tudo emendado), e assinatura com o e-mail de contato',

@@ -111,8 +111,9 @@ servico.post('/chamados/:id/analise', async (req, res) => {
        RETURNING (xmax = 0) AS nova`,
       [ch.id, ch.empresa_id, analise, JSON.stringify(resumo), req.agente.id, resposta]);
     const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
-    email.notificarAdminsComercial({
-      empresa_id: ch.empresa_id,
+    // Aviso só para quem gerou a chave do agente (não para toda a equipe)
+    email.notificarDonoAgente({
+      agente_chave_id: req.agente.id,
       assunto: `Agente ABAP: análise do chamado #${ch.id} — ${ch.titulo}`,
       titulo: `Análise do chamado #${ch.id}`,
       linhas: [['Chamado', `#${ch.id} — ${ch.titulo}`], ['Complexidade', resumo.complexidade],
@@ -159,8 +160,8 @@ servico.post('/chamados/:id/preparo', async (req, res) => {
        RETURNING x.chamado_id`, [preparo, request, ch.id]);
     if (!r.rows.length) return res.status(409).json({ erro: 'A request do chamado mudou ou o chamado ainda não tem análise.' });
     const base = process.env.APP_URL || 'https://marshconsultoria.com.br';
-    email.notificarAdminsComercial({
-      empresa_id: ch.empresa_id,
+    email.notificarDonoAgente({
+      agente_chave_id: req.agente.id,
       assunto: `Agente ABAP: desenvolvimento do chamado #${ch.id} preparado (${request})`,
       titulo: `Preparo do chamado #${ch.id}`,
       linhas: [['Chamado', `#${ch.id} — ${ch.titulo}`], ['Request', request],
