@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.1', data: '2026-10-23', destaques: [
+      'Chamados: o e-mail de mudança de status (inclusive fechar e resolver) e o de comentário da equipe vão só para quem abriu o chamado, com cópia para quem fez a ação na Marsh. Os demais usuários da empresa do cliente não recebem mais',
+    ] },
     { versao: 'v8.0', data: '2026-10-23', destaques: [
       'Agente ABAP: os avisos de análise e de desenvolvimento preparado chegam só para quem gerou a chave do agente, e não mais para toda a equipe',
     ] },

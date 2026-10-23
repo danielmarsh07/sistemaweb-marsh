@@ -53,7 +53,9 @@ router.post('/', async (req, res) => {
 
   try {
     // Garante que o chamado pertence à empresa (e ao cliente, se for cliente)
-    let q = 'SELECT id, status, cliente_id FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE';
+    // titulo e quem abriu (aberto_por / solicitante / licença) vão para o aviso por e-mail ao dono do chamado
+    let q = `SELECT id, status, cliente_id, titulo, aberto_por_usuario_id, solicitante_email, licenca_id
+             FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE`;
     const params = [chamado_id, empresa_id];
     if (isCliente) {
       if (!req.usuario.cliente_id) {
@@ -125,7 +127,8 @@ router.post('/', async (req, res) => {
       chamado: chamadoCompleto,
       remetente_tipo: req.usuario.tipo,
       remetente_nome: req.usuario.nome,
-      empresa_id
+      empresa_id,
+      autor_usuario_id: req.usuario.id
     }).catch(() => {});
 
     res.status(201).json({ mensagem: 'Atendimento registrado com sucesso!', atendimento });

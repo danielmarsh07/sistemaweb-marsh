@@ -315,7 +315,8 @@ router.post('/:id/aprovacao', async (req, res) => {
     }
 
     notificarNovoAtendimento({
-      atendimento, chamado, remetente_tipo: req.usuario.tipo, remetente_nome: nome, empresa_id
+      atendimento, chamado, remetente_tipo: req.usuario.tipo, remetente_nome: nome, empresa_id,
+      autor_usuario_id: req.usuario.id
     }).catch(() => {});
 
     res.json({
@@ -641,7 +642,8 @@ router.put('/:id', async (req, res) => {
       notificarAtualizacaoStatus({
         chamado,
         statusAnterior: ch.status,
-        empresa_id
+        empresa_id,
+        autor_usuario_id: req.usuario.id
       }).catch(() => {});
     }
 

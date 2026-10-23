@@ -22,6 +22,26 @@ async function emailsAdmins(empresa_id) {
   return r.rows; // [{ email, nome }]
 }
 
+// Quem abriu o chamado: e-mail do solicitante (Conector), senão o usuário que abriu, senão o dono da
+// licença do Conector. Avisos do chamado ao cliente vão SÓ para essa pessoa, nunca para todos os usuários
+// do cliente; sem ela, não envia.
+async function emailDonoChamado(chamado) {
+  if (chamado.solicitante_email) return chamado.solicitante_email;
+  const r = await pool.query(
+    `SELECT COALESCE(
+       (SELECT email FROM usuarios WHERE id = $1 AND ativo = TRUE),
+       (SELECT u.email FROM licencas l JOIN usuarios u ON u.id = l.usuario_id WHERE l.id = $2 AND u.ativo = TRUE)) AS email`,
+    [chamado.aberto_por_usuario_id || null, chamado.licenca_id || null]);
+  return r.rows[0]?.email || null;
+}
+
+// Cópia para quem fez a ação na Marsh (ex.: quem fechou o chamado), se for outra pessoa e tiver e-mail
+async function copiaDoAutor(usuario_id, para) {
+  if (!usuario_id) return undefined;
+  const email = (await pool.query('SELECT email FROM usuarios WHERE id = $1 AND ativo = TRUE', [usuario_id])).rows[0]?.email;
+  return email && email.toLowerCase() !== String(para).toLowerCase() ? [email] : undefined;
+}
+
 async function emailsCliente(cliente_id) {
   const r = await pool.query(
     `SELECT email, nome FROM usuarios
@@ -195,12 +215,12 @@ async function notificarNovoChamado({ chamado, empresa_id, aberto_por }) {
 }
 
 /**
- * Status do chamado atualizado — avisa o cliente
+ * Status do chamado atualizado (inclusive fechado/resolvido) — avisa só quem abriu o chamado,
+ * com cópia para quem fez a mudança na Marsh. Nunca para os demais usuários do cliente.
  */
-async function notificarAtualizacaoStatus({ chamado, statusAnterior, empresa_id }) {
-  if (!chamado.cliente_id) return;
-  const clientes = await emailsCliente(chamado.cliente_id);
-  if (!clientes.length) return;
+async function notificarAtualizacaoStatus({ chamado, statusAnterior, empresa_id, autor_usuario_id }) {
+  const dono = await emailDonoChamado(chamado);
+  if (!dono) return;
 
   const html = templateBase({
     titulo: `Chamado #${chamado.id} atualizado`,
@@ -231,7 +251,8 @@ async function notificarAtualizacaoStatus({ chamado, statusAnterior, empresa_id 
   });
 
   await enviar({
-    to: clientes,
+    to: [dono],
+    cc: await copiaDoAutor(autor_usuario_id, dono),
     subject: `[Marsh] Chamado #${chamado.id} — Status atualizado: ${labelStatus[chamado.status] || chamado.status}`,
     html
   });
@@ -242,7 +263,7 @@ async function notificarAtualizacaoStatus({ chamado, statusAnterior, empresa_id 
  * - Se quem comentou é admin/tecnico → avisa o cliente
  * - Se quem comentou é cliente → avisa os admins
  */
-async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, remetente_nome, empresa_id }) {
+async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, remetente_nome, empresa_id, autor_usuario_id }) {
   const ehCliente = remetente_tipo === 'cliente';
 
   const tipoLabel = {
@@ -288,11 +309,12 @@ async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, 
       html
     });
   } else {
-    // Admin/tecnico comentou → avisa cliente
-    if (!chamado.cliente_id) return;
-    const clientes = await emailsCliente(chamado.cliente_id);
+    // Admin/tecnico comentou (ou registrou a solução) → avisa só quem abriu o chamado, com cópia para o autor
+    const dono = await emailDonoChamado(chamado);
+    if (!dono) return;
     await enviar({
-      to: clientes,
+      to: [dono],
+      cc: await copiaDoAutor(autor_usuario_id, dono),
       subject: `[Marsh] ${labelTipo} no seu chamado #${chamado.id}: ${chamado.titulo}`,
       html
     });
