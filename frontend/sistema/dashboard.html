@@ -1120,6 +1120,43 @@
             <a href="#" class="roteiro-ir" onclick="showPage('licencas'); return false;">Licenças →</a>
           </section>
 
+          <!-- Só administradores: o script mostra o card quando o usuário é admin (ver showPage → roteiro) -->
+          <section class="rel-card roteiro-card roteiro-so-admin" id="roteiro-servidor-sap" hidden>
+            <h3>Cadastro de servidor SAP no Conector <small class="fin-muted">(só administradores)</small></h3>
+            <p class="fin-muted">O que pedir ao Basis do cliente, por sistema (DEV, QAS, PRD), antes de cadastrar as conexões da licença.
+              O Conector usa o ADT por HTTP(S): nunca anote usuário nem senha aqui, eles ficam só na máquina do consultor.</p>
+            <div class="fin-matriz roteiro-tabela">
+              <table>
+                <thead><tr><th>Dado</th><th>Transação / onde ver</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">SID</th><td><strong>SM51</strong> (servidor <code>host_SID_nn</code>) ou Sistema → Status</td></tr>
+                  <tr><th scope="row">Mandante</th><td><strong>SCC4</strong> ou Sistema → Status</td></tr>
+                  <tr><th scope="row">Função do mandante (produção, teste, customizing)</th><td><strong>SCC4</strong> → detalhe do mandante. Produção = conexão só leitura</td></tr>
+                  <tr><th scope="row">Host (FQDN)</th><td><strong>SM51</strong>; <strong>SMICM</strong> → Ir para → Serviços</td></tr>
+                  <tr><th scope="row">Porta HTTPS (ou HTTP)</th><td><strong>SMICM</strong> → Ir para → Serviços (protocolo, porta, ativo). Preferir HTTPS</td></tr>
+                  <tr><th scope="row">URL externa (Web Dispatcher/proxy)</th><td><strong>RZ11</strong>: <code>icm/host_name_full</code>, <code>icm/server_port_*</code>; <strong>SICF</strong> → testar serviço mostra a URL</td></tr>
+                  <tr><th scope="row">Serviço ADT ativo</th><td><strong>SICF</strong> → <code>default_host/sap/bc/adt</code> (ativar se estiver cinza)</td></tr>
+                  <tr><th scope="row">Certificado SSL do servidor</th><td><strong>STRUST</strong> → SSL Server Standard → exportar (.pem/.cer). Ver se a chave é RSA 1024</td></tr>
+                  <tr><th scope="row">Idioma</th><td><strong>SMLT</strong> (idiomas instalados); padrão PT</td></tr>
+                  <tr><th scope="row">Release (ECC ou S/4, SAP_BASIS)</th><td>Sistema → Status → Componentes, ou <strong>SPAM</strong></td></tr>
+                  <tr><th scope="row">Usuário do consultor</th><td><strong>SU01</strong> (tipo diálogo, validade, bloqueio)</td></tr>
+                  <tr><th scope="row">Autorizações</th><td><strong>PFCG</strong> (S_ADT_RES, S_RFC, S_TCODE; S_DEVELOP só Z*/Y* no DEV). <strong>SU53</strong> depois do 1º teste</td></tr>
+                  <tr><th scope="row">Chave de desenvolvedor (gravação no DEV)</th><td><strong>SE38</strong> num Z (pede a chave se faltar) ou tabela <code>DEVACCESS</code> na SE16</td></tr>
+                  <tr><th scope="row">Adendo de debug</th><td><strong>SICF</strong> → nó <code>/sap/zmarsh/conector</code> criado e ativo</td></tr>
+                  <tr><th scope="row">Rede</th><td>Fora do SAP: VPN, firewall ou SAProuter liberando a porta vista na SMICM</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <ol>
+              <li>Peça um print de <strong>Sistema → Status</strong>, <strong>SMICM → Serviços</strong> e <strong>SICF</strong> (<code>/sap/bc/adt</code>) de cada sistema.</li>
+              <li>Monte a URL: <code>https://&lt;host&gt;:&lt;porta&gt;</code>, sem barra no final.</li>
+              <li>Cadastre na licença a conexão: SID, URL, mandante e idioma. Produção sempre marcada como só leitura.</li>
+              <li>Guarde o certificado exportado da STRUST junto da documentação do cliente (o instalador fixa o certificado do servidor).</li>
+              <li>No 1º acesso do consultor, se der erro de autorização, peça a <strong>SU53</strong> e ajuste a role.</li>
+            </ol>
+            <a href="#" class="roteiro-ir" onclick="showPage('licencas'); return false;">Licenças →</a>
+          </section>
+
           <section class="rel-card roteiro-card">
             <h3>Chamados</h3>
             <p class="fin-muted">O cliente abre pelo portal; o prazo vem só da prioridade.</p>

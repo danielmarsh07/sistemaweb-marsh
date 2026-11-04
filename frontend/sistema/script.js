@@ -509,6 +509,11 @@ function showPage(page, opcoes = {}) {
   if (page === 'transacoes') loadTransacoes();
   if (page === 'categorias-transacao') loadCategoriasTransacao();
   if (page === 'usuarios') loadUsuarios();
+  // Cards do roteiro marcados "roteiro-so-admin" (ex.: cadastro de servidor SAP) só aparecem para administradores
+  if (page === 'roteiro') {
+    const ehAdmin = !!usuario && ['admin_empresa', 'admin_sistema'].includes(usuario.tipo);
+    document.querySelectorAll('.roteiro-so-admin').forEach(card => { card.hidden = !ehAdmin; });
+  }
   if (page === 'configuracoes') renderThemePicker();
   if (page === 'licencas') loadLicencas();
   if (page === 'treinamentos') loadCursos();

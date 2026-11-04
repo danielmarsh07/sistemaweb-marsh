@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.3', data: '2026-11-04', destaques: [
+      'Roteiro de uso: novo card "Cadastro de servidor SAP no Conector", visível só para administradores, com as transações onde levantar SID, mandante, host, porta HTTPS, serviço ADT, certificado e autorizações de cada sistema do cliente',
+    ] },
     { versao: 'v8.2', data: '2026-10-23', destaques: [
       'Chamados: cada chamado tem um ABAP responsável (no detalhe do chamado, campo "ABAP responsável", com a opção de definir o padrão dos chamados novos). Todo e-mail do chamado vai só para quem abriu e para esse responsável: chamado novo, comentário do cliente, mudança de status, comentário da equipe e avisos do agente ABAP. A equipe toda não recebe mais',
     ] },
