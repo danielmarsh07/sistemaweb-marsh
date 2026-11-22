@@ -17,6 +17,7 @@ Atualizado em 16/10/2026. Modelo aprovado: quem compra (CPF ou CNPJ) é o **gest
 - [ ] **Conferir a trilha dos 4 cursos** em Produtos SAP → Treinamentos (preenchida pelo título; corrigir se precisar).
 - [ ] **Confirmar `MARKETING_CHAVE_CIFRA` no Render** (Environment). Sem ela a licença funciona, mas a chave não aparece no portal e o instalador continua pedindo a chave. Se preferir uma chave só para isso: criar `SISTEMA_CHAVE_CIFRA` (32 bytes em hex) **antes** de emitir as primeiras licenças por pessoa (trocar depois invalida as chaves guardadas).
 - [ ] **Remontar o instalador** (`SAP\Integration ECC\instalador\montar_pacote.ps1`) e publicar em Licenças → Publicar instalador, para valer a leitura do `licenca.json`.
+  Remontado em 2026-10-16 (`dist\MarshSAP-Conector-0.4.0.zip`, 29,2 MB, já lê o `licenca.json`); **falta publicar no painel**. O zip anterior ficou como `MarshSAP-Conector-0.4.0-antigo-2026-10-13.zip`.
 - [ ] **Testar o instalador novo numa máquina**: baixar pelo portal com uma vaga certificada, rodar `Instalar.cmd` e confirmar que abre direto em usuário/senha do SAP.
 - [ ] **Teste ponta a ponta em produção** com e-mails seus: contrato com 1 vaga, convite, cursos, certificado, licença, download, ativação.
 

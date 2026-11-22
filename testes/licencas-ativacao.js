@@ -52,7 +52,7 @@ const hash = s => crypto.createHash('sha256').update(s).digest('hex');
       ['idioma com 3 letras', { conexoes: [{ ...conexoes[0], idioma: 'POR' }] }],
       ['mais de 10 conexões', { conexoes: Array.from({ length: 11 }, () => conexoes[0]) }],
       ['conexões não-lista', { conexoes: 'DEV' }],
-      ['duas conexões com o mesmo SID', { conexoes: [conexoes[0], { ...conexoes[0], sid: 'dev', mandante: '210' }] }],
+      ['duas conexões iguais (SID, mandante e URL)', { conexoes: [conexoes[0], { ...conexoes[0], sid: String(conexoes[0].sid).toLowerCase() }] }],
       ['e-mail do titular inválido', { titular_email: 'fulano@' }],
       ['max_maquinas = 0', { max_maquinas: 0 }],
       ['max_maquinas fracionado', { max_maquinas: 1.5 }]

@@ -97,7 +97,12 @@ function validarConexoes(conexoes) {
     if (!urlOk) return { erro: `Conexão ${n} (${sid}): URL deve começar com http:// ou https://.` };
     if (!/^\d{3}$/.test(mandante)) return { erro: `Conexão ${n} (${sid}): mandante deve ter 3 dígitos.` };
     if (!/^[A-Z]{2}$/.test(idioma)) return { erro: `Conexão ${n} (${sid}): idioma deve ter 2 letras (ex.: PT).` };
-    if (lista.some(x => x.sid === sid)) return { erro: `Conexão ${n}: SID ${sid} repetido (uma conexão por SID).` };
+    // Mesmo SID pode aparecer mais de uma vez (Multiterminais: DEV ECC UPD/200 e DEV Rise S/4 UPD/400; na virada,
+    // PRD do ECC e PRD do Rise). O conector 0.9.0+ separa as conexões por SID+mandante. Só a cópia exata é recusada.
+    const urlNorm = url.replace(/\/+$/, '').toLowerCase();
+    if (lista.some(x => x.sid === sid && x.mandante === mandante && x.url.toLowerCase() === urlNorm)) {
+      return { erro: `Conexão ${n}: ${sid}/${mandante} repetida (mesmo SID, mandante e URL).` };
+    }
     // producao: o conector trata o sistema como produção (sempre somente leitura) e manda o log das
     // consultas para a Marsh. Só é gravada quando marcada (as conexões antigas ficam iguais).
     const producao = c.producao === true || c.producao === 'true';
