@@ -132,6 +132,27 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     ok((await api(chave.texto, '/agente-servico/chamados/preparar')).body.some(c => c.id === c1), 'request trocada volta para a fila');
     ok(!JSON.stringify((await api(tokCliente, `/chamados/${c1}`)).body).includes('PREPARO-OK'), 'cliente não vê o preparo');
 
+    // Encerrar pelo agente: chamado do Conector, com texto da solução; e-mail só a quem abriu
+    ok((await api(chave.texto, `/agente-servico/chamados/${c3}/fechar`, 'POST', { texto: 'x'.repeat(30) })).status === 404,
+      '! fechar chamado que não é do Conector -> 404');
+    ok((await api(chave.texto, `/agente-servico/chamados/${c1}/fechar`, 'POST', { texto: 'curto' })).status === 400, '! fechar sem texto -> 400');
+    ok((await api(chave.texto, `/agente-servico/chamados/${c2}/fechar`, 'POST', { texto: 'x'.repeat(30) })).status === 409,
+      '! fechar chamado já fechado -> 409');
+    const fch = await api(chave.texto, `/agente-servico/chamados/${c1}/fechar`, 'POST', { texto: 'Resolvido no PRD: FECHADO-AGENTE-OK.' });
+    ok(fch.status === 200 && fch.body?.status === 'fechado', `agente encerra o chamado (${fch.status} ${fch.body?.mensagem || fch.body?.erro})`);
+    const detF = await api(tokCliente, `/chamados/${c1}`);
+    ok(detF.body?.status === 'fechado' && JSON.stringify(detF.body).includes('FECHADO-AGENTE-OK'),
+      'cliente vê o chamado fechado com o texto da solução');
+    let regF;
+    for (let i = 0; i < 20 && !regF; i++) {
+      await new Promise(r => setTimeout(r, 150));
+      regF = (await pool.query(`SELECT para FROM emails_enviados WHERE assunto LIKE $1 ORDER BY id DESC LIMIT 1`,
+        [`%Chamado encerrado no seu chamado #${c1}:%`])).rows[0];
+    }
+    ok(regF && regF.para === 'renan.teste@exemplo.com', `aviso do encerramento só para quem abriu (${regF && regF.para})`);
+    ok((await api(chave.texto, `/agente-servico/chamados/${c1}/fechar`, 'POST', { texto: 'x'.repeat(30) })).status === 409,
+      '! fechar de novo -> 409');
+
     ok((await api(tokAdmin, `/agente/chaves/${chave.id}`, 'DELETE')).status === 200, 'admin revoga a chave');
     ok((await api(chave.texto, '/agente-servico/chamados/pendentes')).status === 401, '! chave revogada -> 401');
   } finally {

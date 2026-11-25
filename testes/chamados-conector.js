@@ -322,6 +322,28 @@ const hash = s => crypto.createHash('sha256').update(s).digest('hex');
     ok((await api(tokAdmin, `/chamados/${idA}/especificacao.md`, 'GET', null, true)).status === 404,
       '! especificacao.md de chamado que não é do conector -> 404');
 
+    // --- Fechar pelo conector (ferramenta fechar_chamado): só quem abriu, com motivo ---
+    const authU1 = { chave: chaveA, usuario_hash: U1, maquina_hash: M[0] };
+    const motivoOk = 'Testado no PRD: o anexo grava e exclui em exibição.';
+    ok((await conector(`/chamados/${id1}/fechar`, { ...authU1, usuario_hash: U2, motivo: motivoOk })).status === 404,
+      '! fechar chamado de outro consultor (mesma licença e máquina) -> 404');
+    ok((await conector(`/chamados/${id1}/fechar`, { ...authU1, motivo: 'curto' })).status === 400, '! fechar sem motivo (< 10) -> 400');
+    ok((await conector(`/chamados/${id1}/fechar`, { ...authU1, chave: chaveB, motivo: motivoOk })).status === 403,
+      '! fechar com chave de outra licença (máquina não ativada nela) -> 403');
+    const fe = await conector(`/chamados/${id1}/fechar`, { ...authU1, motivo: motivoOk });
+    ok(fe.status === 200 && fe.body?.status === 'fechado' && fe.body?.numero === `#${id1}`,
+      `fechar o próprio chamado -> 200 fechado (${fe.status} ${fe.body?.mensagem || fe.body?.erro})`);
+    const gFe = (await pool.query('SELECT status, data_fechamento FROM chamados WHERE id = $1', [id1])).rows[0];
+    const atFe = (await pool.query(`SELECT * FROM atendimentos WHERE chamado_id = $1 AND tipo = 'fechamento'`, [id1])).rows;
+    const logFe = (await pool.query(`SELECT * FROM chamados_status_log WHERE chamado_id = $1 AND status_novo = 'fechado'`, [id1])).rows;
+    ok(gFe.status === 'fechado' && gFe.data_fechamento && atFe.length === 1 && atFe[0].usuario_id === null &&
+       atFe[0].descricao.startsWith('Chamado encerrado pelo consultor Fulana Funcional (Conector SAP, NB-FUNC-1)') &&
+       atFe[0].descricao.endsWith(motivoOk) && logFe.length === 1 && logFe[0].observacao.includes(motivoOk),
+      'fechamento gravado: status, data, atendimento de fechamento e histórico');
+    ok((await conector(`/chamados/${id1}/fechar`, { ...authU1, motivo: motivoOk })).status === 409, '! fechar de novo -> 409');
+    const lsFe = await conector('/chamados/listar', authU1);
+    ok((lsFe.body || []).find(c => c.id === id1)?.status === 'fechado', 'listar mostra o chamado fechado');
+
     console.log(`(chamadas às rotas do conector: ${chamadasConector})`);
   } finally {
     const ids = (await pool.query('SELECT id FROM chamados WHERE cliente_id IN ($1, $2)', [cliA, cliB])).rows.map(r => r.id);

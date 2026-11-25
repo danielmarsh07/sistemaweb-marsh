@@ -130,6 +130,57 @@ servico.post('/chamados/:id/analise', async (req, res) => {
   }
 });
 
+// POST /chamados/:id/fechar — o agente (Claude do Daniel) encerra um chamado do Conector já entregue e testado:
+// { texto } com a solução em linguagem do solicitante. Mesmo efeito do "Encerrar" da equipe no portal; o texto
+// vai por e-mail só a quem abriu o chamado (cópia ao ABAP responsável). Autor = ABAP responsável pelo chamado.
+servico.post('/chamados/:id/fechar', async (req, res) => {
+  const texto = typeof req.body?.texto === 'string' ? req.body.texto.trim() : '';
+  if (texto.length < 20 || texto.length > 20000) return res.status(400).json({ erro: 'texto: solução de 20 a 20.000 caracteres.' });
+  try {
+    const ch0 = await chamadoDoAgente(req);
+    if (!ch0) return res.status(404).json({ erro: 'Chamado do Conector não encontrado.' });
+    const ch = (await pool.query('SELECT * FROM chamados WHERE id = $1', [ch0.id])).rows[0];
+    if (ch.status === 'resolvido' || ch.status === 'fechado') {
+      return res.status(409).json({ erro: `O chamado #${ch.id} já está encerrado (${ch.status}).` });
+    }
+    const autorId = ch.atribuido_para_usuario_id || null;
+    const nome = (autorId && (await pool.query('SELECT nome FROM usuarios WHERE id = $1', [autorId])).rows[0]?.nome) || 'Equipe Marsh';
+    const descricao = `Chamado encerrado pela Marsh (${nome}).\n\n${texto}`;
+    const client = await pool.connect();
+    let chamado, atendimento;
+    try {
+      await client.query('BEGIN');
+      const up = await client.query(
+        `UPDATE chamados SET status = 'fechado', data_fechamento = NOW(), atualizado_por_usuario_id = $2, data_atualizacao = NOW()
+         WHERE id = $1 AND status NOT IN ('resolvido', 'fechado') RETURNING *`, [ch.id, autorId]);
+      if (!up.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ erro: `O chamado #${ch.id} já está encerrado.` });
+      }
+      chamado = up.rows[0];
+      atendimento = (await client.query(
+        `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, data_atendimento)
+         VALUES ($1, $2, 'fechamento', $3, NOW()) RETURNING *`, [ch.id, autorId, descricao])).rows[0];
+      await client.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, $3, $4, 'fechado', 'Encerrado pelo Agente ABAP (chave do agente)')`,
+        [ch.id, ch.empresa_id, autorId, ch.status]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    email.notificarNovoAtendimento({
+      atendimento, chamado, remetente_tipo: 'tecnico', remetente_nome: nome, empresa_id: chamado.empresa_id
+    }).catch(() => {});
+    res.json({ mensagem: `Chamado #${chamado.id} encerrado.`, status: chamado.status });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao encerrar o chamado', detalhe: err.message });
+  }
+});
+
 // Request SAP informada no chamado e ainda sem preparo para ELA (trocar a request pede novo preparo)
 servico.get('/chamados/preparar', async (req, res) => {
   try {

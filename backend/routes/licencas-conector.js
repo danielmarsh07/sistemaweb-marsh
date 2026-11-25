@@ -24,7 +24,7 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { PLANOS, VALIDADE_DIAS, hashChave, chavePublicaPem, assinar, listaSids, conexoesDosSids } = require('../services/licenca');
-const { notificarNovoChamado } = require('../services/email');
+const { notificarNovoChamado, notificarNovoAtendimento } = require('../services/email');
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
@@ -547,6 +547,70 @@ router.post('/log-producao', async (req, res) => {
     res.json({ ok: true, recebidos: regs.length, gravados });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao registrar o log de produção', detalhe: err.message });
+  }
+});
+
+// POST /chamados/:id/fechar — o consultor encerra pelo Claude (ferramenta fechar_chamado) um chamado que ELE
+// abriu pelo conector: { chave, usuario_hash, maquina_hash, motivo }. Mesmo efeito do "Encerrar" do portal
+// (status fechado, atendimento de fechamento, histórico) e aviso ao ABAP responsável.
+router.post('/chamados/:id/fechar', async (req, res) => {
+  try {
+    const auth = await autenticarConector(req, res, false);
+    if (!auth) return;
+    const motivo = textoCorpo(req.body?.motivo) || '';
+    if (motivo.length < 10 || motivo.length > 5000) {
+      return res.status(400).json({ erro: 'motivo é obrigatório, de 10 a 5.000 caracteres (por que o chamado pode ser encerrado).' });
+    }
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(400).json({ erro: 'Número de chamado inválido.' });
+    const ch = (await pool.query(
+      `SELECT * FROM chamados WHERE id = $1 AND licenca_id = $2 AND origem = 'conector' AND ativo = TRUE`,
+      [req.params.id, auth.l.id])).rows[0];
+    if (!ch || ch.usuario_hash !== auth.usuario_hash) {
+      return res.status(404).json({ erro: 'Chamado não encontrado entre os seus chamados (só quem abriu pode encerrar pelo conector).' });
+    }
+    if (ch.status === 'resolvido' || ch.status === 'fechado') {
+      return res.status(409).json({ erro: `O chamado #${ch.id} já está encerrado (${ch.status}).` });
+    }
+
+    const nome = ch.solicitante_nome || 'consultor';
+    const texto = `Chamado encerrado pelo consultor ${nome} (Conector SAP, ${auth.nome_maquina || 'máquina sem nome'}).\n\n${motivo}`;
+    const client = await pool.connect();
+    let chamado, atendimento;
+    try {
+      await client.query('BEGIN');
+      // A condição de status no UPDATE segura dois encerramentos simultâneos
+      const up = await client.query(
+        `UPDATE chamados SET status = 'fechado', data_fechamento = NOW(), data_atualizacao = NOW()
+         WHERE id = $1 AND status NOT IN ('resolvido', 'fechado') RETURNING *`, [ch.id]);
+      if (!up.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ erro: `O chamado #${ch.id} já está encerrado.` });
+      }
+      chamado = up.rows[0];
+      atendimento = (await client.query(
+        `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, data_atendimento)
+         VALUES ($1, NULL, 'fechamento', $2, NOW()) RETURNING *`, [ch.id, texto])).rows[0];
+      await client.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, NULL, $3, 'fechado', $4)`,
+        [ch.id, ch.empresa_id, ch.status, `Encerrado pelo consultor ${nome} via Conector SAP: ${motivo}`.slice(0, 5000)]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    // Quem encerrou é o cliente: o aviso vai só ao ABAP responsável
+    notificarNovoAtendimento({
+      atendimento, chamado, remetente_tipo: 'cliente', remetente_nome: `${nome} (Conector SAP)`, empresa_id: chamado.empresa_id
+    }).catch(() => {});
+
+    res.json({ id: chamado.id, numero: `#${chamado.id}`, status: chamado.status, data_fechamento: chamado.data_fechamento,
+      mensagem: `Chamado #${chamado.id} encerrado.` });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao encerrar chamado', detalhe: err.message });
   }
 });
 

@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.6', data: '2026-11-25', destaques: [
+      'Conector SAP: o consultor encerra pelo próprio Claude um chamado que ele abriu (entregue e testado, ou que não é mais necessário), informando o motivo; o encerramento aparece no histórico do chamado e o ABAP responsável é avisado',
+      'Agente ABAP da Marsh: encerra o chamado do Conector depois de entregue, com o texto da solução, que vai por e-mail só para quem abriu',
+    ] },
     { versao: 'v8.5', data: '2026-11-25', destaques: [
       'Portal do cliente: novo botão "Encerrar chamado" no detalhe de um chamado em aberto. Quem abriu (ou o gestor da empresa) encerra o chamado quando o problema foi resolvido ou o pedido não é mais necessário, com um comentário opcional; o encerramento aparece no histórico, o ABAP responsável é avisado e depois dá para avaliar o atendimento ou reabrir',
     ] },
