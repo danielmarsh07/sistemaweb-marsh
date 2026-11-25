@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.5', data: '2026-11-25', destaques: [
+      'Portal do cliente: novo botão "Encerrar chamado" no detalhe de um chamado em aberto. Quem abriu (ou o gestor da empresa) encerra o chamado quando o problema foi resolvido ou o pedido não é mais necessário, com um comentário opcional; o encerramento aparece no histórico, o ABAP responsável é avisado e depois dá para avaliar o atendimento ou reabrir',
+    ] },
     { versao: 'v8.3', data: '2026-11-04', destaques: [
       'Roteiro de uso: novo card "Cadastro de servidor SAP no Conector", visível só para administradores, com as transações onde levantar SID, mandante, host, porta HTTPS, serviço ADT, certificado e autorizações de cada sistema do cliente',
     ] },

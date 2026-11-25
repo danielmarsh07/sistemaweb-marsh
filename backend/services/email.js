@@ -285,7 +285,8 @@ async function notificarNovoAtendimento({ atendimento, chamado, remetente_tipo, 
     visita: 'Visita registrada',
     ligacao: 'Ligação registrada',
     aprovacao: 'Chamado aprovado',
-    recusa: 'Chamado recusado'
+    recusa: 'Chamado recusado',
+    fechamento: 'Chamado encerrado'
   };
   const labelTipo = tipoLabel[atendimento.tipo] || 'Novo atendimento';
 

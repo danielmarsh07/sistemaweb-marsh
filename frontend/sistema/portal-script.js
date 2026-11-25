@@ -1086,7 +1086,18 @@ function renderBlocoConcluido(ch, concluido) {
     return div;
   })();
 
-  if (!concluido) { wrapper.innerHTML = ''; return; }
+  // Chamado ativo: o cliente pode encerrar quando o problema foi resolvido ou o pedido não é mais necessário
+  if (!concluido) {
+    wrapper.innerHTML = `
+      <div class="bloco-concluido">
+        <div class="bloco-concluido-acao">
+          <p>Problema resolvido ou o chamado não é mais necessário? Você pode encerrá-lo.</p>
+          <button class="btn-reabrir" onclick="encerrarChamado(${ch.id})">✓ Encerrar chamado</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
 
   const jaAvaliou = !!ch.avaliacao;
   const nota = jaAvaliou ? ch.avaliacao.nota : 0;
@@ -1135,6 +1146,22 @@ async function enviarAvaliacao(chamadoId) {
   await abrirDetalhe(chamadoId);
 }
 
+async function encerrarChamado(chamadoId) {
+  const motivo = prompt('Encerrar o chamado? Se quiser, conte como ficou (opcional):');
+  if (motivo === null) return; // cancelou
+  const res = await apiFetch(`${API}/chamados/${chamadoId}/encerrar`, {
+    method: 'POST',
+    body: JSON.stringify({ motivo })
+  });
+  if (!res || !res.ok) {
+    const e = res ? await res.json().catch(() => ({})) : {};
+    alert(e.erro || 'Erro ao encerrar chamado.');
+    return;
+  }
+  await carregarChamados();
+  await abrirDetalhe(chamadoId);
+}
+
 async function reabrirChamado(chamadoId) {
   const motivo = prompt('Conta o que ainda não foi resolvido (opcional, mas ajuda muito):');
   if (motivo === null) return; // cancelou
@@ -1166,7 +1193,8 @@ function renderTimeline(atendimentos) {
     solucao: '#10b981',
     reabertura: '#0d6efd',
     aprovacao: '#10b981',
-    recusa: '#ef4444'
+    recusa: '#ef4444',
+    fechamento: '#10b981'
   };
 
   const labels = {
@@ -1176,7 +1204,8 @@ function renderTimeline(atendimentos) {
     solucao: 'Solução',
     reabertura: 'Reabertura',
     aprovacao: 'Aprovação',
-    recusa: 'Recusa'
+    recusa: 'Recusa',
+    fechamento: 'Encerramento'
   };
 
   container.innerHTML = atendimentos.map(a => `

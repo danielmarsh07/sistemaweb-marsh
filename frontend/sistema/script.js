@@ -3932,7 +3932,8 @@ function badgeTipoAtendimento(tipo) {
     solucao: { label: 'Solução', color: '#10b981' },
     reabertura: { label: 'Reabertura', color: '#0d6efd' },
     aprovacao: { label: 'Aprovação do cliente', color: '#10b981' },
-    recusa: { label: 'Recusa do cliente', color: '#ef4444' }
+    recusa: { label: 'Recusa do cliente', color: '#ef4444' },
+    fechamento: { label: 'Encerramento', color: '#10b981' }
   };
   const t = map[tipo] || { label: escapeHtml(tipo), color: '#64748b' };
   return `<span style="background:${t.color}20; color:${t.color}; padding:2px 6px; border-radius:4px; font-size:0.78rem; font-weight:600">${t.label}</span>`;

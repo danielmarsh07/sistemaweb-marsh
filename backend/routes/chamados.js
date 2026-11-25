@@ -751,6 +751,76 @@ router.post('/:id/reabrir', async (req, res) => {
   }
 });
 
+// POST - Encerrar chamado pelo cliente (o problema foi resolvido ou o pedido não é mais necessário).
+// { motivo } opcional. Cliente só nos chamados da própria empresa (usuário de vaga só nos próprios,
+// pelo chamadosDoAluno); equipe da Marsh também pode. Fica registrado na timeline e no log de status,
+// e o ABAP responsável recebe o aviso. Depois de encerrado, o cliente pode avaliar ou reabrir.
+router.post('/:id/encerrar', async (req, res) => {
+  const empresa_id = req.usuario.empresa_id || 1;
+  const isCliente = req.usuario.tipo === 'cliente';
+  const motivo = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
+  if (motivo.length > 5000) return res.status(400).json({ erro: 'Motivo deve ter até 5.000 caracteres.' });
+
+  try {
+    let q = 'SELECT * FROM chamados WHERE id = $1 AND empresa_id = $2 AND ativo = TRUE';
+    const params = [req.params.id, empresa_id];
+    if (isCliente) {
+      if (!req.usuario.cliente_id) return res.status(403).json({ erro: 'Usuário não vinculado a um cliente.' });
+      q += ' AND cliente_id = $3';
+      params.push(req.usuario.cliente_id);
+    }
+    const atual = await pool.query(q, params);
+    if (!atual.rows.length) return res.status(404).json({ erro: 'Chamado não encontrado' });
+    const ch = atual.rows[0];
+    if (ch.status === 'resolvido' || ch.status === 'fechado') {
+      return res.status(409).json({ erro: 'Este chamado já está encerrado.' });
+    }
+
+    const nome = req.usuario.nome || (await pool.query('SELECT nome FROM usuarios WHERE id = $1', [req.usuario.id])).rows[0]?.nome || 'usuário';
+    const texto = `Chamado encerrado ${isCliente ? 'pelo cliente' : 'pela Marsh'} (${nome}).${motivo ? `\n\n${motivo}` : ''}`;
+
+    const client = await pool.connect();
+    let chamado, atendimento;
+    try {
+      await client.query('BEGIN');
+      // A condição de status no UPDATE segura dois encerramentos simultâneos
+      const up = await client.query(
+        `UPDATE chamados SET status = 'fechado', data_fechamento = NOW(),
+           atualizado_por_usuario_id = $1, data_atualizacao = NOW()
+         WHERE id = $2 AND empresa_id = $3 AND status NOT IN ('resolvido', 'fechado')
+         RETURNING *`,
+        [req.usuario.id, ch.id, empresa_id]);
+      if (!up.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ erro: 'Este chamado já está encerrado.' });
+      }
+      chamado = up.rows[0];
+      atendimento = (await client.query(
+        `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, data_atendimento)
+         VALUES ($1, $2, 'fechamento', $3, NOW()) RETURNING *`,
+        [ch.id, req.usuario.id, texto])).rows[0];
+      await client.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, $3, $4, 'fechado', $5)`,
+        [ch.id, empresa_id, req.usuario.id, ch.status, motivo ? `Encerrado: ${motivo}` : 'Encerrado']);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    notificarNovoAtendimento({
+      atendimento, chamado, remetente_tipo: req.usuario.tipo, remetente_nome: nome, empresa_id
+    }).catch(() => {});
+
+    res.json({ mensagem: 'Chamado encerrado.', chamado: { id: chamado.id, status: chamado.status, data_fechamento: chamado.data_fechamento } });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao encerrar chamado', detalhe: err.message });
+  }
+});
+
 // POST - Avaliar chamado (CSAT) — só cliente, só após resolvido/fechado
 router.post('/:id/avaliar', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
