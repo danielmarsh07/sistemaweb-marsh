@@ -408,7 +408,12 @@ router.post('/chamados', async (req, res) => {
     if (erro) return res.status(400).json({ erro });
     const { l, sid } = auth;
     const nomeMaquina = d.nome_maquina || auth.nome_maquina || 'máquina sem nome';
-    const aprovacao = l.chamados_exigem_aprovacao === false ? 'aprovado' : 'pendente';
+    // Licença de vaga (ligada a um usuário do portal): quem pede é o próprio usuário, que revisou a especificação
+    // com a IA e mandou abrir. O pedido dele já é a aprovação: o chamado nasce aprovado por ele e vai direto para
+    // a fila de desenvolvimento (sem botão de aprovar; Gabriel/Multiterminais, 27/11/2026). Licença sem usuário
+    // do portal continua com a regra chamados_exigem_aprovacao (gestor aprova no portal).
+    const aprovadoPeloSolicitante = !!(l.vaga_id && l.usuario_id);
+    const aprovacao = aprovadoPeloSolicitante || l.chamados_exigem_aprovacao === false ? 'aprovado' : 'pendente';
 
     const client = await pool.connect();
     let chamado;
@@ -432,21 +437,25 @@ router.post('/chamados', async (req, res) => {
            empresa_id, cliente_id, aberto_por_usuario_id, titulo, descricao, prioridade, categoria, status, ativo,
            origem, licenca_id, sid, modulo, tipo_demanda, pedido_original, especificacao, objetos_sap,
            solicitante_nome, solicitante_email, usuario_hash, maquina_hash, aprovacao_cliente,
-           atribuido_para_usuario_id
+           atribuido_para_usuario_id, aprovado_por_usuario_id, data_aprovacao
          ) VALUES ($1, $2, NULL, $3, $4, $5, 'Conector SAP', 'aberto', TRUE,
            'conector', $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16, $17,
-           (SELECT abap_padrao_usuario_id FROM empresas WHERE id = $1))
+           (SELECT abap_padrao_usuario_id FROM empresas WHERE id = $1),
+           $18::int, CASE WHEN $18::int IS NOT NULL THEN NOW() END)
          RETURNING *`,
         [l.empresa_id || 1, l.cliente_id, d.titulo, descricaoCurta(d.pedido, !!d.especificacao, sid), d.prioridade,
          l.id, sid, d.modulo, d.tipo, d.pedido, d.especificacao, JSON.stringify(d.objetos),
-         d.solicitante_nome, d.solicitante_email, auth.usuario_hash, auth.maquina_hash, aprovacao]);
+         d.solicitante_nome, d.solicitante_email, auth.usuario_hash, auth.maquina_hash, aprovacao,
+         aprovadoPeloSolicitante ? l.usuario_id : null]);
       chamado = r.rows[0];
       await client.query(
         `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
-         VALUES ($1, $2, NULL, NULL, 'aberto', $3)`,
+         VALUES ($1, $2, $4, NULL, 'aberto', $3)`,
         [chamado.id, chamado.empresa_id,
          `Chamado aberto pelo Conector SAP (${nomeMaquina}, ${sid}) por ${d.solicitante_nome}` +
-         (aprovacao === 'pendente' ? ' — aguardando aprovação do gestor do cliente' : '')]);
+         (aprovacao === 'pendente' ? ' — aguardando aprovação do gestor do cliente'
+           : aprovadoPeloSolicitante ? ' — aprovado pelo próprio solicitante ao abrir' : ''),
+         aprovadoPeloSolicitante ? l.usuario_id : null]);
       await client.query('COMMIT');
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});
@@ -468,7 +477,9 @@ router.post('/chamados', async (req, res) => {
       aprovacao_cliente: chamado.aprovacao_cliente,
       mensagem: aprovacao === 'pendente'
         ? `Chamado #${chamado.id} aberto. Ele aguarda a aprovação do gestor de ${l.cliente_nome} no portal da Marsh antes de entrar na fila de desenvolvimento.`
-        : `Chamado #${chamado.id} aberto e liberado para a equipe da Marsh Consultoria.`
+        : aprovadoPeloSolicitante
+          ? `Chamado #${chamado.id} aberto e já aprovado por você: ele entrou na fila de desenvolvimento da Marsh Consultoria.`
+          : `Chamado #${chamado.id} aberto e liberado para a equipe da Marsh Consultoria.`
     });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao abrir chamado', detalhe: err.message });

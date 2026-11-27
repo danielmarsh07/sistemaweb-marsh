@@ -25,7 +25,8 @@ const uploadInstalador = multer({ storage: multer.memoryStorage(), limits: { fil
 
 const COLUNAS = `l.id, l.cliente_id, l.produto, l.plano, l.max_usuarios, l.sids, l.data_inicio, l.data_fim,
   l.status, l.chave_prefixo, l.ultima_validacao, l.versao_conector, l.observacoes, l.data_criacao,
-  l.titular_nome, l.titular_email, l.max_maquinas, l.conexoes, l.chamados_exigem_aprovacao`;
+  l.titular_nome, l.titular_email, l.max_maquinas, l.conexoes, l.chamados_exigem_aprovacao,
+  (l.vaga_id IS NOT NULL AND l.usuario_id IS NOT NULL) AS licenca_de_vaga`;
 
 const USO_30D = `
   (SELECT COUNT(DISTINCT u.usuario_hash) FROM licencas_uso u

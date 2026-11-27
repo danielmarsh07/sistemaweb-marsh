@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v9.0', data: '2026-11-27', destaques: [
+      'Conector SAP: o chamado que o usuário da vaga abre pelo Claude já entra aprovado por ele mesmo e vai direto para a fila de desenvolvimento da Marsh, sem precisar do botão de aprovar',
+    ] },
     { versao: 'v8.9', data: '2026-11-27', destaques: [
       'Chamados ABAP internos: o consultor da Marsh abre pelo Claude um chamado no cliente, no próprio nome, registra cada ajuste com a request SAP usada e encerra, sem enviar e-mail',
       'Chamados internos aparecem no filtro "Manual" da lista de chamados',

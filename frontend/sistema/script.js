@@ -1797,7 +1797,8 @@ async function verUsoLicenca(id) {
         ${fichaLinha('Chave', `${escapeHtml(l.chave_prefixo)}-••••-••••`)}
         ${fichaLinha('Usuários (30 dias)', `${l.usuarios_ativos} de ${l.max_usuarios || 'ilimitados'}`)}
         ${fichaLinha('Máquinas', `${l.maquinas_ativas} de ${l.max_maquinas || 'ilimitadas'} · ${l.maquinas_online_24h} online nas últimas 24h`)}
-        ${fichaLinha('Chamados do Conector', l.chamados_exigem_aprovacao !== false ? 'precisam da aprovação do cliente' : 'entram sem aprovação')}
+        ${fichaLinha('Chamados do Conector', l.licenca_de_vaga ? 'já entram aprovados pelo próprio usuário da vaga'
+          : l.chamados_exigem_aprovacao !== false ? 'precisam da aprovação do cliente' : 'entram sem aprovação')}
         ${fichaLinha('Último contato', l.ultima_validacao ? formatDataHora(l.ultima_validacao) + (l.versao_conector ? ` · versão ${escapeHtml(l.versao_conector)}` : '') : 'nunca')}
         ${fichaLinha('Observações', escapeHtml(l.observacoes || ''))}
       </div>`, null, 'ficha-caixa-larga'),

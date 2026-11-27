@@ -94,6 +94,9 @@ solicitante_email, usuario_hash, maquina_hash, aprovacao_cliente, aprovado_por_u
 
 - **Aprovação do gestor**: `licencas.chamados_exigem_aprovacao` (padrão `true`, checkbox no modal da licença).
   Exige → o chamado nasce `aprovacao_cliente = 'pendente'`; não exige → nasce `'aprovado'`.
+  **Licença de vaga** (`vaga_id` e `usuario_id` preenchidos, desde v9.0): o pedido do próprio usuário já é a
+  aprovação. O chamado nasce `'aprovado'`, com `aprovado_por_usuario_id` = usuário da vaga e `data_aprovacao` =
+  abertura (SLA conta dali), e vai direto para a fila da fábrica. A regra do gestor vale só para licença sem usuário.
   Chamados antigos (portal/painel) ficam com `origem` e `aprovacao_cliente` NULL e funcionam como antes.
 - **SLA**: pendente não conta prazo (`sla = null`); aprovado conta a partir de `data_aprovacao`.
 - **Fila da fábrica ABAP**: aprovados com status aberto/em andamento, mais antigos primeiro.
