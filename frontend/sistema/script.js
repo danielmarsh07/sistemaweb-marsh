@@ -2320,7 +2320,8 @@ async function loadChamados() {
           : ch.sid ? `<div class="cc-selos-linha"><span class="cc-selo" title="Servidor SAP">${escapeHtml(ch.sid)}${ch.modulo ? ` · ${escapeHtml(ch.modulo)}` : ''}</span></div>` : ''}
         ${auditMeta(ch)}
       </td>
-      <td data-label="Cliente">${escapeHtml(ch.cliente_nome || '-')}</td>
+      <td data-label="Cliente">${escapeHtml(ch.cliente_nome || '-')}${ch.quem_abriu_nome
+        ? `<br><small class="ch-quem-abriu" title="Quem abriu o chamado">Aberto por ${escapeHtml(ch.quem_abriu_nome)}</small>` : ''}</td>
       <td data-label="Tecnologia">${escapeHtml(ch.tecnologia_nome || '-')}</td>
       <td data-label="Status">${badgeStatus(ch.status)}${badgeSlaInline(ch.sla)}</td>
       <td data-label="Prioridade">${badgePrioridade(ch.prioridade)}${ch.avaliacao_nota ? `<br><small style="color:#f59e0b">${'★'.repeat(ch.avaliacao_nota)}</small>` : ''}</td>
@@ -2361,7 +2362,8 @@ async function popularSelectSolicitantesChamados() {
     const atual = sel.value;
     const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
     sel.innerHTML = '<option value="">Todas as pessoas</option>' + pessoas.map(p =>
-      `<option value="${escapeHtml(p.email)}" title="${escapeHtml(p.email)}">${escapeHtml(p.nome || p.email)} · ` +
+      `<option value="${escapeHtml(p.email)}" title="${p.email.startsWith('nome:') ? 'Sem e-mail cadastrado' : escapeHtml(p.email)}">` +
+      `${escapeHtml(p.nome || p.email.replace(/^nome:/, ''))} · ` +
       `${plural(p.abertos, 'aberto', 'abertos')} · ${plural(p.fechados, 'fechado', 'fechados')}</option>`).join('');
     if (atual) sel.value = atual;
     sel.style.display = '';

@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v9.3', data: '2026-11-27', destaques: [
+      'Chamados: a lista mostra, embaixo do cliente, quem abriu cada chamado',
+      'Filtro por quem abriu agora inclui os chamados do Conector SAP abertos sem e-mail (pela pessoa da vaga da licença ou pelo cadastro com o mesmo nome no cliente)',
+    ] },
     { versao: 'v9.2', data: '2026-11-27', destaques: [
       'Chamados: novo filtro por quem abriu o chamado, com todas as pessoas que já abriram chamado (pelo portal ou pelo Conector SAP) e quantos estão em aberto e fechados de cada uma',
     ] },

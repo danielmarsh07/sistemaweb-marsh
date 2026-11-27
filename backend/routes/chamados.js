@@ -94,10 +94,27 @@ async function buscarChamadoCompleto(id, empresa_id) {
   return r.rows[0] || null;
 }
 
-// Quem abriu o chamado, identificado pelo e-mail: o usuário do portal (aberto_por_usuario_id) ou, no chamado
-// do Conector (aberto_por NULL), o solicitante informado. O mesmo e-mail junta as duas origens numa pessoa só.
-const SQL_EMAIL_PESSOA = `LOWER(TRIM(COALESCE((SELECT u.email FROM usuarios u WHERE u.id = ch.aberto_por_usuario_id),
-  ch.solicitante_email)))`;
+// Quem abriu o chamado. Chave da pessoa (e-mail, nessa ordem): o usuário do portal (aberto_por_usuario_id), o
+// e-mail do solicitante, o usuário da vaga da licença do Conector (o Conector grava aberto_por NULL e quase
+// nunca o e-mail), o usuário do MESMO cliente com exatamente o nome do solicitante (só se for um único - licença
+// sem vaga vinculada) e, sem nenhum e-mail, 'nome:<nome do solicitante>'. O mesmo e-mail junta portal e Conector.
+const SQL_EMAIL_VAGA = `(SELECT lu.email FROM licencas l JOIN usuarios lu ON lu.id = l.usuario_id WHERE l.id = ch.licenca_id)`;
+const SQL_EMAIL_MESMO_NOME = `(SELECT MIN(un.email) FROM usuarios un WHERE un.cliente_id = ch.cliente_id AND un.ativo = TRUE
+  AND LOWER(TRIM(un.nome)) = LOWER(TRIM(ch.solicitante_nome)) HAVING COUNT(*) = 1)`;
+const SQL_CHAVE_PESSOA = `LOWER(TRIM(COALESCE(
+  (SELECT u.email FROM usuarios u WHERE u.id = ch.aberto_por_usuario_id),
+  NULLIF(TRIM(ch.solicitante_email), ''),
+  ${SQL_EMAIL_VAGA},
+  ${SQL_EMAIL_MESMO_NOME},
+  'nome:' || NULLIF(TRIM(ch.solicitante_nome), ''))))`;
+// Nome de quem abriu: o do usuário do portal; o do solicitante que informou e-mail; o da vaga; o do solicitante.
+const SQL_NOME_PESSOA = `COALESCE(
+  (SELECT u.nome FROM usuarios u WHERE u.id = ch.aberto_por_usuario_id),
+  CASE WHEN NULLIF(TRIM(ch.solicitante_email), '') IS NOT NULL THEN NULLIF(TRIM(ch.solicitante_nome), '') END,
+  (SELECT lu.nome FROM licencas l JOIN usuarios lu ON lu.id = l.usuario_id WHERE l.id = ch.licenca_id),
+  (SELECT MIN(un.nome) FROM usuarios un WHERE un.cliente_id = ch.cliente_id AND un.ativo = TRUE
+    AND LOWER(TRIM(un.nome)) = LOWER(TRIM(ch.solicitante_nome)) HAVING COUNT(*) = 1),
+  NULLIF(TRIM(ch.solicitante_nome), ''))`;
 
 // GET - Listar chamados (cliente vê só os seus; admin vê todos)
 // Suporta: status, prioridade, cliente_id, busca (texto), data_de, data_ate, page, limit, ordem, direcao,
@@ -132,7 +149,7 @@ router.get('/', async (req, res) => {
     if (prioridade) { where += ` AND ch.prioridade = $${idx++}`; whereParams.push(prioridade); }
     if (!isCliente && cliente_id) { where += ` AND ch.cliente_id = $${idx++}`; whereParams.push(cliente_id); }
     if (!isCliente && !req.soProprios && solicitante) {
-      where += ` AND ${SQL_EMAIL_PESSOA} = $${idx++}`; whereParams.push(solicitante);
+      where += ` AND ${SQL_CHAVE_PESSOA} = $${idx++}`; whereParams.push(solicitante);
     }
     if (data_de) { where += ` AND ch.data_criacao >= $${idx++}::date`; whereParams.push(data_de); }
     if (data_ate) { where += ` AND ch.data_criacao < ($${idx++}::date + INTERVAL '1 day')`; whereParams.push(data_ate); }
@@ -167,6 +184,7 @@ router.get('/', async (req, res) => {
         COALESCE(c.razao_social, c.nome) as cliente_nome,
         t.nome as tecnologia_nome,
         u1.nome as aberto_por_nome,
+        ${SQL_NOME_PESSOA} AS quem_abriu_nome,
         u2.nome as atribuido_para_nome,
         u3.nome as atualizado_por_nome,
         (SELECT COUNT(*) FROM atendimentos a WHERE a.chamado_id = ch.id) as total_atendimentos,
@@ -232,7 +250,7 @@ router.get('/fila-conector', async (req, res) => {
 });
 
 // GET - Pessoas que abriram chamado (em aberto ou já fechado), para o filtro "Quem abriu". Só equipe Marsh.
-// Pessoa = e-mail (usuário do portal ou solicitante do Conector); nome = o do chamado mais recente.
+// Pessoa = chave de SQL_CHAVE_PESSOA (e-mail, ou 'nome:<nome>' sem e-mail); nome = o do chamado mais recente.
 // (Antes de /:id.)
 router.get('/solicitantes', async (req, res) => {
   if (req.usuario.tipo === 'cliente' || req.soProprios) {
@@ -246,9 +264,7 @@ router.get('/solicitantes', async (req, res) => {
               COUNT(*) FILTER (WHERE p.status NOT IN ('resolvido', 'fechado'))::int AS abertos,
               COUNT(*) FILTER (WHERE p.status IN ('resolvido', 'fechado'))::int AS fechados,
               COUNT(*)::int AS total
-       FROM (SELECT ${SQL_EMAIL_PESSOA} AS email, ch.status, ch.data_abertura,
-                    NULLIF(TRIM(COALESCE((SELECT u.nome FROM usuarios u WHERE u.id = ch.aberto_por_usuario_id),
-                      ch.solicitante_nome)), '') AS nome
+       FROM (SELECT ${SQL_CHAVE_PESSOA} AS email, ch.status, ch.data_abertura, ${SQL_NOME_PESSOA} AS nome
              FROM chamados ch WHERE ch.empresa_id = $1 AND ch.ativo = TRUE) p
        WHERE p.email IS NOT NULL AND p.email <> ''
        GROUP BY p.email
@@ -485,6 +501,7 @@ router.get('/:id', async (req, res) => {
         COALESCE(c.razao_social, c.nome) as cliente_nome,
         t.nome as tecnologia_nome,
         u1.nome as aberto_por_nome,
+        ${SQL_NOME_PESSOA} AS quem_abriu_nome,
         u2.nome as atribuido_para_nome,
         u3.nome as atualizado_por_nome,
         ua.nome as aprovado_por_nome,
