@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.7', data: '2026-11-27', destaques: [
+      'Conector SAP: quem está numa vaga do contrato recebe sempre os sistemas SAP cadastrados no contrato. Se o contrato muda (por exemplo, do ECC para o S/4HANA), o conector de cada pessoa passa a usar os sistemas novos, sem sobrar sistema antigo',
+    ] },
     { versao: 'v8.6', data: '2026-11-25', destaques: [
       'Conector SAP: o consultor encerra pelo próprio Claude um chamado que ele abriu (entregue e testado, ou que não é mais necessário), informando o motivo; o encerramento aparece no histórico do chamado e o ABAP responsável é avisado',
       'Agente ABAP da Marsh: encerra o chamado do Conector depois de entregue, com o texto da solução, que vai por e-mail só para quem abriu',

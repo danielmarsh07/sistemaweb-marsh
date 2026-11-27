@@ -41,13 +41,25 @@ const RE_FERRAMENTA = /^[a-z_]{1,50}$/;
 
 async function buscarLicenca(chave) {
   if (!/^MRSH-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(String(chave || '').trim())) return null;
+  // Licença de vaga (contrato por vagas): os sistemas SAP valem SEMPRE os do contrato, lidos agora, e não a
+  // cópia guardada na licença. A cópia podia ficar velha (Gabriel, 27/11/2026: licença com o ECC antigo enquanto
+  // o contrato da Multiterminais já tinha só o Rise), e o conector recebia sistemas fora do contrato.
   const r = await pool.query(
-    `SELECT l.*, COALESCE(c.razao_social, c.nome) AS cliente_nome
+    `SELECT l.*, COALESCE(c.razao_social, c.nome) AS cliente_nome, k.conexoes AS contrato_conexoes
      FROM licencas l JOIN clientes c ON c.id = l.cliente_id
+     LEFT JOIN contratos_conector_vagas v ON v.id = l.vaga_id
+     LEFT JOIN contratos_conector k ON k.id = v.contrato_id
      WHERE l.chave_hash = $1 AND l.ativo = TRUE`,
     [hashChave(chave)]
   );
-  return r.rows[0] || null;
+  const l = r.rows[0];
+  if (!l) return null;
+  if (l.vaga_id && Array.isArray(l.contrato_conexoes)) {
+    l.conexoes = l.contrato_conexoes;
+    l.sids = l.contrato_conexoes.map(c => c.sid).join(',');
+  }
+  delete l.contrato_conexoes;
+  return l;
 }
 
 const negar = (res, motivo, erro) => res.status(403).json({ erro, motivo });
