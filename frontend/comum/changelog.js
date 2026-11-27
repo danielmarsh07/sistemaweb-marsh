@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.8', data: '2026-11-27', destaques: [
+      'Portal do cliente: em "Minha licença do Conector SAP", o campo Sistemas SAP mostra só os sistemas liberados no contrato da empresa (os mesmos que o conector usa)',
+    ] },
     { versao: 'v8.7', data: '2026-11-27', destaques: [
       'Conector SAP: quem está numa vaga do contrato recebe sempre os sistemas SAP cadastrados no contrato. Se o contrato muda (por exemplo, do ECC para o S/4HANA), o conector de cada pessoa passa a usar os sistemas novos, sem sobrar sistema antigo',
     ] },

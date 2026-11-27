@@ -75,7 +75,7 @@ router.get('/eu', async (req, res) => {
     const gestor = await cc.ehAdminCorporativo(req.usuario.id, req.usuario.cliente_id);
     const vagas = (await pool.query(
       `SELECT v.id, v.perfil, k.id AS contrato_id, to_char(k.data_fim, 'YYYY-MM-DD') AS data_fim,
-              (${cc.VAGA_VIGENTE}) AS vigente
+              (${cc.VAGA_VIGENTE}) AS vigente, k.conexoes AS contrato_conexoes
        FROM contratos_conector_vagas v JOIN contratos_conector k ON k.id = v.contrato_id
        WHERE v.usuario_id = $1 AND v.ativo AND k.status <> 'cancelado' ORDER BY v.id`, [req.usuario.id])).rows;
     for (const v of vagas) {
@@ -90,6 +90,10 @@ router.get('/eu', async (req, res) => {
                   ORDER BY a.primeira_ativacao DESC LIMIT 1) AS maquina_nome
          FROM licencas l WHERE l.vaga_id = $1 AND l.usuario_id = $2`, [v.id, req.usuario.id])).rows[0];
       v.licenca = cert.licencaParaPortal(l);
+      // Sistemas SAP da licença = os do contrato (os que o conector recebe), nunca a cópia antiga da licença
+      const sidsContrato = (Array.isArray(v.contrato_conexoes) ? v.contrato_conexoes : []).map(c => c.sid).filter(Boolean);
+      if (v.licenca) v.licenca.sids = sidsContrato.join(',');
+      delete v.contrato_conexoes;
     }
     const aprova_chamados = !!(await pool.query(
       'SELECT aprova_chamados_conector FROM usuarios WHERE id = $1', [req.usuario.id])).rows[0]?.aprova_chamados_conector;
