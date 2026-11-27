@@ -22,6 +22,11 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v8.9', data: '2026-11-27', destaques: [
+      'Chamados ABAP internos: o consultor da Marsh abre pelo Claude um chamado no cliente, no próprio nome, registra cada ajuste com a request SAP usada e encerra, sem enviar e-mail',
+      'Chamados internos aparecem no filtro "Manual" da lista de chamados',
+      'Request SAP do Rise (com letras, ex.: PRDK9Y020H) aceita no preparo do Agente ABAP',
+    ] },
     { versao: 'v8.8', data: '2026-11-27', destaques: [
       'Portal do cliente: em "Minha licença do Conector SAP", o campo Sistemas SAP mostra só os sistemas liberados no contrato da empresa (os mesmos que o conector usa)',
     ] },

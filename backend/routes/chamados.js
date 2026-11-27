@@ -127,7 +127,8 @@ router.get('/', async (req, res) => {
     if (data_de) { where += ` AND ch.data_criacao >= $${idx++}::date`; whereParams.push(data_de); }
     if (data_ate) { where += ` AND ch.data_criacao < ($${idx++}::date + INTERVAL '1 day')`; whereParams.push(data_ate); }
     if (origem === 'conector') where += ` AND ch.origem = 'conector'`;
-    if (origem === 'manual') where += ' AND ch.origem IS NULL';
+    // Chamado ABAP interno (aberto pelo consultor Marsh pelo Claude) conta como manual
+    if (origem === 'manual') where += ` AND (ch.origem IS NULL OR ch.origem = 'interno')`;
     if (['pendente', 'aprovado', 'recusado'].includes(aprovacao)) {
       where += ` AND ch.aprovacao_cliente = $${idx++}`; whereParams.push(aprovacao);
     }

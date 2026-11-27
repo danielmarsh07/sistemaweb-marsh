@@ -9,6 +9,11 @@
  *                                       grava (ou substitui) a análise interna e avisa os administradores por e-mail
  *   GET  /chamados/preparar             chamados com request SAP informada e sem preparo para ela
  *   POST /chamados/:id/preparo          { request, preparo (markdown) } preparo interno do desenvolvimento
+ *   GET  /clientes                      clientes ativos (onde abrir chamado interno)
+ *   POST /chamados/interno              chamado ABAP aberto pelo consultor Marsh no próprio nome (origem 'interno')
+ *   POST /chamados/:id/andamento        ajuste feito + request na timeline (sem e-mail)
+ *   POST /chamados/:id/encerrar-interno encerra o chamado interno (sem e-mail)
+ *   GET  /chamados/internos             chamados internos do autor (abertos; todos=true para todos)
  * /api/agente (login da equipe):
  *   GET|POST /chaves, DELETE /chaves/:id   (administrador) a chave aparece em texto só na criação
  *   GET  /chamados/:id/analise          análise interna, rascunho/resposta enviada e preparo (a equipe vê; o cliente nunca)
@@ -26,7 +31,8 @@ const ehAdmin = t => t === 'admin_empresa' || t === 'admin_sistema';
 const COMPLEXIDADES = ['baixa', 'media', 'alta'];
 const STATUS_ABERTOS = ['aberto', 'em_andamento', 'aguardando_cliente'];
 const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const RE_REQUEST = /^[A-Z0-9]{3}K\d{6}$/;
+// Request SAP: <SID>K + 6 caracteres (ECC UPDK955200; Rise PRDK9Y020H, com letras)
+const RE_REQUEST = /^[A-Z0-9]{3}K[A-Z0-9]{6}$/;
 const textoOpcional = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 
 // ============================== SERVIÇO (chave do agente) ==============================
@@ -225,6 +231,205 @@ servico.post('/chamados/:id/preparo', async (req, res) => {
     res.json({ mensagem: `Preparo do chamado #${ch.id} gravado.` });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao gravar o preparo', detalhe: err.message });
+  }
+});
+
+// ============================== CHAMADOS INTERNOS (chave do agente) ==============================
+// O consultor da Marsh abre pelo Claude (Conector SAP em modo interno) um chamado ABAP no cliente, no PRÓPRIO
+// nome, e registra cada ajuste feito (o que mudou + request SAP). origem 'interno': não passa por aprovação do
+// gestor, não entra na fila de análise do agente e não envia e-mail — fica na timeline do chamado (o cliente vê
+// no portal). Autor e responsável = usuário da equipe indicado por autor_email (mesma empresa da chave).
+const TIPOS_INTERNO = ['melhoria', 'erro', 'nova_funcionalidade', 'duvida'];
+const MODULOS_INTERNO = ['FI', 'CO', 'SD', 'MM', 'PP', 'PM', 'QM', 'HR', 'BASIS', 'ABAP', 'CPI', 'FISCAL', 'OUTRO'];
+const PRIORIDADES_INTERNO = ['baixa', 'media', 'alta', 'critica'];
+const RE_SID = /^[A-Z0-9]{3}$/;
+
+async function autorInterno(req) {
+  const emailAutor = String(req.body?.autor_email || '').trim().toLowerCase();
+  if (!RE_EMAIL.test(emailAutor)) return null;
+  return (await pool.query(
+    `SELECT id, nome FROM usuarios WHERE LOWER(email) = $1 AND empresa_id = $2 AND ativo = TRUE
+       AND COALESCE(tipo, '') <> 'cliente' AND cliente_id IS NULL`, [emailAutor, req.agente.empresa_id])).rows[0] || null;
+}
+
+async function chamadoInterno(req) {
+  return (await pool.query(
+    `SELECT * FROM chamados WHERE id = $1 AND empresa_id = $2 AND origem = 'interno' AND ativo = TRUE`,
+    [req.params.id, req.agente.empresa_id])).rows[0] || null;
+}
+
+// GET /clientes — clientes ativos da empresa (para escolher onde abrir o chamado)
+servico.get('/clientes', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, nome, razao_social FROM clientes WHERE empresa_id = $1 AND COALESCE(ativo, TRUE) = TRUE ORDER BY nome`,
+      [req.agente.empresa_id]);
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao listar clientes', detalhe: err.message });
+  }
+});
+
+// POST /chamados/interno — { autor_email, cliente (id ou nome), titulo, tipo, modulo, prioridade?, pedido,
+//   especificacao?, objetos?: [{tipo, nome}], sid?, request? }
+servico.post('/chamados/interno', async (req, res) => {
+  const b = req.body || {};
+  const titulo = typeof b.titulo === 'string' ? b.titulo.trim() : '';
+  const tipo = String(b.tipo || '').trim().toLowerCase();
+  const modulo = String(b.modulo || '').trim().toUpperCase();
+  const prioridade = String(b.prioridade || 'media').trim().toLowerCase();
+  const pedido = typeof b.pedido === 'string' ? b.pedido.trim() : '';
+  const especificacao = textoOpcional(b.especificacao, 200000);
+  const sid = String(b.sid || '').trim().toUpperCase();
+  const request = String(b.request || '').trim().toUpperCase();
+  if (titulo.length < 5 || titulo.length > 200) return res.status(400).json({ erro: 'titulo: de 5 a 200 caracteres.' });
+  if (!TIPOS_INTERNO.includes(tipo)) return res.status(400).json({ erro: `tipo deve ser um de: ${TIPOS_INTERNO.join(', ')}.` });
+  if (!MODULOS_INTERNO.includes(modulo)) return res.status(400).json({ erro: `modulo deve ser um de: ${MODULOS_INTERNO.join(', ')}.` });
+  if (!PRIORIDADES_INTERNO.includes(prioridade)) return res.status(400).json({ erro: `prioridade deve ser uma de: ${PRIORIDADES_INTERNO.join(', ')}.` });
+  if (pedido.length < 5 || pedido.length > 20000) return res.status(400).json({ erro: 'pedido: de 5 a 20.000 caracteres.' });
+  if (sid && !RE_SID.test(sid)) return res.status(400).json({ erro: 'sid inválido (ex.: PRD).' });
+  if (request && !RE_REQUEST.test(request)) return res.status(400).json({ erro: 'request inválida (ex.: PRDK9Y020H).' });
+  const objetos = [];
+  for (const o of Array.isArray(b.objetos) ? b.objetos.slice(0, 100) : []) {
+    const nome = String(o?.nome || '').trim().toUpperCase();
+    if (/^[A-Z0-9_/]{1,60}$/.test(nome)) objetos.push({ tipo: String(o?.tipo || '').trim().toUpperCase().slice(0, 10), nome });
+  }
+  try {
+    const autor = await autorInterno(req);
+    if (!autor) return res.status(400).json({ erro: 'autor_email não é um usuário ativo da equipe Marsh.' });
+    const ref = String(b.cliente ?? '').trim();
+    if (!ref) return res.status(400).json({ erro: 'cliente obrigatório (id ou nome).' });
+    const clientes = (await pool.query(
+      `SELECT id, nome, razao_social FROM clientes WHERE empresa_id = $1 AND COALESCE(ativo, TRUE) = TRUE
+         AND (CAST(id AS TEXT) = $2 OR nome ILIKE $3 OR razao_social ILIKE $3) ORDER BY id LIMIT 5`,
+      [req.agente.empresa_id, ref, `%${ref.replace(/[%_\\]/g, '\\$&')}%`])).rows;
+    const exato = clientes.find(c => String(c.id) === ref);
+    if (!exato && clientes.length !== 1) {
+      return res.status(400).json({ erro: clientes.length ? `Cliente ambíguo: ${clientes.map(c => `${c.id} ${c.nome}`).join('; ')}` : 'Cliente não encontrado.' });
+    }
+    const cli = exato || clientes[0];
+    const descricao = especificacao ? `${pedido}\n\n---\n\n${especificacao}` : pedido;
+    const client = await pool.connect();
+    let chamado;
+    try {
+      await client.query('BEGIN');
+      chamado = (await client.query(
+        `INSERT INTO chamados (empresa_id, cliente_id, aberto_por_usuario_id, atribuido_para_usuario_id, titulo, descricao,
+           prioridade, categoria, status, ativo, origem, sid, modulo, tipo_demanda, pedido_original, especificacao,
+           objetos_sap, solicitante_nome, request_sap, request_sap_em, request_sap_por_usuario_id)
+         VALUES ($1, $2, $3, $3, $4, $5, $6, 'ABAP', 'em_andamento', TRUE, 'interno', $7, $8, $9, $10, $11, $12::jsonb, $13,
+           $14::varchar, CASE WHEN $14::varchar IS NULL THEN NULL ELSE NOW() END, CASE WHEN $14::varchar IS NULL THEN NULL ELSE $3::int END)
+         RETURNING *`,
+        [req.agente.empresa_id, cli.id, autor.id, titulo, descricao, prioridade, sid || null, modulo, tipo, pedido,
+         especificacao, JSON.stringify(objetos), autor.nome, request || null])).rows[0];
+      await client.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, $3, NULL, 'em_andamento', $4)`,
+        [chamado.id, chamado.empresa_id, autor.id, `Chamado ABAP aberto por ${autor.nome} (Claude, Conector SAP interno)`]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    res.status(201).json({ id: chamado.id, numero: `#${chamado.id}`, status: chamado.status,
+      cliente: cli.razao_social || cli.nome, mensagem: `Chamado #${chamado.id} aberto em ${cli.nome} no nome de ${autor.nome}.` });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao abrir o chamado interno', detalhe: err.message });
+  }
+});
+
+// POST /chamados/:id/andamento — { autor_email, texto, request?, tempo_minutos? } registra o ajuste na timeline
+// (sem e-mail). Com request, ela passa a ser a request do chamado.
+servico.post('/chamados/:id/andamento', async (req, res) => {
+  const texto = typeof req.body?.texto === 'string' ? req.body.texto.trim() : '';
+  const request = String(req.body?.request || '').trim().toUpperCase();
+  const minutos = Number.isInteger(req.body?.tempo_minutos) && req.body.tempo_minutos >= 0 && req.body.tempo_minutos <= 6000
+    ? req.body.tempo_minutos : 0;
+  if (texto.length < 10 || texto.length > 20000) return res.status(400).json({ erro: 'texto: de 10 a 20.000 caracteres.' });
+  if (request && !RE_REQUEST.test(request)) return res.status(400).json({ erro: 'request inválida (ex.: PRDK9Y020H).' });
+  try {
+    const autor = await autorInterno(req);
+    if (!autor) return res.status(400).json({ erro: 'autor_email não é um usuário ativo da equipe Marsh.' });
+    const ch = await chamadoInterno(req);
+    if (!ch) return res.status(404).json({ erro: 'Chamado interno não encontrado.' });
+    if (ch.status === 'resolvido' || ch.status === 'fechado') {
+      return res.status(409).json({ erro: `O chamado #${ch.id} já está encerrado (${ch.status}).` });
+    }
+    const descricao = request ? `${texto}\n\nRequest SAP: ${request}` : texto;
+    const at = (await pool.query(
+      `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, tempo_gasto_minutos, data_atendimento)
+       VALUES ($1, $2, 'comentario', $3, $4, NOW()) RETURNING id`, [ch.id, autor.id, descricao, minutos])).rows[0];
+    await pool.query(
+      `UPDATE chamados SET data_atualizacao = NOW(), atualizado_por_usuario_id = $2,
+         request_sap = COALESCE($3::varchar, request_sap),
+         request_sap_em = CASE WHEN $3::varchar IS NULL THEN request_sap_em ELSE NOW() END,
+         request_sap_por_usuario_id = CASE WHEN $3::varchar IS NULL THEN request_sap_por_usuario_id ELSE $2::int END
+       WHERE id = $1`, [ch.id, autor.id, request || null]);
+    res.status(201).json({ id: at.id, mensagem: `Andamento registrado no chamado #${ch.id}${request ? ` (request ${request})` : ''}.` });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao registrar o andamento', detalhe: err.message });
+  }
+});
+
+// POST /chamados/:id/encerrar-interno — { autor_email, texto } encerra o chamado interno (sem e-mail)
+servico.post('/chamados/:id/encerrar-interno', async (req, res) => {
+  const texto = typeof req.body?.texto === 'string' ? req.body.texto.trim() : '';
+  if (texto.length < 10 || texto.length > 20000) return res.status(400).json({ erro: 'texto: de 10 a 20.000 caracteres.' });
+  try {
+    const autor = await autorInterno(req);
+    if (!autor) return res.status(400).json({ erro: 'autor_email não é um usuário ativo da equipe Marsh.' });
+    const ch = await chamadoInterno(req);
+    if (!ch) return res.status(404).json({ erro: 'Chamado interno não encontrado.' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const up = await client.query(
+        `UPDATE chamados SET status = 'fechado', data_fechamento = NOW(), atualizado_por_usuario_id = $2, data_atualizacao = NOW()
+         WHERE id = $1 AND status NOT IN ('resolvido', 'fechado') RETURNING id`, [ch.id, autor.id]);
+      if (!up.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ erro: `O chamado #${ch.id} já está encerrado.` });
+      }
+      await client.query(
+        `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, data_atendimento)
+         VALUES ($1, $2, 'fechamento', $3, NOW())`, [ch.id, autor.id, texto]);
+      await client.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, $3, $4, 'fechado', $5)`,
+        [ch.id, ch.empresa_id, autor.id, ch.status, `Encerrado por ${autor.nome} (Claude, Conector SAP interno)`]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    res.json({ mensagem: `Chamado #${ch.id} encerrado.`, status: 'fechado' });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao encerrar o chamado interno', detalhe: err.message });
+  }
+});
+
+// GET /chamados/internos?autor_email=&todos= — chamados internos abertos (ou todos) do autor
+servico.get('/chamados/internos', async (req, res) => {
+  try {
+    req.body = { autor_email: req.query.autor_email };
+    const autor = await autorInterno(req);
+    if (!autor) return res.status(400).json({ erro: 'autor_email não é um usuário ativo da equipe Marsh.' });
+    const todos = req.query.todos === 'true';
+    const r = await pool.query(
+      `SELECT ch.id, ch.titulo, ch.status, ch.prioridade, ch.modulo, ch.tipo_demanda, ch.sid, ch.request_sap,
+              ch.data_abertura, ch.data_fechamento, COALESCE(cl.razao_social, cl.nome) AS cliente,
+              (SELECT COUNT(*)::int FROM atendimentos a WHERE a.chamado_id = ch.id) AS andamentos
+       FROM chamados ch JOIN clientes cl ON cl.id = ch.cliente_id
+       WHERE ch.empresa_id = $1 AND ch.origem = 'interno' AND ch.ativo = TRUE AND ch.aberto_por_usuario_id = $2
+         ${todos ? '' : `AND ch.status NOT IN ('resolvido', 'fechado')`}
+       ORDER BY ch.id DESC LIMIT 100`, [req.agente.empresa_id, autor.id]);
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao listar os chamados internos', detalhe: err.message });
   }
 });
 
