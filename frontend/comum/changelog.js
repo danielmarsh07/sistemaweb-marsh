@@ -22,6 +22,9 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v9.2', data: '2026-11-27', destaques: [
+      'Chamados: novo filtro por quem abriu o chamado, com todas as pessoas que já abriram chamado (pelo portal ou pelo Conector SAP) e quantos estão em aberto e fechados de cada uma',
+    ] },
     { versao: 'v9.1', data: '2026-11-27', destaques: [
       'Chamados ABAP internos: o consultor da Marsh muda pelo Claude o status do chamado entre aberto, em andamento e aguardando cliente, com o motivo na linha do tempo e sem enviar e-mail',
     ] },

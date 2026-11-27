@@ -94,14 +94,21 @@ async function buscarChamadoCompleto(id, empresa_id) {
   return r.rows[0] || null;
 }
 
+// Quem abriu o chamado, identificado pelo e-mail: o usuário do portal (aberto_por_usuario_id) ou, no chamado
+// do Conector (aberto_por NULL), o solicitante informado. O mesmo e-mail junta as duas origens numa pessoa só.
+const SQL_EMAIL_PESSOA = `LOWER(TRIM(COALESCE((SELECT u.email FROM usuarios u WHERE u.id = ch.aberto_por_usuario_id),
+  ch.solicitante_email)))`;
+
 // GET - Listar chamados (cliente vê só os seus; admin vê todos)
 // Suporta: status, prioridade, cliente_id, busca (texto), data_de, data_ate, page, limit, ordem, direcao,
-//          origem (conector | manual), aprovacao (pendente | aprovado | recusado)
+//          origem (conector | manual), aprovacao (pendente | aprovado | recusado),
+//          solicitante (e-mail de quem abriu; só equipe Marsh - lista em GET /chamados/solicitantes)
 router.get('/', async (req, res) => {
   const empresa_id = req.usuario.empresa_id || 1;
   const usuario_id = req.usuario.id;
   const isCliente = req.usuario.tipo === 'cliente';
   const { status, prioridade, cliente_id, busca, data_de, data_ate, origem, aprovacao } = req.query;
+  const solicitante = String(req.query.solicitante || '').trim().toLowerCase();
 
   // Paginação (default: page=1, limit=50, max=200)
   const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -124,6 +131,9 @@ router.get('/', async (req, res) => {
     if (status) { where += ` AND ch.status = $${idx++}`; whereParams.push(status); }
     if (prioridade) { where += ` AND ch.prioridade = $${idx++}`; whereParams.push(prioridade); }
     if (!isCliente && cliente_id) { where += ` AND ch.cliente_id = $${idx++}`; whereParams.push(cliente_id); }
+    if (!isCliente && !req.soProprios && solicitante) {
+      where += ` AND ${SQL_EMAIL_PESSOA} = $${idx++}`; whereParams.push(solicitante);
+    }
     if (data_de) { where += ` AND ch.data_criacao >= $${idx++}::date`; whereParams.push(data_de); }
     if (data_ate) { where += ` AND ch.data_criacao < ($${idx++}::date + INTERVAL '1 day')`; whereParams.push(data_ate); }
     if (origem === 'conector') where += ` AND ch.origem = 'conector'`;
@@ -218,6 +228,35 @@ router.get('/fila-conector', async (req, res) => {
     res.json(r.rows.map(ch => ({ ...ch, numero: `#${ch.id}`, sla: calcularSla(ch) })));
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao buscar a fila do conector', detalhe: err.message });
+  }
+});
+
+// GET - Pessoas que abriram chamado (em aberto ou já fechado), para o filtro "Quem abriu". Só equipe Marsh.
+// Pessoa = e-mail (usuário do portal ou solicitante do Conector); nome = o do chamado mais recente.
+// (Antes de /:id.)
+router.get('/solicitantes', async (req, res) => {
+  if (req.usuario.tipo === 'cliente' || req.soProprios) {
+    return res.status(403).json({ erro: 'Acesso restrito à equipe Marsh.' });
+  }
+  const empresa_id = req.usuario.empresa_id || 1;
+  try {
+    const r = await pool.query(
+      `SELECT p.email,
+              (ARRAY_AGG(p.nome ORDER BY p.data_abertura DESC NULLS LAST) FILTER (WHERE p.nome IS NOT NULL))[1] AS nome,
+              COUNT(*) FILTER (WHERE p.status NOT IN ('resolvido', 'fechado'))::int AS abertos,
+              COUNT(*) FILTER (WHERE p.status IN ('resolvido', 'fechado'))::int AS fechados,
+              COUNT(*)::int AS total
+       FROM (SELECT ${SQL_EMAIL_PESSOA} AS email, ch.status, ch.data_abertura,
+                    NULLIF(TRIM(COALESCE((SELECT u.nome FROM usuarios u WHERE u.id = ch.aberto_por_usuario_id),
+                      ch.solicitante_nome)), '') AS nome
+             FROM chamados ch WHERE ch.empresa_id = $1 AND ch.ativo = TRUE) p
+       WHERE p.email IS NOT NULL AND p.email <> ''
+       GROUP BY p.email
+       ORDER BY LOWER(COALESCE((ARRAY_AGG(p.nome ORDER BY p.data_abertura DESC NULLS LAST) FILTER (WHERE p.nome IS NOT NULL))[1], p.email))`,
+      [empresa_id]);
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao listar quem abriu chamados', detalhe: err.message });
   }
 });
 

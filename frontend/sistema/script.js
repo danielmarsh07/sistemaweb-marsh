@@ -2271,15 +2271,18 @@ async function loadChamados() {
   const dataDe = document.getElementById('filtro-chamados-data-de')?.value || '';
   const dataAte = document.getElementById('filtro-chamados-data-ate')?.value || '';
   const origem = document.getElementById('filtro-chamados-origem')?.value || '';
+  const solicitante = document.getElementById('filtro-chamados-solicitante')?.value || '';
 
-  // popula select de clientes (uma vez)
+  // popula select de clientes (uma vez) e o de quem abriu (contagens atualizadas a cada carga)
   await popularSelectClientesChamados();
+  await popularSelectSolicitantesChamados();
 
   const params = new URLSearchParams();
   if (status) params.set('status', status);
   if (prioridade) params.set('prioridade', prioridade);
   if (busca) params.set('busca', busca);
   if (clienteId) params.set('cliente_id', clienteId);
+  if (solicitante) params.set('solicitante', solicitante);
   if (dataDe) params.set('data_de', dataDe);
   if (dataAte) params.set('data_ate', dataAte);
   // Origem: conector | manual; "pendente"/"aprovado" = conector com aquela situação da aprovação do cliente
@@ -2343,6 +2346,25 @@ async function popularSelectClientesChamados() {
     sel.innerHTML = '<option value="">Todos os clientes</option>' +
       _clientesChamadosCache.map(c => `<option value="${c.id}">${escapeHtml(c.razao_social || c.nome)}</option>`).join('');
     if (atual) sel.value = atual;
+  } catch (e) { /* silencioso */ }
+}
+
+// Filtro "Quem abriu": pessoas com chamado em aberto ou já fechado (portal ou Conector SAP), com as contagens.
+// Só a equipe Marsh recebe a lista; para quem não pode ver, o select fica escondido.
+async function popularSelectSolicitantesChamados() {
+  const sel = document.getElementById('filtro-chamados-solicitante');
+  if (!sel) return;
+  try {
+    const r = await apiFetch(`${API_URL}/chamados/solicitantes`);
+    if (!r || !r.ok) { sel.style.display = 'none'; return; }
+    const pessoas = await r.json();
+    const atual = sel.value;
+    const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+    sel.innerHTML = '<option value="">Todas as pessoas</option>' + pessoas.map(p =>
+      `<option value="${escapeHtml(p.email)}" title="${escapeHtml(p.email)}">${escapeHtml(p.nome || p.email)} · ` +
+      `${plural(p.abertos, 'aberto', 'abertos')} · ${plural(p.fechados, 'fechado', 'fechados')}</option>`).join('');
+    if (atual) sel.value = atual;
+    sel.style.display = '';
   } catch (e) { /* silencioso */ }
 }
 
