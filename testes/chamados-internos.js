@@ -80,6 +80,23 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
     const lista = Array.isArray(ad.body) ? ad.body : (ad.body?.chamados || ad.body?.dados || []);
     ok(ad.status === 200 && lista.some(c => c.id === id), 'equipe vê o chamado interno no filtro manual');
 
+    // Mudar status (aberto / em_andamento / aguardando_cliente)
+    const st = `/agente-servico/chamados/${id}/status-interno`;
+    ok((await api(chave, st, 'POST', { autor_email: emailTec, status: 'fechado' })).status === 400, '! status fechado pela rota de status -> 400');
+    ok((await api(chave, st, 'POST', { autor_email: emailCli, status: 'aberto' })).status === 400, '! status por usuário cliente -> 400');
+    ok((await api(chave, `/agente-servico/chamados/${conector}/status-interno`, 'POST', { autor_email: emailTec, status: 'aberto' })).status === 404,
+      '! status em chamado do Conector -> 404');
+    const sa = await api(chave, st, 'POST', { autor_email: emailTec, status: 'aberto', texto: 'Aguardando priorização do Daniel.' });
+    ok(sa.status === 200 && sa.body.status === 'aberto', `muda para aberto (${sa.status})`);
+    ok((await pool.query('SELECT status FROM chamados WHERE id = $1', [id])).rows[0].status === 'aberto', 'status aberto gravado');
+    const lg = (await pool.query(`SELECT * FROM chamados_status_log WHERE chamado_id = $1 ORDER BY id DESC LIMIT 1`, [id])).rows[0];
+    ok(lg && lg.status_anterior === 'em_andamento' && lg.status_novo === 'aberto' && lg.usuario_id === tecnico, 'log de status em_andamento -> aberto');
+    ok((await pool.query(`SELECT COUNT(*)::int AS n FROM atendimentos WHERE chamado_id = $1 AND descricao = 'Aguardando priorização do Daniel.'`, [id])).rows[0].n === 1,
+      'texto do status na timeline');
+    const sr = await api(chave, st, 'POST', { autor_email: emailTec, status: 'aberto' });
+    ok(sr.status === 200 && /já está/.test(sr.body.mensagem), 'mesmo status -> 200 sem mudar');
+    ok((await api(chave, st, 'POST', { autor_email: emailTec, status: 'aguardando_cliente' })).status === 200, 'muda para aguardando_cliente');
+
     const en = await api(chave, `/agente-servico/chamados/${id}/encerrar-interno`, 'POST',
       { autor_email: emailTec, texto: 'Ajuste gravado e testado no PRD Rise.' });
     ok(en.status === 200, `encerra o chamado interno (${en.status})`);
@@ -88,6 +105,8 @@ const ok = (c, msg) => { if (!c) falhas++; console.log(c ? 'OK  ' : 'FAIL', msg)
       '! encerrar de novo -> 409');
     ok((await api(chave, `/agente-servico/chamados/${id}/andamento`, 'POST', { autor_email: emailTec, texto: 'x'.repeat(20) })).status === 409,
       '! andamento em chamado encerrado -> 409');
+    ok((await api(chave, st, 'POST', { autor_email: emailTec, status: 'aberto' })).status === 409,
+      '! status em chamado encerrado -> 409');
 
     await new Promise(r => setTimeout(r, 800));
     const emails = (await pool.query(`SELECT COUNT(*)::int AS n FROM emails_enviados WHERE id > $1 AND assunto LIKE $2`,

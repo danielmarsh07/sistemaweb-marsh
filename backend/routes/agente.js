@@ -13,6 +13,7 @@
  *   POST /chamados/interno              chamado ABAP aberto pelo consultor Marsh no próprio nome (origem 'interno')
  *   POST /chamados/:id/andamento        ajuste feito + request na timeline (sem e-mail)
  *   POST /chamados/:id/encerrar-interno encerra o chamado interno (sem e-mail)
+ *   POST /chamados/:id/status-interno   { status: aberto|em_andamento|aguardando_cliente, texto? } (sem e-mail)
  *   GET  /chamados/internos             chamados internos do autor (abertos; todos=true para todos)
  * /api/agente (login da equipe):
  *   GET|POST /chaves, DELETE /chaves/:id   (administrador) a chave aparece em texto só na criação
@@ -409,6 +410,56 @@ servico.post('/chamados/:id/encerrar-interno', async (req, res) => {
     res.json({ mensagem: `Chamado #${ch.id} encerrado.`, status: 'fechado' });
   } catch (err) {
     res.status(500).json({ erro: 'Erro ao encerrar o chamado interno', detalhe: err.message });
+  }
+});
+
+// POST /chamados/:id/status-interno — { autor_email, status, texto? } muda o status de um chamado interno ainda
+// aberto entre aberto / em_andamento / aguardando_cliente (sem e-mail). Encerrar continua sendo /encerrar-interno.
+// Registra no log de status e, com texto, na timeline.
+servico.post('/chamados/:id/status-interno', async (req, res) => {
+  const status = String(req.body?.status || '').trim().toLowerCase();
+  const texto = typeof req.body?.texto === 'string' ? req.body.texto.trim().slice(0, 20000) : '';
+  if (!STATUS_ABERTOS.includes(status)) {
+    return res.status(400).json({ erro: `status deve ser um de: ${STATUS_ABERTOS.join(', ')} (para encerrar use encerrar-interno).` });
+  }
+  try {
+    const autor = await autorInterno(req);
+    if (!autor) return res.status(400).json({ erro: 'autor_email não é um usuário ativo da equipe Marsh.' });
+    const ch = await chamadoInterno(req);
+    if (!ch) return res.status(404).json({ erro: 'Chamado interno não encontrado.' });
+    if (ch.status === 'resolvido' || ch.status === 'fechado') {
+      return res.status(409).json({ erro: `O chamado #${ch.id} já está encerrado (${ch.status}).` });
+    }
+    if (ch.status === status) return res.json({ mensagem: `O chamado #${ch.id} já está como ${status}.`, status });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const up = await client.query(
+        `UPDATE chamados SET status = $3, atualizado_por_usuario_id = $2, data_atualizacao = NOW()
+         WHERE id = $1 AND status = $4 RETURNING id`, [ch.id, autor.id, status, ch.status]);
+      if (!up.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ erro: `O status do chamado #${ch.id} mudou enquanto isso; tente de novo.` });
+      }
+      if (texto) {
+        await client.query(
+          `INSERT INTO atendimentos (chamado_id, usuario_id, tipo, descricao, data_atendimento)
+           VALUES ($1, $2, 'comentario', $3, NOW())`, [ch.id, autor.id, texto]);
+      }
+      await client.query(
+        `INSERT INTO chamados_status_log (chamado_id, empresa_id, usuario_id, status_anterior, status_novo, observacao)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [ch.id, ch.empresa_id, autor.id, ch.status, status, `Status alterado por ${autor.nome} (Claude, Conector SAP interno)`]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    res.json({ mensagem: `Chamado #${ch.id}: ${ch.status} -> ${status}.`, status });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao mudar o status do chamado interno', detalhe: err.message });
   }
 });
 
