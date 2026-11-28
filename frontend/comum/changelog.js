@@ -22,6 +22,10 @@
 
 (function (raiz) {
   const CHANGELOG = [
+    { versao: 'v9.4', data: '2026-11-27', destaques: [
+      'E-mails do sistema: quando o cliente responde, a resposta chega na caixa da Marsh no domínio marshconsultoria.com.br (antes ia para o noreply e se perdia)',
+      'Remetente, caixa de resposta e e-mail de contato do rodapé e da proposta agora são configuráveis, todos no domínio da Marsh'
+    ] },
     { versao: 'v9.3', data: '2026-11-27', destaques: [
       'Chamados: a lista mostra, embaixo do cliente, quem abriu cada chamado',
       'Filtro por quem abriu agora inclui os chamados do Conector SAP abertos sem e-mail (pela pessoa da vaga da licença ou pelo cadastro com o mesmo nome no cliente)',

@@ -85,6 +85,16 @@ Variáveis (Render → Environment):
 | `INSTAGRAM_API_VERSION` | Versão da API (padrão `v23.0`). |
 | `MARKETING_JOBS` | `off` desliga a rotina de publicação/métricas (testes e ambiente local). |
 
+### E-mail (domínio marshconsultoria.com.br)
+
+Todo envio passa por `backend/services/email.js` (Resend, domínio verificado, retorno pelo subdomínio `send.`) e fica em `emails_enviados`. As caixas que recebem ficam na Locaweb (MX da raiz). Plano completo: `docs/plano-email-dominio.md`. Teste: `node testes/email-dominio.js` (sem banco).
+
+| Variável | Para quê |
+|---|---|
+| `EMAIL_FROM` | Remetente de todo e-mail (padrão `Marsh Consultoria <noreply@marshconsultoria.com.br>`). Precisa ser do domínio verificado no Resend. |
+| `EMAIL_RESPOSTA` | Reply-To quando o envio não define outro (padrão = `EMAIL_CONTATO`). A resposta do consultor no cliente (`email_resposta_marsh`) continua tendo prioridade. |
+| `EMAIL_CONTATO` | Endereço do rodapé dos e-mails e do contato padrão da proposta (padrão `daniel.marsh@marshconsultoria.com.br`). |
+
 ### Ivy (assistente de voz)
 
 Exclusiva do **super usuário** (`usuarios.super_usuario`, o dono do sistema): administradores comuns, técnicos e clientes não veem o botão e a API responde 403. A marca é conferida no banco a cada chamada.

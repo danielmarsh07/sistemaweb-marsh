@@ -1,7 +1,14 @@
 const { Resend } = require('resend');
 const pool = require('../db');
 
-const FROM = 'Marsh Consultoria <noreply@marshconsultoria.com.br>';
+// Endereços do domínio marshconsultoria.com.br (chamado #116), configuráveis no Render -> Environment:
+// EMAIL_FROM     remetente de todo e-mail do portal (Resend, domínio verificado);
+// EMAIL_RESPOSTA caixa da Locaweb que recebe as respostas quando o envio não define outro Reply-To
+//                (sem isso a resposta do cliente ia para o noreply@ e se perdia);
+// EMAIL_CONTATO  endereço mostrado no rodapé dos e-mails e na proposta comercial.
+const FROM = process.env.EMAIL_FROM || 'Marsh Consultoria <noreply@marshconsultoria.com.br>';
+const EMAIL_CONTATO = process.env.EMAIL_CONTATO || 'daniel.marsh@marshconsultoria.com.br';
+const EMAIL_RESPOSTA = process.env.EMAIL_RESPOSTA || EMAIL_CONTATO;
 // PNG (e-mail não mostra SVG no Gmail/Outlook): o mesmo símbolo da tela de login, servido de frontend/comum/img
 const LOGO_URL = `${(process.env.APP_URL || 'https://marshconsultoria.com.br').replace(/\/$/, '')}/img/logo-simbolo-512.png`;
 
@@ -96,7 +103,7 @@ async function enviarSemRegistro({ to, subject, html, cc, replyTo, semAlerta }) 
     const destinatarios = Array.isArray(to) ? to.map(u => (typeof u === 'string' ? u : u.email)) : [to];
     if (!destinatarios.length) return { ok: false, erro: 'sem destinatário' };
     const r = await resend.emails.send({ from: FROM, to: destinatarios, subject, html, ...(cc ? { cc } : {}),
-      ...(replyTo ? { replyTo } : {}) });
+      replyTo: replyTo || EMAIL_RESPOSTA });
     if (r && r.error) throw new Error(r.error.message);
     return { ok: true, erro: null };
   } catch (err) {
@@ -146,7 +153,7 @@ function templateBase({ titulo, preheader, corpo }) {
         <tr><td style="background:#f8fafc;border-radius:0 0 14px 14px;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0">
           <p style="margin:0;color:#64748b;font-size:12px;line-height:1.6">
             Marsh Consultoria · Seu time e a IA trabalhando juntos no SAP<br/>
-            <a href="mailto:daniel.marsh@marshconsultoria.com.br" style="color:#1d6fd8;text-decoration:none">daniel.marsh@marshconsultoria.com.br</a>
+            <a href="mailto:${EMAIL_CONTATO}" style="color:#1d6fd8;text-decoration:none">${EMAIL_CONTATO}</a>
           </p>
         </td></tr>
 

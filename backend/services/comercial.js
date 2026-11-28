@@ -23,7 +23,7 @@ const ORIGENS = {
 const PADRAO_PROPOSTA = {
   prop_razao_social: 'Marsh Consultoria e Desenvolvimento de Sistema LTDA',
   prop_cnpj: '42.567.285/0001-97',
-  prop_contato: 'daniel.marsh@marshconsultoria.com.br · (21) 96780-6718 · Bragança Paulista – SP',
+  prop_contato: (process.env.EMAIL_CONTATO || 'daniel.marsh@marshconsultoria.com.br') + ' · (21) 96780-6718 · Bragança Paulista – SP',
   prop_apresentacao: 'A Marsh Consultoria é especializada em consultoria SAP, integrações com SAP CPI, inteligência artificial aplicada e desenvolvimento de sistemas sob medida. Trabalhamos de forma próxima e orientada a resultado, com suporte contínuo depois da entrega.',
   prop_condicoes_padrao: '• Serviços mensais: faturados todo mês, com nota fiscal, vencimento no dia 10 do mês seguinte.\n• Serviços de valor único: 50% na aprovação e 50% na entrega.\n• Pagamento por transferência bancária ou PIX.\n• Reajuste anual pelo IPCA.',
   prop_validade_dias: 15
